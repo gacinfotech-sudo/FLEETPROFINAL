@@ -74,6 +74,7 @@ import { buildCustomerDriverHistory, buildDriverFeedbackProfile } from "./servic
 import { buildCustomerVehicleHistory, buildVehicleFeedbackProfile } from "./services/vehicleFeedbackService";
 import { DriverLeave, DriverAttendance } from "./models/index";
 import { registerGpsConnectionRoutes } from "./gps/routes/connections";
+import { registerGpsDeviceRoutes } from "./gps/routes/devices";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -266,6 +267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Additive GPS namespace. Existing FleetPro routes and workflows remain
   // authoritative and unchanged.
   registerGpsConnectionRoutes(app);
+  registerGpsDeviceRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({

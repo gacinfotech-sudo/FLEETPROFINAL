@@ -88,6 +88,7 @@ export async function writeGpsConnectionAudit(input: {
   userId: string;
   action: string;
   connectionId: string;
+  deviceId?: string;
   oldValue?: Record<string, unknown>;
   newValue?: Record<string, unknown>;
   reason?: string;

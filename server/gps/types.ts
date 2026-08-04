@@ -33,7 +33,15 @@ export interface GpsProviderDevice {
   deviceName?: string;
   deviceModel?: string;
   providerDeviceType?: string;
+  status?: 'online' | 'offline' | 'inactive' | 'faulty';
   lastSeenAt?: Date;
+  lastLocationAt?: Date;
+  latitude?: number;
+  longitude?: number;
+  batteryLevel?: number;
+  externalPowerConnected?: boolean;
+  gpsSignalAvailable?: boolean;
+  gsmSignalStrength?: number;
   metadata?: Record<string, unknown>;
 }
 

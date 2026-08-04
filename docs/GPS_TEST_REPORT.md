@@ -34,3 +34,14 @@
 - A connection belonging to another tenant returns HTTP 404.
 - `npm run build`: passed with only the pre-existing build warnings.
 - `git diff --check`: passed.
+
+## Phase 3 verification
+
+- GPS registry, connection security and Device Master suites: 7 passed on an isolated database.
+- Provider-normalized device sync is idempotent and rejects duplicate/invalid records.
+- API responses exclude tenant ID and raw provider metadata.
+- Provider device ID is immutable through PATCH.
+- Tenant-scoped unique indexes reject duplicate active provider IDs and IMEIs.
+- Cross-tenant device lookup returns HTTP 404.
+- Undocumented-provider sync returns `configuration_required` without creating a device.
+- `npm run check`, `npm run build` and `git diff --check`: passed.

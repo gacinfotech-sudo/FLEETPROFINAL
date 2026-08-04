@@ -13,6 +13,9 @@ Implemented internal APIs:
 - `POST /api/gps/connections/:connectionId/rotate-credentials`
 - `POST /api/gps/connections/:connectionId/test`
 - `GET /api/gps/connections/:connectionId/logs`
+- `GET/PATCH /api/gps/devices/:deviceId`
+- `GET /api/gps/devices`
+- `POST /api/gps/connections/:connectionId/sync-devices`
 
 | FleetPro capability | Provider endpoint | Status |
 | --- | --- | --- |
