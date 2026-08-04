@@ -1,6 +1,6 @@
 import {
   Customer, Booking, PaymentTransaction, RewardTransaction,
-  CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerMerge,
+  CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerMerge, Invoice,
 } from '../models/index';
 
 export interface TimelineEvent {
@@ -24,7 +24,7 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
     Booking.find({ tenantId, customerId }),
   ]);
   const bookingIds = bookings.map((booking: any) => booking._id);
-  const [payments, rewards, tagEvents, feedback, complaints, followUps, requirements, merges] = await Promise.all([
+  const [payments, rewards, tagEvents, feedback, complaints, followUps, requirements, merges, invoices] = await Promise.all([
     PaymentTransaction.find({ tenantId, bookingId: { $in: bookingIds } }),
     RewardTransaction.find({ tenantId, customerId }),
     CustomerTagEvent.find({ tenantId, customerId }),
@@ -33,6 +33,7 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
     CustomerFollowUp.find({ tenantId, customerId }),
     CustomerRequirement.find({ tenantId, customerId }),
     CustomerMerge.find({ tenantId, status: 'completed', $or: [{ targetCustomerId: customerId }, { sourceCustomerId: customerId }] }),
+    Invoice.find({ tenantId, customerId }),
   ]);
 
   const events: TimelineEvent[] = [];
@@ -125,6 +126,15 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
         ? `Duplicate customer merged into this profile — ${merge.reason}`
         : `Customer profile merged into canonical profile — ${merge.reason}`,
       employee: merge.performedBy?.userId,
+    });
+  }
+
+  for (const invoice of invoices as any[]) {
+    events.push({
+      type: 'invoice', date: invoice.finalizedAt || invoice.createdAt,
+      description: `${invoice.documentType.replace(/_/g, ' ')} ${invoice.invoiceNumber} ${invoice.status}`,
+      bookingId: invoice.bookingId ? bookingIdMap.get(invoice.bookingId.toString()) : undefined,
+      employee: invoice.finalizedBy?.userId || invoice.createdBy?.userId,
     });
   }
 

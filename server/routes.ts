@@ -62,13 +62,14 @@ import { findOrCreateCustomer, recomputeCustomerStats, classifyCustomer } from "
 import { creditBookingReward, reverseBookingReward, previewRedemption, commitRedemption, computeLoyaltyTier, getRewardRule, adjustRewardPoints } from "./services/rewardService";
 import { RewardTransaction, RewardRule } from "./models/index";
 import { computeSegments, computeTagCounts, getSegmentFilter } from "./services/segmentService";
-import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerConsentEvent, Campaign, CampaignRecipient } from "./models/index";
+import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerConsentEvent, CustomerBillingProfile, Invoice, Campaign, CampaignRecipient } from "./models/index";
 import { computeCustomerTimeline } from "./services/timelineService";
 import { previewCampaign, sendCampaign } from "./services/campaignService";
 import { buildDriverPerformance } from "./services/driverPerformance";
 import { buildVehiclePerformance } from "./services/vehiclePerformance";
 import { findDuplicateCandidates, mergeCustomers } from "./services/customerMergeService";
 import { buildCustomerFinancialSummary, buildPaymentReceipt } from "./services/customerFinancialService";
+import { addCurrentInvoiceSettlements, createAdjustmentNote, createInvoiceDraft, finalizeInvoice, previewInvoice, reviseInvoice, updateInvoiceDraft } from "./services/invoiceService";
 import { DriverLeave, DriverAttendance } from "./models/index";
 
 // Statuses where the booking has been financially finalized — further
@@ -2895,6 +2896,169 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Payment receipt error:', error?.message || error);
       res.status(500).json({ message: "Failed to create payment receipt" });
+    }
+  });
+
+  app.get("/api/customers/:id/billing-profiles", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      const profiles = await CustomerBillingProfile.find({ tenantId: req.tenantId, customerId: req.params.id, isActive: true })
+        .sort({ isDefault: -1, createdAt: 1 });
+      res.json(profiles);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch billing profiles" });
+    }
+  });
+
+  const billingProfileFields = [
+    'label', 'customerKind', 'billingName', 'companyName', 'gstNumber', 'panNumber', 'billingAddress',
+    'billingEmail', 'accountsContact', 'purchaseOrderNumber', 'paymentTerms', 'creditPeriodDays', 'tdsInformation',
+  ];
+
+  app.post("/api/customers/:id/billing-profiles", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      const payload: Record<string, any> = {};
+      for (const field of billingProfileFields) if (req.body?.[field] !== undefined) payload[field] = req.body[field];
+      if (!payload.label?.trim() || !payload.billingName?.trim()) return res.status(400).json({ message: "Profile label and billing name are required." });
+      if (payload.gstNumber) payload.gstNumber = String(payload.gstNumber).trim().toUpperCase();
+      if (payload.billingEmail) payload.billingEmail = String(payload.billingEmail).trim().toLowerCase();
+      const isFirst = await CustomerBillingProfile.countDocuments({ tenantId: req.tenantId, customerId: req.params.id, isActive: true }) === 0;
+      const isDefault = isFirst || req.body?.isDefault === true;
+      if (isDefault) await CustomerBillingProfile.updateMany({ tenantId: req.tenantId, customerId: req.params.id }, { $set: { isDefault: false } });
+      const profile = await CustomerBillingProfile.create({
+        tenantId: req.tenantId, customerId: req.params.id, ...payload, isDefault,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(profile);
+    } catch (error: any) {
+      console.error('Create billing profile error:', error?.message || error);
+      res.status(500).json({ message: "Failed to create billing profile" });
+    }
+  });
+
+  app.put("/api/customers/:id/billing-profiles/:profileId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const profile = await CustomerBillingProfile.findOne({
+        _id: req.params.profileId, tenantId: req.tenantId, customerId: req.params.id, isActive: true,
+      });
+      if (!profile) return res.status(404).json({ message: "Billing profile not found" });
+      for (const field of billingProfileFields) if (req.body?.[field] !== undefined) (profile as any)[field] = req.body[field];
+      if (!profile.label?.trim() || !profile.billingName?.trim()) return res.status(400).json({ message: "Profile label and billing name are required." });
+      if (profile.gstNumber) profile.gstNumber = profile.gstNumber.trim().toUpperCase();
+      if (profile.billingEmail) profile.billingEmail = profile.billingEmail.trim().toLowerCase();
+      if (req.body?.isDefault === true && !profile.isDefault) {
+        await CustomerBillingProfile.updateMany({ tenantId: req.tenantId, customerId: req.params.id }, { $set: { isDefault: false } });
+        profile.isDefault = true;
+      }
+      profile.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      profile.updatedAt = new Date();
+      await profile.save();
+      res.json(profile);
+    } catch (error: any) {
+      console.error('Update billing profile error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update billing profile" });
+    }
+  });
+
+  app.post("/api/customers/:id/billing-profiles/:profileId/set-default", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const profile = await CustomerBillingProfile.findOne({ _id: req.params.profileId, tenantId: req.tenantId, customerId: req.params.id, isActive: true });
+      if (!profile) return res.status(404).json({ message: "Billing profile not found" });
+      await CustomerBillingProfile.updateMany({ tenantId: req.tenantId, customerId: req.params.id }, { $set: { isDefault: false } });
+      profile.isDefault = true;
+      profile.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      profile.updatedAt = new Date();
+      await profile.save();
+      res.json(profile);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to set default billing profile" });
+    }
+  });
+
+  app.get("/api/customers/:id/invoices", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const invoices = await Invoice.find({ tenantId: req.tenantId, customerId: req.params.id })
+        .populate('bookingId', 'bookingId pickupDate').sort({ createdAt: -1 });
+      res.json(await addCurrentInvoiceSettlements(invoices));
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  app.post("/api/customers/:id/invoices/preview", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const preview = await previewInvoice({ tenantId: req.tenantId!, customerId: req.params.id, ...req.body });
+      res.json(preview);
+    } catch (error: any) {
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to preview invoice" });
+    }
+  });
+
+  app.post("/api/customers/:id/invoices", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const result = await createInvoiceDraft({
+        tenantId: req.tenantId!, customerId: req.params.id, ...req.body,
+        actor: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(result.alreadyExists ? 200 : 201).json(result);
+    } catch (error: any) {
+      console.error('Create invoice error:', error?.message || error);
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to create invoice" });
+    }
+  });
+
+  app.get("/api/invoices/:invoiceId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const invoice = await Invoice.findOne({ _id: req.params.invoiceId, tenantId: req.tenantId });
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      res.json((await addCurrentInvoiceSettlements([invoice]))[0]);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch invoice" });
+    }
+  });
+
+  app.put("/api/invoices/:invoiceId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const invoice = await updateInvoiceDraft(req.tenantId!, req.params.invoiceId, req.body, { userId: req.userId!, role: req.user?.role || 'client' });
+      res.json(invoice);
+    } catch (error: any) {
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to update invoice" });
+    }
+  });
+
+  app.post("/api/invoices/:invoiceId/finalize", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const invoice = await finalizeInvoice(req.tenantId!, req.params.invoiceId, { userId: req.userId!, role: req.user?.role || 'client' });
+      res.json(invoice);
+    } catch (error: any) {
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to finalize invoice" });
+    }
+  });
+
+  app.post("/api/invoices/:invoiceId/revise", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const invoice = await reviseInvoice(req.tenantId!, req.params.invoiceId, { userId: req.userId!, role: req.user?.role || 'client' });
+      res.status(201).json(invoice);
+    } catch (error: any) {
+      console.error('Revise invoice error:', error?.message || error);
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to revise invoice" });
+    }
+  });
+
+  app.post("/api/invoices/:invoiceId/adjustment-note", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const invoice = await createAdjustmentNote({
+        tenantId: req.tenantId!, invoiceId: req.params.invoiceId, noteType: req.body?.noteType,
+        amount: req.body?.amount, reason: req.body?.reason,
+        actor: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(invoice);
+    } catch (error: any) {
+      console.error('Create invoice adjustment note error:', error?.message || error);
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to create adjustment note" });
     }
   });
 

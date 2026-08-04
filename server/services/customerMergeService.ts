@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import {
-  Booking, CampaignRecipient, Customer, CustomerComplaint, CustomerConsentEvent,
+  Booking, CampaignRecipient, Customer, CustomerBillingProfile, CustomerComplaint, CustomerConsentEvent, Invoice,
   CustomerFeedback, CustomerFollowUp, CustomerMerge, CustomerRequirement,
   CustomerTagEvent, RewardTransaction, WhatsAppMessage,
 } from '../models/index';
@@ -147,6 +147,8 @@ export async function mergeCustomers(input: {
     await move('requirements', CustomerRequirement);
     await move('consentEvents', CustomerConsentEvent);
     await move('messages', WhatsAppMessage);
+    await move('billingProfiles', CustomerBillingProfile);
+    await move('invoices', Invoice);
 
     let movedCampaignRecipients = 0;
     let retainedSourceCampaignRecipients = 0;

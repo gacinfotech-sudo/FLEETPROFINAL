@@ -19,6 +19,7 @@ import CustomerMessageCenter from "./customer-message-center";
 import CustomerRequirements from "./customer-requirements";
 import CustomerDuplicateReview from "./customer-duplicate-review";
 import CustomerPaymentReceipt from "./customer-payment-receipt";
+import CustomerInvoices from "./customer-invoices";
 
 const CUSTOMER_TYPES = ['individual', 'corporate', 'vip', 'self_drive', 'religious_traveller', 'airport', 'outstation'];
 
@@ -121,6 +122,7 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
   const [editForm, setEditForm] = useState(editFormFromCustomer({}));
   const [payingBooking, setPayingBooking] = useState<any>(null);
   const [viewingBooking, setViewingBooking] = useState<any>(null);
+  const [invoiceRequestBookingId, setInvoiceRequestBookingId] = useState<string | null>(null);
   const [paymentForm, setPaymentForm] = useState({ amount: "", paymentType: "advance", paymentMode: "cash", transactionReference: "", receivedBy: "", notes: "" });
 
   const { data: customer, isLoading: loadingCustomer } = useQuery<any>({
@@ -419,6 +421,14 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
 
       <CustomerRequirements customerId={customerId} bookings={rows} />
 
+      <CustomerInvoices
+        customerId={customerId}
+        customer={customer}
+        bookings={rows}
+        requestedBookingId={invoiceRequestBookingId}
+        onRequestHandled={() => setInvoiceRequestBookingId(null)}
+      />
+
       <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -458,6 +468,9 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
                   <span className="text-red-700">Due <strong>{fmtMoney(Math.max(0, currentBooking.totalAmount - (currentBooking.advanceReceived || 0)))}</strong></span>
                 </div>
                 <div className="flex gap-2">
+                  {!['cancelled', 'no_show'].includes(currentBooking.status) && (
+                    <Button size="sm" variant="outline" onClick={() => setInvoiceRequestBookingId(currentBooking._id)}><ReceiptText className="h-4 w-4 mr-1" /> Create Invoice</Button>
+                  )}
                   {Math.max(0, currentBooking.totalAmount - (currentBooking.advanceReceived || 0)) > 0 && (
                     <Button size="sm" onClick={() => {
                       const due = Math.max(0, currentBooking.totalAmount - (currentBooking.advanceReceived || 0));
@@ -528,7 +541,12 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
                         )}
                       </TableCell>
                       <TableCell><Badge variant="outline" className="capitalize">{b.status?.replace(/_/g, ' ')}</Badge></TableCell>
-                      <TableCell><Button size="sm" variant="ghost" onClick={() => setViewingBooking(b)}><Eye className="h-4 w-4" /></Button></TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {!['cancelled', 'no_show'].includes(b.status) && <Button size="sm" variant="ghost" aria-label={`Create Invoice for ${b.bookingId}`} onClick={() => setInvoiceRequestBookingId(b._id)}><ReceiptText className="h-4 w-4" /></Button>}
+                          <Button size="sm" variant="ghost" aria-label={`View ${b.bookingId}`} onClick={() => setViewingBooking(b)}><Eye className="h-4 w-4" /></Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -584,6 +602,7 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setViewingBooking(null)}>Close</Button>
+                {!['cancelled', 'no_show'].includes(viewingBooking.status) && <Button variant="outline" onClick={() => { const bookingId = viewingBooking._id; setViewingBooking(null); setInvoiceRequestBookingId(bookingId); }}><ReceiptText className="h-4 w-4 mr-1" /> Create Invoice</Button>}
                 {onEditBooking && <Button onClick={() => { const booking = viewingBooking; setViewingBooking(null); onEditBooking(booking); }}><Pencil className="h-4 w-4 mr-1" /> Edit Booking</Button>}
               </DialogFooter>
             </div>

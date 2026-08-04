@@ -1484,6 +1484,149 @@ CustomerMergeSchema.index({ tenantId: 1, sourceCustomerId: 1 }, { unique: true }
 CustomerMergeSchema.index({ tenantId: 1, targetCustomerId: 1, completedAt: -1 });
 export const CustomerMerge = mongoose.model<ICustomerMerge>('CustomerMerge', CustomerMergeSchema);
 
+export interface ICustomerBillingProfile extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  customerId: mongoose.Types.ObjectId;
+  label: string;
+  customerKind: 'individual' | 'company';
+  billingName: string;
+  companyName?: string;
+  gstNumber?: string;
+  panNumber?: string;
+  billingAddress?: string;
+  billingEmail?: string;
+  accountsContact?: string;
+  purchaseOrderNumber?: string;
+  paymentTerms?: string;
+  creditPeriodDays?: number;
+  tdsInformation?: string;
+  isDefault: boolean;
+  isActive: boolean;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const CustomerBillingProfileSchema = new Schema<ICustomerBillingProfile>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  label: { type: String, required: true },
+  customerKind: { type: String, enum: ['individual', 'company'], default: 'individual' },
+  billingName: { type: String, required: true },
+  companyName: { type: String },
+  gstNumber: { type: String },
+  panNumber: { type: String },
+  billingAddress: { type: String },
+  billingEmail: { type: String },
+  accountsContact: { type: String },
+  purchaseOrderNumber: { type: String },
+  paymentTerms: { type: String },
+  creditPeriodDays: { type: Number, min: 0 },
+  tdsInformation: { type: String },
+  isDefault: { type: Boolean, default: false },
+  isActive: { type: Boolean, default: true },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+CustomerBillingProfileSchema.index({ tenantId: 1, customerId: 1, isActive: 1 });
+export const CustomerBillingProfile = mongoose.model<ICustomerBillingProfile>('CustomerBillingProfile', CustomerBillingProfileSchema);
+
+export interface IInvoice extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  customerId: mongoose.Types.ObjectId;
+  bookingId?: mongoose.Types.ObjectId;
+  billingProfileId?: mongoose.Types.ObjectId;
+  invoiceNumber: string;
+  sourceKey?: string;
+  documentType: 'tax_invoice' | 'non_gst_invoice' | 'proforma_invoice' | 'payment_receipt' | 'credit_note' | 'debit_note' | 'customer_statement';
+  status: 'draft' | 'finalized' | 'void';
+  revisionNumber: number;
+  parentInvoiceId?: mongoose.Types.ObjectId;
+  relatedInvoiceId?: mongoose.Types.ObjectId;
+  invoiceDate: Date;
+  customerSnapshot: Record<string, any>;
+  billingSnapshot: Record<string, any>;
+  businessSnapshot: Record<string, any>;
+  bookingSnapshot?: Record<string, any>;
+  serviceDescription: string;
+  gstRate: number;
+  discount: number;
+  tollParkingTreatment: 'included' | 'separate_non_taxable';
+  taxableAmount: number;
+  gstAmount: number;
+  tollAmount: number;
+  parkingAmount: number;
+  adjustmentAmount: number;
+  totalAmount: number;
+  amountReceived: number;
+  balanceDue: number;
+  paymentTerms?: string;
+  bankDetails?: string;
+  upiId?: string;
+  termsAndConditions?: string;
+  adjustmentReason?: string;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  finalizedBy?: { userId: string; role: string };
+  finalizedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const InvoiceSchema = new Schema<IInvoice>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  billingProfileId: { type: Schema.Types.ObjectId, ref: 'CustomerBillingProfile' },
+  invoiceNumber: { type: String, required: true },
+  sourceKey: { type: String },
+  documentType: {
+    type: String,
+    enum: ['tax_invoice', 'non_gst_invoice', 'proforma_invoice', 'payment_receipt', 'credit_note', 'debit_note', 'customer_statement'],
+    required: true,
+  },
+  status: { type: String, enum: ['draft', 'finalized', 'void'], default: 'draft' },
+  revisionNumber: { type: Number, default: 1, min: 1 },
+  parentInvoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
+  relatedInvoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
+  invoiceDate: { type: Date, required: true, default: Date.now },
+  customerSnapshot: { type: Schema.Types.Mixed, required: true },
+  billingSnapshot: { type: Schema.Types.Mixed, required: true },
+  businessSnapshot: { type: Schema.Types.Mixed, required: true },
+  bookingSnapshot: { type: Schema.Types.Mixed },
+  serviceDescription: { type: String, required: true },
+  gstRate: { type: Number, default: 0, min: 0, max: 100 },
+  discount: { type: Number, default: 0, min: 0 },
+  tollParkingTreatment: { type: String, enum: ['included', 'separate_non_taxable'], default: 'included' },
+  taxableAmount: { type: Number, required: true, min: 0 },
+  gstAmount: { type: Number, required: true, min: 0 },
+  tollAmount: { type: Number, default: 0, min: 0 },
+  parkingAmount: { type: Number, default: 0, min: 0 },
+  adjustmentAmount: { type: Number, default: 0, min: 0 },
+  totalAmount: { type: Number, required: true, min: 0 },
+  amountReceived: { type: Number, required: true, min: 0 },
+  balanceDue: { type: Number, required: true, min: 0 },
+  paymentTerms: { type: String },
+  bankDetails: { type: String },
+  upiId: { type: String },
+  termsAndConditions: { type: String },
+  adjustmentReason: { type: String },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  finalizedBy: { userId: { type: String }, role: { type: String } },
+  finalizedAt: { type: Date },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+InvoiceSchema.index({ tenantId: 1, invoiceNumber: 1 }, { unique: true });
+InvoiceSchema.index({ tenantId: 1, sourceKey: 1 }, { unique: true, sparse: true });
+InvoiceSchema.index({ tenantId: 1, customerId: 1, createdAt: -1 });
+InvoiceSchema.index({ tenantId: 1, bookingId: 1, status: 1 });
+export const Invoice = mongoose.model<IInvoice>('Invoice', InvoiceSchema);
+
 // Consent history — append-only, same split as tags: Customer.consent is
 // the fast-read current state, this is the audit trail of every grant/
 // revoke behind it. Every campaign send (once campaigns exist) must
