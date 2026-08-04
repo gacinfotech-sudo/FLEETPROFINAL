@@ -1255,10 +1255,27 @@ export interface ICustomerFeedback extends Document {
   tenantId: mongoose.Types.ObjectId;
   customerId: mongoose.Types.ObjectId;
   bookingId?: mongoose.Types.ObjectId;
+  driverId?: mongoose.Types.ObjectId;
+  vehicleId?: mongoose.Types.ObjectId;
   type: 'feedback' | 'appreciation';
+  overallRating?: number;
   driverRating?: number; // 1-5
   vehicleRating?: number;
   serviceRating?: number;
+  bookingProcessRating?: number;
+  officeCommunicationRating?: number;
+  tripSatisfactionRating?: number;
+  valueForMoneyRating?: number;
+  driverPunctualityRating?: number;
+  driverBehaviourRating?: number;
+  driverSafetyRating?: number;
+  driverRouteKnowledgeRating?: number;
+  driverCommunicationRating?: number;
+  driverAssistanceRating?: number;
+  driverPaymentHandlingRating?: number;
+  wouldBookAgain?: boolean;
+  wouldRecommend?: boolean;
+  responsibleParty?: 'company' | 'driver' | 'vehicle' | 'vendor' | 'customer' | 'unclear';
   comments?: string;
   createdBy: { userId: string; role: string };
   createdAt: Date;
@@ -1267,15 +1284,34 @@ const CustomerFeedbackSchema = new Schema<ICustomerFeedback>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
   customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
   bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  driverId: { type: Schema.Types.ObjectId, ref: 'Driver' },
+  vehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle' },
   type: { type: String, enum: ['feedback', 'appreciation'], default: 'feedback' },
+  overallRating: { type: Number, min: 1, max: 5 },
   driverRating: { type: Number, min: 1, max: 5 },
   vehicleRating: { type: Number, min: 1, max: 5 },
   serviceRating: { type: Number, min: 1, max: 5 },
+  bookingProcessRating: { type: Number, min: 1, max: 5 },
+  officeCommunicationRating: { type: Number, min: 1, max: 5 },
+  tripSatisfactionRating: { type: Number, min: 1, max: 5 },
+  valueForMoneyRating: { type: Number, min: 1, max: 5 },
+  driverPunctualityRating: { type: Number, min: 1, max: 5 },
+  driverBehaviourRating: { type: Number, min: 1, max: 5 },
+  driverSafetyRating: { type: Number, min: 1, max: 5 },
+  driverRouteKnowledgeRating: { type: Number, min: 1, max: 5 },
+  driverCommunicationRating: { type: Number, min: 1, max: 5 },
+  driverAssistanceRating: { type: Number, min: 1, max: 5 },
+  driverPaymentHandlingRating: { type: Number, min: 1, max: 5 },
+  wouldBookAgain: { type: Boolean },
+  wouldRecommend: { type: Boolean },
+  responsibleParty: { type: String, enum: ['company', 'driver', 'vehicle', 'vendor', 'customer', 'unclear'] },
   comments: { type: String },
   createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
   createdAt: { type: Date, default: Date.now },
 });
 CustomerFeedbackSchema.index({ tenantId: 1, customerId: 1 });
+CustomerFeedbackSchema.index({ tenantId: 1, driverId: 1, createdAt: -1 });
+CustomerFeedbackSchema.index({ tenantId: 1, vehicleId: 1, createdAt: -1 });
 export const CustomerFeedback = mongoose.model<ICustomerFeedback>('CustomerFeedback', CustomerFeedbackSchema);
 
 // Complaints and service recovery. Compensation (refund/reward points) is
@@ -1286,12 +1322,17 @@ export interface ICustomerComplaint extends Document {
   tenantId: mongoose.Types.ObjectId;
   customerId: mongoose.Types.ObjectId;
   bookingId?: mongoose.Types.ObjectId;
+  driverId?: mongoose.Types.ObjectId;
+  vehicleId?: mongoose.Types.ObjectId;
   category: 'driver_late' | 'driver_behaviour' | 'rash_driving' | 'vehicle_problem' | 'vehicle_cleanliness'
     | 'ac_problem' | 'wrong_vehicle' | 'booking_issue' | 'payment_dispute' | 'office_communication'
     | 'vendor_issue' | 'self_drive_issue' | 'other';
   severity: 'low' | 'medium' | 'high' | 'critical';
   description: string;
   responsibleParty?: 'company' | 'driver' | 'vendor' | 'customer' | 'unclear';
+  responsibilityReason?: string;
+  responsibilityVerifiedBy?: { userId: string; role: string };
+  responsibilityVerifiedAt?: Date;
   assignedTo?: string;
   resolutionDeadline?: Date;
   status: 'open' | 'in_progress' | 'resolved' | 'closed';
@@ -1310,6 +1351,8 @@ const CustomerComplaintSchema = new Schema<ICustomerComplaint>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
   customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
   bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  driverId: { type: Schema.Types.ObjectId, ref: 'Driver' },
+  vehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle' },
   category: {
     type: String,
     enum: ['driver_late', 'driver_behaviour', 'rash_driving', 'vehicle_problem', 'vehicle_cleanliness',
@@ -1320,6 +1363,9 @@ const CustomerComplaintSchema = new Schema<ICustomerComplaint>({
   severity: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
   description: { type: String, required: true },
   responsibleParty: { type: String, enum: ['company', 'driver', 'vendor', 'customer', 'unclear'] },
+  responsibilityReason: { type: String },
+  responsibilityVerifiedBy: { userId: { type: String }, role: { type: String } },
+  responsibilityVerifiedAt: { type: Date },
   assignedTo: { type: String },
   resolutionDeadline: { type: Date },
   status: { type: String, enum: ['open', 'in_progress', 'resolved', 'closed'], default: 'open' },
@@ -1335,6 +1381,8 @@ const CustomerComplaintSchema = new Schema<ICustomerComplaint>({
   createdAt: { type: Date, default: Date.now },
 });
 CustomerComplaintSchema.index({ tenantId: 1, customerId: 1, status: 1 });
+CustomerComplaintSchema.index({ tenantId: 1, driverId: 1, status: 1 });
+CustomerComplaintSchema.index({ tenantId: 1, vehicleId: 1, status: 1 });
 export const CustomerComplaint = mongoose.model<ICustomerComplaint>('CustomerComplaint', CustomerComplaintSchema);
 
 // After-sales follow-up tasks — auto-created on booking completion

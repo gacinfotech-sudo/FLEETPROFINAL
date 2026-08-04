@@ -7,6 +7,7 @@ import EnhancedStats from "../components/dashboard/enhanced-stats";
 import EnhancedBookingForm from "../components/booking/enhanced-booking-form";
 import VehicleForm from "../components/fleet/vehicle-form";
 import DriverForm from "../components/drivers/driver-form";
+import DriverFeedbackProfile from "../components/drivers/driver-feedback-profile";
 import RevenueReport from "../components/reports/revenue-report";
 import BookingHistoryPDF from "../components/reports/booking-history-pdf";
 import EnhancedInvoiceGenerator from "../components/invoice/enhanced-invoice-generator";
@@ -881,7 +882,7 @@ export default function Dashboard() {
                           <div className="flex items-center">
                             <span className="font-medium">Rating:</span>
                             <span className="text-yellow-500 ml-2">⭐</span>
-                            <span className="ml-1">{driver.rating || "5.0"}</span>
+                            <span className="ml-1">{driver.rating ?? "Not rated"}</span>
                           </div>
                         </div>
                         <div className="flex gap-2 pt-2">
@@ -941,7 +942,7 @@ export default function Dashboard() {
                           <TableCell>
                             <div className="flex items-center">
                               <span className="text-yellow-500">⭐</span>
-                              <span className="ml-1">{driver.rating}</span>
+                              <span className="ml-1">{driver.rating ?? "Not rated"}</span>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -2526,10 +2527,10 @@ export default function Dashboard() {
                       <p className="text-sm text-gray-900">{viewingDriver.experience || "Not provided"} years</p>
                     </div>
                     <div>
-                      <Label className="text-sm font-medium text-gray-700">Rating</Label>
+                      <Label className="text-sm font-medium text-gray-700">Legacy Manual Rating</Label>
                       <div className="flex items-center">
                         <span className="text-yellow-500">⭐</span>
-                        <span className="ml-1 text-sm text-gray-900">{viewingDriver.rating || "5.0"}</span>
+                        <span className="ml-1 text-sm text-gray-900">{viewingDriver.rating ?? "Not rated"}</span>
                       </div>
                     </div>
                   </div>
@@ -2614,6 +2615,11 @@ export default function Dashboard() {
                   <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">{viewingDriver.notes}</p>
                 </div>
               )}
+
+              <DriverFeedbackProfile
+                driverId={viewingDriver._id || viewingDriver.id}
+                onOpenBooking={(booking) => { setViewingDriver(null); handleViewBooking(booking); }}
+              />
             </div>
           )}
           <DialogFooter>

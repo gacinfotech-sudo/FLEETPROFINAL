@@ -70,6 +70,7 @@ import { buildVehiclePerformance } from "./services/vehiclePerformance";
 import { findDuplicateCandidates, mergeCustomers } from "./services/customerMergeService";
 import { buildCustomerFinancialSummary, buildPaymentReceipt } from "./services/customerFinancialService";
 import { addCurrentInvoiceSettlements, createAdjustmentNote, createInvoiceDraft, finalizeInvoice, previewInvoice, reviseInvoice, updateInvoiceDraft } from "./services/invoiceService";
+import { buildCustomerDriverHistory, buildDriverFeedbackProfile } from "./services/driverFeedbackService";
 import { DriverLeave, DriverAttendance } from "./models/index";
 
 // Statuses where the booking has been financially finalized — further
@@ -1538,6 +1539,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/drivers/:id/customer-feedback-profile", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid driver ID" });
+      const profile = await buildDriverFeedbackProfile(req.tenantId!, req.params.id);
+      if (!profile) return res.status(404).json({ message: "Driver not found" });
+      res.json(profile);
+    } catch (error: any) {
+      console.error('Driver customer-feedback profile error:', error?.message || error);
+      res.status(500).json({ message: "Failed to build driver customer-feedback profile" });
+    }
+  });
+
   app.post("/api/drivers", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
     try {
       // Check driver limit before adding
@@ -2418,7 +2431,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Feedback — driver/vehicle/service ratings tied to a specific booking.
   app.get("/api/customers/:id/feedback", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const rows = await CustomerFeedback.find({ tenantId: req.tenantId, customerId: req.params.id }).sort({ createdAt: -1 });
+      const rows = await CustomerFeedback.find({ tenantId: req.tenantId, customerId: req.params.id })
+        .populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation')
+        .populate('driverId', 'name phone status')
+        .populate('vehicleId', 'make vehicleModel licensePlate')
+        .sort({ createdAt: -1 });
       res.json(rows);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch feedback" });
@@ -2427,29 +2444,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/customers/:id/feedback", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const { bookingId, type, driverRating, vehicleRating, serviceRating, comments } = req.body || {};
+      const {
+        bookingId, type, overallRating, driverRating, vehicleRating, serviceRating,
+        bookingProcessRating, officeCommunicationRating, tripSatisfactionRating, valueForMoneyRating,
+        driverPunctualityRating, driverBehaviourRating, driverSafetyRating, driverRouteKnowledgeRating,
+        driverCommunicationRating, driverAssistanceRating, driverPaymentHandlingRating,
+        wouldBookAgain, wouldRecommend, responsibleParty, comments,
+      } = req.body || {};
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
-      if (bookingId && !await Booking.exists({ _id: bookingId, tenantId: req.tenantId, customerId: customer._id })) {
-        return res.status(400).json({ message: "bookingId does not belong to this customer." });
+      const booking: any = bookingId
+        ? await Booking.findOne({ _id: bookingId, tenantId: req.tenantId, customerId: customer._id }).lean()
+        : null;
+      if (bookingId && !booking) return res.status(400).json({ message: "bookingId does not belong to this customer." });
+      if (type && !['feedback', 'appreciation'].includes(type)) return res.status(400).json({ message: "Invalid feedback type." });
+
+      const ratingFields = {
+        overallRating, driverRating, vehicleRating, serviceRating, bookingProcessRating,
+        officeCommunicationRating, tripSatisfactionRating, valueForMoneyRating, driverPunctualityRating,
+        driverBehaviourRating, driverSafetyRating, driverRouteKnowledgeRating, driverCommunicationRating,
+        driverAssistanceRating, driverPaymentHandlingRating,
+      };
+      for (const [field, value] of Object.entries(ratingFields)) {
+        if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < 1 || Number(value) > 5)) {
+          return res.status(400).json({ message: `${field} must be between 1 and 5.` });
+        }
+      }
+      // Backward compatibility: the legacy form allowed one generic
+      // driverRating even on self-drive/unassigned bookings. Preserve
+      // those records, but require a real assigned Driver Master for the
+      // new detailed driver dimensions that feed Driver Profile analytics.
+      const hasDriverFeedback = [driverPunctualityRating, driverBehaviourRating, driverSafetyRating,
+        driverRouteKnowledgeRating, driverCommunicationRating, driverAssistanceRating, driverPaymentHandlingRating]
+        .some((value) => value !== undefined);
+      if (hasDriverFeedback && !booking?.driverId) return res.status(400).json({ message: "Select a booking with an assigned driver for driver feedback." });
+      if (vehicleRating !== undefined && !booking?.vehicleId) return res.status(400).json({ message: "Select a booking with an assigned vehicle for vehicle feedback." });
+      if (responsibleParty === 'driver' && !booking?.driverId) return res.status(400).json({ message: "This booking has no assigned driver." });
+      if (!Object.values(ratingFields).some((value) => value !== undefined) && !comments?.trim()) {
+        return res.status(400).json({ message: "Add a rating or feedback comment." });
+      }
+      const feedbackType = type || 'feedback';
+      if (bookingId && await CustomerFeedback.exists({ tenantId: req.tenantId, customerId: customer._id, bookingId, type: feedbackType })) {
+        return res.status(409).json({ message: "Feedback for this booking already exists. The original record was preserved." });
       }
 
       const feedback = await CustomerFeedback.create({
         tenantId: req.tenantId, customerId: req.params.id, bookingId: bookingId || undefined,
-        type: type || 'feedback', driverRating, vehicleRating, serviceRating, comments,
+        driverId: booking?.driverId, vehicleId: booking?.vehicleId,
+        type: feedbackType, ...ratingFields, wouldBookAgain, wouldRecommend, responsibleParty, comments: comments?.trim(),
         createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
       });
-      res.json(feedback);
+      await feedback.populate(['bookingId', 'driverId', 'vehicleId']);
+      res.status(201).json(feedback);
     } catch (error: any) {
       console.error('Add feedback error:', error?.message || error);
       res.status(500).json({ message: "Failed to record feedback" });
     }
   });
 
+  app.get("/api/customers/:id/drivers", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid customer ID" });
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      res.json(await buildCustomerDriverHistory(req.tenantId!, req.params.id));
+    } catch (error: any) {
+      console.error('Customer driver history error:', error?.message || error);
+      res.status(500).json({ message: "Failed to build customer driver history" });
+    }
+  });
+
   // Complaints and service recovery.
   app.get("/api/customers/:id/complaints", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const rows = await CustomerComplaint.find({ tenantId: req.tenantId, customerId: req.params.id }).sort({ createdAt: -1 });
+      const rows = await CustomerComplaint.find({ tenantId: req.tenantId, customerId: req.params.id })
+        .populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation')
+        .populate('driverId', 'name phone status')
+        .populate('vehicleId', 'make vehicleModel licensePlate')
+        .sort({ createdAt: -1 });
       res.json(rows);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch complaints" });
@@ -2458,25 +2530,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/customers/:id/complaints", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const { bookingId, category, severity, description, responsibleParty, assignedTo, resolutionDeadline } = req.body || {};
+      const { bookingId, category, severity, description, responsibleParty, responsibilityReason, assignedTo, resolutionDeadline } = req.body || {};
       if (!category || !description || !description.trim()) {
         return res.status(400).json({ message: "category and description are required." });
       }
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
-      if (bookingId && !await Booking.exists({ _id: bookingId, tenantId: req.tenantId, customerId: customer._id })) {
-        return res.status(400).json({ message: "bookingId does not belong to this customer." });
+      const booking: any = bookingId
+        ? await Booking.findOne({ _id: bookingId, tenantId: req.tenantId, customerId: customer._id }).lean()
+        : null;
+      if (bookingId && !booking) return res.status(400).json({ message: "bookingId does not belong to this customer." });
+      const classifiedParty = responsibleParty || 'unclear';
+      if (classifiedParty === 'driver' && !booking?.driverId) return res.status(400).json({ message: "This booking has no assigned driver." });
+      if (classifiedParty !== 'unclear' && !responsibilityReason?.trim()) {
+        return res.status(400).json({ message: "A responsibility reason is required before assigning fault." });
       }
+      const actor = { userId: req.userId!, role: req.user?.role || 'client' };
 
       const complaint = await CustomerComplaint.create({
         tenantId: req.tenantId, customerId: req.params.id, bookingId: bookingId || undefined,
+        driverId: booking?.driverId, vehicleId: booking?.vehicleId,
         category, severity: severity || 'medium', description,
-        responsibleParty, assignedTo,
+        responsibleParty: classifiedParty, responsibilityReason: responsibilityReason?.trim(), assignedTo,
+        responsibilityVerifiedBy: classifiedParty !== 'unclear' ? actor : undefined,
+        responsibilityVerifiedAt: classifiedParty !== 'unclear' ? new Date() : undefined,
         resolutionDeadline: resolutionDeadline ? new Date(resolutionDeadline) : undefined,
         status: 'open',
-        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+        createdBy: actor,
       });
-      res.json(complaint);
+      await complaint.populate(['bookingId', 'driverId', 'vehicleId']);
+      res.status(201).json(complaint);
     } catch (error: any) {
       console.error('Add complaint error:', error?.message || error);
       res.status(500).json({ message: "Failed to record complaint" });
@@ -2493,7 +2576,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const complaint = await CustomerComplaint.findOne({ _id: req.params.complaintId, tenantId: req.tenantId, customerId: req.params.id });
       if (!complaint) return res.status(404).json({ message: "Complaint not found" });
 
-      const { status, assignedTo, resolutionDeadline, correctiveAction, compensationAmount, compensationPoints, resolution, satisfactionAfterResolution } = req.body || {};
+      const { status, assignedTo, resolutionDeadline, correctiveAction, compensationAmount, compensationPoints, resolution, satisfactionAfterResolution, responsibleParty, responsibilityReason } = req.body || {};
       const actor = { userId: req.userId!, role: req.user?.role || 'client' };
 
       if (status) complaint.status = status;
@@ -2501,6 +2584,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (resolutionDeadline) complaint.resolutionDeadline = new Date(resolutionDeadline);
       if (resolution !== undefined) complaint.resolution = resolution;
       if (satisfactionAfterResolution) complaint.satisfactionAfterResolution = satisfactionAfterResolution;
+      if (responsibleParty !== undefined) {
+        if (!['company', 'driver', 'vendor', 'customer', 'unclear'].includes(responsibleParty)) {
+          return res.status(400).json({ message: "Invalid responsible party." });
+        }
+        if (responsibleParty === 'driver' && !complaint.driverId) return res.status(400).json({ message: "This complaint has no linked driver." });
+        if (responsibleParty !== 'unclear' && !(responsibilityReason || complaint.responsibilityReason)?.trim()) {
+          return res.status(400).json({ message: "A responsibility reason is required before assigning fault." });
+        }
+        complaint.responsibleParty = responsibleParty;
+        complaint.responsibilityReason = responsibleParty === 'unclear' ? undefined : (responsibilityReason || complaint.responsibilityReason)?.trim();
+        complaint.responsibilityVerifiedBy = responsibleParty === 'unclear' ? undefined : actor;
+        complaint.responsibilityVerifiedAt = responsibleParty === 'unclear' ? undefined : new Date();
+      } else if (responsibilityReason !== undefined) {
+        complaint.responsibilityReason = responsibilityReason.trim();
+      }
 
       if (correctiveAction && correctiveAction !== complaint.correctiveAction) {
         complaint.correctiveAction = correctiveAction;

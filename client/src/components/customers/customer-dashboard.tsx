@@ -20,6 +20,7 @@ import CustomerRequirements from "./customer-requirements";
 import CustomerDuplicateReview from "./customer-duplicate-review";
 import CustomerPaymentReceipt from "./customer-payment-receipt";
 import CustomerInvoices from "./customer-invoices";
+import CustomerDrivers from "./customer-drivers";
 
 const CUSTOMER_TYPES = ['individual', 'corporate', 'vip', 'self_drive', 'religious_traveller', 'airport', 'outstation'];
 
@@ -708,6 +709,8 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
       <div id="customer-whatsapp" className="scroll-mt-4">
         <CustomerMessageCenter customerId={customerId} bookings={rows} />
       </div>
+
+      <CustomerDrivers customerId={customerId} />
 
       <CustomerService customerId={customerId} bookings={rows} />
 

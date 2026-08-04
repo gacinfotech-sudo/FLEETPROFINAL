@@ -34,6 +34,18 @@ const STATUS_BADGE: Record<string, string> = {
   resolved: "bg-green-100 text-green-800", closed: "bg-gray-100 text-gray-600",
 };
 
+const EMPTY_FEEDBACK_FORM = {
+  bookingId: "", type: "feedback", driverRating: 0, vehicleRating: 0, serviceRating: 0,
+  driverPunctualityRating: 0, driverBehaviourRating: 0, driverSafetyRating: 0,
+  driverRouteKnowledgeRating: 0, driverPaymentHandlingRating: 0, comments: "",
+};
+
+const DRIVER_RATING_FIELDS = [
+  ['driverPunctualityRating', 'Punctuality'], ['driverBehaviourRating', 'Behaviour'],
+  ['driverSafetyRating', 'Driving Safety'], ['driverRouteKnowledgeRating', 'Route Knowledge'],
+  ['driverPaymentHandlingRating', 'Payment Handling'],
+] as const;
+
 function Stars({ rating }: { rating?: number }) {
   if (!rating) return <span className="text-gray-400 text-xs">Not rated</span>;
   return (
@@ -52,9 +64,9 @@ export default function CustomerService({ customerId, bookings }: Props) {
   const [showComplaintForm, setShowComplaintForm] = useState(false);
   const [resolvingComplaint, setResolvingComplaint] = useState<any>(null);
 
-  const [feedbackForm, setFeedbackForm] = useState({ bookingId: "", driverRating: 0, vehicleRating: 0, serviceRating: 0, comments: "" });
-  const [complaintForm, setComplaintForm] = useState({ bookingId: "", category: "other", severity: "medium", description: "" });
-  const [resolveForm, setResolveForm] = useState({ status: "in_progress", correctiveAction: "none", compensationAmount: "", compensationPoints: "", resolution: "" });
+  const [feedbackForm, setFeedbackForm] = useState({ ...EMPTY_FEEDBACK_FORM });
+  const [complaintForm, setComplaintForm] = useState({ bookingId: "", category: "other", severity: "medium", description: "", responsibleParty: "unclear", responsibilityReason: "" });
+  const [resolveForm, setResolveForm] = useState({ status: "in_progress", correctiveAction: "none", compensationAmount: "", compensationPoints: "", resolution: "", responsibleParty: "unclear", responsibilityReason: "" });
 
   const { data: feedback } = useQuery<any[]>({ queryKey: [`/api/customers/${customerId}/feedback`] });
   const { data: complaints } = useQuery<any[]>({ queryKey: [`/api/customers/${customerId}/complaints`] });
@@ -67,19 +79,20 @@ export default function CustomerService({ customerId, bookings }: Props) {
   };
 
   const addFeedback = useMutation({
-    mutationFn: async () => (await apiRequest("POST", `/api/customers/${customerId}/feedback`, {
-      ...feedbackForm,
-      driverRating: feedbackForm.driverRating || undefined,
-      vehicleRating: feedbackForm.vehicleRating || undefined,
-      serviceRating: feedbackForm.serviceRating || undefined,
-    })).json(),
-    onSuccess: () => { toast({ title: "Feedback recorded" }); setShowFeedbackForm(false); setFeedbackForm({ bookingId: "", driverRating: 0, vehicleRating: 0, serviceRating: 0, comments: "" }); invalidate(); },
+    mutationFn: async () => {
+      const payload: Record<string, any> = { ...feedbackForm };
+      for (const field of ['driverRating', 'vehicleRating', 'serviceRating', ...DRIVER_RATING_FIELDS.map(([key]) => key)]) {
+        if (!payload[field]) payload[field] = undefined;
+      }
+      return (await apiRequest("POST", `/api/customers/${customerId}/feedback`, payload)).json();
+    },
+    onSuccess: () => { toast({ title: "Feedback recorded" }); setShowFeedbackForm(false); setFeedbackForm({ ...EMPTY_FEEDBACK_FORM }); invalidate(); },
     onError: (err: any) => toast({ title: "Could not record feedback", description: err.message, variant: "destructive" }),
   });
 
   const addComplaint = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/customers/${customerId}/complaints`, complaintForm)).json(),
-    onSuccess: () => { toast({ title: "Complaint recorded" }); setShowComplaintForm(false); setComplaintForm({ bookingId: "", category: "other", severity: "medium", description: "" }); invalidate(); },
+    onSuccess: () => { toast({ title: "Complaint recorded" }); setShowComplaintForm(false); setComplaintForm({ bookingId: "", category: "other", severity: "medium", description: "", responsibleParty: "unclear", responsibilityReason: "" }); invalidate(); },
     onError: (err: any) => toast({ title: "Could not record complaint", description: err.message, variant: "destructive" }),
   });
 
@@ -109,11 +122,13 @@ export default function CustomerService({ customerId, bookings }: Props) {
           <div className="space-y-2">
             {feedback.map((f: any) => (
               <div key={f._id} className="border rounded-lg p-3 text-sm space-y-1">
-                <div className="flex items-center gap-4">
-                  <span>Driver: <Stars rating={f.driverRating} /></span>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <span>Driver{f.driverId?.name ? ` (${f.driverId.name})` : ''}: <Stars rating={f.driverRating} /></span>
                   <span>Vehicle: <Stars rating={f.vehicleRating} /></span>
                   <span>Service: <Stars rating={f.serviceRating} /></span>
+                  {f.type === 'appreciation' && <Badge className="bg-green-100 text-green-800">Appreciation</Badge>}
                 </div>
+                {(f.driverPunctualityRating || f.driverBehaviourRating || f.driverSafetyRating || f.driverRouteKnowledgeRating || f.driverPaymentHandlingRating) && <p className="text-xs text-gray-500">Punctuality {f.driverPunctualityRating || '-'} · Behaviour {f.driverBehaviourRating || '-'} · Safety {f.driverSafetyRating || '-'} · Route {f.driverRouteKnowledgeRating || '-'} · Payment {f.driverPaymentHandlingRating || '-'}</p>}
                 {f.comments && <p className="text-gray-600">{f.comments}</p>}
                 <p className="text-xs text-gray-400">{new Date(f.createdAt).toLocaleDateString('en-IN')}</p>
               </div>
@@ -143,12 +158,13 @@ export default function CustomerService({ customerId, bookings }: Props) {
                     <Badge className={STATUS_BADGE[c.status]}>{c.status.replace(/_/g, ' ')}</Badge>
                   </div>
                   {c.status !== 'closed' && (
-                    <Button size="sm" variant="ghost" onClick={() => { setResolvingComplaint(c); setResolveForm({ status: c.status === 'open' ? 'in_progress' : c.status, correctiveAction: c.correctiveAction || 'none', compensationAmount: '', compensationPoints: '', resolution: c.resolution || '' }); }}>
+                    <Button size="sm" variant="ghost" onClick={() => { setResolvingComplaint(c); setResolveForm({ status: c.status === 'open' ? 'in_progress' : c.status, correctiveAction: c.correctiveAction || 'none', compensationAmount: '', compensationPoints: '', resolution: c.resolution || '', responsibleParty: c.responsibleParty || 'unclear', responsibilityReason: c.responsibilityReason || '' }); }}>
                       Manage
                     </Button>
                   )}
                 </div>
                 <p className="text-gray-700">{c.description}</p>
+                <p className="text-xs text-gray-500 capitalize">Responsibility: {c.responsibleParty || 'unclear'}{c.driverId?.name ? ` · Driver ${c.driverId.name}` : ''}{c.responsibilityReason ? ` · ${c.responsibilityReason}` : ''}</p>
                 {c.correctiveAction && c.correctiveAction !== 'none' && (
                   <p className="text-xs text-green-700">
                     Compensation: {c.correctiveAction.replace(/_/g, ' ')}
@@ -166,30 +182,41 @@ export default function CustomerService({ customerId, bookings }: Props) {
 
       {/* Add feedback dialog */}
       <Dialog open={showFeedbackForm} onOpenChange={setShowFeedbackForm}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Add Feedback</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Booking (Optional)</Label>
+              <Label>Feedback Type</Label>
+              <Select value={feedbackForm.type} onValueChange={(v) => setFeedbackForm((f) => ({ ...f, type: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="feedback">Feedback</SelectItem><SelectItem value="appreciation">Appreciation</SelectItem></SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Booking (required for Driver/Vehicle ratings)</Label>
               <Select value={feedbackForm.bookingId} onValueChange={(v) => setFeedbackForm((f) => ({ ...f, bookingId: v }))}>
                 <SelectTrigger><SelectValue placeholder="Select booking" /></SelectTrigger>
                 <SelectContent>
-                  {bookings.map((b: any) => <SelectItem key={b._id} value={b._id}>{b.bookingId}</SelectItem>)}
+                  {bookings.map((b: any) => <SelectItem key={b._id} value={b._id}>{b.bookingId} · {b.driverId?.name || 'No driver assigned'}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            {(['driverRating', 'vehicleRating', 'serviceRating'] as const).map((field) => (
-              <div key={field} className="flex items-center justify-between">
-                <Label className="capitalize">{field.replace('Rating', ' Rating')}</Label>
+            {([['driverRating', 'Overall Driver'], ['vehicleRating', 'Vehicle'], ['serviceRating', 'Overall Service']] as const).map(([field, label]) => (
+              <div key={field} className="flex items-center justify-between gap-3">
+                <Label>{label}</Label>
                 <div className="flex gap-1">
                   {[1, 2, 3, 4, 5].map((n) => (
-                    <button key={n} type="button" onClick={() => setFeedbackForm((f) => ({ ...f, [field]: n }))}>
+                    <button key={n} type="button" aria-label={`${label} ${n}`} onClick={() => setFeedbackForm((f) => ({ ...f, [field]: n }))}>
                       <Star className={`w-5 h-5 ${n <= (feedbackForm as any)[field] ? "fill-amber-400 text-amber-400" : "text-gray-300"}`} />
                     </button>
                   ))}
                 </div>
               </div>
             ))}
+            <div className="border-t pt-3 space-y-2">
+              <p className="text-sm font-semibold">Detailed Driver Ratings</p>
+              {DRIVER_RATING_FIELDS.map(([field, label]) => <div key={field} className="flex items-center justify-between gap-3"><Label>{label}</Label><div className="flex gap-1">{[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" aria-label={`${label} ${n}`} onClick={() => setFeedbackForm((form) => ({ ...form, [field]: n }))}><Star className={`w-5 h-5 ${n <= feedbackForm[field] ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} /></button>)}</div></div>)}
+            </div>
             <div>
               <Label>Comments</Label>
               <Textarea value={feedbackForm.comments} onChange={(e) => setFeedbackForm((f) => ({ ...f, comments: e.target.value }))} />
@@ -212,7 +239,7 @@ export default function CustomerService({ customerId, bookings }: Props) {
               <Select value={complaintForm.bookingId} onValueChange={(v) => setComplaintForm((f) => ({ ...f, bookingId: v }))}>
                 <SelectTrigger><SelectValue placeholder="Select booking" /></SelectTrigger>
                 <SelectContent>
-                  {bookings.map((b: any) => <SelectItem key={b._id} value={b._id}>{b.bookingId}</SelectItem>)}
+                  {bookings.map((b: any) => <SelectItem key={b._id} value={b._id}>{b.bookingId} · {b.driverId?.name || 'No driver assigned'}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -240,13 +267,21 @@ export default function CustomerService({ customerId, bookings }: Props) {
               </div>
             </div>
             <div>
+              <Label>Verified Responsible Party</Label>
+              <Select value={complaintForm.responsibleParty} onValueChange={(v) => setComplaintForm((f) => ({ ...f, responsibleParty: v, responsibilityReason: v === 'unclear' ? '' : f.responsibilityReason }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="unclear">Unclear / Investigate</SelectItem><SelectItem value="driver">Driver</SelectItem><SelectItem value="company">Company / Office</SelectItem><SelectItem value="vendor">Vendor</SelectItem><SelectItem value="customer">Customer</SelectItem></SelectContent>
+              </Select>
+            </div>
+            {complaintForm.responsibleParty !== 'unclear' && <div><Label>Responsibility Evidence / Reason</Label><Textarea value={complaintForm.responsibilityReason} onChange={(e) => setComplaintForm((f) => ({ ...f, responsibilityReason: e.target.value }))} /></div>}
+            <div>
               <Label>Description</Label>
               <Textarea value={complaintForm.description} onChange={(e) => setComplaintForm((f) => ({ ...f, description: e.target.value }))} />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowComplaintForm(false)}>Cancel</Button>
-            <Button disabled={!complaintForm.description.trim() || addComplaint.isPending} onClick={() => addComplaint.mutate()}>Submit Complaint</Button>
+            <Button disabled={!complaintForm.description.trim() || (complaintForm.responsibleParty !== 'unclear' && !complaintForm.responsibilityReason.trim()) || addComplaint.isPending} onClick={() => addComplaint.mutate()}>Submit Complaint</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -267,6 +302,14 @@ export default function CustomerService({ customerId, bookings }: Props) {
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>Verified Responsible Party</Label>
+              <Select value={resolveForm.responsibleParty} onValueChange={(v) => setResolveForm((f) => ({ ...f, responsibleParty: v, responsibilityReason: v === 'unclear' ? '' : f.responsibilityReason }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="unclear">Unclear / Investigate</SelectItem><SelectItem value="driver">Driver</SelectItem><SelectItem value="company">Company / Office</SelectItem><SelectItem value="vendor">Vendor</SelectItem><SelectItem value="customer">Customer</SelectItem></SelectContent>
+              </Select>
+            </div>
+            {resolveForm.responsibleParty !== 'unclear' && <div><Label>Responsibility Evidence / Reason</Label><Textarea value={resolveForm.responsibilityReason} onChange={(e) => setResolveForm((f) => ({ ...f, responsibilityReason: e.target.value }))} /></div>}
             <div>
               <Label>Corrective Action / Compensation</Label>
               <Select value={resolveForm.correctiveAction} onValueChange={(v) => setResolveForm((f) => ({ ...f, correctiveAction: v }))}>
@@ -302,7 +345,7 @@ export default function CustomerService({ customerId, bookings }: Props) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setResolvingComplaint(null)}>Cancel</Button>
-            <Button disabled={resolveComplaint.isPending} onClick={() => resolveComplaint.mutate()}>Save</Button>
+            <Button disabled={(resolveForm.responsibleParty !== 'unclear' && !resolveForm.responsibilityReason.trim()) || resolveComplaint.isPending} onClick={() => resolveComplaint.mutate()}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
