@@ -57,6 +57,10 @@ function editFormFromCustomer(c: any) {
   };
 }
 
+function newPaymentRequestId() {
+  return `payment_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
 const PAYMENT_TYPES = [
   { value: 'advance', label: 'Advance' },
   { value: 'partial_payment', label: 'Partial Payment' },
@@ -127,6 +131,7 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
   const [viewingBooking, setViewingBooking] = useState<any>(null);
   const [invoiceRequestBookingId, setInvoiceRequestBookingId] = useState<string | null>(null);
   const [paymentForm, setPaymentForm] = useState({ amount: "", paymentType: "advance", paymentMode: "cash", transactionReference: "", receivedBy: "", notes: "" });
+  const [paymentRequestId, setPaymentRequestId] = useState(newPaymentRequestId);
 
   const { data: customer, isLoading: loadingCustomer } = useQuery<any>({
     queryKey: [`/api/customers/${customerId}`],
@@ -179,12 +184,13 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
       const amount = Number(paymentForm.amount);
       if (!amount || amount <= 0) throw new Error("Enter a valid amount");
       return (await apiRequest("POST", `/api/bookings/${payingBooking._id}/payments`, {
-        ...paymentForm, amount,
+        ...paymentForm, amount, requestId: paymentRequestId,
       })).json();
     },
     onSuccess: () => {
       toast({ title: "Payment recorded" });
       setPayingBooking(null);
+      setPaymentRequestId(newPaymentRequestId());
       queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/bookings`] });
       queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/payments`] });
       queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/financial-summary`] });
@@ -488,6 +494,7 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
                     <Button size="sm" onClick={() => {
                       const due = Math.max(0, currentBooking.totalAmount - (currentBooking.advanceReceived || 0));
                       setPayingBooking(currentBooking);
+                      setPaymentRequestId(newPaymentRequestId());
                       setPaymentForm({ amount: String(due), paymentType: currentBooking.advanceReceived ? 'final_payment' : 'advance', paymentMode: 'cash', transactionReference: '', receivedBy: '', notes: '' });
                     }}><IndianRupee className="h-4 w-4 mr-1" /> Record Payment</Button>
                   )}
@@ -545,7 +552,7 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
                       <TableCell>
                         {due > 0 ? (
                           <button
-                            onClick={() => { setPayingBooking(b); setPaymentForm({ amount: String(due), paymentType: b.advanceReceived ? 'final_payment' : 'advance', paymentMode: 'cash', transactionReference: '', receivedBy: '', notes: '' }); }}
+                            onClick={() => { setPayingBooking(b); setPaymentRequestId(newPaymentRequestId()); setPaymentForm({ amount: String(due), paymentType: b.advanceReceived ? 'final_payment' : 'advance', paymentMode: 'cash', transactionReference: '', receivedBy: '', notes: '' }); }}
                             className="flex items-center gap-1 text-red-600 hover:underline font-medium"
                             title="Tap to record a payment"
                           >

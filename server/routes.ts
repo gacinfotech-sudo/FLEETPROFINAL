@@ -2303,7 +2303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/bookings/:id/payments", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const { amount, paymentType, paymentMode, transactionReference, receivedBy, receivedAt, notes } = req.body || {};
+      const { amount, paymentType, paymentMode, transactionReference, receivedBy, receivedAt, notes, requestId } = req.body || {};
       if (!amount || amount <= 0) {
         return res.status(400).json({ message: "A positive amount is required." });
       }
@@ -2314,6 +2314,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const VALID_MODES = ['cash', 'upi', 'bank_transfer', 'card', 'payment_gateway', 'driver_collection', 'vendor_collection', 'credit'];
       if (!VALID_MODES.includes(paymentMode)) {
         return res.status(400).json({ message: `paymentMode must be one of: ${VALID_MODES.join(', ')}` });
+      }
+      if (requestId !== undefined && (typeof requestId !== 'string' || !/^[A-Za-z0-9_-]{8,100}$/.test(requestId))) {
+        return res.status(400).json({ message: "requestId must be 8-100 letters, numbers, underscores, or hyphens." });
       }
 
       const booking = await storage.getBooking(req.params.id, scopeTenant(req));
@@ -2330,6 +2333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receivedAt: receivedAt ? new Date(receivedAt) : undefined,
         notes,
         createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+        idempotencyKey: requestId ? `${req.tenantId}_${req.params.id}_payment_${requestId}` : undefined,
       });
 
       res.json(result);
@@ -2603,6 +2607,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { bookingId, category, severity, description, responsibleParty, responsibilityReason, assignedTo, resolutionDeadline } = req.body || {};
       if (!category || !description || !description.trim()) {
         return res.status(400).json({ message: "category and description are required." });
+      }
+      const validComplaintCategories = ['driver_late', 'driver_behaviour', 'rash_driving', 'vehicle_problem', 'vehicle_cleanliness',
+        'vehicle_breakdown', 'ac_problem', 'wrong_vehicle', 'booking_issue', 'payment_dispute', 'office_communication',
+        'vendor_issue', 'self_drive_issue', 'other'];
+      if (!validComplaintCategories.includes(category)) {
+        return res.status(400).json({ message: "Invalid complaint category." });
+      }
+      if (severity !== undefined && !['low', 'medium', 'high', 'critical'].includes(severity)) {
+        return res.status(400).json({ message: "Invalid complaint severity." });
       }
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
@@ -3886,6 +3899,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer-linked side effects must be identical whether completion is
+  // requested through the generic status action or the dedicated Complete
+  // Trip action. Keeping them here prevents one UI path from silently
+  // skipping rewards, tier updates, or after-sales tasks.
+  async function applyCustomerStatusEffects(booking: any, bookingRecordId: string, status: string, req: AuthRequest) {
+    if (!booking.customerId) return;
+    const customerId = booking.customerId.toString();
+    const actor = { userId: req.userId!, role: req.user?.role || 'client' };
+    try {
+      const result = await recomputeCustomerStats(customerId);
+      if (['completed', 'closed'].includes(status)) {
+        await creditBookingReward(req.tenantId!, customerId, bookingRecordId, booking.totalAmount, actor, result?.completedBookings);
+      }
+      if (status === 'completed') {
+        const alreadyCreated = await CustomerFollowUp.exists({ tenantId: req.tenantId, bookingId: bookingRecordId });
+        if (!alreadyCreated) {
+          const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+          const inAWeek = new Date(); inAWeek.setDate(inAWeek.getDate() + 7);
+          await CustomerFollowUp.insertMany([
+            { tenantId: req.tenantId, customerId, bookingId: bookingRecordId, taskType: 'Confirm safe trip completion', dueDate: new Date(), priority: 'high', createdBy: actor },
+            { tenantId: req.tenantId, customerId, bookingId: bookingRecordId, taskType: 'Ask for driver feedback', dueDate: tomorrow, priority: 'medium', createdBy: actor },
+            { tenantId: req.tenantId, customerId, bookingId: bookingRecordId, taskType: 'Offer repeat booking benefit', dueDate: inAWeek, priority: 'low', createdBy: actor },
+          ]);
+        }
+      }
+      if (['cancelled', 'no_show'].includes(status)) {
+        await reverseBookingReward(req.tenantId!, customerId, bookingRecordId, actor);
+      }
+      if (result) {
+        const tier = await computeLoyaltyTier(req.tenantId!, result);
+        if (result.loyaltyTier !== tier.name) {
+          result.loyaltyTier = tier.name;
+          await result.save();
+        }
+      }
+    } catch (err: any) {
+      console.error('Customer stats/reward recompute failed after status change:', err?.message || err);
+    }
+  }
+
   // The single sanctioned way to change a booking's status. Every status
   // mutation (cancel, complete, assign, dispatch, ...) goes through this
   // so the state machine's transition rules are always enforced.
@@ -3920,45 +3973,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Awaited (not fire-and-forget) because reward crediting needs the
       // freshly-recomputed completedBookings count to detect the repeat-
       // booking-bonus threshold correctly.
-      if ((booking as any).customerId) {
-        const customerId = (booking as any).customerId.toString();
-        const actor = { userId: req.userId!, role: req.user?.role || 'client' };
-        try {
-          const result = await recomputeCustomerStats(customerId);
-          if (['completed', 'closed'].includes(status)) {
-            await creditBookingReward(req.tenantId!, customerId, id, booking.totalAmount, actor, result?.completedBookings);
-          }
-          if (status === 'completed') {
-            // Default after-sales task set for every completed trip — a
-            // real, working starting point per spec section 15, not
-            // configurable per-tenant yet (see Remaining Issues). Guarded
-            // against duplicate creation in case this transition fires
-            // more than once for the same booking (e.g. a retried request).
-            const alreadyCreated = await CustomerFollowUp.exists({ tenantId: req.tenantId, bookingId: id });
-            if (!alreadyCreated) {
-              const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-              const inAWeek = new Date(); inAWeek.setDate(inAWeek.getDate() + 7);
-              await CustomerFollowUp.insertMany([
-                { tenantId: req.tenantId, customerId, bookingId: id, taskType: 'Confirm safe trip completion', dueDate: new Date(), priority: 'high', createdBy: actor },
-                { tenantId: req.tenantId, customerId, bookingId: id, taskType: 'Ask for driver feedback', dueDate: tomorrow, priority: 'medium', createdBy: actor },
-                { tenantId: req.tenantId, customerId, bookingId: id, taskType: 'Offer repeat booking benefit', dueDate: inAWeek, priority: 'low', createdBy: actor },
-              ]);
-            }
-          }
-          if (['cancelled', 'no_show'].includes(status)) {
-            await reverseBookingReward(req.tenantId!, customerId, id, actor);
-          }
-          if (result) {
-            const tier = await computeLoyaltyTier(req.tenantId!, result);
-            if (result.loyaltyTier !== tier.name) {
-              result.loyaltyTier = tier.name;
-              await result.save();
-            }
-          }
-        } catch (err: any) {
-          console.error('Customer stats/reward recompute failed after status change:', err?.message || err);
-        }
-      }
+      await applyCustomerStatusEffects(booking, id, status, req);
 
       const server = (global as any).notificationServer;
       if (server && server.broadcastNotification) {
@@ -4023,6 +4038,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { endOdometer }
       );
       if (!booking) return res.status(404).json({ message: "Booking not found" });
+      await applyCustomerStatusEffects(booking, req.params.id, 'completed', req);
       res.json(booking);
     } catch (error: any) {
       if (error instanceof InvalidTransitionError) {

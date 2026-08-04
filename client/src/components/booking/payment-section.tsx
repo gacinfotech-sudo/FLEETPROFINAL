@@ -19,6 +19,10 @@ function fmtMoney(n?: number) {
   return `₹${(n || 0).toLocaleString("en-IN")}`;
 }
 
+function newPaymentRequestId() {
+  return `payment_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+}
+
 const PAYMENT_TYPE_LABELS: Record<string, string> = {
   advance: "Advance", partial_payment: "Partial Payment", final_payment: "Final Payment",
   refund: "Refund", adjustment: "Adjustment", driver_collection: "Driver Collection", vendor_collection: "Vendor Collection",
@@ -50,6 +54,7 @@ export default function PaymentSection({ booking }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showAddPayment, setShowAddPayment] = useState(false);
+  const [paymentRequestId, setPaymentRequestId] = useState(newPaymentRequestId);
   const bookingId = booking._id || booking.id;
 
   const [form, setForm] = useState({
@@ -76,12 +81,14 @@ export default function PaymentSection({ booking }: Props) {
         transactionReference: form.transactionReference || undefined,
         receivedBy: form.receivedBy || undefined,
         notes: form.notes || undefined,
+        requestId: paymentRequestId,
       });
       return res.json();
     },
     onSuccess: () => {
       toast({ title: "Payment recorded" });
       setShowAddPayment(false);
+      setPaymentRequestId(newPaymentRequestId());
       setForm({ amount: "", paymentType: "partial_payment", paymentMode: "cash", transactionReference: "", receivedBy: "", notes: "" });
       queryClient.invalidateQueries({ queryKey: [`/api/bookings/${bookingId}/payments`] });
       invalidateBookingMoneyQueries(queryClient);
@@ -134,7 +141,7 @@ export default function PaymentSection({ booking }: Props) {
           <Badge variant={booking.paymentStatus === 'paid' ? 'default' : booking.paymentStatus === 'refunded' ? 'destructive' : 'secondary'} className="capitalize">
             {booking.paymentStatus || 'pending'}
           </Badge>
-          <Button size="sm" variant="outline" onClick={() => setShowAddPayment(true)}>
+          <Button size="sm" variant="outline" onClick={() => { setPaymentRequestId(newPaymentRequestId()); setShowAddPayment(true); }}>
             <Plus className="w-3.5 h-3.5 mr-1" />
             Add Payment
           </Button>
