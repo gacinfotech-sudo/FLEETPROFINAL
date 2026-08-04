@@ -65,6 +65,8 @@ import { computeSegments, computeTagCounts, getSegmentFilter } from "./services/
 import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerConsentEvent, Campaign, CampaignRecipient } from "./models/index";
 import { computeCustomerTimeline } from "./services/timelineService";
 import { previewCampaign, sendCampaign } from "./services/campaignService";
+import { Vendor } from "./models/index";
+import { createVendor } from "./services/vendorService";
 import { buildDriverPerformance } from "./services/driverPerformance";
 import { buildVehiclePerformance } from "./services/vehiclePerformance";
 import { DriverLeave, DriverAttendance } from "./models/index";
@@ -3060,6 +3062,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(recipients);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch campaign recipients" });
+    }
+  });
+
+  // ---------------------------------------------------------------------
+  // Vendor 360° — Vendor Master (Phase 1). Drivers/Vehicles/Duty/Ledger/
+  // Settlement are separate follow-up patches; this covers the root
+  // Vendor record every later phase links against via vendorId.
+  // ---------------------------------------------------------------------
+  app.get("/api/vendors", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const { status, search } = req.query as { status?: string; search?: string };
+      const query: any = { tenantId: req.tenantId, isDeleted: { $ne: true } };
+      if (status) query.status = status;
+      if (search) {
+        const normalized = normalizeIndianPhone(search) || '';
+        query.$or = [
+          { companyName: { $regex: search, $options: 'i' } },
+          { contactPerson: { $regex: search, $options: 'i' } },
+          { vendorCode: { $regex: search, $options: 'i' } },
+          ...(normalized ? [{ normalizedMobile: normalized }] : []),
+        ];
+      }
+      const vendors = await Vendor.find(query).sort({ createdAt: -1 });
+      res.json(vendors);
+    } catch (error: any) {
+      console.error('List vendors error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch vendors" });
+    }
+  });
+
+  app.get("/api/vendors/:vendorId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      res.json(vendor);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch vendor" });
+    }
+  });
+
+  app.post("/api/vendors", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_CREATE), async (req: AuthRequest, res) => {
+    try {
+      const { companyName, contactPerson, primaryMobile } = req.body || {};
+      if (!companyName || !companyName.trim()) return res.status(400).json({ message: "Company name is required" });
+      if (!contactPerson || !contactPerson.trim()) return res.status(400).json({ message: "Contact person is required" });
+      if (!primaryMobile) return res.status(400).json({ message: "Primary mobile is required" });
+
+      const vendor = await createVendor({
+        tenantId: req.tenantId!,
+        companyName, contactPerson, primaryMobile,
+        alternateMobile: req.body.alternateMobile,
+        whatsappNumber: req.body.whatsappNumber,
+        email: req.body.email,
+        address: req.body.address,
+        vendorTypes: req.body.vendorTypes,
+        roles: req.body.roles,
+        serviceAreas: req.body.serviceAreas,
+        businessDetails: req.body.businessDetails,
+        bankDetails: req.body.bankDetails,
+        defaultCommercialTerms: req.body.defaultCommercialTerms,
+        internalNotes: req.body.internalNotes,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(vendor);
+    } catch (error: any) {
+      console.error('Create vendor error:', error?.message || error);
+      res.status(400).json({ message: error?.message || "Failed to create vendor" });
+    }
+  });
+
+  // Explicit allowlist merge — never `vendor = req.body`. Nested objects
+  // (businessDetails/bankDetails/address/defaultCommercialTerms) are
+  // shallow-merged onto the existing subdocument so a partial payload
+  // can't blow away fields the caller didn't intend to touch.
+  app.patch("/api/vendors/:vendorId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_EDIT), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      const payload = req.body || {};
+
+      if (payload.companyName !== undefined) vendor.companyName = payload.companyName;
+      if (payload.contactPerson !== undefined) vendor.contactPerson = payload.contactPerson;
+      if (payload.primaryMobile !== undefined) {
+        const normalized = normalizeIndianPhone(payload.primaryMobile);
+        if (!normalized) return res.status(400).json({ message: `Invalid mobile number: "${payload.primaryMobile}"` });
+        vendor.primaryMobile = normalized;
+        vendor.normalizedMobile = normalized;
+      }
+      if (payload.alternateMobile !== undefined) vendor.alternateMobile = payload.alternateMobile;
+      if (payload.whatsappNumber !== undefined) vendor.whatsappNumber = payload.whatsappNumber;
+      if (payload.email !== undefined) vendor.email = payload.email;
+      if (payload.address !== undefined) vendor.address = { ...(vendor.address || {}), ...payload.address };
+      if (payload.vendorTypes !== undefined) vendor.vendorTypes = payload.vendorTypes;
+      if (payload.roles !== undefined) vendor.roles = payload.roles;
+      if (payload.serviceAreas !== undefined) vendor.serviceAreas = payload.serviceAreas;
+      if (payload.businessDetails !== undefined) vendor.businessDetails = { ...(vendor.businessDetails || {}), ...payload.businessDetails };
+      if (payload.bankDetails !== undefined) vendor.bankDetails = { ...(vendor.bankDetails || {}), ...payload.bankDetails };
+      if (payload.defaultCommercialTerms !== undefined) vendor.defaultCommercialTerms = { ...(vendor.defaultCommercialTerms || {}), ...payload.defaultCommercialTerms };
+      if (payload.internalNotes !== undefined) vendor.internalNotes = payload.internalNotes;
+      if (payload.rating !== undefined) vendor.rating = payload.rating;
+      // Immutable / server-derived — never client-settable via PATCH.
+      // (vendorCode, tenantId, status changes go through /block /activate.)
+
+      vendor.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      vendor.version = (vendor.version || 1) + 1;
+      await vendor.save();
+      res.json(vendor);
+    } catch (error: any) {
+      console.error('Update vendor error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update vendor" });
+    }
+  });
+
+  app.post("/api/vendors/:vendorId/block", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_BLOCK), async (req: AuthRequest, res) => {
+    try {
+      const { reason } = req.body || {};
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      vendor.status = 'temporarily_blocked';
+      vendor.suspensionReason = reason;
+      vendor.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      await vendor.save();
+      res.json(vendor);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to block vendor" });
+    }
+  });
+
+  app.post("/api/vendors/:vendorId/activate", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_BLOCK), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      vendor.status = 'active';
+      vendor.suspensionReason = undefined;
+      vendor.blacklistReason = undefined;
+      vendor.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      await vendor.save();
+      res.json(vendor);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to activate vendor" });
     }
   });
 

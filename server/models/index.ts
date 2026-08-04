@@ -1433,6 +1433,135 @@ const CampaignRecipientSchema = new Schema<ICampaignRecipient>({
 CampaignRecipientSchema.index({ campaignId: 1, customerId: 1 }, { unique: true });
 export const CampaignRecipient = mongoose.model<ICampaignRecipient>('CampaignRecipient', CampaignRecipientSchema);
 
+// ---------------------------------------------------------------------
+// Vendor 360°
+// ---------------------------------------------------------------------
+
+// Generic atomic per-tenant sequence generator — `findOneAndUpdate` with
+// `$inc` is a single atomic Mongo operation, so concurrent vendor creation
+// can never hand out the same number twice (unlike `count() + 1`, which
+// races under concurrent inserts).
+export interface ICounter extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  name: string;
+  value: number;
+}
+const CounterSchema = new Schema<ICounter>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  name: { type: String, required: true },
+  value: { type: Number, default: 0 },
+});
+CounterSchema.index({ tenantId: 1, name: 1 }, { unique: true });
+export const Counter = mongoose.model<ICounter>('Counter', CounterSchema);
+
+export type VendorType =
+  | 'taxi_vendor' | 'fleet_owner' | 'travel_agent' | 'booking_agent' | 'tour_operator'
+  | 'vehicle_owner' | 'driver_cum_owner' | 'corporate_transport_vendor' | 'hotel_partner'
+  | 'religious_tour_partner' | 'self_drive_vendor' | 'attached_vehicle_partner'
+  | 'online_booking_partner' | 'other';
+export type VendorRole = 'booking_source' | 'vehicle_provider' | 'driver_provider' | 'complete_duty_provider' | 'commission_partner';
+export type VendorStatus = 'draft' | 'verification_pending' | 'active' | 'temporarily_blocked' | 'suspended' | 'inactive' | 'blacklisted' | 'agreement_expired';
+export type VendorPaymentCycle = 'per_trip' | 'weekly' | 'fortnightly' | 'monthly' | 'on_demand';
+export type CommissionType = 'fixed' | 'percentage' | 'per_booking' | 'per_km' | 'monthly' | 'none' | 'custom';
+
+// Vendor Master — the root record everything else in Vendor 360° (drivers,
+// vehicles, duties, ledger, settlements) hangs off of via vendorId. Money
+// fields here follow this codebase's existing convention (plain rupee
+// Numbers, same as Booking.totalAmount/advanceReceived) rather than the
+// paise-integer convention sometimes used elsewhere, to avoid mixing two
+// units across a single booking->vendor cost calculation.
+export interface IVendor extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  vendorCode: string;
+  companyName: string;
+  contactPerson: string;
+  primaryMobile: string;
+  normalizedMobile: string;
+  alternateMobile?: string;
+  whatsappNumber?: string;
+  email?: string;
+  address?: { line1?: string; line2?: string; city?: string; state?: string; pinCode?: string };
+  vendorTypes: VendorType[];
+  roles: VendorRole[];
+  serviceAreas: string[];
+  businessDetails?: {
+    gstNumber?: string; pan?: string; registrationNumber?: string;
+    agreementNumber?: string; agreementStartDate?: Date; agreementEndDate?: Date;
+    creditLimit?: number; creditPeriodDays?: number; paymentCycle?: VendorPaymentCycle;
+    taxTreatment?: string; tdsApplicable?: boolean;
+  };
+  bankDetails?: {
+    accountHolderName?: string; bankName?: string; accountNumberEncrypted?: string;
+    ifsc?: string; branch?: string; upiId?: string; paymentInstructions?: string;
+  };
+  defaultCommercialTerms?: { commissionType?: CommissionType; commissionValue?: number; rateAgreementNotes?: string };
+  status: VendorStatus;
+  rating?: number;
+  blacklistReason?: string;
+  suspensionReason?: string;
+  internalNotes?: string;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+  isDeleted: boolean;
+  version: number;
+}
+const VendorSchema = new Schema<IVendor>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  vendorCode: { type: String, required: true },
+  companyName: { type: String, required: true },
+  contactPerson: { type: String, required: true },
+  primaryMobile: { type: String, required: true },
+  normalizedMobile: { type: String, required: true },
+  alternateMobile: { type: String },
+  whatsappNumber: { type: String },
+  email: { type: String },
+  address: {
+    line1: { type: String }, line2: { type: String }, city: { type: String },
+    state: { type: String }, pinCode: { type: String },
+  },
+  vendorTypes: [{ type: String }],
+  roles: [{ type: String }],
+  serviceAreas: [{ type: String }],
+  businessDetails: {
+    gstNumber: { type: String }, pan: { type: String }, registrationNumber: { type: String },
+    agreementNumber: { type: String }, agreementStartDate: { type: Date }, agreementEndDate: { type: Date },
+    creditLimit: { type: Number }, creditPeriodDays: { type: Number }, paymentCycle: { type: String },
+    taxTreatment: { type: String }, tdsApplicable: { type: Boolean },
+  },
+  bankDetails: {
+    accountHolderName: { type: String }, bankName: { type: String }, accountNumberEncrypted: { type: String },
+    ifsc: { type: String }, branch: { type: String }, upiId: { type: String }, paymentInstructions: { type: String },
+  },
+  defaultCommercialTerms: {
+    commissionType: { type: String }, commissionValue: { type: Number }, rateAgreementNotes: { type: String },
+  },
+  status: {
+    type: String,
+    enum: ['draft', 'verification_pending', 'active', 'temporarily_blocked', 'suspended', 'inactive', 'blacklisted', 'agreement_expired'],
+    default: 'active',
+  },
+  rating: { type: Number },
+  blacklistReason: { type: String },
+  suspensionReason: { type: String },
+  internalNotes: { type: String },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  isDeleted: { type: Boolean, default: false },
+  version: { type: Number, default: 1 },
+});
+VendorSchema.index({ tenantId: 1, vendorCode: 1 }, { unique: true });
+VendorSchema.index({ tenantId: 1, normalizedMobile: 1 });
+VendorSchema.index({ tenantId: 1, status: 1 });
+VendorSchema.pre('save', function (next) {
+  (this as any).updatedAt = new Date();
+  next();
+});
+export const Vendor = mongoose.model<IVendor>('Vendor', VendorSchema);
+
 export const User = mongoose.model<IUser>('User', UserSchema);
 export const Vehicle = mongoose.model<IVehicle>('Vehicle', VehicleSchema);
 export const Driver = mongoose.model<IDriver>('Driver', DriverSchema);
