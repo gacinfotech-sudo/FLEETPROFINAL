@@ -22,6 +22,7 @@ import CustomerPaymentReceipt from "./customer-payment-receipt";
 import CustomerInvoices from "./customer-invoices";
 import CustomerDrivers from "./customer-drivers";
 import CustomerVehicles from "./customer-vehicles";
+import CustomerGoogleReviews from "./customer-google-reviews";
 
 const CUSTOMER_TYPES = ['individual', 'corporate', 'vip', 'self_drive', 'religious_traveller', 'airport', 'outstation'];
 
@@ -158,6 +159,9 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
   const { data: financial } = useQuery<any>({
     queryKey: [`/api/customers/${customerId}/financial-summary`],
   });
+  const { data: googleReviews = [] } = useQuery<any[]>({
+    queryKey: [`/api/customers/${customerId}/google-reviews`],
+  });
 
   // Profile fields (name, contact, address, company, GST) are directly
   // editable here — they're plain data, not derived from bookings.
@@ -200,6 +204,9 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
   const activeStatuses = ['confirmed', 'vehicle_assigned', 'driver_assigned', 'ready_for_dispatch', 'trip_started', 'ongoing', 'extended', 'return_pending'];
   const currentBooking = rows.find((b: any) => activeStatuses.includes(b.status)) || rows[0];
   const totalDue = financial?.totalPendingDue || 0;
+  const latestGoogleReview = googleReviews[0];
+  const googleReviewByBooking = new Map(googleReviews.filter((review: any) => review.bookingId).map((review: any) => [review.bookingId._id || review.bookingId, review]));
+  const viewingGoogleReview = viewingBooking ? googleReviewByBooking.get(viewingBooking._id) as any : undefined;
 
   return (
     <div className="space-y-6">
@@ -419,6 +426,10 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
           <Label className="text-xs text-gray-500">Reward Points</Label>
           <p className="text-lg font-semibold text-green-700">{customer.rewardPointsBalance || 0}</p>
         </div>
+        <div className="bg-amber-50 rounded-lg p-3">
+          <Label className="text-xs text-gray-500">Google Review</Label>
+          <p className="text-sm font-semibold text-amber-800">{latestGoogleReview?.reviewReceived ? `${latestGoogleReview.reviewRating || '-'}★ Received` : latestGoogleReview?.reviewRequested ? 'Requested · pending' : 'Not requested'}</p>
+        </div>
       </div>
 
       <CustomerRequirements customerId={customerId} bookings={rows} />
@@ -512,12 +523,14 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
                   <TableHead>Advance</TableHead>
                   <TableHead>Due</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Google Review</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.map((b: any) => {
                   const due = Math.max(0, (b.totalAmount || 0) - (b.advanceReceived || 0));
+                  const googleReview = googleReviewByBooking.get(b._id) as any;
                   return (
                     <TableRow key={b._id}>
                       <TableCell className="font-medium">{b.bookingId}</TableCell>
@@ -543,6 +556,7 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
                         )}
                       </TableCell>
                       <TableCell><Badge variant="outline" className="capitalize">{b.status?.replace(/_/g, ' ')}</Badge></TableCell>
+                      <TableCell>{googleReview?.reviewReceived ? <Badge className="bg-green-100 text-green-800">{googleReview.reviewRating || '-'}★ received</Badge> : googleReview?.reviewRequested ? <Badge className="bg-blue-100 text-blue-800">Requested</Badge> : <span className="text-xs text-gray-400">Not requested</span>}</TableCell>
                       <TableCell>
                         <div className="flex gap-1">
                           {!['cancelled', 'no_show'].includes(b.status) && <Button size="sm" variant="ghost" aria-label={`Create Invoice for ${b.bookingId}`} onClick={() => setInvoiceRequestBookingId(b._id)}><ReceiptText className="h-4 w-4" /></Button>}
@@ -568,6 +582,7 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
                 <div><Label className="text-xs text-gray-500">Booking Type</Label><p className="capitalize font-medium">{viewingBooking.bookingType?.replace(/_/g, ' ')}</p></div>
                 <div><Label className="text-xs text-gray-500">Source</Label><p className="capitalize font-medium">{viewingBooking.bookingSource?.replace(/_/g, ' ') || 'Direct customer'}</p></div>
                 <div><Label className="text-xs text-gray-500">Fulfilment</Label><p className="capitalize font-medium">{viewingBooking.fulfilmentType || 'Own fleet'}</p></div>
+                <div><Label className="text-xs text-gray-500">Google Review</Label><p className="font-medium">{viewingGoogleReview?.reviewReceived ? `${viewingGoogleReview.reviewRating || '-'}★ received` : viewingGoogleReview?.reviewRequested ? 'Requested · pending' : 'Not requested'}</p></div>
                 <div className="col-span-2"><Label className="text-xs text-gray-500">Route</Label><p className="font-medium">{viewingBooking.pickupLocation} → {viewingBooking.dropoffLocation || '-'}</p></div>
                 <div><Label className="text-xs text-gray-500">Pickup</Label><p className="font-medium">{new Date(viewingBooking.pickupDate).toLocaleDateString('en-IN')} {viewingBooking.pickupTime || ''}</p></div>
                 <div><Label className="text-xs text-gray-500">Return</Label><p className="font-medium">{viewingBooking.returnDate ? new Date(viewingBooking.returnDate).toLocaleDateString('en-IN') : '-'} {viewingBooking.returnTime || ''}</p></div>
@@ -704,6 +719,8 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
           )}
         </CardContent>
       </Card>
+
+      <CustomerGoogleReviews customerId={customerId} bookings={rows} />
 
       <CustomerRewardsPanel customerId={customerId} rewards={rewards} />
 

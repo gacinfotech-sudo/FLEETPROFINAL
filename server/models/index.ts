@@ -1442,6 +1442,80 @@ const CustomerFollowUpSchema = new Schema<ICustomerFollowUp>({
 CustomerFollowUpSchema.index({ tenantId: 1, status: 1, dueDate: 1 });
 export const CustomerFollowUp = mongoose.model<ICustomerFollowUp>('CustomerFollowUp', CustomerFollowUpSchema);
 
+// Google review tracking is an auditable linked record, not a loose flag
+// on Customer. A customer may be asked after more than one completed trip,
+// while every request/confirmation keeps its original Booking context.
+export interface IGoogleReviewTracking extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  customerId: mongoose.Types.ObjectId;
+  bookingId?: mongoose.Types.ObjectId;
+  reviewPageUrl?: string;
+  reviewRequested: boolean;
+  requestDate?: Date;
+  requestSentThrough?: 'whatsapp' | 'email' | 'sms' | 'phone' | 'in_person' | 'other';
+  requestMessageId?: mongoose.Types.ObjectId;
+  requestHistory: {
+    sentAt: Date;
+    channel: 'whatsapp' | 'email' | 'sms' | 'phone' | 'in_person' | 'other';
+    messageId?: mongoose.Types.ObjectId;
+    requestId?: string;
+    sentBy: { userId: string; role: string };
+  }[];
+  reviewReceived: boolean;
+  reviewDate?: Date;
+  reviewRating?: number;
+  reviewLink?: string;
+  reviewReference?: string;
+  followUpRequired: boolean;
+  responseStatus: 'not_required' | 'pending' | 'responded';
+  respondedAt?: Date;
+  respondedBy?: { userId: string; role: string };
+  notes?: string;
+  reviewConfirmedBy?: { userId: string; role: string };
+  reviewConfirmedAt?: Date;
+  lastUpdatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const GoogleReviewTrackingSchema = new Schema<IGoogleReviewTracking>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  reviewPageUrl: { type: String },
+  reviewRequested: { type: Boolean, default: false },
+  requestDate: { type: Date },
+  requestSentThrough: { type: String, enum: ['whatsapp', 'email', 'sms', 'phone', 'in_person', 'other'] },
+  requestMessageId: { type: Schema.Types.ObjectId, ref: 'WhatsAppMessage' },
+  requestHistory: [{
+    sentAt: { type: Date, required: true },
+    channel: { type: String, enum: ['whatsapp', 'email', 'sms', 'phone', 'in_person', 'other'], required: true },
+    messageId: { type: Schema.Types.ObjectId, ref: 'WhatsAppMessage' },
+    requestId: { type: String },
+    sentBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  }],
+  reviewReceived: { type: Boolean, default: false },
+  reviewDate: { type: Date },
+  reviewRating: { type: Number, min: 1, max: 5 },
+  reviewLink: { type: String },
+  reviewReference: { type: String },
+  followUpRequired: { type: Boolean, default: false },
+  responseStatus: { type: String, enum: ['not_required', 'pending', 'responded'], default: 'not_required' },
+  respondedAt: { type: Date },
+  respondedBy: { userId: { type: String }, role: { type: String } },
+  notes: { type: String },
+  reviewConfirmedBy: { userId: { type: String }, role: { type: String } },
+  reviewConfirmedAt: { type: Date },
+  lastUpdatedBy: { userId: { type: String }, role: { type: String } },
+}, { timestamps: true });
+GoogleReviewTrackingSchema.index({ tenantId: 1, customerId: 1, requestDate: -1 });
+GoogleReviewTrackingSchema.index(
+  { tenantId: 1, customerId: 1, bookingId: 1 },
+  { unique: true, partialFilterExpression: { bookingId: { $type: 'objectId' } } },
+);
+GoogleReviewTrackingSchema.index({ tenantId: 1, reviewReceived: 1, followUpRequired: 1 });
+export const GoogleReviewTracking = mongoose.model<IGoogleReviewTracking>('GoogleReviewTracking', GoogleReviewTrackingSchema);
+
 // Append-only requirement snapshots. A new trip or changed request creates
 // a new row instead of mutating an earlier booking's agreed requirements.
 export interface ICustomerRequirement extends Document {

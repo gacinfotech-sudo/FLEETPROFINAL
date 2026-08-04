@@ -19,6 +19,9 @@ const TYPE_ICON: Record<string, any> = {
   complaint: AlertTriangle,
   complaint_resolved: CheckCircle2,
   follow_up: ClipboardCheck,
+  google_review_request: Star,
+  google_review_received: CheckCircle2,
+  google_review_responded: CheckCircle2,
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -32,6 +35,9 @@ const TYPE_COLOR: Record<string, string> = {
   complaint: "text-red-600 bg-red-50",
   complaint_resolved: "text-green-600 bg-green-50",
   follow_up: "text-cyan-600 bg-cyan-50",
+  google_review_request: "text-blue-600 bg-blue-50",
+  google_review_received: "text-amber-600 bg-amber-50",
+  google_review_responded: "text-green-600 bg-green-50",
 };
 
 // Assembled server-side on read from every collection this customer

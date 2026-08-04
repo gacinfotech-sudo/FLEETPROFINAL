@@ -1,6 +1,7 @@
 import {
   Customer, Booking, PaymentTransaction, RewardTransaction,
   CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerMerge, Invoice,
+  GoogleReviewTracking,
 } from '../models/index';
 
 export interface TimelineEvent {
@@ -24,7 +25,7 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
     Booking.find({ tenantId, customerId }),
   ]);
   const bookingIds = bookings.map((booking: any) => booking._id);
-  const [payments, rewards, tagEvents, feedback, complaints, followUps, requirements, merges, invoices] = await Promise.all([
+  const [payments, rewards, tagEvents, feedback, complaints, followUps, requirements, merges, invoices, googleReviews] = await Promise.all([
     PaymentTransaction.find({ tenantId, bookingId: { $in: bookingIds } }),
     RewardTransaction.find({ tenantId, customerId }),
     CustomerTagEvent.find({ tenantId, customerId }),
@@ -34,6 +35,7 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
     CustomerRequirement.find({ tenantId, customerId }),
     CustomerMerge.find({ tenantId, status: 'completed', $or: [{ targetCustomerId: customerId }, { sourceCustomerId: customerId }] }),
     Invoice.find({ tenantId, customerId }),
+    GoogleReviewTracking.find({ tenantId, customerId }),
   ]);
 
   const events: TimelineEvent[] = [];
@@ -136,6 +138,33 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
       bookingId: invoice.bookingId ? bookingIdMap.get(invoice.bookingId.toString()) : undefined,
       employee: invoice.finalizedBy?.userId || invoice.createdBy?.userId,
     });
+  }
+
+  for (const review of googleReviews as any[]) {
+    for (const request of review.requestHistory || []) {
+      events.push({
+        type: 'google_review_request', date: request.sentAt,
+        description: `Google review requested through ${String(request.channel).replace(/_/g, ' ')}`,
+        bookingId: review.bookingId ? bookingIdMap.get(review.bookingId.toString()) : undefined,
+        employee: request.sentBy?.userId,
+      });
+    }
+    if (review.reviewReceived && review.reviewDate) {
+      events.push({
+        type: 'google_review_received', date: review.reviewDate,
+        description: `Google review received: ${review.reviewRating || '-'}★${review.reviewReference ? ` — ${review.reviewReference}` : ''}`,
+        bookingId: review.bookingId ? bookingIdMap.get(review.bookingId.toString()) : undefined,
+        employee: review.reviewConfirmedBy?.userId,
+      });
+    }
+    if (review.responseStatus === 'responded' && review.respondedAt) {
+      events.push({
+        type: 'google_review_responded', date: review.respondedAt,
+        description: 'Google review response marked as completed',
+        bookingId: review.bookingId ? bookingIdMap.get(review.bookingId.toString()) : undefined,
+        employee: review.respondedBy?.userId,
+      });
+    }
   }
 
   return events

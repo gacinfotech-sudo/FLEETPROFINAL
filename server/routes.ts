@@ -62,7 +62,7 @@ import { findOrCreateCustomer, recomputeCustomerStats, classifyCustomer } from "
 import { creditBookingReward, reverseBookingReward, previewRedemption, commitRedemption, computeLoyaltyTier, getRewardRule, adjustRewardPoints } from "./services/rewardService";
 import { RewardTransaction, RewardRule } from "./models/index";
 import { computeSegments, computeTagCounts, getSegmentFilter } from "./services/segmentService";
-import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerConsentEvent, CustomerBillingProfile, Invoice, Campaign, CampaignRecipient } from "./models/index";
+import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerConsentEvent, CustomerBillingProfile, Invoice, Campaign, CampaignRecipient, GoogleReviewTracking } from "./models/index";
 import { computeCustomerTimeline } from "./services/timelineService";
 import { previewCampaign, sendCampaign } from "./services/campaignService";
 import { buildDriverPerformance } from "./services/driverPerformance";
@@ -82,6 +82,34 @@ const FINANCIAL_FIELDS = [
   'totalAmount', 'paymentStatus', 'tollCharges', 'parkingCharges', 'petrolCharges',
   'dieselCharges', 'cngCharges', 'miscellaneousAmount', 'thirdPartyDriverCharges',
 ];
+
+const GOOGLE_REVIEW_CHANNELS = ['whatsapp', 'email', 'sms', 'phone', 'in_person', 'other'] as const;
+const REVIEW_ELIGIBLE_STATUSES = new Set(['completed', 'payment_pending', 'closed']);
+
+function safeGoogleReviewUrl(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  try {
+    const url = new URL(value.trim());
+    const host = url.hostname.toLowerCase();
+    const googleOwnedHost = host === 'g.page' || host === 'goo.gl' || host.endsWith('.goo.gl')
+      || host === 'google.com' || host.endsWith('.google.com');
+    return ['http:', 'https:'].includes(url.protocol) && googleOwnedHost ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function googleReviewRequestMessage(customer: any, booking: any, tenant: any, reviewPageUrl: string) {
+  const business = tenant?.businessName || tenant?.name || 'FleetPro';
+  return [
+    `Namaste ${customer.name || 'Customer'} ji,`,
+    `Booking ${booking.bookingId} (${booking.pickupLocation} → ${booking.dropoffLocation || '-'}) ke liye dhanyavaad.`,
+    'Aap apna genuine experience Google par share kar sakte hain:',
+    reviewPageUrl,
+    'Review dena poori tarah optional hai. Aapke honest feedback se hume service improve karne mein madad milegi.',
+    `- ${business}`,
+  ].join('\n');
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // P0 SECURITY HELPER: admin users are allowed cross-tenant access (see
@@ -2841,6 +2869,261 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Update follow-up error:', error?.message || error);
       res.status(500).json({ message: "Failed to update follow-up task" });
+    }
+  });
+
+  // Google review tracking is deliberately confirmation-based. Sending a
+  // request never marks a review as received; only the evidence-gated
+  // /received action below can do that.
+  app.get("/api/customers/:id/google-reviews", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid customer ID" });
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      const rows = await GoogleReviewTracking.find({ tenantId: req.tenantId, customerId: req.params.id })
+        .populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status')
+        .populate('requestMessageId', 'status provider providerMessageId sentAt')
+        .sort({ requestDate: -1, reviewDate: -1, createdAt: -1 });
+      res.json(rows);
+    } catch (error: any) {
+      console.error('List Google reviews error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch Google review tracking" });
+    }
+  });
+
+  app.post("/api/customers/:id/google-reviews/request", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      const { bookingId, channel, reviewPageUrl, requestId, confirmedSent } = req.body || {};
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid customer ID" });
+      if (!mongoose.isValidObjectId(bookingId)) return res.status(400).json({ message: "A valid completed booking is required" });
+      if (!GOOGLE_REVIEW_CHANNELS.includes(channel)) return res.status(400).json({ message: "Invalid review request channel" });
+      if (typeof requestId !== 'string' || !/^[A-Za-z0-9_-]{8,100}$/.test(requestId)) {
+        return res.status(400).json({ message: "A valid requestId is required" });
+      }
+      const pageUrl = safeGoogleReviewUrl(reviewPageUrl);
+      if (!pageUrl) return res.status(400).json({ message: "A valid Google review page URL is required" });
+
+      const [customer, booking, tenant] = await Promise.all([
+        Customer.findOne({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } }),
+        Booking.findOne({ _id: bookingId, tenantId: req.tenantId, customerId: req.params.id }),
+        storage.getTenant(req.tenantId!),
+      ]);
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      if (!booking) return res.status(400).json({ message: "bookingId does not belong to this customer" });
+      if (!REVIEW_ELIGIBLE_STATUSES.has(booking.status)) {
+        return res.status(400).json({ message: "Google review requests are allowed only after trip completion" });
+      }
+
+      let tracking = await GoogleReviewTracking.findOne({ tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id });
+      if (tracking?.reviewReceived) return res.status(409).json({ message: "A received Google review is already confirmed for this booking" });
+      const previousAttempt = tracking?.requestHistory?.find((attempt: any) => attempt.requestId === requestId);
+      if (previousAttempt) {
+        await tracking!.populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status');
+        return res.json({ alreadyProcessed: true, review: tracking });
+      }
+
+      const actor = { userId: req.userId!, role: req.user?.role || 'client' };
+      let messageDoc: any;
+      let sentAt = new Date();
+      if (channel === 'whatsapp') {
+        if (customer.status === 'do_not_contact' || customer.consent?.whatsapp === false) {
+          return res.status(400).json({ message: "Customer has opted out of WhatsApp messages" });
+        }
+        const recipientPhone = normalizeIndianPhone(customer.whatsappNumber || customer.primaryMobile);
+        if (!recipientPhone) return res.status(400).json({ message: "Customer WhatsApp number is invalid" });
+        const idempotencyKey = `${req.tenantId}_${customer._id}_google_review_request_${requestId}`;
+        messageDoc = await WhatsAppMessage.findOne({ idempotencyKey, status: { $in: ['queued', 'sent'] } });
+        if (messageDoc?.status === 'queued') {
+          return res.status(409).json({ message: "This Google review request is already being processed" });
+        }
+        if (!messageDoc) {
+          messageDoc = await WhatsAppMessage.create({
+            tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id,
+            recipientType: 'customer', recipientPhone, messageType: 'customer_google_review_request',
+            content: googleReviewRequestMessage(customer, booking, tenant, pageUrl),
+            provider: whatsappProvider.kind, status: 'queued', attemptCount: 0, createdBy: actor, idempotencyKey,
+          });
+          const result = await whatsappProvider.sendText(req.tenantId!, recipientPhone, messageDoc.content);
+          messageDoc.attemptCount = 1;
+          messageDoc.status = result.status === 'sent' ? 'sent' : 'failed';
+          messageDoc.providerMessageId = result.providerMessageId || undefined;
+          messageDoc.error = result.error || undefined;
+          if (result.status === 'sent') messageDoc.sentAt = new Date();
+          await messageDoc.save();
+          if (result.status !== 'sent') {
+            return res.status(502).json({ message: result.error || "Google review request was not sent", messageDoc });
+          }
+        }
+        sentAt = messageDoc.sentAt || messageDoc.createdAt || sentAt;
+      } else if (confirmedSent !== true) {
+        return res.status(400).json({ message: "Confirm that the review request was actually sent through this channel" });
+      }
+
+      if (!tracking) {
+        tracking = new GoogleReviewTracking({ tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id });
+      }
+      tracking.reviewPageUrl = pageUrl;
+      tracking.reviewRequested = true;
+      tracking.requestDate = sentAt;
+      tracking.requestSentThrough = channel;
+      tracking.requestMessageId = messageDoc?._id;
+      tracking.followUpRequired = true;
+      tracking.lastUpdatedBy = actor;
+      tracking.requestHistory.push({ sentAt, channel, messageId: messageDoc?._id, requestId, sentBy: actor });
+      await tracking.save();
+
+      const openReviewTask = await CustomerFollowUp.exists({
+        tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id,
+        taskType: 'Google review follow-up', status: { $nin: ['resolved', 'closed', 'do_not_contact'] },
+      });
+      if (!openReviewTask) {
+        const dueDate = new Date(sentAt); dueDate.setDate(dueDate.getDate() + 3);
+        await CustomerFollowUp.create({
+          tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id,
+          taskType: 'Google review follow-up', dueDate, priority: 'low',
+          notes: `Review requested through ${String(channel).replace(/_/g, ' ')}`,
+          createdBy: actor,
+        });
+      }
+      await tracking.populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status');
+      res.status(201).json({ alreadyProcessed: false, review: tracking, message: messageDoc });
+    } catch (error: any) {
+      if (error?.code === 11000) return res.status(409).json({ message: "This review request is already being processed" });
+      console.error('Send Google review request error:', error?.message || error);
+      res.status(500).json({ message: "Failed to send Google review request" });
+    }
+  });
+
+  app.put("/api/customers/:id/google-reviews/:reviewId/received", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      const { confirmedReceived, reviewDate, reviewRating, reviewLink, reviewReference, responseStatus, notes } = req.body || {};
+      if (!mongoose.isValidObjectId(req.params.id) || !mongoose.isValidObjectId(req.params.reviewId)) {
+        return res.status(400).json({ message: "Invalid customer or review ID" });
+      }
+      if (confirmedReceived !== true) return res.status(400).json({ message: "Explicit review-received confirmation is required" });
+      const rating = Number(reviewRating);
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ message: "Google review rating must be a whole number from 1 to 5" });
+      const link = reviewLink ? safeGoogleReviewUrl(reviewLink) : undefined;
+      if (reviewLink && !link) return res.status(400).json({ message: "Review link must be a valid HTTP or HTTPS URL" });
+      if (!link && (typeof reviewReference !== 'string' || reviewReference.trim().length < 3)) {
+        return res.status(400).json({ message: "Add the actual review link or a screenshot/reference before confirming receipt" });
+      }
+      if (responseStatus && !['not_required', 'pending', 'responded'].includes(responseStatus)) {
+        return res.status(400).json({ message: "Invalid review response status" });
+      }
+      const receivedAt = reviewDate ? new Date(reviewDate) : new Date();
+      if (Number.isNaN(receivedAt.getTime()) || receivedAt.getTime() > Date.now() + 300000) {
+        return res.status(400).json({ message: "Review date is invalid or in the future" });
+      }
+
+      const review = await GoogleReviewTracking.findOne({ _id: req.params.reviewId, tenantId: req.tenantId, customerId: req.params.id });
+      if (!review) return res.status(404).json({ message: "Google review tracking record not found" });
+      if (review.reviewReceived) {
+        await review.populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status');
+        return res.json(review);
+      }
+
+      const actor = { userId: req.userId!, role: req.user?.role || 'client' };
+      review.reviewReceived = true;
+      review.reviewDate = receivedAt;
+      review.reviewRating = rating;
+      review.reviewLink = link;
+      review.reviewReference = typeof reviewReference === 'string' ? reviewReference.trim() : undefined;
+      review.followUpRequired = false;
+      review.responseStatus = responseStatus || 'pending';
+      review.notes = typeof notes === 'string' ? notes.trim() : review.notes;
+      review.reviewConfirmedBy = actor;
+      review.reviewConfirmedAt = new Date();
+      review.lastUpdatedBy = actor;
+      if (review.responseStatus === 'responded') {
+        review.respondedAt = new Date();
+        review.respondedBy = actor;
+      }
+      await review.save();
+      await CustomerFollowUp.updateMany({
+        tenantId: req.tenantId, customerId: req.params.id, bookingId: review.bookingId,
+        taskType: 'Google review follow-up', status: { $nin: ['resolved', 'closed'] },
+      }, {
+        $set: { status: 'resolved', resolution: 'Google review receipt confirmed with evidence.', communicationResult: `Received ${rating}-star Google review.` },
+      });
+      await review.populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status');
+      res.json(review);
+    } catch (error: any) {
+      console.error('Confirm Google review receipt error:', error?.message || error);
+      res.status(500).json({ message: "Failed to confirm Google review receipt" });
+    }
+  });
+
+  app.put("/api/customers/:id/google-reviews/:reviewId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id) || !mongoose.isValidObjectId(req.params.reviewId)) {
+        return res.status(400).json({ message: "Invalid customer or review ID" });
+      }
+      const review = await GoogleReviewTracking.findOne({ _id: req.params.reviewId, tenantId: req.tenantId, customerId: req.params.id });
+      if (!review) return res.status(404).json({ message: "Google review tracking record not found" });
+      const { reviewPageUrl, reviewLink, reviewReference, reviewRating, reviewDate, followUpRequired, responseStatus, notes } = req.body || {};
+      if (reviewPageUrl !== undefined) {
+        const value = safeGoogleReviewUrl(reviewPageUrl);
+        if (!value) return res.status(400).json({ message: "Google review page URL is invalid" });
+        review.reviewPageUrl = value;
+      }
+      if (reviewLink !== undefined) {
+        const value = reviewLink ? safeGoogleReviewUrl(reviewLink) : undefined;
+        if (reviewLink && !value) return res.status(400).json({ message: "Review link is invalid" });
+        review.reviewLink = value;
+      }
+      if (reviewReference !== undefined) review.reviewReference = String(reviewReference).trim() || undefined;
+      if (reviewRating !== undefined) {
+        if (!review.reviewReceived) return res.status(400).json({ message: "Confirm the review receipt before adding its rating" });
+        const rating = Number(reviewRating);
+        if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ message: "Google review rating must be a whole number from 1 to 5" });
+        review.reviewRating = rating;
+      }
+      if (reviewDate !== undefined) {
+        if (!review.reviewReceived) return res.status(400).json({ message: "Confirm the review receipt before changing its date" });
+        const value = new Date(reviewDate);
+        if (Number.isNaN(value.getTime()) || value.getTime() > Date.now() + 300000) return res.status(400).json({ message: "Review date is invalid or in the future" });
+        review.reviewDate = value;
+      }
+      if (followUpRequired !== undefined) {
+        if (typeof followUpRequired !== 'boolean') return res.status(400).json({ message: "followUpRequired must be boolean" });
+        review.followUpRequired = followUpRequired;
+      }
+      const actor = { userId: req.userId!, role: req.user?.role || 'client' };
+      if (responseStatus !== undefined) {
+        if (!['not_required', 'pending', 'responded'].includes(responseStatus)) return res.status(400).json({ message: "Invalid review response status" });
+        if (responseStatus !== 'not_required' && !review.reviewReceived) return res.status(400).json({ message: "A response status requires a confirmed received review" });
+        review.responseStatus = responseStatus;
+        if (responseStatus === 'responded' && !review.respondedAt) {
+          review.respondedAt = new Date();
+          review.respondedBy = actor;
+        } else if (responseStatus !== 'responded') {
+          review.respondedAt = undefined;
+          review.respondedBy = undefined;
+        }
+      }
+      if (notes !== undefined) review.notes = String(notes).trim() || undefined;
+      review.lastUpdatedBy = actor;
+      await review.save();
+
+      if (review.followUpRequired) {
+        const openTask = await CustomerFollowUp.exists({
+          tenantId: req.tenantId, customerId: req.params.id, bookingId: review.bookingId,
+          taskType: 'Google review follow-up', status: { $nin: ['resolved', 'closed', 'do_not_contact'] },
+        });
+        if (!openTask) {
+          const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + 3);
+          await CustomerFollowUp.create({
+            tenantId: req.tenantId, customerId: req.params.id, bookingId: review.bookingId,
+            taskType: 'Google review follow-up', dueDate, priority: 'low', notes: 'Added from Google Review tracking.', createdBy: actor,
+          });
+        }
+      }
+      await review.populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status');
+      res.json(review);
+    } catch (error: any) {
+      console.error('Update Google review tracking error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update Google review tracking" });
     }
   });
 
