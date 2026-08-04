@@ -1,0 +1,221 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Phone, MessageCircle, RefreshCw, AlertTriangle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+
+type Bucket = "startDue" | "startDelayed" | "startingSoon" | "ongoing" | "endingSoon" | "completionOverdue" | "paymentPending" | "completedToday" | "delayed" | "unassigned" | "cancelled";
+
+const TABS: { key: Bucket; label: string }[] = [
+  { key: "startDue", label: "Start Due" },
+  { key: "startDelayed", label: "Start Delayed" },
+  { key: "startingSoon", label: "Starting Soon" },
+  { key: "ongoing", label: "Ongoing Trips" },
+  { key: "endingSoon", label: "Ending Soon" },
+  { key: "completionOverdue", label: "Completion Overdue" },
+  { key: "paymentPending", label: "Payment Pending" },
+  { key: "completedToday", label: "Completed Today" },
+  { key: "delayed", label: "Delayed / Attention" },
+  { key: "unassigned", label: "Unassigned" },
+  { key: "cancelled", label: "Cancelled" },
+];
+
+function fmtDate(d?: string) {
+  if (!d) return "-";
+  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+}
+
+function formatMoney(n?: number) {
+  if (n === undefined || n === null) return "-";
+  return `₹${n.toLocaleString("en-IN")}`;
+}
+
+export default function LiveBookings() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<Bucket>("startDue");
+  const [startingWindow, setStartingWindow] = useState("today");
+  const [endingWindow, setEndingWindow] = useState("today");
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: [`/api/operations/live-bookings?startingWindow=${startingWindow}&endingWindow=${endingWindow}`],
+    refetchInterval: 60000, // gentle auto-refresh, not a tight poll loop
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await apiRequest("POST", `/api/bookings/${id}/status`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/operations/live-bookings?startingWindow=${startingWindow}&endingWindow=${endingWindow}`] });
+      toast({ title: "Status updated" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not change status", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const rows: any[] = (data as any)?.[activeTab] || [];
+
+  const nextActionFor = (status: string): { label: string; next: string } | null => {
+    const map: Record<string, { label: string; next: string }> = {
+      confirmed: { label: "Assign Vehicle", next: "vehicle_assigned" },
+      vehicle_assigned: { label: "Assign Driver", next: "driver_assigned" },
+      driver_assigned: { label: "Ready for Dispatch", next: "ready_for_dispatch" },
+      ready_for_dispatch: { label: "Start Trip", next: "trip_started" },
+      trip_started: { label: "Mark Ongoing", next: "ongoing" },
+      ongoing: { label: "Return Pending", next: "return_pending" },
+      return_pending: { label: "Complete Trip", next: "completed" },
+      completed: { label: "Close Booking", next: "closed" },
+    };
+    return map[status] || null;
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Live Bookings</h1>
+          <p className="text-sm text-gray-500">
+            {(data as any)?.generatedAt ? `Updated ${new Date((data as any).generatedAt).toLocaleTimeString()}` : ""}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={startingWindow} onValueChange={setStartingWindow}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="Starting window" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1h">Next 1 hour</SelectItem>
+              <SelectItem value="3h">Next 3 hours</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="tomorrow">Tomorrow</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={endingWindow} onValueChange={setEndingWindow}>
+            <SelectTrigger className="w-40"><SelectValue placeholder="Ending window" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1h">Next 1 hour</SelectItem>
+              <SelectItem value="3h">Next 3 hours</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => queryClient.invalidateQueries({ queryKey: [`/api/operations/live-bookings?startingWindow=${startingWindow}&endingWindow=${endingWindow}`] })}
+          >
+            <RefreshCw className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as Bucket)}>
+        <TabsList className="flex-wrap h-auto">
+          {TABS.map((t) => (
+            <TabsTrigger key={t.key} value={t.key}>
+              {t.label}
+              {data ? <Badge variant="secondary" className="ml-2">{((data as any)[t.key] || []).length}</Badge> : null}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {TABS.map((t) => (
+          <TabsContent key={t.key} value={t.key}>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">{t.label}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <p className="text-sm text-gray-500">Loading...</p>
+                ) : isError ? (
+                  <p className="text-sm text-red-600">Failed to load live bookings.</p>
+                ) : rows.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-6 text-center">No bookings in this bucket.</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableCell>Booking</TableCell>
+                        <TableCell>Customer</TableCell>
+                        <TableCell>Pickup</TableCell>
+                        <TableCell>Vehicle / Driver</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Payment</TableCell>
+                        <TableCell>Flags</TableCell>
+                        <TableCell>Actions</TableCell>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((b) => {
+                        const nextAction = nextActionFor(b.status);
+                        return (
+                          <TableRow key={b.id}>
+                            <TableCell className="font-mono text-xs">{b.bookingId}</TableCell>
+                            <TableCell>{b.customerName}</TableCell>
+                            <TableCell>{fmtDate(b.pickupDate)} {b.pickupTime || ""}</TableCell>
+                            <TableCell className="text-sm">
+                              {b.fulfilmentType === "vendor" ? (
+                                <Badge variant="secondary" className="mb-1">Vendor: {b.vendorName || "unnamed"}</Badge>
+                              ) : (
+                                <>
+                                  {b.vehicle ? `${b.vehicle.make} (${b.vehicle.registrationNumber || "-"})` : "No vehicle"}
+                                  <br />
+                                  {b.driver ? b.driver.name : (b.bookingType === "self_drive" ? "Self-drive" : "No driver")}
+                                </>
+                              )}
+                            </TableCell>
+                            <TableCell><Badge variant="outline">{b.status.replace(/_/g, " ")}</Badge></TableCell>
+                            <TableCell>
+                              <div>{formatMoney(b.totalAmount)}</div>
+                              <Badge variant={b.paymentStatus === "paid" ? "default" : "destructive"} className="text-xs">
+                                {b.paymentStatus}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                {b.flags?.driverNotAssigned && <span className="flex items-center text-xs text-amber-600"><AlertTriangle className="w-3 h-3 mr-1" />No driver</span>}
+                                {b.flags?.vehicleNotAssigned && <span className="flex items-center text-xs text-amber-600"><AlertTriangle className="w-3 h-3 mr-1" />No vehicle</span>}
+                                {b.flags?.advancePaymentPending && <span className="flex items-center text-xs text-red-600"><AlertTriangle className="w-3 h-3 mr-1" />Payment due</span>}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <a href={`tel:${b.customerPhone}`} title="Call customer">
+                                  <Button variant="ghost" size="icon"><Phone className="w-4 h-4" /></Button>
+                                </a>
+                                <a href={`https://wa.me/${b.customerPhone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="WhatsApp customer">
+                                  <Button variant="ghost" size="icon"><MessageCircle className="w-4 h-4" /></Button>
+                                </a>
+                                {nextAction && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={statusMutation.isPending}
+                                    onClick={() => statusMutation.mutate({ id: b.id, status: nextAction.next })}
+                                  >
+                                    {nextAction.label}
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        ))}
+      </Tabs>
+    </div>
+  );
+}

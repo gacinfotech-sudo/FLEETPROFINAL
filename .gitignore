@@ -1,0 +1,18 @@
+node_modules
+dist
+.DS_Store
+server/public
+vite.config.ts.*
+*.tar.gz
+# Security - never commit these
+ADMIN_CREDENTIALS.md
+cookies.txt
+test-login.js
+*.env
+.env
+.env.local
+.env.production
+uploads/
+# WhatsApp session credentials (per-tenant login state) — equivalent to a
+# live auth token, never commit
+whatsapp-sessions/
