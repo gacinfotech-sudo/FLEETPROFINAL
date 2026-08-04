@@ -3,6 +3,7 @@ import {
   Booking, Customer, CustomerBillingProfile, Invoice, PaymentTransaction, Tenant, User,
 } from '../models/index';
 import { computePaymentSummary } from './paymentLedger';
+import { nextInvoiceNumber, getInvoiceSettings } from './invoiceSettingsService';
 
 export const INVOICE_TYPES = [
   'tax_invoice', 'non_gst_invoice', 'proforma_invoice', 'payment_receipt',
@@ -10,15 +11,6 @@ export const INVOICE_TYPES = [
 ] as const;
 
 const roundMoney = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
-const prefix: Record<string, string> = {
-  tax_invoice: 'TAX', non_gst_invoice: 'INV', proforma_invoice: 'PRO', payment_receipt: 'RCT',
-  credit_note: 'CRN', debit_note: 'DBN', customer_statement: 'STM',
-};
-
-function invoiceNumber(documentType: string) {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  return `${prefix[documentType] || 'DOC'}-${date}-${nanoid(6).toUpperCase()}`;
-}
 
 function error(message: string, status = 400) {
   return Object.assign(new Error(message), { status });
@@ -33,12 +25,13 @@ async function loadContext(input: {
   if (!INVOICE_TYPES.includes(input.documentType as any) || ['credit_note', 'debit_note'].includes(input.documentType)) {
     throw error('Invalid invoice document type. Credit/debit notes must be created from a finalized invoice.');
   }
-  const [customer, booking, tenant, owner] = await Promise.all([
+  const [customer, booking, tenant, owner, invoiceSettings] = await Promise.all([
     Customer.findOne({ _id: input.customerId, tenantId: input.tenantId, isDeleted: { $ne: true } }).lean(),
     Booking.findOne({ _id: input.bookingId, tenantId: input.tenantId, customerId: input.customerId })
       .populate('vehicleId', 'make vehicleModel licensePlate type').lean(),
     Tenant.findById(input.tenantId).lean(),
     User.findOne({ tenantId: input.tenantId, role: 'client' }).select('businessDetails').lean(),
+    getInvoiceSettings(input.tenantId),
   ]);
   if (!customer || !booking || !tenant) throw error('Customer or booking not found.', 404);
   if (['cancelled', 'no_show'].includes((booking as any).status)) throw error('Cancelled or no-show bookings are not eligible for an invoice.');
@@ -52,7 +45,7 @@ async function loadContext(input: {
   const payment = computePaymentSummary((booking as any).totalAmount || 0, paymentRows);
   const documentType = input.documentType;
   const discount = Math.max(0, Number(input.discount) || 0);
-  const gstRate = documentType === 'tax_invoice' ? Math.min(100, Math.max(0, Number(input.gstRate) || 18)) : 0;
+  const gstRate = documentType === 'tax_invoice' ? Math.min(100, Math.max(0, Number(input.gstRate) || invoiceSettings.defaultGstRate || 18)) : 0;
   const tollParkingTreatment = input.tollParkingTreatment === 'separate_non_taxable' ? 'separate_non_taxable' : 'included';
   const tollAmount = Math.max(0, Number((booking as any).tollCharges) || 0);
   const parkingAmount = Math.max(0, Number((booking as any).parkingCharges) || 0);
@@ -94,11 +87,28 @@ async function loadContext(input: {
       customerType: (customer as any).customerType,
     },
     billingSnapshot,
+    // InvoiceSettings (once a tenant has configured it) wins over the
+    // older, more generic User.businessDetails — that field stays exactly
+    // as-is and remains the fallback for any tenant that never opened
+    // Invoice Settings.
     businessSnapshot: {
-      businessName: business.businessName || (tenant as any).businessName || (tenant as any).name,
-      ownerName: business.ownerName, address: business.businessAddress || (tenant as any).address,
-      gstNumber: business.gstNumber, email: business.businessEmail || (tenant as any).email,
-      phone: business.businessPhone || (tenant as any).phone, logoUrl: business.logoUrl, signatureUrl: business.signatureUrl,
+      businessName: invoiceSettings.legalCompanyName || business.businessName || (tenant as any).businessName || (tenant as any).name,
+      brandName: invoiceSettings.brandName,
+      ownerName: business.ownerName,
+      address: invoiceSettings.registeredAddress || business.businessAddress || (tenant as any).address,
+      branchAddress: invoiceSettings.branchAddress,
+      gstNumber: invoiceSettings.gstNumber || business.gstNumber,
+      panNumber: invoiceSettings.panNumber,
+      email: invoiceSettings.email || business.businessEmail || (tenant as any).email,
+      phone: invoiceSettings.mobile || business.businessPhone || (tenant as any).phone,
+      website: invoiceSettings.website,
+      logoUrl: invoiceSettings.logoUrl || business.logoUrl,
+      signatureUrl: invoiceSettings.signatureUrl || business.signatureUrl,
+      authorizedSignatoryName: invoiceSettings.authorizedSignatoryName,
+      bankAccountName: invoiceSettings.bankAccountName, bankName: invoiceSettings.bankName,
+      bankAccountNumber: invoiceSettings.bankAccountNumber, bankIfsc: invoiceSettings.bankIfsc,
+      bankBranch: invoiceSettings.bankBranch, paymentQrUrl: invoiceSettings.paymentQrUrl,
+      invoiceFooterMessage: invoiceSettings.invoiceFooterMessage,
     },
     bookingSnapshot: {
       bookingNumber: (booking as any).bookingId, pickupDate: (booking as any).pickupDate,
@@ -116,10 +126,13 @@ async function loadContext(input: {
     tollAmount, parkingAmount, adjustmentAmount: 0, totalAmount,
     amountReceived, balanceDue: roundMoney(Math.max(0, totalAmount - amountReceived)),
     paymentTerms: input.paymentTerms || billingProfile?.paymentTerms
-      || (fallbackBilling.creditPeriodDays ? `Net ${fallbackBilling.creditPeriodDays} days` : undefined),
-    bankDetails: input.bankDetails || fallbackBilling.bankPaymentInstructions,
-    upiId: input.upiId,
-    termsAndConditions: input.termsAndConditions || 'Payment is subject to the agreed booking terms and cancellation policy.',
+      || (fallbackBilling.creditPeriodDays ? `Net ${fallbackBilling.creditPeriodDays} days` : undefined)
+      || invoiceSettings.defaultPaymentTerms,
+    bankDetails: input.bankDetails || fallbackBilling.bankPaymentInstructions
+      || (invoiceSettings.bankAccountNumber ? [invoiceSettings.bankAccountName, invoiceSettings.bankName, invoiceSettings.bankAccountNumber && `A/C ${invoiceSettings.bankAccountNumber}`, invoiceSettings.bankIfsc && `IFSC ${invoiceSettings.bankIfsc}`].filter(Boolean).join(', ') : undefined),
+    upiId: input.upiId || invoiceSettings.upiId,
+    termsAndConditions: input.termsAndConditions || invoiceSettings.defaultTermsAndConditions
+      || 'Payment is subject to the agreed booking terms and cancellation policy.',
   };
 }
 
@@ -168,7 +181,7 @@ export async function createInvoiceDraft(input: Parameters<typeof loadContext>[0
   const context = await loadContext(input);
   try {
     const invoice = await Invoice.create({
-      ...context, sourceKey, invoiceNumber: input.invoiceNumber?.trim() || invoiceNumber(input.documentType),
+      ...context, sourceKey, invoiceNumber: input.invoiceNumber?.trim() || await nextInvoiceNumber(input.tenantId, input.documentType),
       status: 'draft', revisionNumber: 1, createdBy: input.actor,
     });
     return { invoice, alreadyExists: false };
@@ -253,7 +266,7 @@ export async function createAdjustmentNote(input: {
   if (!input.reason?.trim()) throw error('Adjustment reason is required.');
   return Invoice.create({
     tenantId: input.tenantId, customerId: original.customerId, bookingId: original.bookingId,
-    billingProfileId: original.billingProfileId, invoiceNumber: invoiceNumber(input.noteType),
+    billingProfileId: original.billingProfileId, invoiceNumber: await nextInvoiceNumber(input.tenantId, input.noteType),
     sourceKey: `${input.tenantId}_${original._id}_${input.noteType}_${nanoid(8)}`,
     documentType: input.noteType, status: 'draft', revisionNumber: 1, relatedInvoiceId: original._id,
     invoiceDate: new Date(), customerSnapshot: original.customerSnapshot, billingSnapshot: original.billingSnapshot,

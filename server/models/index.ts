@@ -1765,6 +1765,110 @@ InvoiceSchema.index({ tenantId: 1, customerId: 1, createdAt: -1 });
 InvoiceSchema.index({ tenantId: 1, bookingId: 1, status: 1 });
 export const Invoice = mongoose.model<IInvoice>('Invoice', InvoiceSchema);
 
+// Generic atomic per-tenant sequence generator — `findOneAndUpdate` with
+// `$inc` is a single atomic Mongo operation, so concurrent invoice
+// creation can never hand out the same number twice (unlike
+// `count() + 1`, which races under concurrent inserts). Used for
+// financial-year-aware invoice numbering below.
+export interface ICounter extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  name: string;
+  value: number;
+}
+const CounterSchema = new Schema<ICounter>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  name: { type: String, required: true },
+  value: { type: Number, default: 0 },
+});
+CounterSchema.index({ tenantId: 1, name: 1 }, { unique: true });
+export const Counter = mongoose.model<ICounter>('Counter', CounterSchema);
+
+// Tenant-specific invoice configuration — company/tax/bank details used to
+// render the PDF header/footer and WhatsApp templates, plus the numbering
+// scheme. Deliberately a SEPARATE document from User.businessDetails
+// (which already exists and stays exactly as-is, still used as a
+// fallback in invoiceService.ts's businessSnapshot) rather than folded
+// into it, since invoice prefixes/bank details/T&C are invoice-specific
+// configuration, not a generic company profile. Changing these settings
+// only affects invoices generated AFTER the change — every existing
+// finalized invoice already carries its own immutable businessSnapshot.
+export interface IInvoiceSettings extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  legalCompanyName?: string;
+  brandName?: string;
+  logoUrl?: string;
+  gstNumber?: string;
+  panNumber?: string;
+  registeredAddress?: string;
+  branchAddress?: string;
+  mobile?: string;
+  email?: string;
+  website?: string;
+  taxInvoicePrefix: string;
+  nonGstInvoicePrefix: string;
+  proformaPrefix: string;
+  creditNotePrefix: string;
+  debitNotePrefix: string;
+  receiptPrefix: string;
+  statementPrefix: string;
+  financialYearStartMonth: number; // 1-12, default 4 (April, Indian FY)
+  defaultGstRate: number;
+  defaultPaymentTerms?: string;
+  defaultTermsAndConditions?: string;
+  authorizedSignatoryName?: string;
+  signatureUrl?: string;
+  bankAccountName?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankIfsc?: string;
+  bankBranch?: string;
+  upiId?: string;
+  paymentQrUrl?: string;
+  invoiceFooterMessage?: string;
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+const InvoiceSettingsSchema = new Schema<IInvoiceSettings>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, unique: true },
+  legalCompanyName: { type: String },
+  brandName: { type: String },
+  logoUrl: { type: String },
+  gstNumber: { type: String },
+  panNumber: { type: String },
+  registeredAddress: { type: String },
+  branchAddress: { type: String },
+  mobile: { type: String },
+  email: { type: String },
+  website: { type: String },
+  taxInvoicePrefix: { type: String, default: 'INV' },
+  nonGstInvoicePrefix: { type: String, default: 'INV' },
+  proformaPrefix: { type: String, default: 'PI' },
+  creditNotePrefix: { type: String, default: 'CN' },
+  debitNotePrefix: { type: String, default: 'DN' },
+  receiptPrefix: { type: String, default: 'RCT' },
+  statementPrefix: { type: String, default: 'STMT' },
+  financialYearStartMonth: { type: Number, default: 4, min: 1, max: 12 },
+  defaultGstRate: { type: Number, default: 18, min: 0, max: 100 },
+  defaultPaymentTerms: { type: String },
+  defaultTermsAndConditions: { type: String },
+  authorizedSignatoryName: { type: String },
+  signatureUrl: { type: String },
+  bankAccountName: { type: String },
+  bankName: { type: String },
+  bankAccountNumber: { type: String },
+  bankIfsc: { type: String },
+  bankBranch: { type: String },
+  upiId: { type: String },
+  paymentQrUrl: { type: String },
+  invoiceFooterMessage: { type: String },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+InvoiceSettingsSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const InvoiceSettings = mongoose.model<IInvoiceSettings>('InvoiceSettings', InvoiceSettingsSchema);
+
 // Consent history — append-only, same split as tags: Customer.consent is
 // the fast-read current state, this is the audit trail of every grant/
 // revoke behind it. Every campaign send (once campaigns exist) must

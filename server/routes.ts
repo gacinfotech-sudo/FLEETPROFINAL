@@ -70,6 +70,7 @@ import { buildVehiclePerformance } from "./services/vehiclePerformance";
 import { findDuplicateCandidates, mergeCustomers } from "./services/customerMergeService";
 import { buildCustomerFinancialSummary, buildPaymentReceipt } from "./services/customerFinancialService";
 import { addCurrentInvoiceSettlements, createAdjustmentNote, createInvoiceDraft, finalizeInvoice, previewInvoice, reviseInvoice, updateInvoiceDraft } from "./services/invoiceService";
+import { getInvoiceSettings, upsertInvoiceSettings } from "./services/invoiceSettingsService";
 import { buildCustomerDriverHistory, buildDriverFeedbackProfile } from "./services/driverFeedbackService";
 import { buildCustomerVehicleHistory, buildVehicleFeedbackProfile } from "./services/vehicleFeedbackService";
 import { DriverLeave, DriverAttendance } from "./models/index";
@@ -3338,6 +3339,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Payment receipt error:', error?.message || error);
       res.status(500).json({ message: "Failed to create payment receipt" });
+    }
+  });
+
+  // Invoice Settings — tenant-specific company/tax/bank/numbering config
+  // used to render invoice PDFs and WhatsApp templates. GET always returns
+  // a full object (merged with defaults) even if the tenant never saved
+  // one; PATCH is the only thing that persists a row (upsert). Changing
+  // these only affects invoices generated AFTER the change — every
+  // existing finalized invoice already carries its own immutable
+  // businessSnapshot (see invoiceService.ts's loadContext).
+  app.get("/api/invoice-settings", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const settings = await getInvoiceSettings(req.tenantId!);
+      res.json(settings);
+    } catch (error: any) {
+      console.error('Get invoice settings error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch invoice settings" });
+    }
+  });
+
+  app.patch("/api/invoice-settings", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_INVOICE_SETTINGS), async (req: AuthRequest, res) => {
+    try {
+      const settings = await upsertInvoiceSettings(req.tenantId!, req.body || {}, { userId: req.userId!, role: req.user?.role || 'client' });
+      res.json(settings);
+    } catch (error: any) {
+      console.error('Update invoice settings error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update invoice settings" });
     }
   });
 

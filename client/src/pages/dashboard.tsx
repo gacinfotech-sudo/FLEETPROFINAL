@@ -14,6 +14,7 @@ import BookingHistoryPDF from "../components/reports/booking-history-pdf";
 import EnhancedInvoiceGenerator from "../components/invoice/enhanced-invoice-generator";
 import UserManagement from "../components/user-management";
 import BusinessProfile from "../components/business-profile";
+import InvoiceSettingsPanel from "../components/invoice/invoice-settings-panel";
 import OnboardingWizard from "../components/onboarding/onboarding-wizard";
 import ManageExpenses from "./manage-expenses";
 import LiveBookings from "./live-bookings";
@@ -1535,11 +1536,14 @@ export default function Dashboard() {
             )}
 
             {/* Business Profile Section */}
-            <BusinessProfile 
-              userRole={user?.role || ''} 
+            <BusinessProfile
+              userRole={user?.role || ''}
               onShowOnboarding={() => setShowOnboarding(true)}
             />
-            
+
+            {/* Invoice Settings Section */}
+            <InvoiceSettingsPanel userRole={user?.role || ''} />
+
             {/* Security Section */}
             <Card>
               <CardHeader>

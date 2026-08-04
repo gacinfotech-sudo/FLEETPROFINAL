@@ -52,5 +52,6 @@ export const PERMISSIONS = {
   MANAGE_DRIVERS: 'manage_drivers',
   VIEW_REVENUE: 'view_revenue',
   MANAGE_USERS: 'manage_users',
-  MANAGE_CAMPAIGNS: 'manage_campaigns'
+  MANAGE_CAMPAIGNS: 'manage_campaigns',
+  MANAGE_INVOICE_SETTINGS: 'manage_invoice_settings'
 } as const;
