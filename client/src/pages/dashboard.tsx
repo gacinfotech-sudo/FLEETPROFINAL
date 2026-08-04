@@ -29,6 +29,7 @@ import WhatsAppPanel from "./whatsapp-panel";
 import DailyOperationsPopup from "../components/dashboard/daily-operations-popup";
 import BookingCommunication from "../components/booking/booking-communication";
 import ExtendBookingDialog from "../components/booking/extend-booking-dialog";
+import AssignVendorDialog from "../components/booking/assign-vendor-dialog";
 import PaymentSection from "../components/booking/payment-section";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -2189,7 +2190,8 @@ export default function Dashboard() {
                 <PaymentSection booking={viewingBooking} />
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <AssignVendorDialog booking={viewingBooking} />
                 <ExtendBookingDialog booking={viewingBooking} />
               </div>
 

@@ -104,13 +104,98 @@ since the field it was built on no longer exists anywhere in the current schema 
 codebase. Verified via direct API call before and after, and the full suite went from
 38/49 to 49/49 passing with no other change.
 
+## Phase 3: Booking Source / Fulfilment Source patch
+
+The Booking model already had a `bookingSource`/`sourceName`/... block and a
+`fulfilmentType`/`vendorName`/`vendorDriverName`/`vendorVehicleDetails`/... block from
+an earlier patch this session (spec §8) — but the fulfilment side had **no frontend at
+all** (confirmed by grep: zero matches in `enhanced-booking-form.tsx`, and
+`POST /api/bookings/:id/assign-vendor` had zero callers anywhere in the client). Both
+sides were free-text only, not linked to the Vendor 360° records built in Phases 1–2.
+This phase does two things: gives Fulfilment a real, working UI for the first time,
+and lets both sides optionally link to real Vendor Master records while staying fully
+backward compatible with the existing free-text display fields every other screen
+already reads (duty slip, live/upcoming bookings, dashboards, customer dashboard).
+
+### Database
+
+Four new optional fields on `Booking`, all references, none required:
+- `sourceVendorId` (ref `Vendor`) — optional link for Booking Source.
+- `fulfilmentVendorId` (ref `Vendor`), `vendorDriverId` (ref `VendorDriver`),
+  `vendorVehicleId` (ref `VendorVehicle`) — optional links for Fulfilment.
+
+The existing free-text fields (`sourceName`, `sourceContact`, `vendorName`,
+`vendorContactPhone`, `vendorDriverName`, `vendorDriverPhone`,
+`vendorVehicleDetails`) are unchanged and remain the actual display values in every
+existing reader — they're now *derived* from the linked record when one is provided
+(and the caller didn't already fill them in manually), rather than replaced by a
+second, parallel display path.
+
+### Backend
+
+- `POST /api/bookings` (creation): if `sourceVendorId` is present, validates the
+  vendor exists/belongs to the tenant/is `active`, and fills `sourceName`/
+  `sourceContact` from it only when the caller left those blank (a manual override
+  always wins).
+- `POST /api/bookings/:id/assign-vendor`: rewritten to support two modes side by
+  side — the original free-text-only mode (`vendorName` required, unchanged
+  behavior) and a new real-record mode (`fulfilmentVendorId` + optional
+  `vendorDriverId`/`vendorVehicleId`). The real-record mode validates the vendor is
+  `active`, and for a given driver/vehicle calls the exact same
+  `checkVendorDriverAvailability`/`checkVendorVehicleAvailability` functions built in
+  Phase 2 — an unavailable driver (on leave, suspended, expired license, etc.) or
+  vehicle is rejected with a clear reason, and a blocked/inactive vendor is rejected
+  outright. This is the "availability protection... at booking assignment" moment
+  spec §7 describes — there was no real assignment action to protect until this
+  patch existed.
+
+### Frontend
+
+- `enhanced-booking-form.tsx`: the existing Booking Source panel (shown for
+  external/agent source types) gained an optional "Link to Vendor Master" select,
+  populated from `GET /api/vendors?status=active` (only fetched when the panel is
+  actually showing). Selecting a vendor auto-fills Source Name/Contact via
+  `form.setValue` but leaves them editable — a manual edit afterward still wins on
+  submit, matching the backend's "don't override an explicit value" rule.
+- `client/src/components/booking/assign-vendor-dialog.tsx` (new) — the first actual
+  UI for the previously-dead `assign-vendor` endpoint. Select an active vendor, then
+  optionally pick one of that vendor's existing drivers/vehicles from a dropdown, or
+  choose "Add new driver/vehicle to this vendor" to create one inline (calling the
+  Phase 2 create endpoints) without leaving the dialog — a simplified, dropdown-based
+  version of spec §5/§6's "search by mobile/registration, offer to add if not found"
+  flow. Wired into the existing Booking Details view (`dashboard.tsx`) next to the
+  pre-existing `ExtendBookingDialog`, not a new page or layout change.
+
+## Critical fix made during Phase 3 verification (regression I introduced)
+
+Full-suite verification caught a real regression: after adding `sourceVendorId` to
+the booking form (default value `""` when nothing is selected), **every** booking
+creation started failing with a 500 — not just ones using the new field. Server log:
+
+```
+Booking validation failed: sourceVendorId: Cast to ObjectId failed for value ""
+```
+
+Mongoose's ObjectId setter throws on an empty string rather than treating it as
+unset. The booking creation route already had this exact guard for `driverId`
+(`req.body.driverId && req.body.driverId.trim() !== '' ? req.body.driverId :
+undefined`) — `sourceVendorId` needed the identical treatment and didn't have it.
+Fixed by adding the same empty-string-to-undefined mapping in `server/routes.ts`'s
+`mappedData` construction. Caught by two *pre-existing, unrelated* tests
+(`advance-payment.spec.ts`, `booking-source.spec.ts`) failing at the final "Confirm
+Booking" step — both are booking-creation tests that never touch the new field, which
+is what made it obvious this wasn't scenario-specific. Verified fixed by direct
+re-run of both, then the full suite.
+
 ## Not yet built (explicitly out of scope for this patch)
 
 Per the spec's own 27-section scope: driver/vehicle availability's real time-window
-overlap check, Booking Source/Fulfilment Source patch to the booking form, Vendor
-Duty, Vendor Duty Slip, Vendor Ledger (`VendorTransaction`), Receivable/Payable,
-Commission, Booking Profitability/Margin service, Vendor Settlement UI, Vendor
-communication templates, the booking-vendor-mention migration, and the remaining
-permission codes (`vendor.payable.view`, `vendor.receivable.view`, `vendor.margin.view`,
+overlap check (needs Vendor Duty to exist), the "search by mobile/registration with
+confirm" version of auto-add (current version is dropdown + inline add, not a
+mobile/registration search-first flow), Vendor Duty, Vendor Duty Slip, Vendor Ledger
+(`VendorTransaction`), Receivable/Payable, Commission, Booking Profitability/Margin
+service, Vendor Settlement UI, Vendor communication templates, the
+booking-vendor-mention migration, and the remaining permission codes
+(`vendor.payable.view`, `vendor.receivable.view`, `vendor.margin.view`,
 `vendor.payment.*`, `vendor.duty_slip.create`, `vendor.communication.send`,
 `vendor.statement.export`) that only make sense once their features exist.

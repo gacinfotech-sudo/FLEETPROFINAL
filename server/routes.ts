@@ -1939,6 +1939,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerEmail: req.body.customerEmail || undefined,
         // Handle driverId - convert empty string to undefined for MongoDB ObjectId
         driverId: req.body.driverId && req.body.driverId.trim() !== '' ? req.body.driverId : undefined,
+        // Same empty-string-to-undefined handling for the optional Source
+        // Vendor link — the booking form always submits this field (default
+        // "" when nothing is selected), and Mongoose's ObjectId cast throws
+        // on an empty string rather than treating it as unset.
+        sourceVendorId: req.body.sourceVendorId && req.body.sourceVendorId.trim() !== '' ? req.body.sourceVendorId : undefined,
         // Handle totalKilometers for per-km pricing
         totalKilometers: req.body.totalKilometers || undefined,
         // Default values for optional fields
@@ -1954,6 +1959,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // P0 FIX: no longer logging the full mapped booking payload — it
       // contains customer PII (name, phone, email) and financial amounts.
       const bookingData: any = mongoBookingSchema.parse(mappedData);
+
+      // Optional Source Vendor link — when the booking source is a known
+      // vendor/agent, the caller may point at a real Vendor Master record
+      // instead of (or alongside) the free-text sourceName. Validated as
+      // active/belonging-to-tenant; sourceName/sourceContact are derived
+      // from it here only when the caller left them blank, so a manually
+      // typed override always wins.
+      if (bookingData.sourceVendorId) {
+        const sourceVendor = await Vendor.findOne({ _id: bookingData.sourceVendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+        if (!sourceVendor) {
+          return res.status(400).json({ message: "Source vendor not found" });
+        }
+        if (sourceVendor.status !== 'active') {
+          return res.status(400).json({ message: `Source vendor "${sourceVendor.companyName}" is ${sourceVendor.status.replace(/_/g, ' ')}, not active.` });
+        }
+        if (!bookingData.sourceName) bookingData.sourceName = sourceVendor.companyName;
+        if (!bookingData.sourceContact) bookingData.sourceContact = sourceVendor.primaryMobile;
+      }
 
       // Customer Database linking — resolved BEFORE the booking is
       // created (not after) so an "Apply Reward Points" redemption can be
@@ -3691,15 +3714,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Assign fulfilment to a vendor. Scoped-down stand-in for a full vendor
-  // master/ledger — stores vendor + vendor driver/vehicle directly on the
-  // booking so "assign to vendor" is a real, working action now, rather
-  // than a half-built vendor accounting system with nothing behind it.
+  // Assign fulfilment to a vendor. Two modes, both writing the same
+  // free-text display fields (vendorName/vendorDriverName/
+  // vendorVehicleDetails) so every existing reader of them — duty slip,
+  // live/upcoming bookings, dashboards — keeps working unchanged either
+  // way:
+  //   1. Legacy free-text: vendorName required, exactly as before.
+  //   2. Real Vendor 360° link: fulfilmentVendorId (+ optional
+  //      vendorDriverId/vendorVehicleId) — validated active/available,
+  //      free-text fields derived from the linked records unless the
+  //      caller explicitly overrides them.
   app.post("/api/bookings/:id/assign-vendor", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const { vendorName, vendorContactPhone, vendorDriverName, vendorDriverPhone, vendorVehicleDetails, vendorAgreedRate, vendorAdvancePaid } = req.body || {};
+      const { fulfilmentVendorId, vendorDriverId, vendorVehicleId } = req.body || {};
+      let { vendorName, vendorContactPhone, vendorDriverName, vendorDriverPhone, vendorVehicleDetails, vendorAgreedRate, vendorAdvancePaid } = req.body || {};
+
+      let linkedVendor: any = null;
+      if (fulfilmentVendorId) {
+        linkedVendor = await Vendor.findOne({ _id: fulfilmentVendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+        if (!linkedVendor) return res.status(400).json({ message: "Vendor not found" });
+        if (linkedVendor.status !== 'active') {
+          return res.status(400).json({ message: `Vendor "${linkedVendor.companyName}" is ${linkedVendor.status.replace(/_/g, ' ')}, not active.` });
+        }
+        if (!vendorName) vendorName = linkedVendor.companyName;
+        if (!vendorContactPhone) vendorContactPhone = linkedVendor.primaryMobile;
+
+        if (vendorDriverId) {
+          const driver = await VendorDriver.findOne({ _id: vendorDriverId, tenantId: req.tenantId, vendorId: linkedVendor._id, isDeleted: { $ne: true } });
+          if (!driver) return res.status(400).json({ message: "Vendor driver not found under this vendor" });
+          const availability = await checkVendorDriverAvailability(req.tenantId!, String(linkedVendor._id), vendorDriverId);
+          if (!availability.available) {
+            return res.status(400).json({ message: `Vendor driver unavailable: ${availability.reason}` });
+          }
+          if (!vendorDriverName) vendorDriverName = driver.name;
+          if (!vendorDriverPhone) vendorDriverPhone = driver.primaryMobile;
+        }
+
+        if (vendorVehicleId) {
+          const vehicle = await VendorVehicle.findOne({ _id: vendorVehicleId, tenantId: req.tenantId, vendorId: linkedVendor._id, isDeleted: { $ne: true } });
+          if (!vehicle) return res.status(400).json({ message: "Vendor vehicle not found under this vendor" });
+          const availability = await checkVendorVehicleAvailability(req.tenantId!, String(linkedVendor._id), vendorVehicleId);
+          if (!availability.available) {
+            return res.status(400).json({ message: `Vendor vehicle unavailable: ${availability.reason}` });
+          }
+          if (!vendorVehicleDetails) vendorVehicleDetails = `${vehicle.make ? vehicle.make + ' ' : ''}${vehicle.vehicleModel} (${vehicle.registrationNumber})`;
+        }
+      }
+
       if (!vendorName || !vendorName.trim()) {
-        return res.status(400).json({ message: "vendorName is required" });
+        return res.status(400).json({ message: "vendorName is required (or select a Vendor)" });
       }
       if (vendorDriverPhone && !normalizeIndianPhone(vendorDriverPhone)) {
         return res.status(400).json({ message: `Invalid vendor driver phone number: "${vendorDriverPhone}"` });
@@ -3719,6 +3782,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (vendorVehicleDetails !== undefined) booking.vendorVehicleDetails = vendorVehicleDetails;
       if (vendorAgreedRate !== undefined) booking.vendorAgreedRate = vendorAgreedRate;
       if (vendorAdvancePaid !== undefined) booking.vendorAdvancePaid = vendorAdvancePaid;
+      booking.fulfilmentVendorId = linkedVendor ? linkedVendor._id : undefined;
+      booking.vendorDriverId = vendorDriverId || undefined;
+      booking.vendorVehicleId = vendorVehicleId || undefined;
 
       await booking.save();
       res.json(booking);

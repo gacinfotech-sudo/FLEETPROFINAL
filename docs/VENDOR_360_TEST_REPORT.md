@@ -64,6 +64,51 @@ no corresponding schema field (pre-existing, unrelated to Vendor 360 code — se
 `VENDOR_360_IMPLEMENTATION.md`'s "Critical fix" section). Fixed by dropping the stale
 index; suite went from 38/49 to 49/49 with no other change.
 
+## Phase 3: Booking Source / Fulfilment vendor linking
+
+`tests/e2e/booking-vendor-fulfilment.spec.ts` — 4/4 passing:
+
+1. **Source Vendor link**: creating a booking with `sourceVendorId` auto-fills
+   `sourceName`/`sourceContact` from the real vendor record and stores the link.
+2. **Assign Vendor (API)**: real vendor+driver+vehicle assignment auto-derives every
+   free-text display field (`vendorName`, `vendorDriverName`, `vendorVehicleDetails`)
+   from the linked records and stores the real IDs; an `on_leave` driver is rejected
+   with a named reason; a blocked vendor is rejected; the original free-text-only mode
+   (no vendor link at all) still works unchanged, proving backward compatibility.
+3. **UI — Booking Source**: the full booking-creation click-path (same as the
+   pre-existing `booking-source.spec.ts`) through to a real "Booking created
+   successfully!" toast, with the new "Link to Vendor Master" select appearing,
+   auto-filling Source Name on selection, and the booking actually persisting.
+4. **UI — Assign Vendor**: opens a real booking from Booking History (walking rows
+   to one that accepts an assignment, same pattern as the pre-existing Extend Booking
+   test), selects a real vendor and one of its drivers from the dialog's dropdowns,
+   submits, and confirms the success toast — proving the previously dead
+   `assign-vendor` endpoint now has a real, working caller.
+
+## Critical fix caught during Phase 3 full-suite verification
+
+A full-suite run surfaced 3 failures immediately after adding the Source Vendor
+field to the booking form; 2 of them (`advance-payment.spec.ts`,
+`booking-source.spec.ts`) were **pre-existing, unrelated tests failing at the exact
+same "Confirm Booking" step** — the tell that this was a real regression, not scenario
+-specific flakiness, since neither test touches the new field. Root cause and fix are
+in `VENDOR_360_IMPLEMENTATION.md`'s "Critical fix" section (empty-string `""` failing
+Mongoose's ObjectId cast on every booking creation). Verified fixed: both tests pass
+individually and the fix required no test changes, only the one-line backend guard.
+
+## Full regression suite (all three phases combined)
+
+`npx playwright test tests/e2e/` → **53/53 passing** on the final run. Two more
+transient failures were seen and diagnosed as load-related flakiness during this
+phase's verification (not regressions — confirmed by clean reruns in isolation):
+`app-shell.spec.ts`'s logout test and `navigation.spec.ts`'s "Upcoming Bookings" case
+both landed on `/login` mid-run (session/rate-limit pressure from a long sequential
+suite, same class of flakiness documented earlier in this project's test history), and
+`booking-actions.spec.ts`'s Extend Booking test hit a real (correct) driver/vehicle
+overlap conflict from accumulated shared test data across this session's many runs —
+not a bug, the availability engine correctly refused a genuinely conflicting
+extension.
+
 ## Not covered yet (belongs to later phases, per the Implementation doc)
 
 Auto-add-from-booking's confirmation UI (needs the Fulfilment Source booking-form

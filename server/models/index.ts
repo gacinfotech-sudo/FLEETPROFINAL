@@ -165,9 +165,16 @@ export interface IBooking extends Document {
   sourceCommissionAmount?: number;
   sourceReferenceNumber?: string;
   sourceNotes?: string;
+  // Optional link to a real Vendor Master record (Vendor 360°). The
+  // free-text sourceName/sourceContact above remain the display fields
+  // either way — set from the linked vendor when this is present.
+  sourceVendorId?: mongoose.Types.ObjectId;
   // Fulfilment: who is actually providing the vehicle/driver for this
-  // booking. Scoped-down stand-in for a full vendor master — good enough
-  // to make "assign to vendor" a real, working action; not a ledger.
+  // booking. fulfilmentVendorId/vendorDriverId/vendorVehicleId are
+  // optional links to real Vendor 360° records (set via
+  // POST /api/bookings/:id/assign-vendor); the free-text fields below
+  // stay populated either way (derived from the linked records when
+  // present) so every existing reader of them keeps working unchanged.
   fulfilmentType?: 'own' | 'vendor';
   vendorName?: string;
   vendorContactPhone?: string;
@@ -176,6 +183,9 @@ export interface IBooking extends Document {
   vendorVehicleDetails?: string;
   vendorAgreedRate?: number;
   vendorAdvancePaid?: number;
+  fulfilmentVendorId?: mongoose.Types.ObjectId;
+  vendorDriverId?: mongoose.Types.ObjectId;
+  vendorVehicleId?: mongoose.Types.ObjectId;
   bookingType: 'self_drive' | 'with_driver' | 'one_way' | 'round_trip' | 'local' | 'airport';
   pricingType?: 'day' | 'km';
   totalKilometers?: number;
@@ -438,6 +448,7 @@ const BookingSchema = new Schema<IBooking>({
   sourceCommissionAmount: { type: Number },
   sourceReferenceNumber: { type: String },
   sourceNotes: { type: String },
+  sourceVendorId: { type: Schema.Types.ObjectId, ref: 'Vendor' },
   fulfilmentType: { type: String, enum: ['own', 'vendor'], default: 'own' },
   vendorName: { type: String },
   vendorContactPhone: { type: String },
@@ -446,6 +457,9 @@ const BookingSchema = new Schema<IBooking>({
   vendorVehicleDetails: { type: String },
   vendorAgreedRate: { type: Number },
   vendorAdvancePaid: { type: Number },
+  fulfilmentVendorId: { type: Schema.Types.ObjectId, ref: 'Vendor' },
+  vendorDriverId: { type: Schema.Types.ObjectId, ref: 'VendorDriver' },
+  vendorVehicleId: { type: Schema.Types.ObjectId, ref: 'VendorVehicle' },
   bookingType: {
     type: String, 
     enum: ['self_drive', 'with_driver', 'one_way', 'round_trip', 'local', 'airport'], 
