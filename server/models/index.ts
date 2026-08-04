@@ -855,7 +855,9 @@ export interface ICustomer extends Document {
   primaryMobile: string;
   alternateMobile?: string;
   whatsappNumber?: string;
+  phoneAliases: string[];
   email?: string;
+  emailAliases: string[];
   dateOfBirth?: Date;
   anniversary?: Date;
   address?: string;
@@ -863,9 +865,11 @@ export interface ICustomer extends Document {
   state?: string;
   pinCode?: string;
   companyName?: string;
+  companyAliases: string[];
   customerType: 'individual' | 'family' | 'corporate' | 'travel_agent' | 'hotel_guest' | 'religious_traveller'
     | 'self_drive' | 'airport' | 'outstation' | 'vip' | 'credit' | 'other';
   gstNumber?: string;
+  gstAliases: string[];
   emergencyContact?: string;
   preferredLanguage?: string;
   photoUrl?: string;
@@ -952,6 +956,8 @@ export interface ICustomer extends Document {
   createdBy: { userId: string; role: string };
   updatedBy?: { userId: string; role: string };
   isDeleted?: boolean;
+  mergedIntoCustomerId?: mongoose.Types.ObjectId;
+  mergedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -966,7 +972,9 @@ const CustomerSchema = new Schema<ICustomer>({
   primaryMobile: { type: String, required: true },
   alternateMobile: { type: String },
   whatsappNumber: { type: String },
+  phoneAliases: { type: [String], default: [] },
   email: { type: String },
+  emailAliases: { type: [String], default: [] },
   dateOfBirth: { type: Date },
   anniversary: { type: Date },
   address: { type: String },
@@ -974,6 +982,7 @@ const CustomerSchema = new Schema<ICustomer>({
   state: { type: String },
   pinCode: { type: String },
   companyName: { type: String },
+  companyAliases: { type: [String], default: [] },
   customerType: {
     type: String,
     enum: ['individual', 'family', 'corporate', 'travel_agent', 'hotel_guest', 'religious_traveller',
@@ -981,6 +990,7 @@ const CustomerSchema = new Schema<ICustomer>({
     default: 'individual',
   },
   gstNumber: { type: String },
+  gstAliases: { type: [String], default: [] },
   emergencyContact: { type: String },
   preferredLanguage: { type: String },
   photoUrl: { type: String },
@@ -1053,10 +1063,17 @@ const CustomerSchema = new Schema<ICustomer>({
   createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
   updatedBy: { userId: { type: String }, role: { type: String } },
   isDeleted: { type: Boolean, default: false },
+  mergedIntoCustomerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
+  mergedAt: { type: Date },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
 CustomerSchema.index({ tenantId: 1, primaryMobile: 1 });
+CustomerSchema.index({ tenantId: 1, phoneAliases: 1 });
+CustomerSchema.index({ tenantId: 1, email: 1 });
+CustomerSchema.index({ tenantId: 1, emailAliases: 1 });
+CustomerSchema.index({ tenantId: 1, gstNumber: 1 });
+CustomerSchema.index({ tenantId: 1, gstAliases: 1 });
 CustomerSchema.index({ tenantId: 1, customerCode: 1 }, { unique: true, sparse: true });
 CustomerSchema.index({ tenantId: 1, customerStatus: 1 });
 CustomerSchema.pre('save', function (next) { this.updatedAt = new Date(); next(); });
@@ -1435,6 +1452,37 @@ const CustomerRequirementSchema = new Schema<ICustomerRequirement>({
 CustomerRequirementSchema.index({ tenantId: 1, customerId: 1, createdAt: -1 });
 CustomerRequirementSchema.index({ tenantId: 1, bookingId: 1 });
 export const CustomerRequirement = mongoose.model<ICustomerRequirement>('CustomerRequirement', CustomerRequirementSchema);
+
+export interface ICustomerMerge extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  sourceCustomerId: mongoose.Types.ObjectId;
+  targetCustomerId: mongoose.Types.ObjectId;
+  reason: string;
+  status: 'in_progress' | 'completed' | 'failed';
+  movedCounts: Record<string, number>;
+  retainedSourceCampaignRecipients: number;
+  error?: string;
+  performedBy: { userId: string; role: string };
+  startedAt: Date;
+  completedAt?: Date;
+}
+
+const CustomerMergeSchema = new Schema<ICustomerMerge>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  sourceCustomerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  targetCustomerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  reason: { type: String, required: true },
+  status: { type: String, enum: ['in_progress', 'completed', 'failed'], default: 'in_progress' },
+  movedCounts: { type: Schema.Types.Mixed, default: {} },
+  retainedSourceCampaignRecipients: { type: Number, default: 0 },
+  error: { type: String },
+  performedBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  startedAt: { type: Date, default: Date.now },
+  completedAt: { type: Date },
+});
+CustomerMergeSchema.index({ tenantId: 1, sourceCustomerId: 1 }, { unique: true });
+CustomerMergeSchema.index({ tenantId: 1, targetCustomerId: 1, completedAt: -1 });
+export const CustomerMerge = mongoose.model<ICustomerMerge>('CustomerMerge', CustomerMergeSchema);
 
 // Consent history — append-only, same split as tags: Customer.consent is
 // the fast-read current state, this is the audit trail of every grant/

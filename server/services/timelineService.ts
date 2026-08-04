@@ -1,6 +1,6 @@
 import {
   Customer, Booking, PaymentTransaction, RewardTransaction,
-  CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement,
+  CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerMerge,
 } from '../models/index';
 
 export interface TimelineEvent {
@@ -19,16 +19,20 @@ export interface TimelineEvent {
 // a second copy would just be another place these could drift out of
 // sync with the record that's actually authoritative.
 export async function computeCustomerTimeline(tenantId: string, customerId: string): Promise<TimelineEvent[]> {
-  const [customer, bookings, payments, rewards, tagEvents, feedback, complaints, followUps, requirements] = await Promise.all([
+  const [customer, bookings] = await Promise.all([
     Customer.findOne({ _id: customerId, tenantId }),
     Booking.find({ tenantId, customerId }),
-    PaymentTransaction.find({ tenantId, customerId }),
+  ]);
+  const bookingIds = bookings.map((booking: any) => booking._id);
+  const [payments, rewards, tagEvents, feedback, complaints, followUps, requirements, merges] = await Promise.all([
+    PaymentTransaction.find({ tenantId, bookingId: { $in: bookingIds } }),
     RewardTransaction.find({ tenantId, customerId }),
     CustomerTagEvent.find({ tenantId, customerId }),
     CustomerFeedback.find({ tenantId, customerId }),
     CustomerComplaint.find({ tenantId, customerId }),
     CustomerFollowUp.find({ tenantId, customerId }),
     CustomerRequirement.find({ tenantId, customerId }),
+    CustomerMerge.find({ tenantId, status: 'completed', $or: [{ targetCustomerId: customerId }, { sourceCustomerId: customerId }] }),
   ]);
 
   const events: TimelineEvent[] = [];
@@ -111,6 +115,16 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
       description: `Requirement added${requirement.route ? `: ${requirement.route}` : requirement.tripRequirement ? `: ${requirement.tripRequirement}` : ''}`,
       bookingId: requirement.bookingId ? bookingIdMap.get(requirement.bookingId.toString()) : undefined,
       employee: requirement.createdBy?.userId,
+    });
+  }
+
+  for (const merge of merges as any[]) {
+    events.push({
+      type: 'customer_merge', date: merge.completedAt,
+      description: merge.targetCustomerId.toString() === customerId
+        ? `Duplicate customer merged into this profile — ${merge.reason}`
+        : `Customer profile merged into canonical profile — ${merge.reason}`,
+      employee: merge.performedBy?.userId,
     });
   }
 

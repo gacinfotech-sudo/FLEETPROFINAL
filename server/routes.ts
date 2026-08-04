@@ -67,6 +67,7 @@ import { computeCustomerTimeline } from "./services/timelineService";
 import { previewCampaign, sendCampaign } from "./services/campaignService";
 import { buildDriverPerformance } from "./services/driverPerformance";
 import { buildVehiclePerformance } from "./services/vehiclePerformance";
+import { findDuplicateCandidates, mergeCustomers } from "./services/customerMergeService";
 import { DriverLeave, DriverAttendance } from "./models/index";
 
 // Statuses where the booking has been financially finalized — further
@@ -2331,7 +2332,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           { name: { $regex: safeSearch, $options: 'i' } },
           { primaryMobile: { $regex: normalized.replace(/\D/g, '') } },
           { alternateMobile: { $regex: normalized.replace(/\D/g, '') } },
+          { whatsappNumber: { $regex: normalized.replace(/\D/g, '') } },
+          { phoneAliases: { $regex: normalized.replace(/\D/g, '') } },
           { email: { $regex: safeSearch, $options: 'i' } },
+          { emailAliases: { $regex: safeSearch, $options: 'i' } },
+          { companyAliases: { $regex: safeSearch, $options: 'i' } },
         ];
       }
       const customers = await Customer.find(query).sort({ lastBookingDate: -1, createdAt: -1 }).limit(500);
@@ -2704,7 +2709,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const customer = await Customer.findOne({
         tenantId: req.tenantId, isDeleted: { $ne: true },
-        $or: [{ primaryMobile: normalized }, { alternateMobile: normalized }, { whatsappNumber: normalized }],
+        $or: [{ primaryMobile: normalized }, { alternateMobile: normalized }, { whatsappNumber: normalized }, { phoneAliases: normalized }],
       });
       if (!customer) return res.json({ customer: null });
 
@@ -2744,6 +2749,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Customer bookings error:', error?.message || error);
       res.status(500).json({ message: "Failed to fetch customer bookings" });
+    }
+  });
+
+  app.get("/api/customers/:id/duplicate-candidates", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const result = await findDuplicateCandidates(req.tenantId!, req.params.id);
+      if (!result) return res.status(404).json({ message: "Customer not found" });
+      res.json(result);
+    } catch (error: any) {
+      console.error('Duplicate candidate search error:', error?.message || error);
+      res.status(500).json({ message: "Failed to find duplicate customers" });
+    }
+  });
+
+  app.post("/api/customers/merge", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!req.user || !['admin', 'client'].includes(req.user.role)) {
+        return res.status(403).json({ message: "Only an administrator or account owner can merge customers." });
+      }
+      const { sourceCustomerId, targetCustomerId, reason } = req.body || {};
+      const result = await mergeCustomers({
+        tenantId: req.tenantId!, sourceCustomerId, targetCustomerId, reason: String(reason || ''),
+        actor: { userId: req.userId!, role: req.user.role },
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.error('Customer merge error:', error?.message || error);
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to merge customers" });
     }
   });
 
@@ -2979,11 +3012,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const key of ['primaryMobile', 'alternateMobile', 'whatsappNumber']) {
         if (!update[key]) continue;
         duplicateChecks.push(
-          { primaryMobile: update[key] }, { alternateMobile: update[key] }, { whatsappNumber: update[key] },
+          { primaryMobile: update[key] }, { alternateMobile: update[key] }, { whatsappNumber: update[key] }, { phoneAliases: update[key] },
         );
       }
-      if (update.email) duplicateChecks.push({ email: update.email });
-      if (update.gstNumber) duplicateChecks.push({ gstNumber: update.gstNumber });
+      if (update.email) duplicateChecks.push({ email: update.email }, { emailAliases: update.email });
+      if (update.gstNumber) duplicateChecks.push({ gstNumber: update.gstNumber }, { gstAliases: update.gstNumber });
       if (duplicateChecks.length && await Customer.exists({
         _id: { $ne: req.params.id }, tenantId: req.tenantId, isDeleted: { $ne: true }, $or: duplicateChecks,
       })) {

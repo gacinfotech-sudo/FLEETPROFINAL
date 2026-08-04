@@ -17,6 +17,7 @@ import CustomerConsent from "./customer-consent";
 import CustomerRewardsPanel from "./customer-rewards-panel";
 import CustomerMessageCenter from "./customer-message-center";
 import CustomerRequirements from "./customer-requirements";
+import CustomerDuplicateReview from "./customer-duplicate-review";
 
 const CUSTOMER_TYPES = ['individual', 'corporate', 'vip', 'self_drive', 'religious_traveller', 'airport', 'outstation'];
 
@@ -183,6 +184,7 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
           <p className="text-xs text-gray-400 mt-0.5">Customer ID: {customer.customerCode || customer._id}</p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
+          <CustomerDuplicateReview customerId={customerId} />
           <a href={`tel:${customer.primaryMobile || ''}`}><Button size="sm" variant="outline"><Phone className="h-4 w-4 mr-1" /> Call</Button></a>
           <a href="#customer-whatsapp"><Button size="sm" className="bg-green-600 hover:bg-green-700"><MessageCircle className="h-4 w-4 mr-1" /> Message</Button></a>
           <Badge variant="outline" className="border-purple-300 text-purple-700">{customer.loyaltyTier || "Regular"} Tier</Badge>

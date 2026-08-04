@@ -38,9 +38,9 @@ export async function findOrCreateCustomer(
 
   const normalizedEmail = input.email?.trim().toLowerCase();
   const duplicateKeys: Record<string, any>[] = [
-    { primaryMobile: normalized }, { alternateMobile: normalized }, { whatsappNumber: normalized },
+    { primaryMobile: normalized }, { alternateMobile: normalized }, { whatsappNumber: normalized }, { phoneAliases: normalized },
   ];
-  if (normalizedEmail) duplicateKeys.push({ email: normalizedEmail });
+  if (normalizedEmail) duplicateKeys.push({ email: normalizedEmail }, { emailAliases: normalizedEmail });
   const existing = await Customer.findOne({
     tenantId,
     isDeleted: { $ne: true },
