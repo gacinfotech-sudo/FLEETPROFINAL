@@ -132,9 +132,12 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
   }
 
   for (const invoice of invoices as any[]) {
+    // A draft created since numbering moved to finalization time has no
+    // invoiceNumber yet — show "Draft" rather than the literal string
+    // "undefined".
     events.push({
       type: 'invoice', date: invoice.finalizedAt || invoice.createdAt,
-      description: `${invoice.documentType.replace(/_/g, ' ')} ${invoice.invoiceNumber} ${invoice.status}`,
+      description: `${invoice.documentType.replace(/_/g, ' ')} ${invoice.invoiceNumber || 'Draft'} ${invoice.status}`,
       bookingId: invoice.bookingId ? bookingIdMap.get(invoice.bookingId.toString()) : undefined,
       employee: invoice.finalizedBy?.userId || invoice.createdBy?.userId,
     });

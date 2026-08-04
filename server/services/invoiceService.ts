@@ -180,8 +180,13 @@ export async function createInvoiceDraft(input: Parameters<typeof loadContext>[0
   if (existing) return { invoice: existing, alreadyExists: true };
   const context = await loadContext(input);
   try {
+    // No number assigned here on purpose — a draft that's discarded or
+    // never finalized must never have consumed a real sequence number
+    // (the whole point of an atomic, gap-free financial-year series).
+    // A caller MAY still pass an explicit invoiceNumber (e.g. importing a
+    // pre-numbered legacy document); that manual value is honored as-is.
     const invoice = await Invoice.create({
-      ...context, sourceKey, invoiceNumber: input.invoiceNumber?.trim() || await nextInvoiceNumber(input.tenantId, input.documentType),
+      ...context, sourceKey, invoiceNumber: input.invoiceNumber?.trim() || undefined,
       status: 'draft', revisionNumber: 1, createdBy: input.actor,
     });
     return { invoice, alreadyExists: false };
@@ -228,12 +233,25 @@ export async function finalizeInvoice(tenantId: string, invoiceId: string, actor
   if (!invoice) throw error('Invoice not found.', 404);
   if (invoice.status === 'finalized') return invoice;
   if (invoice.status !== 'draft') throw error('Only a draft invoice can be finalized.', 409);
-  if (!invoice.invoiceNumber || invoice.totalAmount < 0) throw error('Invoice is incomplete.');
+  if (invoice.totalAmount < 0) throw error('Invoice is incomplete.');
+  // The real, sequential, financial-year-aware number is issued HERE —
+  // the one moment an invoice becomes a real, immutable financial
+  // document — not at draft creation. A manually-assigned number (set
+  // via createInvoiceDraft's explicit override, or updateInvoiceDraft)
+  // is honored as-is and not replaced.
+  if (!invoice.invoiceNumber) {
+    invoice.invoiceNumber = await nextInvoiceNumber(tenantId, invoice.documentType);
+  }
   invoice.status = 'finalized';
   invoice.finalizedBy = actor;
   invoice.finalizedAt = new Date();
   invoice.updatedAt = new Date();
-  await invoice.save();
+  try {
+    await invoice.save();
+  } catch (cause: any) {
+    if (cause?.code === 11000) throw error('Invoice number already exists.', 409);
+    throw cause;
+  }
   return invoice;
 }
 
@@ -264,9 +282,12 @@ export async function createAdjustmentNote(input: {
   if (!amount || amount <= 0) throw error('A positive adjustment amount is required.');
   if (input.noteType === 'credit_note' && amount > original.totalAmount) throw error('Credit note cannot exceed the original invoice total.');
   if (!input.reason?.trim()) throw error('Adjustment reason is required.');
+  // Same deferred-numbering rule as createInvoiceDraft — a credit/debit
+  // note draft gets its real number only when IT is finalized, not when
+  // it's first created here.
   return Invoice.create({
     tenantId: input.tenantId, customerId: original.customerId, bookingId: original.bookingId,
-    billingProfileId: original.billingProfileId, invoiceNumber: await nextInvoiceNumber(input.tenantId, input.noteType),
+    billingProfileId: original.billingProfileId,
     sourceKey: `${input.tenantId}_${original._id}_${input.noteType}_${nanoid(8)}`,
     documentType: input.noteType, status: 'draft', revisionNumber: 1, relatedInvoiceId: original._id,
     invoiceDate: new Date(), customerSnapshot: original.customerSnapshot, billingSnapshot: original.billingSnapshot,

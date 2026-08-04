@@ -1677,7 +1677,12 @@ export interface IInvoice extends Document {
   customerId: mongoose.Types.ObjectId;
   bookingId?: mongoose.Types.ObjectId;
   billingProfileId?: mongoose.Types.ObjectId;
-  invoiceNumber: string;
+  // Undefined for a fresh draft — real numbering only happens at
+  // finalization (see finalizeInvoice in invoiceService.ts), so a draft
+  // that never gets finalized never burns a sequence number. Revisions
+  // keep their existing immediate-suffix behavior (${parent}-R{n}),
+  // unchanged from before this field became optional.
+  invoiceNumber?: string;
   sourceKey?: string;
   documentType: 'tax_invoice' | 'non_gst_invoice' | 'proforma_invoice' | 'payment_receipt' | 'credit_note' | 'debit_note' | 'customer_statement';
   status: 'draft' | 'finalized' | 'void';
@@ -1719,7 +1724,7 @@ const InvoiceSchema = new Schema<IInvoice>({
   customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
   bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
   billingProfileId: { type: Schema.Types.ObjectId, ref: 'CustomerBillingProfile' },
-  invoiceNumber: { type: String, required: true },
+  invoiceNumber: { type: String },
   sourceKey: { type: String },
   documentType: {
     type: String,
@@ -1759,7 +1764,18 @@ const InvoiceSchema = new Schema<IInvoice>({
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
-InvoiceSchema.index({ tenantId: 1, invoiceNumber: 1 }, { unique: true });
+// A plain `sparse: true` does NOT work here: for a COMPOUND index, Mongo
+// only skips a document from a sparse index if it's missing ALL of the
+// indexed fields — since tenantId is always present, every draft (even
+// with invoiceNumber absent) still gets indexed with an effective null
+// key, so a second draft collides with the first "null" entry. A partial
+// index with an explicit filter is the correct fix: only documents that
+// actually HAVE a real invoiceNumber are indexed at all, so any number of
+// unfinalized drafts can coexist.
+InvoiceSchema.index(
+  { tenantId: 1, invoiceNumber: 1 },
+  { unique: true, partialFilterExpression: { invoiceNumber: { $type: 'string' } } },
+);
 InvoiceSchema.index({ tenantId: 1, sourceKey: 1 }, { unique: true, sparse: true });
 InvoiceSchema.index({ tenantId: 1, customerId: 1, createdAt: -1 });
 InvoiceSchema.index({ tenantId: 1, bookingId: 1, status: 1 });

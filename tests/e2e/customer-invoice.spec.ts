@@ -83,6 +83,9 @@ test('billing profiles and immutable invoice lifecycle use booking and payment l
   expect(created.alreadyExists).toBe(false);
   const invoice = created.invoice;
   expect(invoice.status).toBe('draft');
+  // Numbering is deferred to finalization — a draft never burns a real
+  // sequence number until it's actually finalized.
+  expect(invoice.invoiceNumber).toBeFalsy();
 
   const duplicateResponse = await page.request.post(`/api/customers/${customer._id}/invoices`, { headers, data: payload });
   expect(duplicateResponse.status()).toBe(200);
@@ -94,6 +97,9 @@ test('billing profiles and immutable invoice lifecycle use booking and payment l
   expect(finalizeResponse.ok()).toBe(true);
   const finalized = await finalizeResponse.json();
   expect(finalized.status).toBe('finalized');
+  // Real, atomic, financial-year-aware number issued exactly at finalization.
+  const finalNumber = finalized.invoiceNumber;
+  expect(finalNumber).toMatch(/^[A-Z0-9]+\/\d{4}-\d{2}\/\d{4}$/);
   const immutableCompany = finalized.billingSnapshot.companyName;
 
   const editProfile = await page.request.put(`/api/customers/${customer._id}/billing-profiles/${corporate._id}`, {
@@ -124,7 +130,7 @@ test('billing profiles and immutable invoice lifecycle use booking and payment l
   const revision = await revisionResponse.json();
   expect(revision.status).toBe('draft');
   expect(revision.parentInvoiceId).toBe(invoice._id);
-  expect(revision.invoiceNumber).toContain(`${invoice.invoiceNumber}-R2`);
+  expect(revision.invoiceNumber).toContain(`${finalNumber}-R2`);
   expect(revision.billingSnapshot.companyName).toBe(immutableCompany);
 
   const noteResponse = await page.request.post(`/api/invoices/${invoice._id}/adjustment-note`, {
@@ -143,14 +149,14 @@ test('billing profiles and immutable invoice lifecycle use booking and payment l
   expect(invoices.some((row: any) => row._id === revision._id)).toBe(true);
   expect(invoices.some((row: any) => row._id === note._id && row.status === 'finalized')).toBe(true);
   const timeline = await (await page.request.get(`/api/customers/${customer._id}/timeline`)).json();
-  expect(timeline.some((event: any) => event.type === 'invoice' && event.description.includes(invoice.invoiceNumber))).toBe(true);
+  expect(timeline.some((event: any) => event.type === 'invoice' && event.description.includes(finalNumber))).toBe(true);
 
   await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(phone);
   await page.locator('table tbody tr').first().click();
   const dashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });
   await expect(dashboard.getByText('Invoices & Billing Profiles')).toBeVisible();
-  await expect(dashboard.getByText(invoice.invoiceNumber, { exact: true })).toBeVisible();
+  await expect(dashboard.getByText(finalNumber, { exact: true })).toBeVisible();
   await expect(dashboard.getByRole('button', { name: 'Create Invoice' }).first()).toBeEnabled();
   await dashboard.getByRole('button', { name: 'View' }).first().click();
   const document = page.getByRole('dialog', { name: 'Invoice Document' });

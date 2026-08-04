@@ -56,7 +56,12 @@ test.describe('Invoice Settings + atomic financial-year-aware numbering', () => 
       });
       const created = await invoiceRes.json();
       expect(invoiceRes.ok(), JSON.stringify(created)).toBe(true);
-      return created.invoice;
+      // Numbering is deferred to finalization (see invoice-deferred-numbering.spec.ts)
+      // — finalize here since this test is specifically checking the number format.
+      const finalizeRes = await page.request.post(`/api/invoices/${created.invoice._id}/finalize`, { headers: { 'X-CSRF-Token': csrfToken } });
+      const finalized = await finalizeRes.json();
+      expect(finalizeRes.ok(), JSON.stringify(finalized)).toBe(true);
+      return finalized;
     }
 
     const invoice1 = await makeInvoice('Numbering Test Customer 1', 0);
