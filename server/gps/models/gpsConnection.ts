@@ -67,6 +67,7 @@ export interface IGpsAuditLog extends Document {
   action: string;
   connectionId?: mongoose.Types.ObjectId;
   deviceId?: mongoose.Types.ObjectId;
+  vehicleId?: mongoose.Types.ObjectId;
   oldValue?: Record<string, unknown>;
   newValue?: Record<string, unknown>;
   reason?: string;
@@ -79,6 +80,7 @@ const GpsAuditLogSchema = new Schema<IGpsAuditLog>({
   action: { type: String, required: true, maxlength: 100 },
   connectionId: { type: Schema.Types.ObjectId, ref: 'GpsConnection' },
   deviceId: { type: Schema.Types.ObjectId, ref: 'GpsDevice' },
+  vehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle' },
   oldValue: { type: Schema.Types.Mixed },
   newValue: { type: Schema.Types.Mixed },
   reason: { type: String, maxlength: 500 },
@@ -88,5 +90,6 @@ const GpsAuditLogSchema = new Schema<IGpsAuditLog>({
 GpsAuditLogSchema.index({ tenantId: 1, createdAt: -1 });
 GpsAuditLogSchema.index({ tenantId: 1, connectionId: 1, createdAt: -1 });
 GpsAuditLogSchema.index({ tenantId: 1, deviceId: 1, createdAt: -1 });
+GpsAuditLogSchema.index({ tenantId: 1, vehicleId: 1, createdAt: -1 });
 
 export const GpsAuditLog = mongoose.model<IGpsAuditLog>('GpsAuditLog', GpsAuditLogSchema);

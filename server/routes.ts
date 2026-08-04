@@ -75,6 +75,7 @@ import { buildCustomerVehicleHistory, buildVehicleFeedbackProfile } from "./serv
 import { DriverLeave, DriverAttendance } from "./models/index";
 import { registerGpsConnectionRoutes } from "./gps/routes/connections";
 import { registerGpsDeviceRoutes } from "./gps/routes/devices";
+import { registerGpsAssignmentRoutes } from "./gps/routes/assignments";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -268,6 +269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // authoritative and unchanged.
   registerGpsConnectionRoutes(app);
   registerGpsDeviceRoutes(app);
+  registerGpsAssignmentRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({

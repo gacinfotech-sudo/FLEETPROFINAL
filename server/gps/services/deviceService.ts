@@ -53,7 +53,7 @@ function validCoordinate(latitude: unknown, longitude: unknown) {
     && typeof longitude === 'number' && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180;
 }
 
-function providerSet(device: GpsProviderDevice, actor: string) {
+function providerSet(device: GpsProviderDevice, actor: string, preserveAssignedStatus = false) {
   const update: Record<string, unknown> = { updatedBy: actor };
   const strings: Array<[keyof GpsProviderDevice, number]> = [
     ['imei', 100], ['simNumber', 100], ['deviceName', 200], ['deviceModel', 200], ['providerDeviceType', 200],
@@ -62,7 +62,7 @@ function providerSet(device: GpsProviderDevice, actor: string) {
     const value = device[field];
     if (typeof value === 'string' && value.trim()) update[field] = value.trim().slice(0, maxLength);
   }
-  if (device.status) update.status = device.status;
+  if (device.status && !preserveAssignedStatus) update.status = device.status;
   if (device.lastSeenAt instanceof Date && !Number.isNaN(device.lastSeenAt.getTime())) update.lastSeenAt = device.lastSeenAt;
   if (device.lastLocationAt instanceof Date && !Number.isNaN(device.lastLocationAt.getTime())) update.lastLocationAt = device.lastLocationAt;
   if (validCoordinate(device.latitude, device.longitude)) {
@@ -104,7 +104,7 @@ export async function synchronizeProviderDevices(input: {
         isDeleted: false,
       });
       if (existing) {
-        Object.assign(existing, providerSet(device, input.actor));
+        Object.assign(existing, providerSet(device, input.actor, existing.status === 'assigned'));
         await existing.save();
         updated += 1;
         continue;
