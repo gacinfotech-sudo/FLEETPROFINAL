@@ -846,6 +846,7 @@ DriverAttendanceSchema.index({ tenantId: 1, driverId: 1, date: 1 }, { unique: tr
 // separate collections added in later phases, not bolted onto this one.
 export interface ICustomer extends Document {
   tenantId: mongoose.Types.ObjectId;
+  customerCode?: string;
   name: string;
   // Canonical normalizeIndianPhone() form ("919876543210") — the actual
   // de-duplication key. alternateMobile/whatsappNumber are stored in the
@@ -867,6 +868,23 @@ export interface ICustomer extends Document {
   gstNumber?: string;
   emergencyContact?: string;
   preferredLanguage?: string;
+  photoUrl?: string;
+  billing?: {
+    billingName?: string;
+    panNumber?: string;
+    billingAddress?: string;
+    billingEmail?: string;
+    accountsContact?: string;
+    purchaseOrderRequired?: boolean;
+    creditPeriodDays?: number;
+    creditLimit?: number;
+    invoiceRequired?: boolean;
+    gstInvoiceRequired?: boolean;
+    tdsInformation?: string;
+    preferredInvoiceFormat?: string;
+    bankPaymentInstructions?: string;
+    internalBillingNotes?: string;
+  };
   preferences?: {
     preferredVehicleCategory?: string;
     preferredVehicleId?: mongoose.Types.ObjectId;
@@ -884,6 +902,10 @@ export interface ICustomer extends Document {
     airportPreference?: boolean;
     noSmoking?: boolean;
     driverBehaviourPreference?: string;
+    hotelPreference?: string;
+    foodStopPreference?: string;
+    specialAssistance?: string;
+    generalRequirements?: string;
     specialInstructions?: string;
   };
   // Cached summary — recomputed server-side from real bookings whenever a
@@ -936,6 +958,10 @@ export interface ICustomer extends Document {
 
 const CustomerSchema = new Schema<ICustomer>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  customerCode: {
+    type: String,
+    default: () => `CUS-${new mongoose.Types.ObjectId().toString().slice(-8).toUpperCase()}`,
+  },
   name: { type: String, required: true },
   primaryMobile: { type: String, required: true },
   alternateMobile: { type: String },
@@ -957,6 +983,23 @@ const CustomerSchema = new Schema<ICustomer>({
   gstNumber: { type: String },
   emergencyContact: { type: String },
   preferredLanguage: { type: String },
+  photoUrl: { type: String },
+  billing: {
+    billingName: { type: String },
+    panNumber: { type: String },
+    billingAddress: { type: String },
+    billingEmail: { type: String },
+    accountsContact: { type: String },
+    purchaseOrderRequired: { type: Boolean, default: false },
+    creditPeriodDays: { type: Number, min: 0 },
+    creditLimit: { type: Number, min: 0 },
+    invoiceRequired: { type: Boolean, default: false },
+    gstInvoiceRequired: { type: Boolean, default: false },
+    tdsInformation: { type: String },
+    preferredInvoiceFormat: { type: String },
+    bankPaymentInstructions: { type: String },
+    internalBillingNotes: { type: String },
+  },
   preferences: {
     preferredVehicleCategory: { type: String },
     preferredVehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle' },
@@ -974,6 +1017,10 @@ const CustomerSchema = new Schema<ICustomer>({
     airportPreference: { type: Boolean },
     noSmoking: { type: Boolean },
     driverBehaviourPreference: { type: String },
+    hotelPreference: { type: String },
+    foodStopPreference: { type: String },
+    specialAssistance: { type: String },
+    generalRequirements: { type: String },
     specialInstructions: { type: String },
   },
   totalBookings: { type: Number, default: 0 },
@@ -1010,6 +1057,7 @@ const CustomerSchema = new Schema<ICustomer>({
   updatedAt: { type: Date, default: Date.now },
 });
 CustomerSchema.index({ tenantId: 1, primaryMobile: 1 });
+CustomerSchema.index({ tenantId: 1, customerCode: 1 }, { unique: true, sparse: true });
 CustomerSchema.index({ tenantId: 1, customerStatus: 1 });
 CustomerSchema.pre('save', function (next) { this.updatedAt = new Date(); next(); });
 
@@ -1314,6 +1362,79 @@ const CustomerFollowUpSchema = new Schema<ICustomerFollowUp>({
 });
 CustomerFollowUpSchema.index({ tenantId: 1, status: 1, dueDate: 1 });
 export const CustomerFollowUp = mongoose.model<ICustomerFollowUp>('CustomerFollowUp', CustomerFollowUpSchema);
+
+// Append-only requirement snapshots. A new trip or changed request creates
+// a new row instead of mutating an earlier booking's agreed requirements.
+export interface ICustomerRequirement extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  customerId: mongoose.Types.ObjectId;
+  bookingId?: mongoose.Types.ObjectId;
+  tripRequirement?: string;
+  pickupRequirements?: string;
+  dropRequirements?: string;
+  route?: string;
+  multipleStops: string[];
+  numberOfPassengers?: number;
+  luggage?: string;
+  hotelDetails?: string;
+  trainFlightDetails?: string;
+  seniorCitizenRequirement?: boolean;
+  childRequirement?: boolean;
+  wheelchair?: boolean;
+  templeTiming?: string;
+  darshanTiming?: string;
+  vehicleCategory?: string;
+  driverPreference?: string;
+  languagePreference?: string;
+  acRequirement?: boolean;
+  paymentArrangement?: string;
+  tollParkingAgreement?: string;
+  includedServices: string[];
+  excludedServices: string[];
+  customerVisibleInstructions?: string;
+  driverInstructions?: string;
+  officeOnlyNotes?: string;
+  billingInstructions?: string;
+  createdBy: { userId: string; role: string };
+  createdAt: Date;
+}
+
+const CustomerRequirementSchema = new Schema<ICustomerRequirement>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  tripRequirement: { type: String },
+  pickupRequirements: { type: String },
+  dropRequirements: { type: String },
+  route: { type: String },
+  multipleStops: { type: [String], default: [] },
+  numberOfPassengers: { type: Number, min: 1 },
+  luggage: { type: String },
+  hotelDetails: { type: String },
+  trainFlightDetails: { type: String },
+  seniorCitizenRequirement: { type: Boolean, default: false },
+  childRequirement: { type: Boolean, default: false },
+  wheelchair: { type: Boolean, default: false },
+  templeTiming: { type: String },
+  darshanTiming: { type: String },
+  vehicleCategory: { type: String },
+  driverPreference: { type: String },
+  languagePreference: { type: String },
+  acRequirement: { type: Boolean, default: false },
+  paymentArrangement: { type: String },
+  tollParkingAgreement: { type: String },
+  includedServices: { type: [String], default: [] },
+  excludedServices: { type: [String], default: [] },
+  customerVisibleInstructions: { type: String },
+  driverInstructions: { type: String },
+  officeOnlyNotes: { type: String },
+  billingInstructions: { type: String },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  createdAt: { type: Date, default: Date.now },
+});
+CustomerRequirementSchema.index({ tenantId: 1, customerId: 1, createdAt: -1 });
+CustomerRequirementSchema.index({ tenantId: 1, bookingId: 1 });
+export const CustomerRequirement = mongoose.model<ICustomerRequirement>('CustomerRequirement', CustomerRequirementSchema);
 
 // Consent history — append-only, same split as tags: Customer.consent is
 // the fast-read current state, this is the audit trail of every grant/

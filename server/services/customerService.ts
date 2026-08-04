@@ -18,7 +18,7 @@ export interface FindOrCreateResult {
 }
 
 // The single place a Customer record is found or created from a
-// name+phone pair — used by booking creation and by the historical-
+// name+phone/email pair — used by booking creation and by the historical-
 // booking backfill migration, so both paths dedupe identically. Matches
 // on primaryMobile, alternateMobile, or whatsappNumber (any of the three
 // on the incoming number vs any of the three already stored) — a
@@ -36,10 +36,15 @@ export async function findOrCreateCustomer(
     throw Object.assign(new Error(`Invalid phone number: "${input.phone}"`), { code: 'INVALID_PHONE' });
   }
 
+  const normalizedEmail = input.email?.trim().toLowerCase();
+  const duplicateKeys: Record<string, any>[] = [
+    { primaryMobile: normalized }, { alternateMobile: normalized }, { whatsappNumber: normalized },
+  ];
+  if (normalizedEmail) duplicateKeys.push({ email: normalizedEmail });
   const existing = await Customer.findOne({
     tenantId,
     isDeleted: { $ne: true },
-    $or: [{ primaryMobile: normalized }, { alternateMobile: normalized }, { whatsappNumber: normalized }],
+    $or: duplicateKeys,
   }).session(session ?? null);
 
   if (existing) {
@@ -50,7 +55,7 @@ export async function findOrCreateCustomer(
     tenantId,
     name: input.name,
     primaryMobile: normalized,
-    email: input.email || undefined,
+    email: normalizedEmail || undefined,
     customerType: 'individual',
     customerStatus: 'new',
     status: 'active',

@@ -16,6 +16,7 @@ import CustomerTimeline from "./customer-timeline";
 import CustomerConsent from "./customer-consent";
 import CustomerRewardsPanel from "./customer-rewards-panel";
 import CustomerMessageCenter from "./customer-message-center";
+import CustomerRequirements from "./customer-requirements";
 
 const CUSTOMER_TYPES = ['individual', 'corporate', 'vip', 'self_drive', 'religious_traveller', 'airport', 'outstation'];
 
@@ -24,7 +25,13 @@ function editFormFromCustomer(c: any) {
     name: c.name || "",
     primaryMobile: c.primaryMobile || "",
     alternateMobile: c.alternateMobile || "",
+    whatsappNumber: c.whatsappNumber || "",
     email: c.email || "",
+    dateOfBirth: c.dateOfBirth ? String(c.dateOfBirth).slice(0, 10) : "",
+    anniversary: c.anniversary ? String(c.anniversary).slice(0, 10) : "",
+    emergencyContact: c.emergencyContact || "",
+    preferredLanguage: c.preferredLanguage || "",
+    photoUrl: c.photoUrl || "",
     companyName: c.companyName || "",
     customerType: c.customerType || "individual",
     gstNumber: c.gstNumber || "",
@@ -32,6 +39,15 @@ function editFormFromCustomer(c: any) {
     city: c.city || "",
     state: c.state || "",
     pinCode: c.pinCode || "",
+    billing: {
+      billingName: c.billing?.billingName || "", panNumber: c.billing?.panNumber || "",
+      billingAddress: c.billing?.billingAddress || "", billingEmail: c.billing?.billingEmail || "",
+      accountsContact: c.billing?.accountsContact || "", purchaseOrderRequired: !!c.billing?.purchaseOrderRequired,
+      creditPeriodDays: c.billing?.creditPeriodDays ?? "", creditLimit: c.billing?.creditLimit ?? "",
+      invoiceRequired: !!c.billing?.invoiceRequired, gstInvoiceRequired: !!c.billing?.gstInvoiceRequired,
+      tdsInformation: c.billing?.tdsInformation || "", preferredInvoiceFormat: c.billing?.preferredInvoiceFormat || "",
+      bankPaymentInstructions: c.billing?.bankPaymentInstructions || "", internalBillingNotes: c.billing?.internalBillingNotes || "",
+    },
   };
 }
 
@@ -164,6 +180,7 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
             </button>
           </div>
           <p className="text-sm text-gray-500">{customer.primaryMobile?.replace(/^91/, '')} {customer.email ? `· ${customer.email}` : ""}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Customer ID: {customer.customerCode || customer._id}</p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
           <a href={`tel:${customer.primaryMobile || ''}`}><Button size="sm" variant="outline"><Phone className="h-4 w-4 mr-1" /> Call</Button></a>
@@ -174,7 +191,7 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
       </div>
 
       <Dialog open={showEdit} onOpenChange={setShowEdit}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Edit Customer</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
@@ -189,10 +206,19 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
               <Label>Alternate Mobile</Label>
               <Input value={editForm.alternateMobile} onChange={(e) => setEditForm({ ...editForm, alternateMobile: e.target.value })} />
             </div>
+            <div>
+              <Label>WhatsApp Number</Label>
+              <Input value={editForm.whatsappNumber} onChange={(e) => setEditForm({ ...editForm, whatsappNumber: e.target.value })} />
+            </div>
             <div className="col-span-2">
               <Label>Email</Label>
               <Input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
             </div>
+            <div><Label>Date of Birth</Label><Input type="date" value={editForm.dateOfBirth} onChange={(e) => setEditForm({ ...editForm, dateOfBirth: e.target.value })} /></div>
+            <div><Label>Anniversary</Label><Input type="date" value={editForm.anniversary} onChange={(e) => setEditForm({ ...editForm, anniversary: e.target.value })} /></div>
+            <div><Label>Emergency Contact</Label><Input value={editForm.emergencyContact} onChange={(e) => setEditForm({ ...editForm, emergencyContact: e.target.value })} /></div>
+            <div><Label>Preferred Language</Label><Input value={editForm.preferredLanguage} onChange={(e) => setEditForm({ ...editForm, preferredLanguage: e.target.value })} /></div>
+            <div className="col-span-2"><Label>Customer Photo URL</Label><Input value={editForm.photoUrl} onChange={(e) => setEditForm({ ...editForm, photoUrl: e.target.value })} /></div>
             <div>
               <Label>Customer Type</Label>
               <Select value={editForm.customerType} onValueChange={(v) => setEditForm({ ...editForm, customerType: v })}>
@@ -226,6 +252,38 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
               <Label>PIN Code</Label>
               <Input value={editForm.pinCode} onChange={(e) => setEditForm({ ...editForm, pinCode: e.target.value })} />
             </div>
+            <details className="col-span-2 rounded-lg border p-3">
+              <summary className="font-medium cursor-pointer">Business & Billing Information</summary>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                {[
+                  ['billingName', 'Billing Name'], ['panNumber', 'PAN'], ['billingEmail', 'Billing Email'],
+                  ['accountsContact', 'Accounts Contact'], ['creditPeriodDays', 'Credit Period (days)'],
+                  ['creditLimit', 'Credit Limit'], ['preferredInvoiceFormat', 'Preferred Invoice Format'],
+                  ['tdsInformation', 'TDS Information'], ['bankPaymentInstructions', 'Bank / Payment Instructions'],
+                  ['internalBillingNotes', 'Internal Billing Notes'],
+                ].map(([key, label]) => (
+                  <div key={key} className={['bankPaymentInstructions', 'internalBillingNotes'].includes(key) ? 'col-span-2' : ''}>
+                    <Label>{label}</Label>
+                    <Input
+                      type={['creditPeriodDays', 'creditLimit'].includes(key) ? 'number' : 'text'}
+                      value={(editForm.billing as any)[key]}
+                      onChange={(e) => setEditForm({ ...editForm, billing: { ...editForm.billing, [key]: e.target.value } })}
+                    />
+                  </div>
+                ))}
+                <div className="col-span-2"><Label>Billing Address</Label><Input value={editForm.billing.billingAddress} onChange={(e) => setEditForm({ ...editForm, billing: { ...editForm.billing, billingAddress: e.target.value } })} /></div>
+                <div className="col-span-2 flex flex-wrap gap-4 rounded-lg bg-gray-50 p-3">
+                  {[
+                    ['purchaseOrderRequired', 'Purchase order required'], ['invoiceRequired', 'Invoice required'],
+                    ['gstInvoiceRequired', 'GST invoice required'],
+                  ].map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={!!(editForm.billing as any)[key]} onChange={(e) => setEditForm({ ...editForm, billing: { ...editForm.billing, [key]: e.target.checked } })} /> {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </details>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEdit(false)}>Cancel</Button>
@@ -304,6 +362,8 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
           <p className="text-lg font-semibold text-green-700">{customer.rewardPointsBalance || 0}</p>
         </div>
       </div>
+
+      <CustomerRequirements customerId={customerId} bookings={rows} />
 
       <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-white">
         <CardHeader className="pb-3">

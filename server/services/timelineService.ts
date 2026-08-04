@@ -1,6 +1,6 @@
 import {
   Customer, Booking, PaymentTransaction, RewardTransaction,
-  CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp,
+  CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement,
 } from '../models/index';
 
 export interface TimelineEvent {
@@ -19,7 +19,7 @@ export interface TimelineEvent {
 // a second copy would just be another place these could drift out of
 // sync with the record that's actually authoritative.
 export async function computeCustomerTimeline(tenantId: string, customerId: string): Promise<TimelineEvent[]> {
-  const [customer, bookings, payments, rewards, tagEvents, feedback, complaints, followUps] = await Promise.all([
+  const [customer, bookings, payments, rewards, tagEvents, feedback, complaints, followUps, requirements] = await Promise.all([
     Customer.findOne({ _id: customerId, tenantId }),
     Booking.find({ tenantId, customerId }),
     PaymentTransaction.find({ tenantId, customerId }),
@@ -28,6 +28,7 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
     CustomerFeedback.find({ tenantId, customerId }),
     CustomerComplaint.find({ tenantId, customerId }),
     CustomerFollowUp.find({ tenantId, customerId }),
+    CustomerRequirement.find({ tenantId, customerId }),
   ]);
 
   const events: TimelineEvent[] = [];
@@ -101,6 +102,15 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
       type: 'follow_up', date: t.createdAt, description: `Follow-up created: ${t.taskType}`,
       bookingId: t.bookingId ? bookingIdMap.get(t.bookingId.toString()) : undefined,
       employee: t.createdBy?.userId,
+    });
+  }
+
+  for (const requirement of requirements as any[]) {
+    events.push({
+      type: 'requirement', date: requirement.createdAt,
+      description: `Requirement added${requirement.route ? `: ${requirement.route}` : requirement.tripRequirement ? `: ${requirement.tripRequirement}` : ''}`,
+      bookingId: requirement.bookingId ? bookingIdMap.get(requirement.bookingId.toString()) : undefined,
+      employee: requirement.createdBy?.userId,
     });
   }
 

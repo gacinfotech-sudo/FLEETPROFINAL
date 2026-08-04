@@ -62,7 +62,7 @@ import { findOrCreateCustomer, recomputeCustomerStats, classifyCustomer } from "
 import { creditBookingReward, reverseBookingReward, previewRedemption, commitRedemption, computeLoyaltyTier, getRewardRule, adjustRewardPoints } from "./services/rewardService";
 import { RewardTransaction, RewardRule } from "./models/index";
 import { computeSegments, computeTagCounts, getSegmentFilter } from "./services/segmentService";
-import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerConsentEvent, Campaign, CampaignRecipient } from "./models/index";
+import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerConsentEvent, Campaign, CampaignRecipient } from "./models/index";
 import { computeCustomerTimeline } from "./services/timelineService";
 import { previewCampaign, sendCampaign } from "./services/campaignService";
 import { buildDriverPerformance } from "./services/driverPerformance";
@@ -2747,6 +2747,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Requirements are immutable snapshots. Staff add a new version when a
+  // customer's needs change so older booking agreements remain auditable.
+  app.get("/api/customers/:id/requirements", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      const rows = await CustomerRequirement.find({ tenantId: req.tenantId, customerId: req.params.id })
+        .populate('bookingId', 'bookingId pickupDate')
+        .sort({ createdAt: -1 });
+      res.json(rows);
+    } catch (error: any) {
+      console.error('Customer requirements error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch customer requirements" });
+    }
+  });
+
+  app.post("/api/customers/:id/requirements", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+      const allowed = [
+        'bookingId', 'tripRequirement', 'pickupRequirements', 'dropRequirements', 'route', 'multipleStops',
+        'numberOfPassengers', 'luggage', 'hotelDetails', 'trainFlightDetails', 'seniorCitizenRequirement',
+        'childRequirement', 'wheelchair', 'templeTiming', 'darshanTiming', 'vehicleCategory',
+        'driverPreference', 'languagePreference', 'acRequirement', 'paymentArrangement',
+        'tollParkingAgreement', 'includedServices', 'excludedServices', 'customerVisibleInstructions',
+        'driverInstructions', 'officeOnlyNotes', 'billingInstructions',
+      ];
+      const payload: Record<string, any> = {};
+      for (const key of allowed) if (req.body?.[key] !== undefined) payload[key] = req.body[key];
+      for (const key of ['multipleStops', 'includedServices', 'excludedServices']) {
+        if (payload[key] !== undefined && !Array.isArray(payload[key])) {
+          return res.status(400).json({ message: `${key} must be an array.` });
+        }
+        if (Array.isArray(payload[key])) payload[key] = payload[key].map((value: any) => String(value).trim()).filter(Boolean);
+      }
+      if (payload.numberOfPassengers !== undefined) {
+        payload.numberOfPassengers = Number(payload.numberOfPassengers);
+        if (!Number.isInteger(payload.numberOfPassengers) || payload.numberOfPassengers < 1) {
+          return res.status(400).json({ message: "numberOfPassengers must be a positive whole number." });
+        }
+      }
+      if (payload.bookingId && !await Booking.exists({
+        _id: payload.bookingId, tenantId: req.tenantId, customerId: req.params.id,
+      })) {
+        return res.status(400).json({ message: "bookingId does not belong to this customer." });
+      }
+      const hasRequirement = Object.entries(payload).some(([key, value]) => {
+        if (key === 'bookingId' || value === undefined || value === null) return false;
+        if (typeof value === 'string') return value.trim().length > 0;
+        if (typeof value === 'boolean') return value;
+        if (Array.isArray(value)) return value.length > 0;
+        return true;
+      });
+      if (!hasRequirement) return res.status(400).json({ message: "Add at least one requirement." });
+
+      const requirement = await CustomerRequirement.create({
+        tenantId: req.tenantId,
+        customerId: req.params.id,
+        ...payload,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      await requirement.populate('bookingId', 'bookingId pickupDate');
+      res.status(201).json(requirement);
+    } catch (error: any) {
+      console.error('Add customer requirement error:', error?.message || error);
+      res.status(500).json({ message: "Failed to add customer requirement" });
+    }
+  });
+
   // Customer 360: one consolidated financial ledger across every booking.
   // Payment rows remain immutable; this endpoint only assembles them for
   // the customer dashboard with their human booking number populated.
@@ -2887,20 +2958,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/customers/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const update = { ...req.body };
-      // Cached/derived fields are never client-editable — same rule as
-      // booking.advanceReceived, for the same reason (a direct overwrite
-      // here would silently disagree with the real booking data next
-      // time anything recomputes it).
-      delete update.totalBookings; delete update.completedBookings; delete update.cancelledBookings;
-      delete update.totalSpending; delete update.customerStatus; delete update.tenantId;
-      delete update.firstBookingDate; delete update.lastBookingDate;
-      delete update.rewardPointsBalance; delete update.loyaltyTier;
+      const editableFields = [
+        'name', 'primaryMobile', 'alternateMobile', 'whatsappNumber', 'email', 'dateOfBirth', 'anniversary',
+        'address', 'city', 'state', 'pinCode', 'companyName', 'customerType', 'gstNumber', 'emergencyContact',
+        'preferredLanguage', 'photoUrl', 'billing', 'preferences',
+      ];
+      const update: Record<string, any> = {};
+      for (const key of editableFields) if (req.body?.[key] !== undefined) update[key] = req.body[key];
 
-      if (update.primaryMobile) {
-        const normalized = normalizeIndianPhone(update.primaryMobile);
-        if (!normalized) return res.status(400).json({ message: `Invalid phone number: "${update.primaryMobile}"` });
-        update.primaryMobile = normalized;
+      for (const key of ['primaryMobile', 'alternateMobile', 'whatsappNumber']) {
+        if (!update[key]) continue;
+        const normalized = normalizeIndianPhone(update[key]);
+        if (!normalized) return res.status(400).json({ message: `Invalid phone number: "${update[key]}"` });
+        update[key] = normalized;
+      }
+      if (update.email) update.email = String(update.email).trim().toLowerCase();
+      if (update.gstNumber) update.gstNumber = String(update.gstNumber).trim().toUpperCase();
+
+      const duplicateChecks: Record<string, any>[] = [];
+      for (const key of ['primaryMobile', 'alternateMobile', 'whatsappNumber']) {
+        if (!update[key]) continue;
+        duplicateChecks.push(
+          { primaryMobile: update[key] }, { alternateMobile: update[key] }, { whatsappNumber: update[key] },
+        );
+      }
+      if (update.email) duplicateChecks.push({ email: update.email });
+      if (update.gstNumber) duplicateChecks.push({ gstNumber: update.gstNumber });
+      if (duplicateChecks.length && await Customer.exists({
+        _id: { $ne: req.params.id }, tenantId: req.tenantId, isDeleted: { $ne: true }, $or: duplicateChecks,
+      })) {
+        return res.status(409).json({ message: "Another customer already uses this mobile, email, or GST number." });
       }
       update.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
       update.updatedAt = new Date();
