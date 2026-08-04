@@ -1562,6 +1562,178 @@ VendorSchema.pre('save', function (next) {
 });
 export const Vendor = mongoose.model<IVendor>('Vendor', VendorSchema);
 
+export type VendorDriverStatus = 'available' | 'tentatively_held' | 'assigned' | 'on_duty' | 'on_leave' | 'suspended' | 'inactive' | 'document_expired';
+
+// A driver belonging to a Vendor (not a company driver — see `Driver`
+// above). Scoped to (tenantId, vendorId); duplicate detection is by
+// normalized mobile WITHIN the same vendor only — the same person
+// legitimately drives for two different vendors in this domain.
+export interface IVendorDriver extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  vendorId: mongoose.Types.ObjectId;
+  driverCode: string;
+  name: string;
+  primaryMobile: string;
+  normalizedMobile: string;
+  alternateMobile?: string;
+  whatsappNumber?: string;
+  licenseNumber?: string;
+  licenseExpiry?: Date;
+  policeVerificationStatus?: string;
+  address?: string;
+  emergencyContact?: string;
+  photoUrl?: string;
+  status: VendorDriverStatus;
+  assignedVehicleId?: mongoose.Types.ObjectId;
+  serviceAreas: string[];
+  rating?: number;
+  complaintCount: number;
+  completedDutyCount: number;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+  isDeleted: boolean;
+}
+const VendorDriverSchema = new Schema<IVendorDriver>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  driverCode: { type: String, required: true },
+  name: { type: String, required: true },
+  primaryMobile: { type: String, required: true },
+  normalizedMobile: { type: String, required: true },
+  alternateMobile: { type: String },
+  whatsappNumber: { type: String },
+  licenseNumber: { type: String },
+  licenseExpiry: { type: Date },
+  policeVerificationStatus: { type: String },
+  address: { type: String },
+  emergencyContact: { type: String },
+  photoUrl: { type: String },
+  status: {
+    type: String,
+    enum: ['available', 'tentatively_held', 'assigned', 'on_duty', 'on_leave', 'suspended', 'inactive', 'document_expired'],
+    default: 'available',
+  },
+  assignedVehicleId: { type: Schema.Types.ObjectId, ref: 'VendorVehicle' },
+  serviceAreas: [{ type: String }],
+  rating: { type: Number },
+  complaintCount: { type: Number, default: 0 },
+  completedDutyCount: { type: Number, default: 0 },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  isDeleted: { type: Boolean, default: false },
+});
+VendorDriverSchema.index({ tenantId: 1, vendorId: 1, driverCode: 1 }, { unique: true });
+// Real duplicate protection (spec §5) — the same mobile can't be created
+// twice under the same vendor; not just an advisory lookup. Scoped to
+// non-deleted rows so a soft-deleted driver doesn't block a legitimate
+// re-add.
+VendorDriverSchema.index(
+  { tenantId: 1, vendorId: 1, normalizedMobile: 1 },
+  { unique: true, partialFilterExpression: { isDeleted: false } },
+);
+VendorDriverSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const VendorDriver = mongoose.model<IVendorDriver>('VendorDriver', VendorDriverSchema);
+
+export type VendorVehicleStatus = 'available' | 'tentatively_held' | 'assigned' | 'on_trip' | 'maintenance' | 'breakdown' | 'document_expired' | 'inactive';
+
+// A vehicle belonging to a Vendor (not a company vehicle — see `Vehicle`
+// above). Registration numbers are normalized (case/space/hyphen
+// insensitive) before the duplicate check so "MP09 AB 1234", "MP09AB1234"
+// and "mp-09-ab-1234" all resolve to the same vendor vehicle.
+export interface IVendorVehicle extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  vendorId: mongoose.Types.ObjectId;
+  vehicleCode: string;
+  registrationNumber: string;
+  normalizedRegistrationNumber: string;
+  make?: string;
+  vehicleModel: string;
+  variant?: string;
+  category: string;
+  seatingCapacity?: number;
+  fuelType?: string;
+  colour?: string;
+  ownerName?: string;
+  assignedDriverId?: mongoose.Types.ObjectId;
+  rcNumber?: string;
+  rcExpiry?: Date;
+  insuranceExpiry?: Date;
+  permitExpiry?: Date;
+  fitnessExpiry?: Date;
+  pucExpiry?: Date;
+  taxExpiry?: Date;
+  fastagDetails?: string;
+  gpsDetails?: string;
+  currentOdometer?: number;
+  status: VendorVehicleStatus;
+  completedDutyCount: number;
+  totalRevenue: number;
+  totalVendorCost: number;
+  rating?: number;
+  complaintCount: number;
+  notes?: string;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+  isDeleted: boolean;
+}
+const VendorVehicleSchema = new Schema<IVendorVehicle>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  vehicleCode: { type: String, required: true },
+  registrationNumber: { type: String, required: true },
+  normalizedRegistrationNumber: { type: String, required: true },
+  make: { type: String },
+  vehicleModel: { type: String, required: true },
+  variant: { type: String },
+  category: { type: String, required: true },
+  seatingCapacity: { type: Number },
+  fuelType: { type: String },
+  colour: { type: String },
+  ownerName: { type: String },
+  assignedDriverId: { type: Schema.Types.ObjectId, ref: 'VendorDriver' },
+  rcNumber: { type: String },
+  rcExpiry: { type: Date },
+  insuranceExpiry: { type: Date },
+  permitExpiry: { type: Date },
+  fitnessExpiry: { type: Date },
+  pucExpiry: { type: Date },
+  taxExpiry: { type: Date },
+  fastagDetails: { type: String },
+  gpsDetails: { type: String },
+  currentOdometer: { type: Number },
+  status: {
+    type: String,
+    enum: ['available', 'tentatively_held', 'assigned', 'on_trip', 'maintenance', 'breakdown', 'document_expired', 'inactive'],
+    default: 'available',
+  },
+  completedDutyCount: { type: Number, default: 0 },
+  totalRevenue: { type: Number, default: 0 },
+  totalVendorCost: { type: Number, default: 0 },
+  rating: { type: Number },
+  complaintCount: { type: Number, default: 0 },
+  notes: { type: String },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  isDeleted: { type: Boolean, default: false },
+});
+VendorVehicleSchema.index({ tenantId: 1, vendorId: 1, vehicleCode: 1 }, { unique: true });
+// Real duplicate protection (spec §6) — same reasoning as VendorDriver's
+// normalizedMobile index above.
+VendorVehicleSchema.index(
+  { tenantId: 1, vendorId: 1, normalizedRegistrationNumber: 1 },
+  { unique: true, partialFilterExpression: { isDeleted: false } },
+);
+VendorVehicleSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const VendorVehicle = mongoose.model<IVendorVehicle>('VendorVehicle', VendorVehicleSchema);
+
 export const User = mongoose.model<IUser>('User', UserSchema);
 export const Vehicle = mongoose.model<IVehicle>('Vehicle', VehicleSchema);
 export const Driver = mongoose.model<IDriver>('Driver', DriverSchema);

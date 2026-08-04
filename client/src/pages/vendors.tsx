@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Building2, Plus, Search, ShieldOff, ShieldCheck } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import VendorDrivers from "@/components/vendors/vendor-drivers";
+import VendorVehicles from "@/components/vendors/vendor-vehicles";
 
 const VENDOR_TYPES = [
   'taxi_vendor', 'fleet_owner', 'travel_agent', 'booking_agent', 'tour_operator',
@@ -204,10 +206,13 @@ export default function VendorsPage() {
   );
 }
 
+const VENDOR_TABS = ['overview', 'drivers', 'vehicles'] as const;
+
 function VendorDetail({ vendorId, onClose }: { vendorId: string; onClose: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [reason, setReason] = useState("");
+  const [tab, setTab] = useState<typeof VENDOR_TABS[number]>('overview');
 
   const { data: vendor } = useQuery<any>({ queryKey: [`/api/vendors/${vendorId}`] });
 
@@ -232,36 +237,53 @@ function VendorDetail({ vendorId, onClose }: { vendorId: string; onClose: () => 
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {vendor.companyName} <span className="text-xs font-mono text-gray-400">{vendor.vendorCode}</span>
             <Badge className={badge.className}>{badge.label}</Badge>
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-2 text-sm">
-          <p><span className="text-gray-500">Contact:</span> {vendor.contactPerson}</p>
-          <p><span className="text-gray-500">Mobile:</span> {vendor.primaryMobile}</p>
-          {vendor.email && <p><span className="text-gray-500">Email:</span> {vendor.email}</p>}
-          <p className="capitalize"><span className="text-gray-500">Types:</span> {(vendor.vendorTypes || []).map((t: string) => t.replace(/_/g, ' ')).join(', ') || '-'}</p>
-          <p className="capitalize"><span className="text-gray-500">Roles:</span> {(vendor.roles || []).map((r: string) => r.replace(/_/g, ' ')).join(', ') || '-'}</p>
+
+        <div className="flex gap-1 border-b">
+          {VENDOR_TABS.map((t) => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`px-3 py-1.5 text-sm capitalize border-b-2 -mb-px ${tab === t ? 'border-blue-600 text-blue-700 font-medium' : 'border-transparent text-gray-500'}`}>
+              {t}
+            </button>
+          ))}
         </div>
 
-        {vendor.status !== 'temporarily_blocked' && vendor.status !== 'blacklisted' ? (
-          <div className="border-t pt-3 space-y-2">
-            <Label>Block Vendor</Label>
-            <Textarea placeholder="Reason for blocking" value={reason} onChange={(e) => setReason(e.target.value)} />
-            <Button variant="destructive" size="sm" disabled={blockMutation.isPending} onClick={() => blockMutation.mutate()}>
-              <ShieldOff className="w-3.5 h-3.5 mr-1.5" />Block
-            </Button>
-          </div>
-        ) : (
-          <div className="border-t pt-3">
-            <Button variant="outline" size="sm" disabled={activateMutation.isPending} onClick={() => activateMutation.mutate()}>
-              <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />Reactivate
-            </Button>
-          </div>
+        {tab === 'overview' && (
+          <>
+            <div className="space-y-2 text-sm">
+              <p><span className="text-gray-500">Contact:</span> {vendor.contactPerson}</p>
+              <p><span className="text-gray-500">Mobile:</span> {vendor.primaryMobile}</p>
+              {vendor.email && <p><span className="text-gray-500">Email:</span> {vendor.email}</p>}
+              <p className="capitalize"><span className="text-gray-500">Types:</span> {(vendor.vendorTypes || []).map((t: string) => t.replace(/_/g, ' ')).join(', ') || '-'}</p>
+              <p className="capitalize"><span className="text-gray-500">Roles:</span> {(vendor.roles || []).map((r: string) => r.replace(/_/g, ' ')).join(', ') || '-'}</p>
+            </div>
+
+            {vendor.status !== 'temporarily_blocked' && vendor.status !== 'blacklisted' ? (
+              <div className="border-t pt-3 space-y-2">
+                <Label>Block Vendor</Label>
+                <Textarea placeholder="Reason for blocking" value={reason} onChange={(e) => setReason(e.target.value)} />
+                <Button variant="destructive" size="sm" disabled={blockMutation.isPending} onClick={() => blockMutation.mutate()}>
+                  <ShieldOff className="w-3.5 h-3.5 mr-1.5" />Block
+                </Button>
+              </div>
+            ) : (
+              <div className="border-t pt-3">
+                <Button variant="outline" size="sm" disabled={activateMutation.isPending} onClick={() => activateMutation.mutate()}>
+                  <ShieldCheck className="w-3.5 h-3.5 mr-1.5" />Reactivate
+                </Button>
+              </div>
+            )}
+          </>
         )}
+
+        {tab === 'drivers' && <VendorDrivers vendorId={vendorId} />}
+        {tab === 'vehicles' && <VendorVehicles vendorId={vendorId} />}
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Close</Button>

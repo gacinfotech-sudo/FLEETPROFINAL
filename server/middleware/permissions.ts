@@ -56,5 +56,9 @@ export const PERMISSIONS = {
   VENDOR_VIEW: 'vendor_view',
   VENDOR_CREATE: 'vendor_create',
   VENDOR_EDIT: 'vendor_edit',
-  VENDOR_BLOCK: 'vendor_block'
+  VENDOR_BLOCK: 'vendor_block',
+  VENDOR_DRIVER_CREATE: 'vendor_driver_create',
+  VENDOR_DRIVER_EDIT: 'vendor_driver_edit',
+  VENDOR_VEHICLE_CREATE: 'vendor_vehicle_create',
+  VENDOR_VEHICLE_EDIT: 'vendor_vehicle_edit'
 } as const;

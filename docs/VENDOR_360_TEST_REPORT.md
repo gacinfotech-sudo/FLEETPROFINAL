@@ -39,10 +39,36 @@ sequential load** (46 tests × fresh logins hitting the same rate-limited
 - `npm run build` — Vite + esbuild both succeed; only pre-existing chunk-size
   warnings (unrelated to this patch).
 
+## Phase 2: Vendor Drivers + Vendor Vehicles
+
+`tests/e2e/vendor-drivers-vehicles.spec.ts` — 3/3 passing:
+
+1. **Driver**: create → `VD-####` code; lookup-by-mobile finds it, a different mobile doesn't; a second create with the *same* mobile under the *same* vendor is **rejected** (`already exists`, not silently deduped or silently allowed); availability flips `available → false` when status becomes `on_leave` (reason names the status), and separately flips to `false` on an expired license (reason mentions license) even while status is `available`.
+2. **Vehicle**: create with `"MP09 AB 1234"` → normalizes to `MP09AB1234`; lookup with `"mp-09-ab-1234"`, `"MP09AB1234"`, and `"mp09 ab 1234"` all resolve to the same vehicle; a duplicate-registration create in yet another format is rejected; availability flips to `false` on an expired insurance date (reason mentions insurance).
+3. **UI**: creates a vendor, opens its detail dialog, switches to the Drivers tab and adds one (appears in the list), switches to Vehicles and adds one (appears in the list).
+
+Manual API smoke test (`curl`, before writing the automated suite) additionally
+confirmed the duplicate-protection unique index actually rejects at the database
+layer, not just via the application-level pre-check (verified by first deleting the
+pre-check's guard-relevant test data and confirming index creation succeeded cleanly
+on a fresh server restart).
+
+## Full regression suite (both phases combined)
+
+`npx playwright test tests/e2e/` → **49/49 passing.** This run initially surfaced an
+11-test failure (`Cannot read properties of null (reading '_id')` / `Customer must
+exist`) that reproduced consistently across repeated runs and in isolation — i.e. a
+real regression, not the load-related flakiness seen earlier in this project's test
+history. Root-caused to a stale `customerCode` unique index in the live database with
+no corresponding schema field (pre-existing, unrelated to Vendor 360 code — see
+`VENDOR_360_IMPLEMENTATION.md`'s "Critical fix" section). Fixed by dropping the stale
+index; suite went from 38/49 to 49/49 with no other change.
+
 ## Not covered yet (belongs to later phases, per the Implementation doc)
 
-Vendor Driver/Vehicle CRUD, auto-add-from-booking, driver/vehicle overlap protection,
-Booking Source/Fulfilment Source patch, Vendor Duty, Vendor Duty Slip generation,
-Vendor Ledger/Receivable/Payable/Commission/Settlement, margin calculation and its
-permission gate, and the booking-vendor-mention migration all still need their own
-test suites once built.
+Auto-add-from-booking's confirmation UI (needs the Fulfilment Source booking-form
+patch as its trigger), real time-window driver/vehicle overlap protection (needs
+Vendor Duty to exist), Booking Source/Fulfilment Source patch, Vendor Duty, Vendor
+Duty Slip generation, Vendor Ledger/Receivable/Payable/Commission/Settlement, margin
+calculation and its permission gate, and the booking-vendor-mention migration all
+still need their own test suites once built.

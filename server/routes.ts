@@ -65,8 +65,10 @@ import { computeSegments, computeTagCounts, getSegmentFilter } from "./services/
 import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerConsentEvent, Campaign, CampaignRecipient } from "./models/index";
 import { computeCustomerTimeline } from "./services/timelineService";
 import { previewCampaign, sendCampaign } from "./services/campaignService";
-import { Vendor } from "./models/index";
+import { Vendor, VendorDriver, VendorVehicle } from "./models/index";
 import { createVendor } from "./services/vendorService";
+import { createVendorDriver, findVendorDriverByMobile, checkVendorDriverAvailability } from "./services/vendorDriverService";
+import { createVendorVehicle, findVendorVehicleByRegistration, checkVendorVehicleAvailability, normalizeRegistrationNumber } from "./services/vendorVehicleService";
 import { buildDriverPerformance } from "./services/driverPerformance";
 import { buildVehiclePerformance } from "./services/vehiclePerformance";
 import { DriverLeave, DriverAttendance } from "./models/index";
@@ -3202,6 +3204,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(vendor);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to activate vendor" });
+    }
+  });
+
+  // Vendor Drivers — scoped to (tenantId, vendorId). Duplicate protection
+  // is by normalized mobile WITHIN the vendor only (see vendorDriverService).
+  app.get("/api/vendors/:vendorId/drivers", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      const drivers = await VendorDriver.find({ tenantId: req.tenantId, vendorId: vendor._id, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
+      res.json(drivers);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch vendor drivers" });
+    }
+  });
+
+  // "Search within this vendor for an existing driver by mobile before
+  // creating a new one" — the exact lookup the booking-assignment flow
+  // (spec §5) needs before showing "Add this driver to Vendor CRM".
+  app.get("/api/vendors/:vendorId/drivers/lookup", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const { mobile } = req.query as { mobile?: string };
+      if (!mobile) return res.status(400).json({ message: "mobile is required" });
+      const driver = await findVendorDriverByMobile(req.tenantId!, req.params.vendorId, mobile);
+      res.json({ found: !!driver, driver });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to look up vendor driver" });
+    }
+  });
+
+  app.get("/api/vendors/:vendorId/drivers/:driverId/availability", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const result = await checkVendorDriverAvailability(req.tenantId!, req.params.vendorId, req.params.driverId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to check driver availability" });
+    }
+  });
+
+  app.post("/api/vendors/:vendorId/drivers", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_DRIVER_CREATE), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      const { name, primaryMobile } = req.body || {};
+      if (!name || !name.trim()) return res.status(400).json({ message: "Driver name is required" });
+      if (!primaryMobile) return res.status(400).json({ message: "Primary mobile is required" });
+
+      const driver = await createVendorDriver({
+        tenantId: req.tenantId!, vendorId: req.params.vendorId,
+        name, primaryMobile,
+        alternateMobile: req.body.alternateMobile, whatsappNumber: req.body.whatsappNumber,
+        licenseNumber: req.body.licenseNumber,
+        licenseExpiry: req.body.licenseExpiry ? new Date(req.body.licenseExpiry) : undefined,
+        address: req.body.address, emergencyContact: req.body.emergencyContact,
+        serviceAreas: req.body.serviceAreas,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(driver);
+    } catch (error: any) {
+      console.error('Create vendor driver error:', error?.message || error);
+      res.status(400).json({ message: error?.message || "Failed to create vendor driver" });
+    }
+  });
+
+  app.patch("/api/vendors/:vendorId/drivers/:driverId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_DRIVER_EDIT), async (req: AuthRequest, res) => {
+    try {
+      const driver = await VendorDriver.findOne({ _id: req.params.driverId, tenantId: req.tenantId, vendorId: req.params.vendorId, isDeleted: { $ne: true } });
+      if (!driver) return res.status(404).json({ message: "Vendor driver not found" });
+      const payload = req.body || {};
+
+      if (payload.name !== undefined) driver.name = payload.name;
+      if (payload.primaryMobile !== undefined) {
+        const normalized = normalizeIndianPhone(payload.primaryMobile);
+        if (!normalized) return res.status(400).json({ message: `Invalid mobile number: "${payload.primaryMobile}"` });
+        driver.primaryMobile = normalized;
+        driver.normalizedMobile = normalized;
+      }
+      if (payload.alternateMobile !== undefined) driver.alternateMobile = payload.alternateMobile;
+      if (payload.whatsappNumber !== undefined) driver.whatsappNumber = payload.whatsappNumber;
+      if (payload.licenseNumber !== undefined) driver.licenseNumber = payload.licenseNumber;
+      if (payload.licenseExpiry !== undefined) driver.licenseExpiry = payload.licenseExpiry ? new Date(payload.licenseExpiry) : undefined;
+      if (payload.address !== undefined) driver.address = payload.address;
+      if (payload.emergencyContact !== undefined) driver.emergencyContact = payload.emergencyContact;
+      if (payload.serviceAreas !== undefined) driver.serviceAreas = payload.serviceAreas;
+      if (payload.status !== undefined) driver.status = payload.status;
+      if (payload.rating !== undefined) driver.rating = payload.rating;
+
+      driver.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      await driver.save();
+      res.json(driver);
+    } catch (error: any) {
+      console.error('Update vendor driver error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update vendor driver" });
+    }
+  });
+
+  // Vendor Vehicles — scoped to (tenantId, vendorId). Duplicate protection
+  // is by normalized registration number WITHIN the vendor only.
+  app.get("/api/vendors/:vendorId/vehicles", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      const vehicles = await VendorVehicle.find({ tenantId: req.tenantId, vendorId: vendor._id, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
+      res.json(vehicles);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch vendor vehicles" });
+    }
+  });
+
+  app.get("/api/vendors/:vendorId/vehicles/lookup", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const { registrationNumber } = req.query as { registrationNumber?: string };
+      if (!registrationNumber) return res.status(400).json({ message: "registrationNumber is required" });
+      const vehicle = await findVendorVehicleByRegistration(req.tenantId!, req.params.vendorId, registrationNumber);
+      res.json({ found: !!vehicle, vehicle });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to look up vendor vehicle" });
+    }
+  });
+
+  app.get("/api/vendors/:vendorId/vehicles/:vehicleId/availability", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const result = await checkVendorVehicleAvailability(req.tenantId!, req.params.vendorId, req.params.vehicleId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to check vehicle availability" });
+    }
+  });
+
+  app.post("/api/vendors/:vendorId/vehicles", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VEHICLE_CREATE), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      const { registrationNumber, vehicleModel, category } = req.body || {};
+      if (!registrationNumber) return res.status(400).json({ message: "Registration number is required" });
+      if (!vehicleModel) return res.status(400).json({ message: "Vehicle model is required" });
+      if (!category) return res.status(400).json({ message: "Vehicle category is required" });
+
+      const vehicle = await createVendorVehicle({
+        tenantId: req.tenantId!, vendorId: req.params.vendorId,
+        registrationNumber, vehicleModel, category,
+        make: req.body.make, variant: req.body.variant,
+        seatingCapacity: req.body.seatingCapacity, fuelType: req.body.fuelType, colour: req.body.colour,
+        ownerName: req.body.ownerName,
+        insuranceExpiry: req.body.insuranceExpiry ? new Date(req.body.insuranceExpiry) : undefined,
+        permitExpiry: req.body.permitExpiry ? new Date(req.body.permitExpiry) : undefined,
+        fitnessExpiry: req.body.fitnessExpiry ? new Date(req.body.fitnessExpiry) : undefined,
+        pucExpiry: req.body.pucExpiry ? new Date(req.body.pucExpiry) : undefined,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(vehicle);
+    } catch (error: any) {
+      console.error('Create vendor vehicle error:', error?.message || error);
+      res.status(400).json({ message: error?.message || "Failed to create vendor vehicle" });
+    }
+  });
+
+  app.patch("/api/vendors/:vendorId/vehicles/:vehicleId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VEHICLE_EDIT), async (req: AuthRequest, res) => {
+    try {
+      const vehicle = await VendorVehicle.findOne({ _id: req.params.vehicleId, tenantId: req.tenantId, vendorId: req.params.vendorId, isDeleted: { $ne: true } });
+      if (!vehicle) return res.status(404).json({ message: "Vendor vehicle not found" });
+      const payload = req.body || {};
+
+      if (payload.registrationNumber !== undefined) {
+        vehicle.registrationNumber = payload.registrationNumber;
+        vehicle.normalizedRegistrationNumber = normalizeRegistrationNumber(payload.registrationNumber);
+      }
+      if (payload.make !== undefined) vehicle.make = payload.make;
+      if (payload.vehicleModel !== undefined) vehicle.vehicleModel = payload.vehicleModel;
+      if (payload.variant !== undefined) vehicle.variant = payload.variant;
+      if (payload.category !== undefined) vehicle.category = payload.category;
+      if (payload.seatingCapacity !== undefined) vehicle.seatingCapacity = payload.seatingCapacity;
+      if (payload.fuelType !== undefined) vehicle.fuelType = payload.fuelType;
+      if (payload.colour !== undefined) vehicle.colour = payload.colour;
+      if (payload.ownerName !== undefined) vehicle.ownerName = payload.ownerName;
+      if (payload.insuranceExpiry !== undefined) vehicle.insuranceExpiry = payload.insuranceExpiry ? new Date(payload.insuranceExpiry) : undefined;
+      if (payload.permitExpiry !== undefined) vehicle.permitExpiry = payload.permitExpiry ? new Date(payload.permitExpiry) : undefined;
+      if (payload.fitnessExpiry !== undefined) vehicle.fitnessExpiry = payload.fitnessExpiry ? new Date(payload.fitnessExpiry) : undefined;
+      if (payload.pucExpiry !== undefined) vehicle.pucExpiry = payload.pucExpiry ? new Date(payload.pucExpiry) : undefined;
+      if (payload.status !== undefined) vehicle.status = payload.status;
+      if (payload.notes !== undefined) vehicle.notes = payload.notes;
+      if (payload.rating !== undefined) vehicle.rating = payload.rating;
+
+      vehicle.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      await vehicle.save();
+      res.json(vehicle);
+    } catch (error: any) {
+      console.error('Update vendor vehicle error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update vendor vehicle" });
     }
   });
 
