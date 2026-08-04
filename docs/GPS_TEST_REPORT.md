@@ -21,3 +21,16 @@
 - `git diff --check`: passed.
 - The worktree contains only GPS foundation, tests and audit documentation.
 - No network/provider test is claimed until official documentation and credentials exist.
+
+## Phase 2 verification
+
+- `npm run check`: passed.
+- GPS connection and registry suites: 5 passed.
+- AES-256-GCM ciphertext contains no plaintext credential and is bound to both tenant and connection through authenticated additional data.
+- Connection API returns only masked credential fields; direct isolated-database inspection verified encrypted storage.
+- Manual submission of `status: connected` is rejected.
+- Credential rotation is encrypted and audited without storing either old or new plaintext in the audit response.
+- Undocumented provider testing returns HTTP 409 with `configuration_required`.
+- A connection belonging to another tenant returns HTTP 404.
+- `npm run build`: passed with only the pre-existing build warnings.
+- `git diff --check`: passed.

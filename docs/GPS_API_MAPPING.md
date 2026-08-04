@@ -4,6 +4,16 @@
 
 No provider API is mapped in Phase 1 because no official provider documentation was supplied. FleetPro does not guess endpoints or payload fields.
 
+The tenant-scoped FleetPro connection APIs are implemented independently of any vendor endpoint. Testing an unregistered provider returns `configuration_required`; it never claims a successful connection.
+
+Implemented internal APIs:
+
+- `GET/POST /api/gps/connections`
+- `GET/PATCH /api/gps/connections/:connectionId`
+- `POST /api/gps/connections/:connectionId/rotate-credentials`
+- `POST /api/gps/connections/:connectionId/test`
+- `GET /api/gps/connections/:connectionId/logs`
+
 | FleetPro capability | Provider endpoint | Status |
 | --- | --- | --- |
 | Test connection | Not supplied | Configuration required |

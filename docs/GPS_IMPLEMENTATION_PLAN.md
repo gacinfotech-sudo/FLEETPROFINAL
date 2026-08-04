@@ -3,7 +3,7 @@
 Every phase is additive, tenant-scoped, permission-controlled and committed independently.
 
 1. Safety baseline, existing-code audit, provider-neutral types, adapter contract and registry.
-2. Encrypted tenant GPS connection model, redacted DTOs, permissions, CRUD/test boundary and audit records.
+2. Encrypted tenant GPS connection model, redacted DTOs, permissions, CRUD/test boundary and audit records. **Completed.**
 3. GPS Device Master and provider device synchronization with idempotent tenant indexes.
 4. Historical vehicle-device assignments with one-active-device/vehicle enforcement.
 5. Normalization, validation, deduplication and time-series telemetry storage.
