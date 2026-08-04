@@ -6,6 +6,7 @@ import Sidebar from "../components/layout/sidebar";
 import EnhancedStats from "../components/dashboard/enhanced-stats";
 import EnhancedBookingForm from "../components/booking/enhanced-booking-form";
 import VehicleForm from "../components/fleet/vehicle-form";
+import VehicleFeedbackProfile from "../components/fleet/vehicle-feedback-profile";
 import DriverForm from "../components/drivers/driver-form";
 import DriverFeedbackProfile from "../components/drivers/driver-feedback-profile";
 import RevenueReport from "../components/reports/revenue-report";
@@ -57,6 +58,7 @@ export default function Dashboard() {
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [showDriverForm, setShowDriverForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<any>(null);
+  const [viewingVehicle, setViewingVehicle] = useState<any>(null);
   const [editingDriver, setEditingDriver] = useState<any>(null);
   const [viewingDriver, setViewingDriver] = useState<any>(null);
   const [viewingBooking, setViewingBooking] = useState<any>(null);
@@ -227,6 +229,10 @@ export default function Dashboard() {
   const handleEditVehicle = (vehicle: any) => {
     setEditingVehicle(vehicle);
     setShowVehicleForm(true);
+  };
+
+  const handleViewVehicle = (vehicle: any) => {
+    setViewingVehicle(vehicle);
   };
 
   const handleEditDriver = (driver: any) => {
@@ -693,16 +699,19 @@ export default function Dashboard() {
                           <div><span className="font-medium">Rate/km:</span> {vehicle.pricePerKm ? `₹${vehicle.pricePerKm}/km` : <span className="text-gray-400">Not set</span>}</div>
                           <div><span className="font-medium">Year:</span> {vehicle.year || 'Not specified'}</div>
                         </div>
-                        {canManageFleet() && (
-                          <div className="flex gap-2 pt-2">
+                        <div className="flex gap-2 pt-2">
+                          <Button size="sm" variant="secondary" className="flex-1" onClick={() => handleViewVehicle(vehicle)}>
+                            View Profile
+                          </Button>
+                          {canManageFleet() && <>
                             <Button size="sm" variant="outline" className="flex-1" onClick={() => handleEditVehicle(vehicle)}>
                               Edit
                             </Button>
                             <Button size="sm" variant="destructive" className="flex-1" onClick={() => handleDeleteVehicle(vehicle._id || vehicle.id)}>
                               Delete
                             </Button>
-                          </div>
-                        )}
+                          </>}
+                        </div>
                       </div>
                     ))
                   )}
@@ -759,8 +768,16 @@ export default function Dashboard() {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              {canManageFleet() ? (
-                                <div className="flex gap-1">
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-blue-600 hover:text-blue-700"
+                                  onClick={() => handleViewVehicle(vehicle)}
+                                >
+                                  View Profile
+                                </Button>
+                                {canManageFleet() && <>
                                   <Button 
                                     variant="ghost" 
                                     size="sm"
@@ -777,10 +794,8 @@ export default function Dashboard() {
                                   >
                                     Delete
                                   </Button>
-                                </div>
-                              ) : (
-                                <span className="text-gray-400 text-sm">View Only</span>
-                              )}
+                                </>}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
@@ -2470,6 +2485,39 @@ export default function Dashboard() {
           setInvoiceBooking(null);
         }}
       />
+
+      {/* Read-only Vehicle Profile added without replacing Fleet Management or editing. */}
+      <Dialog open={!!viewingVehicle} onOpenChange={() => setViewingVehicle(null)}>
+        <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Car className="text-blue-600" size={24} />
+              <span>Vehicle Profile</span>
+            </DialogTitle>
+          </DialogHeader>
+          {viewingVehicle && <div className="space-y-6">
+            <div className="flex items-center justify-between gap-4 p-4 bg-gray-50 rounded-lg flex-wrap">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center"><Car className="h-8 w-8 text-blue-600" /></div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 capitalize">{[viewingVehicle.make, viewingVehicle.vehicleModel || viewingVehicle.model].filter(Boolean).join(' ')}</h2>
+                  <p className="text-gray-600">{viewingVehicle.licensePlate || viewingVehicle.registrationNumber || 'No registration'}</p>
+                </div>
+              </div>
+              <div className="flex gap-2 flex-wrap text-sm">
+                <Badge variant={viewingVehicle.status === 'available' ? 'default' : 'secondary'} className="capitalize">{viewingVehicle.status}</Badge>
+                <Badge variant="outline" className="capitalize">{viewingVehicle.type || viewingVehicle.vehicleType || 'Uncategorised'}</Badge>
+                {viewingVehicle.year && <Badge variant="outline">{viewingVehicle.year}</Badge>}
+              </div>
+            </div>
+            <VehicleFeedbackProfile
+              vehicleId={viewingVehicle._id || viewingVehicle.id}
+              onOpenBooking={(booking) => { setViewingVehicle(null); handleViewBooking(booking); }}
+            />
+          </div>}
+          <DialogFooter><Button variant="outline" onClick={() => setViewingVehicle(null)}>Close</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* View Driver Profile Modal */}
       <Dialog open={!!viewingDriver} onOpenChange={() => setViewingDriver(null)}>

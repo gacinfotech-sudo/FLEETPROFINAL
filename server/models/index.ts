@@ -1262,6 +1262,13 @@ export interface ICustomerFeedback extends Document {
   driverRating?: number; // 1-5
   vehicleRating?: number;
   serviceRating?: number;
+  vehicleCleanlinessRating?: number;
+  vehicleComfortRating?: number;
+  vehicleAcRating?: number;
+  vehicleConditionRating?: number;
+  vehicleIssueReported?: boolean;
+  breakdownOccurred?: boolean;
+  vehicleIssueDescription?: string;
   bookingProcessRating?: number;
   officeCommunicationRating?: number;
   tripSatisfactionRating?: number;
@@ -1291,6 +1298,13 @@ const CustomerFeedbackSchema = new Schema<ICustomerFeedback>({
   driverRating: { type: Number, min: 1, max: 5 },
   vehicleRating: { type: Number, min: 1, max: 5 },
   serviceRating: { type: Number, min: 1, max: 5 },
+  vehicleCleanlinessRating: { type: Number, min: 1, max: 5 },
+  vehicleComfortRating: { type: Number, min: 1, max: 5 },
+  vehicleAcRating: { type: Number, min: 1, max: 5 },
+  vehicleConditionRating: { type: Number, min: 1, max: 5 },
+  vehicleIssueReported: { type: Boolean },
+  breakdownOccurred: { type: Boolean },
+  vehicleIssueDescription: { type: String },
   bookingProcessRating: { type: Number, min: 1, max: 5 },
   officeCommunicationRating: { type: Number, min: 1, max: 5 },
   tripSatisfactionRating: { type: Number, min: 1, max: 5 },
@@ -1324,12 +1338,12 @@ export interface ICustomerComplaint extends Document {
   bookingId?: mongoose.Types.ObjectId;
   driverId?: mongoose.Types.ObjectId;
   vehicleId?: mongoose.Types.ObjectId;
-  category: 'driver_late' | 'driver_behaviour' | 'rash_driving' | 'vehicle_problem' | 'vehicle_cleanliness'
+  category: 'driver_late' | 'driver_behaviour' | 'rash_driving' | 'vehicle_problem' | 'vehicle_cleanliness' | 'vehicle_breakdown'
     | 'ac_problem' | 'wrong_vehicle' | 'booking_issue' | 'payment_dispute' | 'office_communication'
     | 'vendor_issue' | 'self_drive_issue' | 'other';
   severity: 'low' | 'medium' | 'high' | 'critical';
   description: string;
-  responsibleParty?: 'company' | 'driver' | 'vendor' | 'customer' | 'unclear';
+  responsibleParty?: 'company' | 'driver' | 'vehicle' | 'vendor' | 'customer' | 'unclear';
   responsibilityReason?: string;
   responsibilityVerifiedBy?: { userId: string; role: string };
   responsibilityVerifiedAt?: Date;
@@ -1355,14 +1369,14 @@ const CustomerComplaintSchema = new Schema<ICustomerComplaint>({
   vehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle' },
   category: {
     type: String,
-    enum: ['driver_late', 'driver_behaviour', 'rash_driving', 'vehicle_problem', 'vehicle_cleanliness',
+    enum: ['driver_late', 'driver_behaviour', 'rash_driving', 'vehicle_problem', 'vehicle_cleanliness', 'vehicle_breakdown',
       'ac_problem', 'wrong_vehicle', 'booking_issue', 'payment_dispute', 'office_communication',
       'vendor_issue', 'self_drive_issue', 'other'],
     required: true,
   },
   severity: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
   description: { type: String, required: true },
-  responsibleParty: { type: String, enum: ['company', 'driver', 'vendor', 'customer', 'unclear'] },
+  responsibleParty: { type: String, enum: ['company', 'driver', 'vehicle', 'vendor', 'customer', 'unclear'] },
   responsibilityReason: { type: String },
   responsibilityVerifiedBy: { userId: { type: String }, role: { type: String } },
   responsibilityVerifiedAt: { type: Date },

@@ -21,6 +21,7 @@ import CustomerDuplicateReview from "./customer-duplicate-review";
 import CustomerPaymentReceipt from "./customer-payment-receipt";
 import CustomerInvoices from "./customer-invoices";
 import CustomerDrivers from "./customer-drivers";
+import CustomerVehicles from "./customer-vehicles";
 
 const CUSTOMER_TYPES = ['individual', 'corporate', 'vip', 'self_drive', 'religious_traveller', 'airport', 'outstation'];
 
@@ -711,6 +712,8 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
       </div>
 
       <CustomerDrivers customerId={customerId} />
+
+      <CustomerVehicles customerId={customerId} />
 
       <CustomerService customerId={customerId} bookings={rows} />
 

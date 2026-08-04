@@ -71,6 +71,7 @@ import { findDuplicateCandidates, mergeCustomers } from "./services/customerMerg
 import { buildCustomerFinancialSummary, buildPaymentReceipt } from "./services/customerFinancialService";
 import { addCurrentInvoiceSettlements, createAdjustmentNote, createInvoiceDraft, finalizeInvoice, previewInvoice, reviseInvoice, updateInvoiceDraft } from "./services/invoiceService";
 import { buildCustomerDriverHistory, buildDriverFeedbackProfile } from "./services/driverFeedbackService";
+import { buildCustomerVehicleHistory, buildVehicleFeedbackProfile } from "./services/vehicleFeedbackService";
 import { DriverLeave, DriverAttendance } from "./models/index";
 
 // Statuses where the booking has been financially finalized — further
@@ -1425,6 +1426,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/vehicles/:id/customer-feedback-profile", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid vehicle ID" });
+      const profile = await buildVehicleFeedbackProfile(req.tenantId!, req.params.id);
+      if (!profile) return res.status(404).json({ message: "Vehicle not found" });
+      res.json(profile);
+    } catch (error: any) {
+      console.error('Vehicle customer-feedback profile error:', error?.message || error);
+      res.status(500).json({ message: "Failed to build vehicle customer-feedback profile" });
+    }
+  });
+
   app.post("/api/vehicles", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_VEHICLES), async (req: AuthRequest, res) => {
     try {
       // Check vehicle limit before adding
@@ -2447,6 +2460,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const {
         bookingId, type, overallRating, driverRating, vehicleRating, serviceRating,
         bookingProcessRating, officeCommunicationRating, tripSatisfactionRating, valueForMoneyRating,
+        vehicleCleanlinessRating, vehicleComfortRating, vehicleAcRating, vehicleConditionRating,
+        vehicleIssueReported, breakdownOccurred, vehicleIssueDescription,
         driverPunctualityRating, driverBehaviourRating, driverSafetyRating, driverRouteKnowledgeRating,
         driverCommunicationRating, driverAssistanceRating, driverPaymentHandlingRating,
         wouldBookAgain, wouldRecommend, responsibleParty, comments,
@@ -2461,7 +2476,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const ratingFields = {
         overallRating, driverRating, vehicleRating, serviceRating, bookingProcessRating,
-        officeCommunicationRating, tripSatisfactionRating, valueForMoneyRating, driverPunctualityRating,
+        officeCommunicationRating, tripSatisfactionRating, valueForMoneyRating,
+        vehicleCleanlinessRating, vehicleComfortRating, vehicleAcRating, vehicleConditionRating,
+        driverPunctualityRating,
         driverBehaviourRating, driverSafetyRating, driverRouteKnowledgeRating, driverCommunicationRating,
         driverAssistanceRating, driverPaymentHandlingRating,
       };
@@ -2478,9 +2495,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         driverRouteKnowledgeRating, driverCommunicationRating, driverAssistanceRating, driverPaymentHandlingRating]
         .some((value) => value !== undefined);
       if (hasDriverFeedback && !booking?.driverId) return res.status(400).json({ message: "Select a booking with an assigned driver for driver feedback." });
-      if (vehicleRating !== undefined && !booking?.vehicleId) return res.status(400).json({ message: "Select a booking with an assigned vehicle for vehicle feedback." });
+      const hasVehicleFeedback = [vehicleRating, vehicleCleanlinessRating, vehicleComfortRating, vehicleAcRating,
+        vehicleConditionRating, vehicleIssueReported, breakdownOccurred, vehicleIssueDescription]
+        .some((value) => value !== undefined && value !== false && value !== '');
+      if (hasVehicleFeedback && !booking?.vehicleId) return res.status(400).json({ message: "Select a booking with an assigned vehicle for vehicle feedback." });
       if (responsibleParty === 'driver' && !booking?.driverId) return res.status(400).json({ message: "This booking has no assigned driver." });
-      if (!Object.values(ratingFields).some((value) => value !== undefined) && !comments?.trim()) {
+      if (responsibleParty === 'vehicle' && !booking?.vehicleId) return res.status(400).json({ message: "This booking has no assigned vehicle." });
+      if (responsibleParty && !['company', 'driver', 'vehicle', 'vendor', 'customer', 'unclear'].includes(responsibleParty)) {
+        return res.status(400).json({ message: "Invalid responsible party." });
+      }
+      if (vehicleIssueReported !== undefined && typeof vehicleIssueReported !== 'boolean') return res.status(400).json({ message: "vehicleIssueReported must be boolean." });
+      if (breakdownOccurred !== undefined && typeof breakdownOccurred !== 'boolean') return res.status(400).json({ message: "breakdownOccurred must be boolean." });
+      if (vehicleIssueDescription !== undefined && typeof vehicleIssueDescription !== 'string') return res.status(400).json({ message: "vehicleIssueDescription must be text." });
+      if (comments !== undefined && typeof comments !== 'string') return res.status(400).json({ message: "comments must be text." });
+      if (!Object.values(ratingFields).some((value) => value !== undefined) && !comments?.trim() && !vehicleIssueReported && !breakdownOccurred) {
         return res.status(400).json({ message: "Add a rating or feedback comment." });
       }
       const feedbackType = type || 'feedback';
@@ -2491,7 +2519,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const feedback = await CustomerFeedback.create({
         tenantId: req.tenantId, customerId: req.params.id, bookingId: bookingId || undefined,
         driverId: booking?.driverId, vehicleId: booking?.vehicleId,
-        type: feedbackType, ...ratingFields, wouldBookAgain, wouldRecommend, responsibleParty, comments: comments?.trim(),
+        type: feedbackType, ...ratingFields, vehicleIssueReported, breakdownOccurred,
+        vehicleIssueDescription: vehicleIssueDescription?.trim(), wouldBookAgain, wouldRecommend,
+        responsibleParty, comments: comments?.trim(),
         createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
       });
       await feedback.populate(['bookingId', 'driverId', 'vehicleId']);
@@ -2511,6 +2541,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Customer driver history error:', error?.message || error);
       res.status(500).json({ message: "Failed to build customer driver history" });
+    }
+  });
+
+  app.get("/api/customers/:id/vehicles", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid customer ID" });
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      res.json(await buildCustomerVehicleHistory(req.tenantId!, req.params.id));
+    } catch (error: any) {
+      console.error('Customer vehicle history error:', error?.message || error);
+      res.status(500).json({ message: "Failed to build customer vehicle history" });
     }
   });
 
@@ -2541,7 +2583,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : null;
       if (bookingId && !booking) return res.status(400).json({ message: "bookingId does not belong to this customer." });
       const classifiedParty = responsibleParty || 'unclear';
+      if (!['company', 'driver', 'vehicle', 'vendor', 'customer', 'unclear'].includes(classifiedParty)) {
+        return res.status(400).json({ message: "Invalid responsible party." });
+      }
       if (classifiedParty === 'driver' && !booking?.driverId) return res.status(400).json({ message: "This booking has no assigned driver." });
+      if (classifiedParty === 'vehicle' && !booking?.vehicleId) return res.status(400).json({ message: "This booking has no assigned vehicle." });
       if (classifiedParty !== 'unclear' && !responsibilityReason?.trim()) {
         return res.status(400).json({ message: "A responsibility reason is required before assigning fault." });
       }
@@ -2585,10 +2631,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (resolution !== undefined) complaint.resolution = resolution;
       if (satisfactionAfterResolution) complaint.satisfactionAfterResolution = satisfactionAfterResolution;
       if (responsibleParty !== undefined) {
-        if (!['company', 'driver', 'vendor', 'customer', 'unclear'].includes(responsibleParty)) {
+        if (!['company', 'driver', 'vehicle', 'vendor', 'customer', 'unclear'].includes(responsibleParty)) {
           return res.status(400).json({ message: "Invalid responsible party." });
         }
         if (responsibleParty === 'driver' && !complaint.driverId) return res.status(400).json({ message: "This complaint has no linked driver." });
+        if (responsibleParty === 'vehicle' && !complaint.vehicleId) return res.status(400).json({ message: "This complaint has no linked vehicle." });
         if (responsibleParty !== 'unclear' && !(responsibilityReason || complaint.responsibilityReason)?.trim()) {
           return res.status(400).json({ message: "A responsibility reason is required before assigning fault." });
         }
@@ -4042,12 +4089,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const monthStart = new Date(year, month - 1, 1);
       const monthEnd = new Date(year, month, 1);
 
-      const [bookings, expenses, vehicles] = await Promise.all([
+      const [bookings, expenses, vehicles, feedback, complaints] = await Promise.all([
         storage.getBookingsByTenant(req.tenantId!),
         storage.getExpensesByTenant(req.tenantId!),
         storage.getVehiclesByTenant(req.tenantId!),
+        CustomerFeedback.find({ tenantId: req.tenantId }).lean(),
+        CustomerComplaint.find({ tenantId: req.tenantId }).lean(),
       ]);
-      const summary = buildVehiclePerformance(bookings, expenses, vehicles, monthStart, monthEnd);
+      const summary = buildVehiclePerformance(bookings, expenses, vehicles, monthStart, monthEnd, feedback, complaints);
       res.json({ month: `${year}-${String(month).padStart(2, '0')}`, vehicles: summary });
     } catch (error: any) {
       console.error('Vehicle performance report error:', error?.message || error);
