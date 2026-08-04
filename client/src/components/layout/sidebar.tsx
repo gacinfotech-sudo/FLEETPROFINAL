@@ -81,7 +81,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
           </div>
         </div>
         
-        <nav className="mt-6 lg:mt-8 flex-1">
+        <nav className="mt-6 lg:mt-8 flex-1 overflow-y-auto min-h-0">
           <div className="px-3 lg:px-4 space-y-1 lg:space-y-2">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;
