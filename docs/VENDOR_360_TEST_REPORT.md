@@ -109,6 +109,48 @@ overlap conflict from accumulated shared test data across this session's many ru
 not a bug, the availability engine correctly refused a genuinely conflicting
 extension.
 
+## Phase 4: Vendor Duty + real overlap protection
+
+`tests/e2e/vendor-duty.spec.ts` — 4/4 passing:
+
+1. **Exact spec §7 acceptance scenario**: a vendor driver assigned to a 2pm-10pm duty
+   cannot be assigned to an overlapping 3pm-11pm booking — rejected `409` with
+   `code: VENDOR_DRIVER_TIME_CONFLICT` and a message naming the real conflicting
+   booking. Once the first booking is walked to `completed` (real state machine
+   transitions, not a direct jump), its duty completes and the driver becomes
+   assignable to the second booking.
+2. **Non-overlapping same-day duties both succeed** — the test that would have caught
+   the status-auto-lock bug described below; proves a driver isn't falsely blocked
+   from a second, genuinely non-conflicting assignment.
+3. **Cancelling a booking cancels its duty**, freeing the driver for a new
+   (even time-overlapping-with-the-cancelled-one) assignment.
+4. **UI**: the Duties tab on a real vendor's detail dialog shows a real `DUTY-####`
+   row with the assigned driver's name after assignment.
+
+Manual API smoke tests (`curl`, run before and after the status-auto-lock fix
+described next) additionally confirmed: duty numbers are real and sequential: `duty
+count: 1 status: active dutyNumber: DUTY-0001`; the driver-status field before the fix
+incorrectly stayed `'assigned'` after a single duty and blocked an unrelated
+non-overlapping assignment; after the fix, status correctly stays `'available'`
+throughout (time-based blocking comes entirely from the real duty-window check, whose
+rejection message named the exact real conflicting booking: *"Already assigned to
+booking BK... (Duty B1) from 8/3/2062, 2:00:00 pm to 8/3/2062, 10:00:00 pm"*).
+
+## Design bug caught during this phase's own verification (fixed before committing)
+
+The first cut of Phase 4 auto-set vendor driver/vehicle `status` to `'assigned'` on
+every duty. Running the exact acceptance-scenario smoke test caught that this made
+`checkVendorDriverAvailability`'s status check (which treats `'assigned'` as
+unconditionally unavailable) block ALL future assignments for that driver, not just
+genuinely overlapping ones — defeating the actual purpose of building time-window
+overlap checking in the first place. Root cause, fix, and the specific test that
+proves it's fixed are in `VENDOR_360_IMPLEMENTATION.md`.
+
+## Full regression suite (all four phases combined)
+
+`npx playwright test tests/e2e/` → **57/57 passing** on the first full run — no
+flakiness or unrelated failures observed this phase.
+
 ## Not covered yet (belongs to later phases, per the Implementation doc)
 
 Auto-add-from-booking's confirmation UI (needs the Fulfilment Source booking-form

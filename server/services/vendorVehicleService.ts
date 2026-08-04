@@ -1,4 +1,6 @@
 import { Counter, VendorVehicle, IVendorVehicle } from '../models/index';
+import { findVendorVehicleDutyConflicts } from './vendorDutyService';
+import type { AvailabilityWindow } from './vendorDriverService';
 
 // "MP09 AB 1234", "MP09AB1234", "mp-09-ab-1234" all resolve to the same
 // value — strip everything but alphanumerics and uppercase.
@@ -80,9 +82,10 @@ export async function findVendorVehicleByRegistration(tenantId: string, vendorId
 const UNAVAILABLE_STATUSES = new Set(['maintenance', 'breakdown', 'document_expired', 'inactive', 'assigned', 'on_trip']);
 const EXPIRY_FIELDS: (keyof IVendorVehicle)[] = ['insuranceExpiry', 'permitExpiry', 'fitnessExpiry', 'pucExpiry'];
 
-// Status-only for now, same reasoning as checkVendorDriverAvailability —
-// real time-window overlap checking activates once Vendor Duty exists.
-export async function checkVendorVehicleAvailability(tenantId: string, vendorId: string, vehicleId: string) {
+// Status check always runs; the real time-window overlap check (against
+// VendorDuty) only runs when a `window` is supplied — same split as
+// checkVendorDriverAvailability, for the same reason.
+export async function checkVendorVehicleAvailability(tenantId: string, vendorId: string, vehicleId: string, window?: AvailabilityWindow) {
   const vehicle = await VendorVehicle.findOne({ _id: vehicleId, tenantId, vendorId, isDeleted: { $ne: true } });
   if (!vehicle) return { available: false, reason: 'Vehicle not found' };
   if (UNAVAILABLE_STATUSES.has(vehicle.status)) {
@@ -93,6 +96,16 @@ export async function checkVendorVehicleAvailability(tenantId: string, vendorId:
     const value = vehicle[field] as unknown as Date | undefined;
     if (value && value < now) {
       return { available: false, reason: `Vehicle ${String(field).replace('Expiry', '')} has expired` };
+    }
+  }
+  if (window) {
+    const conflicts = await findVendorVehicleDutyConflicts(tenantId, vehicleId, window.start, window.end, window.excludeBookingId);
+    if (conflicts.length > 0) {
+      const c = conflicts[0];
+      return {
+        available: false,
+        reason: `Already assigned to booking ${c.bookingNumber} (${c.customerName}) from ${c.scheduledStartDateTime.toLocaleString('en-IN')} to ${c.scheduledEndDateTime.toLocaleString('en-IN')}`,
+      };
     }
   }
   return { available: true, reason: null };

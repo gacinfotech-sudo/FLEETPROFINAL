@@ -69,6 +69,8 @@ import { Vendor, VendorDriver, VendorVehicle } from "./models/index";
 import { createVendor } from "./services/vendorService";
 import { createVendorDriver, findVendorDriverByMobile, checkVendorDriverAvailability } from "./services/vendorDriverService";
 import { createVendorVehicle, findVendorVehicleByRegistration, checkVendorVehicleAvailability, normalizeRegistrationNumber } from "./services/vendorVehicleService";
+import { VendorDuty } from "./models/index";
+import { upsertVendorDuty, cancelVendorDutyForBooking, completeVendorDutyForBooking } from "./services/vendorDutyService";
 import { buildDriverPerformance } from "./services/driverPerformance";
 import { buildVehiclePerformance } from "./services/vehiclePerformance";
 import { DriverLeave, DriverAttendance } from "./models/index";
@@ -3419,6 +3421,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vendor Duties — created/updated by assign-vendor, listed here for the
+  // Vendor 360 detail view's Duties tab. Read-only; there is no direct
+  // create/edit route since a duty only ever comes from a real booking
+  // assignment or that booking's own status changes.
+  app.get("/api/vendors/:vendorId/duties", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      const duties = await VendorDuty.find({ tenantId: req.tenantId, fulfilmentVendorId: vendor._id })
+        .populate('bookingId', 'bookingId customerName pickupLocation dropoffLocation status totalAmount')
+        .populate('vendorDriverId', 'name driverCode')
+        .populate('vendorVehicleId', 'registrationNumber vehicleCode')
+        .sort({ createdAt: -1 });
+      res.json(duties);
+    } catch (error: any) {
+      console.error('List vendor duties error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch vendor duties" });
+    }
+  });
+
   // Manual credit/debit — e.g. service-recovery compensation, referral
   // bonus not tied to a booking. Scoped to admins/owners since it directly
   // creates value with no booking behind it, same reasoning as payment
@@ -3555,6 +3577,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (err: any) {
           console.error('Customer stats/reward recompute failed after status change:', err?.message || err);
+        }
+      }
+
+      // Keep any Vendor Duty's lifecycle in sync with its booking — a
+      // completed/closed booking's duty is done; a cancelled/no-show
+      // booking's duty never happened. (Driver/vehicle `status` is
+      // deliberately left alone here — see the long comment in
+      // assign-vendor for why it's not auto-managed off duty state.)
+      if (['completed', 'closed'].includes(status) || ['cancelled', 'no_show'].includes(status)) {
+        try {
+          const actor = { userId: req.userId!, role: req.user?.role || 'client' };
+          if (['completed', 'closed'].includes(status)) {
+            await completeVendorDutyForBooking(req.tenantId!, id, actor);
+          } else {
+            await cancelVendorDutyForBooking(req.tenantId!, id, actor);
+          }
+        } catch (err: any) {
+          console.error('Vendor duty status sync failed after booking status change:', err?.message || err);
         }
       }
 
@@ -3729,6 +3769,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { fulfilmentVendorId, vendorDriverId, vendorVehicleId } = req.body || {};
       let { vendorName, vendorContactPhone, vendorDriverName, vendorDriverPhone, vendorVehicleDetails, vendorAgreedRate, vendorAdvancePaid } = req.body || {};
 
+      const booking: any = await Booking.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+      if (['cancelled', 'no_show', 'completed', 'closed'].includes(booking.status)) {
+        return res.status(400).json({ message: `Cannot assign a vendor to a booking that is ${booking.status}.` });
+      }
+      // Real overlap checking needs the booking's actual scheduled window —
+      // loaded here (not after) so it can be passed into the driver/vehicle
+      // availability checks below, and so this same booking never conflicts
+      // with itself.
+      const window = { start: booking.scheduledStartDateTime, end: booking.scheduledEndDateTime, excludeBookingId: String(booking._id) };
+
       let linkedVendor: any = null;
       if (fulfilmentVendorId) {
         linkedVendor = await Vendor.findOne({ _id: fulfilmentVendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
@@ -3742,9 +3793,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (vendorDriverId) {
           const driver = await VendorDriver.findOne({ _id: vendorDriverId, tenantId: req.tenantId, vendorId: linkedVendor._id, isDeleted: { $ne: true } });
           if (!driver) return res.status(400).json({ message: "Vendor driver not found under this vendor" });
-          const availability = await checkVendorDriverAvailability(req.tenantId!, String(linkedVendor._id), vendorDriverId);
+          const availability = await checkVendorDriverAvailability(req.tenantId!, String(linkedVendor._id), vendorDriverId, window);
           if (!availability.available) {
-            return res.status(400).json({ message: `Vendor driver unavailable: ${availability.reason}` });
+            return res.status(409).json({ message: `Vendor driver unavailable: ${availability.reason}`, code: 'VENDOR_DRIVER_TIME_CONFLICT' });
           }
           if (!vendorDriverName) vendorDriverName = driver.name;
           if (!vendorDriverPhone) vendorDriverPhone = driver.primaryMobile;
@@ -3753,9 +3804,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (vendorVehicleId) {
           const vehicle = await VendorVehicle.findOne({ _id: vendorVehicleId, tenantId: req.tenantId, vendorId: linkedVendor._id, isDeleted: { $ne: true } });
           if (!vehicle) return res.status(400).json({ message: "Vendor vehicle not found under this vendor" });
-          const availability = await checkVendorVehicleAvailability(req.tenantId!, String(linkedVendor._id), vendorVehicleId);
+          const availability = await checkVendorVehicleAvailability(req.tenantId!, String(linkedVendor._id), vendorVehicleId, window);
           if (!availability.available) {
-            return res.status(400).json({ message: `Vendor vehicle unavailable: ${availability.reason}` });
+            return res.status(409).json({ message: `Vendor vehicle unavailable: ${availability.reason}`, code: 'VENDOR_VEHICLE_TIME_CONFLICT' });
           }
           if (!vendorVehicleDetails) vendorVehicleDetails = `${vehicle.make ? vehicle.make + ' ' : ''}${vehicle.vehicleModel} (${vehicle.registrationNumber})`;
         }
@@ -3768,11 +3819,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: `Invalid vendor driver phone number: "${vendorDriverPhone}"` });
       }
 
-      const booking: any = await Booking.findOne({ _id: req.params.id, tenantId: req.tenantId });
-      if (!booking) return res.status(404).json({ message: "Booking not found" });
-      if (['cancelled', 'no_show', 'completed', 'closed'].includes(booking.status)) {
-        return res.status(400).json({ message: `Cannot assign a vendor to a booking that is ${booking.status}.` });
-      }
+      const actor = { userId: req.userId!, role: req.user?.role || 'client' };
 
       booking.fulfilmentType = 'vendor';
       booking.vendorName = vendorName.trim();
@@ -3787,6 +3834,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       booking.vendorVehicleId = vendorVehicleId || undefined;
 
       await booking.save();
+
+      // Vendor Duty — the record that this assignment is a real, time-
+      // windowed commitment. Only created for a real Vendor Master link;
+      // the legacy free-text-only mode has no vendor/driver/vehicle record
+      // to create a duty against. Reassigning away from a linked vendor
+      // (or back to free-text) cancels the prior duty so it stops
+      // occupying its driver/vehicle in future conflict checks.
+      //
+      // Deliberately NOT flipping VendorDriver/VendorVehicle.status to
+      // "assigned" here: status is a coarse, non-time-scoped flag, and a
+      // driver can legitimately hold several non-overlapping duties across
+      // different days. Auto-setting "assigned" on every duty would make
+      // checkVendorDriverAvailability's status check block every FUTURE
+      // assignment for that driver too, not just genuinely overlapping
+      // ones — the real conflict signal is the time-window duty check
+      // above, which already handles this correctly on its own.
+      try {
+        if (linkedVendor) {
+          await upsertVendorDuty({
+            tenantId: req.tenantId!, bookingId: String(booking._id), fulfilmentVendorId: String(linkedVendor._id),
+            vendorDriverId: vendorDriverId || undefined, vendorVehicleId: vendorVehicleId || undefined,
+            scheduledStartDateTime: booking.scheduledStartDateTime, scheduledEndDateTime: booking.scheduledEndDateTime,
+            vendorAgreedRate: booking.vendorAgreedRate, vendorAdvancePaid: booking.vendorAdvancePaid, actor,
+          });
+        } else {
+          await cancelVendorDutyForBooking(req.tenantId!, String(booking._id), actor);
+        }
+      } catch (dutyError: any) {
+        // The booking-level assignment already saved successfully — a duty
+        // bookkeeping failure shouldn't roll that back or fail the request,
+        // just get logged loudly so it can be reconciled.
+        console.error('Vendor duty sync failed after successful assignment:', dutyError?.message || dutyError);
+      }
+
       res.json(booking);
     } catch (error: any) {
       console.error('Assign vendor error:', error?.message || error);

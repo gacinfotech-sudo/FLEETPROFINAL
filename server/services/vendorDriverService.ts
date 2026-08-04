@@ -1,5 +1,6 @@
 import { Counter, VendorDriver } from '../models/index';
 import { normalizeIndianPhone } from '../whatsapp/phone';
+import { findVendorDriverDutyConflicts } from './vendorDutyService';
 
 async function nextDriverCode(tenantId: string, vendorId: string): Promise<string> {
   const counter = await Counter.findOneAndUpdate(
@@ -72,13 +73,19 @@ export async function findVendorDriverByMobile(tenantId: string, vendorId: strin
 
 const UNAVAILABLE_STATUSES = new Set(['on_leave', 'suspended', 'inactive', 'document_expired', 'on_duty', 'assigned']);
 
-// Status-only availability for now — Vendor Duty (time-windowed
-// assignments) does not exist yet, so there is nothing to check real
-// overlapping time windows against. Once Vendor Duty ships, this same
-// function gains a real `overlaps(existingStart, existingEnd, ...)` check
-// against confirmed/tentative duties, matching the company-driver
-// overlap engine, without changing its call sites.
-export async function checkVendorDriverAvailability(tenantId: string, vendorId: string, driverId: string) {
+export interface AvailabilityWindow {
+  start: Date;
+  end: Date;
+  excludeBookingId?: string;
+}
+
+// Status check always runs. The real time-window overlap check (against
+// VendorDuty — see vendorDutyService.ts) only runs when a `window` is
+// supplied, since the plain GET availability endpoint (no booking context)
+// has no window to check against and stays status-only; the assign-vendor
+// route, which always has the booking's real schedule in hand, passes one
+// and gets the actual "Amit is already on a duty from 2pm-10pm" protection.
+export async function checkVendorDriverAvailability(tenantId: string, vendorId: string, driverId: string, window?: AvailabilityWindow) {
   const driver = await VendorDriver.findOne({ _id: driverId, tenantId, vendorId, isDeleted: { $ne: true } });
   if (!driver) return { available: false, reason: 'Driver not found' };
   if (UNAVAILABLE_STATUSES.has(driver.status)) {
@@ -86,6 +93,16 @@ export async function checkVendorDriverAvailability(tenantId: string, vendorId: 
   }
   if (driver.licenseExpiry && driver.licenseExpiry < new Date()) {
     return { available: false, reason: 'Driver license has expired' };
+  }
+  if (window) {
+    const conflicts = await findVendorDriverDutyConflicts(tenantId, driverId, window.start, window.end, window.excludeBookingId);
+    if (conflicts.length > 0) {
+      const c = conflicts[0];
+      return {
+        available: false,
+        reason: `Already assigned to booking ${c.bookingNumber} (${c.customerName}) from ${c.scheduledStartDateTime.toLocaleString('en-IN')} to ${c.scheduledEndDateTime.toLocaleString('en-IN')}`,
+      };
+    }
   }
   return { available: true, reason: null };
 }

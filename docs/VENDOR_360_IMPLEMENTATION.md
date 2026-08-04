@@ -187,15 +187,86 @@ Booking" step — both are booking-creation tests that never touch the new field
 is what made it obvious this wasn't scenario-specific. Verified fixed by direct
 re-run of both, then the full suite.
 
+## Phase 4: Vendor Duty + real time-window overlap protection
+
+Phase 2's driver/vehicle availability checks were explicitly status-only — there was
+nothing to check real overlapping time windows against, because no record existed of
+*when* a vendor driver/vehicle was actually committed to a duty. This phase creates
+that record and wires it into `checkVendorDriverAvailability`/
+`checkVendorVehicleAvailability`, giving the exact "Amit is already assigned to
+another duty from 2:00 PM to 10:00 PM" protection spec §7 describes.
+
+### Database
+
+`VendorDuty` — created/updated by `POST /api/bookings/:id/assign-vendor`, one active
+duty per booking (unique partial index on `(tenantId, bookingId)` where
+`status: 'active'`). Atomic `DUTY-0001` codes via the same `Counter` pattern as
+Vendor/VendorDriver/VendorVehicle codes. `scheduledStartDateTime`/
+`scheduledEndDateTime` are a snapshot taken at assignment time (for display/audit —
+future Duty Slip) — but see below for why the *conflict-check path* doesn't use this
+snapshot.
+
+### Real overlap checking, and why it reads the live booking, not the duty snapshot
+
+`findVendorDriverDutyConflicts`/`findVendorVehicleDutyConflicts` (`vendorDutyService.ts`)
+find a driver/vehicle's active duties and check for overlap — but instead of comparing
+against the duty's own stored `scheduledStartDateTime`/`scheduledEndDateTime`, they
+populate the duty's `bookingId` and compare against the **live** booking's
+`scheduledStartDateTime`/`scheduledEndDateTime` (kept fresh by `Booking`'s own
+pre-save/pre-findOneAndUpdate hooks). If a booking is rescheduled or extended after
+its vendor was assigned, the duty's own snapshot would go stale and could silently
+stop catching a real conflict — reading through to the booking avoids that class of
+bug entirely without needing to touch every booking-mutation route to keep a
+duplicate window in sync. Mirrors the exact `{$lt: end}` / `{$gt: start}` overlap
+query `server/services/availability.ts` already uses for company drivers/vehicles.
+
+`checkVendorDriverAvailability`/`checkVendorVehicleAvailability` (Phase 2) gained an
+optional `window` parameter — the plain `GET .../availability` endpoint (no booking
+context) still calls them without one and stays status-only exactly as documented in
+Phase 2; `POST /api/bookings/:id/assign-vendor` now always passes one (the booking's
+own real schedule, with itself excluded from conflicts), so assignment through that
+route gets full time-window protection.
+
+### A design bug caught and fixed during this phase's own verification
+
+The first implementation also auto-flipped `VendorDriver`/`VendorVehicle.status` to
+`'assigned'` on every duty assignment (and back to `'available'` on completion/
+cancellation), reasoning it would keep the status field "accurate." Verification
+caught the real consequence: `status: 'assigned'` is in `UNAVAILABLE_STATUSES`, which
+the availability check treats as an unconditional block — so a driver with any single
+active duty became unassignable to any OTHER booking too, even ones with a
+completely non-overlapping time window on a different day. This would have silently
+broken exactly the legitimate case the whole point of *time-window* checking exists
+for: a vendor driver holding several non-overlapping duties. Fixed by removing the
+auto status-sync entirely — `status` stays a purely administrative flag (on leave/
+suspended/inactive/document expired, or a deliberate manual override), and all
+time-based availability comes from the real duty-window check. Verified by two
+curl scripts: one proving the exact 2pm-10pm/3pm-11pm conflict is still caught, one
+proving two genuinely non-overlapping same-day duties for the same driver both
+succeed.
+
+### Booking status-change hook
+
+`POST /api/bookings/:id/status`: on `completed`/`closed`, marks the booking's active
+duty `completed`; on `cancelled`/`no_show`, marks it `cancelled`. Both call the same
+`completeVendorDutyForBooking`/`cancelVendorDutyForBooking` functions the
+assign-vendor route uses when reassigning away from a vendor.
+
+### API / Frontend
+
+`GET /api/vendors/:vendorId/duties` (read-only — a duty only ever comes from a real
+booking assignment or that booking's status changes, never a direct create/edit) +
+`client/src/components/vendors/vendor-duties.tsx`, wired in as a fourth tab
+(Overview/Drivers/Vehicles/Duties) on the existing Vendor detail dialog.
+
 ## Not yet built (explicitly out of scope for this patch)
 
-Per the spec's own 27-section scope: driver/vehicle availability's real time-window
-overlap check (needs Vendor Duty to exist), the "search by mobile/registration with
-confirm" version of auto-add (current version is dropdown + inline add, not a
-mobile/registration search-first flow), Vendor Duty, Vendor Duty Slip, Vendor Ledger
-(`VendorTransaction`), Receivable/Payable, Commission, Booking Profitability/Margin
-service, Vendor Settlement UI, Vendor communication templates, the
-booking-vendor-mention migration, and the remaining permission codes
+Per the spec's own 27-section scope: the "search by mobile/registration with confirm"
+version of auto-add (current version is dropdown + inline add, not a
+mobile/registration search-first flow), Vendor Duty Slip (PDF/print/WhatsApp),
+Vendor Ledger (`VendorTransaction`), Receivable/Payable, Commission, Booking
+Profitability/Margin service, Vendor Settlement UI, Vendor communication templates,
+the booking-vendor-mention migration, and the remaining permission codes
 (`vendor.payable.view`, `vendor.receivable.view`, `vendor.margin.view`,
 `vendor.payment.*`, `vendor.duty_slip.create`, `vendor.communication.send`,
 `vendor.statement.export`) that only make sense once their features exist.

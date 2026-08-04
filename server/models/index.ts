@@ -1748,6 +1748,63 @@ VendorVehicleSchema.index(
 VendorVehicleSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
 export const VendorVehicle = mongoose.model<IVendorVehicle>('VendorVehicle', VendorVehicleSchema);
 
+// The record that a booking's vendor assignment became a real duty with a
+// time window — created/updated by POST /api/bookings/:id/assign-vendor,
+// one active duty per booking (upserted by bookingId). scheduledStart/
+// EndDateTime is a snapshot taken at assignment time for display/audit
+// (duty slip) purposes; the actual overlap-check path in
+// vendorDriverService/vendorVehicleService reads the LIVE booking's
+// scheduledStartDateTime/scheduledEndDateTime instead of this snapshot,
+// so a later reschedule/extend of the booking can't leave a stale
+// duty window silently defeating conflict detection.
+export type VendorDutyStatus = 'active' | 'completed' | 'cancelled';
+export interface IVendorDuty extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  dutyNumber: string;
+  bookingId: mongoose.Types.ObjectId;
+  fulfilmentVendorId: mongoose.Types.ObjectId;
+  vendorDriverId?: mongoose.Types.ObjectId;
+  vendorVehicleId?: mongoose.Types.ObjectId;
+  scheduledStartDateTime: Date;
+  scheduledEndDateTime: Date;
+  vendorAgreedRate?: number;
+  vendorAdvancePaid?: number;
+  status: VendorDutyStatus;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+const VendorDutySchema = new Schema<IVendorDuty>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  dutyNumber: { type: String, required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
+  fulfilmentVendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  vendorDriverId: { type: Schema.Types.ObjectId, ref: 'VendorDriver' },
+  vendorVehicleId: { type: Schema.Types.ObjectId, ref: 'VendorVehicle' },
+  scheduledStartDateTime: { type: Date, required: true },
+  scheduledEndDateTime: { type: Date, required: true },
+  vendorAgreedRate: { type: Number },
+  vendorAdvancePaid: { type: Number },
+  status: { type: String, enum: ['active', 'completed', 'cancelled'], default: 'active' },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+VendorDutySchema.index({ tenantId: 1, dutyNumber: 1 }, { unique: true });
+// One active duty per booking — assign-vendor upserts against this rather
+// than ever inserting a second live duty for the same booking.
+VendorDutySchema.index(
+  { tenantId: 1, bookingId: 1 },
+  { unique: true, partialFilterExpression: { status: 'active' } },
+);
+VendorDutySchema.index({ tenantId: 1, vendorDriverId: 1, status: 1 });
+VendorDutySchema.index({ tenantId: 1, vendorVehicleId: 1, status: 1 });
+VendorDutySchema.index({ tenantId: 1, fulfilmentVendorId: 1, status: 1 });
+VendorDutySchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const VendorDuty = mongoose.model<IVendorDuty>('VendorDuty', VendorDutySchema);
+
 export const User = mongoose.model<IUser>('User', UserSchema);
 export const Vehicle = mongoose.model<IVehicle>('Vehicle', VehicleSchema);
 export const Driver = mongoose.model<IDriver>('Driver', DriverSchema);

@@ -14,6 +14,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import VendorDrivers from "@/components/vendors/vendor-drivers";
 import VendorVehicles from "@/components/vendors/vendor-vehicles";
+import VendorDuties from "@/components/vendors/vendor-duties";
 
 const VENDOR_TYPES = [
   'taxi_vendor', 'fleet_owner', 'travel_agent', 'booking_agent', 'tour_operator',
@@ -206,7 +207,7 @@ export default function VendorsPage() {
   );
 }
 
-const VENDOR_TABS = ['overview', 'drivers', 'vehicles'] as const;
+const VENDOR_TABS = ['overview', 'drivers', 'vehicles', 'duties'] as const;
 
 function VendorDetail({ vendorId, onClose }: { vendorId: string; onClose: () => void }) {
   const { toast } = useToast();
@@ -284,6 +285,7 @@ function VendorDetail({ vendorId, onClose }: { vendorId: string; onClose: () => 
 
         {tab === 'drivers' && <VendorDrivers vendorId={vendorId} />}
         {tab === 'vehicles' && <VendorVehicles vendorId={vendorId} />}
+        {tab === 'duties' && <VendorDuties vendorId={vendorId} />}
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Close</Button>
