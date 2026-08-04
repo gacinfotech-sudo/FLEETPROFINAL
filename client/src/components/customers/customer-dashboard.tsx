@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { X, Plus, Pencil, IndianRupee, Phone, MessageCircle, Car, UserRound, Eye, ReceiptText, CalendarClock } from "lucide-react";
+import { X, Plus, Pencil, IndianRupee, Phone, MessageCircle, Car, UserRound, Eye, ReceiptText, CalendarClock, Download } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import CustomerService from "./customer-service";
@@ -18,6 +18,7 @@ import CustomerRewardsPanel from "./customer-rewards-panel";
 import CustomerMessageCenter from "./customer-message-center";
 import CustomerRequirements from "./customer-requirements";
 import CustomerDuplicateReview from "./customer-duplicate-review";
+import CustomerPaymentReceipt from "./customer-payment-receipt";
 
 const CUSTOMER_TYPES = ['individual', 'corporate', 'vip', 'self_drive', 'religious_traveller', 'airport', 'outstation'];
 
@@ -67,6 +68,35 @@ const PAYMENT_MODES = [
 
 function fmtMoney(n?: number) {
   return `₹${(n || 0).toLocaleString("en-IN")}`;
+}
+
+function downloadStatement(customer: any, financial: any, payments: any[]) {
+  const csv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const lines = [
+    ['Customer Statement', customer.name],
+    ['Customer ID', customer.customerCode || customer._id],
+    ['Generated', new Date().toLocaleString('en-IN')],
+    [],
+    ['Lifetime billed', financial?.lifetimeBilledAmount || 0],
+    ['Lifetime collected', financial?.lifetimeCollectedAmount || 0],
+    ['Refunds', financial?.lifetimeRefunds || 0],
+    ['Net collected', financial?.netCollectedAmount || 0],
+    ['Pending due', financial?.totalPendingDue || 0],
+    ['Overdue', financial?.overdueAmount || 0],
+    [],
+    ['Date', 'Booking', 'Type', 'Mode', 'Reference', 'Amount', 'Status'],
+    ...payments.map((payment) => [
+      new Date(payment.receivedAt || payment.createdAt).toLocaleString('en-IN'), payment.bookingId?.bookingId || '-',
+      payment.paymentType, payment.paymentMode, payment.transactionReference || '-', payment.amount, payment.status,
+    ]),
+  ];
+  const blob = new Blob([`\uFEFF${lines.map((row) => row.map(csv).join(',')).join('\n')}`], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${String(customer.name || 'customer').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-statement.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
@@ -121,6 +151,9 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
   const { data: payments = [] } = useQuery<any[]>({
     queryKey: [`/api/customers/${customerId}/payments`],
   });
+  const { data: financial } = useQuery<any>({
+    queryKey: [`/api/customers/${customerId}/financial-summary`],
+  });
 
   // Profile fields (name, contact, address, company, GST) are directly
   // editable here — they're plain data, not derived from bookings.
@@ -146,6 +179,7 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
       setPayingBooking(null);
       queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/bookings`] });
       queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/payments`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/financial-summary`] });
       invalidateCustomer();
     },
     onError: (err: any) => toast({ title: "Could not record payment", description: err.message, variant: "destructive" }),
@@ -161,9 +195,7 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
   const live = rows.filter((b: any) => ['trip_started', 'ongoing', 'extended', 'return_pending'].includes(b.status)).length;
   const activeStatuses = ['confirmed', 'vehicle_assigned', 'driver_assigned', 'ready_for_dispatch', 'trip_started', 'ongoing', 'extended', 'return_pending'];
   const currentBooking = rows.find((b: any) => activeStatuses.includes(b.status)) || rows[0];
-  const totalDue = rows
-    .filter((b: any) => !['cancelled', 'no_show'].includes(b.status))
-    .reduce((sum: number, b: any) => sum + Math.max(0, (b.totalAmount || 0) - (b.advanceReceived || 0)), 0);
+  const totalDue = financial?.totalPendingDue || 0;
 
   return (
     <div className="space-y-6">
@@ -344,12 +376,32 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
           <p className="text-lg font-semibold">{upcoming} / {live}</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-3">
-          <Label className="text-xs text-gray-500">Lifetime Spend</Label>
-          <p className="text-lg font-semibold">{fmtMoney(customer.totalSpending)}</p>
+          <Label className="text-xs text-gray-500">Lifetime Billed</Label>
+          <p className="text-lg font-semibold">{fmtMoney(financial?.lifetimeBilledAmount)}</p>
+        </div>
+        <div className="bg-green-50 rounded-lg p-3">
+          <Label className="text-xs text-gray-500">Lifetime Collected</Label>
+          <p className="text-lg font-semibold text-green-700">{fmtMoney(financial?.lifetimeCollectedAmount)}</p>
+        </div>
+        <div className="bg-red-50 rounded-lg p-3">
+          <Label className="text-xs text-gray-500">Lifetime Refunds</Label>
+          <p className="text-lg font-semibold text-red-700">{fmtMoney(financial?.lifetimeRefunds)}</p>
+        </div>
+        <div className="bg-blue-50 rounded-lg p-3">
+          <Label className="text-xs text-gray-500">Net Lifetime Value</Label>
+          <p className="text-lg font-semibold text-blue-700">{fmtMoney(financial?.netLifetimeValue)}</p>
+        </div>
+        <div className="bg-gray-50 rounded-lg p-3">
+          <Label className="text-xs text-gray-500">Average Booking Value</Label>
+          <p className="text-lg font-semibold">{fmtMoney(financial?.averageBookingValue)}</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-3">
           <Label className="text-xs text-gray-500">Pending Due</Label>
           <p className="text-lg font-semibold text-red-600">{fmtMoney(totalDue)}</p>
+        </div>
+        <div className="bg-amber-50 rounded-lg p-3">
+          <Label className="text-xs text-gray-500">Overdue Amount</Label>
+          <p className="text-lg font-semibold text-amber-800">{fmtMoney(financial?.overdueAmount)}</p>
         </div>
         <div className="bg-gray-50 rounded-lg p-3">
           <Label className="text-xs text-gray-500">Last Booking</Label>
@@ -593,12 +645,25 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
       </Dialog>
 
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><ReceiptText className="h-5 w-5 text-green-600" /> Complete Payment Ledger</CardTitle></CardHeader>
+        <CardHeader className="pb-3">
+          <div className="flex justify-between items-center gap-3 flex-wrap">
+            <CardTitle className="text-base flex items-center gap-2"><ReceiptText className="h-5 w-5 text-green-600" /> Complete Payment Ledger</CardTitle>
+            <Button size="sm" variant="outline" onClick={() => downloadStatement(customer, financial, payments)}><Download className="h-4 w-4 mr-1" /> Download Statement</Button>
+          </div>
+        </CardHeader>
         <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 mb-4 text-sm">
+            {[
+              ['Advance', financial?.paymentBreakdown?.advance], ['Partial', financial?.paymentBreakdown?.partial_payment],
+              ['Final', financial?.paymentBreakdown?.final_payment], ['Driver', financial?.paymentBreakdown?.driver_collection],
+              ['Vendor', financial?.paymentBreakdown?.vendor_collection], ['Refunds', financial?.paymentBreakdown?.refund],
+              ['Adjustments', financial?.paymentBreakdown?.adjustment],
+            ].map(([label, amount]) => <div key={String(label)} className="rounded-md bg-gray-50 border p-2"><p className="text-xs text-gray-500">{label}</p><p className="font-semibold">{fmtMoney(Number(amount) || 0)}</p></div>)}
+          </div>
           {payments.length === 0 ? <p className="text-sm text-gray-500">No payment transactions yet.</p> : (
             <div className="overflow-x-auto border rounded-lg">
               <Table>
-                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Booking</TableHead><TableHead>Type</TableHead><TableHead>Mode</TableHead><TableHead>Reference</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Booking</TableHead><TableHead>Type</TableHead><TableHead>Mode</TableHead><TableHead>Reference</TableHead><TableHead>Amount</TableHead><TableHead>Status</TableHead><TableHead>Receipt</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {payments.map((payment: any) => (
                     <TableRow key={payment._id}>
@@ -609,6 +674,7 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
                       <TableCell>{payment.transactionReference || '-'}</TableCell>
                       <TableCell className={payment.amount < 0 || payment.paymentType === 'refund' ? 'text-red-600 font-semibold' : 'text-green-700 font-semibold'}>{fmtMoney(payment.amount)}</TableCell>
                       <TableCell><Badge variant="outline" className="capitalize">{payment.status}</Badge></TableCell>
+                      <TableCell><CustomerPaymentReceipt customerId={customerId} paymentId={payment._id} /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

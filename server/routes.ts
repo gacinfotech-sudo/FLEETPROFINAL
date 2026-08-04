@@ -68,6 +68,7 @@ import { previewCampaign, sendCampaign } from "./services/campaignService";
 import { buildDriverPerformance } from "./services/driverPerformance";
 import { buildVehiclePerformance } from "./services/vehiclePerformance";
 import { findDuplicateCandidates, mergeCustomers } from "./services/customerMergeService";
+import { buildCustomerFinancialSummary, buildPaymentReceipt } from "./services/customerFinancialService";
 import { DriverLeave, DriverAttendance } from "./models/index";
 
 // Statuses where the booking has been financially finalized — further
@@ -2869,6 +2870,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Customer payment ledger error:', error?.message || error);
       res.status(500).json({ message: "Failed to fetch customer payment ledger" });
+    }
+  });
+
+  app.get("/api/customers/:id/financial-summary", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const summary = await buildCustomerFinancialSummary(req.tenantId!, req.params.id);
+      if (!summary) return res.status(404).json({ message: "Customer not found" });
+      res.json(summary);
+    } catch (error: any) {
+      console.error('Customer financial summary error:', error?.message || error);
+      res.status(500).json({ message: "Failed to compute customer financial summary" });
+    }
+  });
+
+  app.get("/api/customers/:id/payments/:paymentId/receipt", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id) || !mongoose.isValidObjectId(req.params.paymentId)) {
+        return res.status(400).json({ message: "Invalid customer or payment ID" });
+      }
+      const receipt = await buildPaymentReceipt(req.tenantId!, req.params.id, req.params.paymentId);
+      if (!receipt) return res.status(404).json({ message: "Payment receipt not found for this customer" });
+      res.json(receipt);
+    } catch (error: any) {
+      console.error('Payment receipt error:', error?.message || error);
+      res.status(500).json({ message: "Failed to create payment receipt" });
     }
   });
 
