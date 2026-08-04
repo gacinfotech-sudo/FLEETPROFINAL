@@ -59,7 +59,7 @@ import { findVehicleConflicts, checkDriverAvailability, combineDateTime } from "
 import { recordPayment, reversePayment, recomputeBookingPaymentSummary } from "./services/paymentLedger";
 import { PaymentTransaction, Customer } from "./models/index";
 import { findOrCreateCustomer, recomputeCustomerStats, classifyCustomer } from "./services/customerService";
-import { creditBookingReward, reverseBookingReward, previewRedemption, commitRedemption, computeLoyaltyTier, getRewardRule, adjustRewardPoints } from "./services/rewardService";
+import { creditBookingReward, reverseBookingReward, previewRedemption, commitRedemption, computeLoyaltyTier, getRewardRule, adjustRewardPoints, creditVerifiedGoogleReviewReward } from "./services/rewardService";
 import { RewardTransaction, RewardRule } from "./models/index";
 import { computeSegments, computeTagCounts, getSegmentFilter } from "./services/segmentService";
 import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerConsentEvent, CustomerBillingProfile, Invoice, Campaign, CampaignRecipient, GoogleReviewTracking } from "./models/index";
@@ -2399,7 +2399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(customers);
     } catch (error: any) {
       console.error('List customers error:', error?.message || error);
-      res.status(500).json({ message: "Failed to fetch customers" });
+      res.status(error?.status || 500).json({ message: error?.status ? error.message : "Failed to fetch customers" });
     }
   });
 
@@ -2883,6 +2883,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rows = await GoogleReviewTracking.find({ tenantId: req.tenantId, customerId: req.params.id })
         .populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status')
         .populate('requestMessageId', 'status provider providerMessageId sentAt')
+        .populate('rewardTransactionId', 'transactionType points balanceAfter reason createdAt')
         .sort({ requestDate: -1, reviewDate: -1, createdAt: -1 });
       res.json(rows);
     } catch (error: any) {
@@ -3018,12 +3019,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const review = await GoogleReviewTracking.findOne({ _id: req.params.reviewId, tenantId: req.tenantId, customerId: req.params.id });
       if (!review) return res.status(404).json({ message: "Google review tracking record not found" });
+      const actor = { userId: req.userId!, role: req.user?.role || 'client' };
       if (review.reviewReceived) {
+        const reward = await creditVerifiedGoogleReviewReward(req.tenantId!, req.params.id, review._id.toString(), actor);
+        if (reward && review.rewardTransactionId?.toString() !== reward._id.toString()) {
+          review.rewardTransactionId = reward._id;
+          review.lastUpdatedBy = actor;
+          await review.save();
+        }
         await review.populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status');
+        await review.populate('rewardTransactionId', 'transactionType points balanceAfter reason createdAt');
         return res.json(review);
       }
 
-      const actor = { userId: req.userId!, role: req.user?.role || 'client' };
       review.reviewReceived = true;
       review.reviewDate = receivedAt;
       review.reviewRating = rating;
@@ -3040,6 +3048,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         review.respondedBy = actor;
       }
       await review.save();
+      const reward = await creditVerifiedGoogleReviewReward(req.tenantId!, req.params.id, review._id.toString(), actor);
+      if (reward) {
+        review.rewardTransactionId = reward._id;
+        await review.save();
+      }
       await CustomerFollowUp.updateMany({
         tenantId: req.tenantId, customerId: req.params.id, bookingId: review.bookingId,
         taskType: 'Google review follow-up', status: { $nin: ['resolved', 'closed'] },
@@ -3047,6 +3060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         $set: { status: 'resolved', resolution: 'Google review receipt confirmed with evidence.', communicationResult: `Received ${rating}-star Google review.` },
       });
       await review.populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status');
+      await review.populate('rewardTransactionId', 'transactionType points balanceAfter reason createdAt');
       res.json(review);
     } catch (error: any) {
       console.error('Confirm Google review receipt error:', error?.message || error);
@@ -3714,6 +3728,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!['segment', 'tag'].includes(targetType)) return res.status(400).json({ message: "targetType must be 'segment' or 'tag'" });
       if (!targetKey || !String(targetKey).trim()) return res.status(400).json({ message: "targetKey is required" });
       if (!messageTemplate || !messageTemplate.trim()) return res.status(400).json({ message: "messageTemplate is required" });
+      if (targetType === 'segment') await getSegmentFilter(req.tenantId!, String(targetKey));
 
       const campaign = await Campaign.create({
         tenantId: req.tenantId, name: name.trim(), description,
@@ -3727,7 +3742,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(campaign);
     } catch (error: any) {
       console.error('Create campaign error:', error?.message || error);
-      res.status(500).json({ message: "Failed to create campaign" });
+      res.status(error?.status || 500).json({ message: error?.status ? error.message : "Failed to create campaign" });
     }
   });
 
@@ -3738,6 +3753,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (campaign.status !== 'draft') return res.status(400).json({ message: `Cannot edit a campaign that is already ${campaign.status}.` });
 
       const { name, description, offerType, offerValue, targetType, targetKey, messageTemplate, validFrom, validTo } = req.body || {};
+      const nextTargetType = targetType === undefined ? campaign.targetType : targetType;
+      const nextTargetKey = targetKey === undefined ? campaign.targetKey : targetKey;
+      if (!['segment', 'tag'].includes(nextTargetType)) return res.status(400).json({ message: "targetType must be 'segment' or 'tag'" });
+      if (!nextTargetKey || !String(nextTargetKey).trim()) return res.status(400).json({ message: "targetKey is required" });
+      if (nextTargetType === 'segment') await getSegmentFilter(req.tenantId!, String(nextTargetKey));
       if (name !== undefined) campaign.name = name;
       if (description !== undefined) campaign.description = description;
       if (offerType !== undefined) campaign.offerType = offerType;
@@ -3750,7 +3770,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await campaign.save();
       res.json(campaign);
     } catch (error: any) {
-      res.status(500).json({ message: "Failed to update campaign" });
+      res.status(error?.status || 500).json({ message: error?.status ? error.message : "Failed to update campaign" });
     }
   });
 
@@ -3774,7 +3794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(preview);
     } catch (error: any) {
       console.error('Campaign preview error:', error?.message || error);
-      res.status(500).json({ message: "Failed to preview campaign" });
+      res.status(error?.status || 500).json({ message: error?.status ? error.message : "Failed to preview campaign" });
     }
   });
 

@@ -54,6 +54,10 @@ export default function CustomerGoogleReviews({ customerId, bookings }: { custom
     queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/follow-ups`] });
     queryClient.invalidateQueries({ queryKey: ['/api/follow-ups'] });
     queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/timeline`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/rewards`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}`] });
+    queryClient.invalidateQueries({ queryKey: ['/api/customers/segments'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/customers'] });
   };
 
   const requestMutation = useMutation({
@@ -136,6 +140,7 @@ export default function CustomerGoogleReviews({ customerId, bookings }: { custom
                 <Badge className={review.reviewReceived ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}>{reviewStatus(review)}</Badge>
                 {review.followUpRequired && <Badge variant="outline" className="border-amber-300 text-amber-700">Follow-up required</Badge>}
                 {review.reviewReceived && <Badge variant="outline" className="capitalize">Response: {review.responseStatus?.replace(/_/g, ' ')}</Badge>}
+                {review.rewardTransactionId && <Badge className="bg-purple-100 text-purple-800">+{review.rewardTransactionId.points} review reward points</Badge>}
               </div>
             </div>
             <div className="grid sm:grid-cols-3 gap-2 text-xs text-gray-600">

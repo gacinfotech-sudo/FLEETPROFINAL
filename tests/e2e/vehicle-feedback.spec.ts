@@ -143,8 +143,14 @@ test('vehicle feedback links Customer, Booking and Fleet profiles with odometer-
   await expect(vehicleDialog.getByText(`Vehicle feedback ${marker}`, { exact: true }).first()).toBeVisible();
   const relatedBookingRow = vehicleDialog.getByRole('row').filter({ hasText: booking.bookingId });
   await relatedBookingRow.getByRole('button', { name: 'Open Booking' }).click();
-  await expect(page.getByRole('dialog', { name: 'Booking Details' }).getByText(booking.bookingId, { exact: true })).toBeVisible();
-  await page.keyboard.press('Escape');
+  const bookingDialog = page.getByRole('dialog', { name: 'Booking Details' });
+  await expect(bookingDialog.getByText(booking.bookingId, { exact: true })).toBeVisible();
+  await bookingDialog.getByRole('button', { name: 'Close' }).click();
+  await expect(bookingDialog).toBeHidden();
+  // Closing this nested booking view returns to the fleet list in the
+  // existing dialog state, so wait for the parent modal to clear before
+  // using sidebar navigation and avoid a modal focus-trap race.
+  await expect(vehicleDialog).toBeHidden();
 
   await page.locator('nav').getByRole('button', { name: 'Vehicle Performance' }).click();
   await page.locator('input[type="month"]').fill(month);

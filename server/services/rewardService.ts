@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Customer, RewardRule, RewardTransaction, LoyaltyTier, Booking } from '../models/index';
+import { Customer, RewardRule, RewardTransaction, LoyaltyTier, Booking, GoogleReviewTracking } from '../models/index';
 
 const DEFAULT_RULE = {
   earningRatePerAmount: 1,
@@ -209,6 +209,39 @@ export async function creditBookingReward(
   }
 
   return tx;
+}
+
+// A review bonus is granted for an evidence-confirmed Google review,
+// regardless of its rating. Rewarding only positive ratings would create
+// review gating; the configured bonus recognizes honest participation.
+// The review ID, rather than only the booking ID, is the idempotency unit.
+export async function creditVerifiedGoogleReviewReward(
+  tenantId: string,
+  customerId: string,
+  reviewId: string,
+  actor: { userId: string; role: string },
+) {
+  const review = await GoogleReviewTracking.findOne({
+    _id: reviewId, tenantId, customerId, reviewReceived: true,
+    reviewRating: { $gte: 1, $lte: 5 },
+    $or: [
+      { reviewLink: { $exists: true, $nin: [null, ''] } },
+      { reviewReference: { $exists: true, $nin: [null, ''] } },
+    ],
+  });
+  if (!review) throw Object.assign(new Error('Only an evidence-confirmed Google review can earn review points.'), { status: 400 });
+
+  const rule = await getRewardRule(tenantId);
+  const points = Math.floor(Number(rule.reviewBonusPoints) || 0);
+  if (points <= 0) return null;
+  const expiryDate = rule.expiryDays ? new Date(Date.now() + rule.expiryDays * 24 * 60 * 60 * 1000) : undefined;
+  return createTransaction({
+    tenantId, customerId, bookingId: review.bookingId?.toString(),
+    transactionType: 'review_bonus', points, expiryDate,
+    reason: `Reward for verified Google review (${review.reviewRating}★)`,
+    idempotencyKey: `${tenantId}_${review._id}_google_review_bonus`,
+    createdBy: actor,
+  });
 }
 
 // Reverses a booking's reward credit (and any repeat-bonus it triggered)

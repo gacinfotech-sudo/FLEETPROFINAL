@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Customer, Booking, CustomerFeedback, CustomerComplaint } from '../models/index';
+import { Customer, Booking, CustomerFeedback, CustomerComplaint, GoogleReviewTracking } from '../models/index';
 import { getRewardRule } from './rewardService';
 
 export interface SegmentDefinition {
@@ -57,9 +57,10 @@ export async function computeSegments(tenantId: string): Promise<SegmentDefiniti
   const rewardEligible = await Customer.countDocuments({ ...base, rewardPointsBalance: { $gte: rule.minPointsToRedeem } });
 
   const pendingDuesCustomerIds = await pendingDuesCustomers(tenantId);
-  const [positiveFeedbackIds, unresolvedComplaintIds] = await Promise.all([
+  const [positiveFeedbackIds, unresolvedComplaintIds, googleReviewPendingIds] = await Promise.all([
     positiveFeedbackCustomers(tenantId),
     unresolvedComplaintCustomers(tenantId),
+    googleReviewPendingCustomers(tenantId),
   ]);
 
   return [
@@ -84,6 +85,7 @@ export async function computeSegments(tenantId: string): Promise<SegmentDefiniti
     { key: 'reward_eligible', label: 'Reward Eligible Customers', count: rewardEligible, query: { rewardPointsBalance: { $gte: rule.minPointsToRedeem } } },
     { key: 'positive_feedback', label: 'Customers with Positive Feedback', count: positiveFeedbackIds.length, query: { _id: positiveFeedbackIds } },
     { key: 'unresolved_complaints', label: 'Customers with Unresolved Complaints', count: unresolvedComplaintIds.length, query: { _id: unresolvedComplaintIds } },
+    { key: 'google_review_pending', label: 'Google Review Pending', count: googleReviewPendingIds.length, query: { _id: googleReviewPendingIds } },
     { key: 'all', label: 'All Customers', count: total, query: {} },
   ];
 }
@@ -132,6 +134,37 @@ async function unresolvedComplaintCustomers(tenantId: string) {
   return rows.map((r: any) => r._id);
 }
 
+// A customer is pending when at least one financially finished trip has no
+// evidence-confirmed Google review. A review on an older trip must not hide a
+// newer unreviewed trip from this segment.
+async function googleReviewPendingCustomers(tenantId: string) {
+  const tenantObjectId = new mongoose.Types.ObjectId(tenantId);
+  const completedBookings = await Booking.find({
+    tenantId: tenantObjectId,
+    status: { $in: ['completed', 'payment_pending', 'closed'] },
+    customerId: { $exists: true, $ne: null },
+  }).select('_id customerId').lean();
+  if (!completedBookings.length) return [];
+
+  const reviewedBookingIds = await GoogleReviewTracking.distinct('bookingId', {
+    tenantId: tenantObjectId,
+    bookingId: { $in: completedBookings.map((booking: any) => booking._id) },
+    reviewReceived: true,
+  });
+  const reviewed = new Set(reviewedBookingIds.map((id: any) => id.toString()));
+  const pendingCustomerIds = new Map<string, any>();
+  for (const booking of completedBookings as any[]) {
+    if (!reviewed.has(booking._id.toString()) && booking.customerId) {
+      pendingCustomerIds.set(booking.customerId.toString(), booking.customerId);
+    }
+  }
+  return Customer.find({
+    _id: { $in: [...pendingCustomerIds.values()] },
+    tenantId: tenantObjectId,
+    isDeleted: { $ne: true },
+  }).distinct('_id');
+}
+
 // Resolves a segment key into an actual Mongo filter against Customer —
 // the single source of truth clicking a segment card uses (via GET
 // /api/customers?segment=key) to see the SAME customers the count on the
@@ -170,8 +203,14 @@ export async function getSegmentFilter(tenantId: string, key: string): Promise<R
       const ids = await unresolvedComplaintCustomers(tenantId);
       return { _id: { $in: ids } };
     }
-    default:
+    case 'google_review_pending': {
+      const ids = await googleReviewPendingCustomers(tenantId);
+      return { _id: { $in: ids } };
+    }
+    case 'all':
       return {};
+    default:
+      throw Object.assign(new Error(`Unknown customer segment: ${key}`), { status: 400 });
   }
 }
 

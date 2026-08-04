@@ -1466,6 +1466,7 @@ export interface IGoogleReviewTracking extends Document {
   reviewRating?: number;
   reviewLink?: string;
   reviewReference?: string;
+  rewardTransactionId?: mongoose.Types.ObjectId;
   followUpRequired: boolean;
   responseStatus: 'not_required' | 'pending' | 'responded';
   respondedAt?: Date;
@@ -1499,6 +1500,7 @@ const GoogleReviewTrackingSchema = new Schema<IGoogleReviewTracking>({
   reviewRating: { type: Number, min: 1, max: 5 },
   reviewLink: { type: String },
   reviewReference: { type: String },
+  rewardTransactionId: { type: Schema.Types.ObjectId, ref: 'RewardTransaction' },
   followUpRequired: { type: Boolean, default: false },
   responseStatus: { type: String, enum: ['not_required', 'pending', 'responded'], default: 'not_required' },
   respondedAt: { type: Date },
