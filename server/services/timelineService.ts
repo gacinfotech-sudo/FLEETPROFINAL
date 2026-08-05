@@ -1,7 +1,7 @@
 import {
   Customer, Booking, PaymentTransaction, RewardTransaction,
   CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerMerge, Invoice,
-  GoogleReviewTracking,
+  GoogleReviewTracking, Inquiry, Lead,
 } from '../models/index';
 
 export interface TimelineEvent {
@@ -167,6 +167,32 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
         bookingId: review.bookingId ? bookingIdMap.get(review.bookingId.toString()) : undefined,
         employee: review.respondedBy?.userId,
       });
+    }
+  }
+
+  // Inquiry -> Lead -> Customer conversion events (spec §41 "Add Customer
+  // Timeline event" when a lead converts). Read live from Inquiry/Lead,
+  // same "assembled on read, not a second stored copy" principle as the
+  // rest of this function.
+  const linkedInquiries = await Inquiry.find({ tenantId, linkedCustomerId: customerId });
+  for (const inq of linkedInquiries as any[]) {
+    events.push({
+      type: 'inquiry_linked', date: inq.createdAt,
+      description: `Inquiry ${inq.inquiryNumber || inq._id} logged (source: ${(inq.source || 'other').replace(/_/g, ' ')})`,
+      employee: inq.createdBy?.userId,
+    });
+    if (inq.convertedToLeadAt) {
+      const lead: any = await Lead.findOne({ tenantId, inquiryId: inq._id });
+      events.push({
+        type: 'inquiry_converted_to_lead', date: inq.convertedToLeadAt,
+        description: `Inquiry ${inq.inquiryNumber || inq._id} converted to lead ${lead?.leadNumber || ''}`.trim(),
+      });
+      if (lead?.convertedToCustomerAt) {
+        events.push({
+          type: 'lead_converted_to_customer', date: lead.convertedToCustomerAt,
+          description: `Lead ${lead.leadNumber} converted to this customer record`,
+        });
+      }
     }
   }
 

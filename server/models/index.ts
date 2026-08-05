@@ -639,6 +639,8 @@ export interface IWhatsAppMessage extends Document {
   tenantId: mongoose.Types.ObjectId;
   customerId?: mongoose.Types.ObjectId;
   bookingId?: mongoose.Types.ObjectId;
+  leadId?: mongoose.Types.ObjectId;
+  quotationId?: mongoose.Types.ObjectId;
   recipientType: 'customer' | 'driver';
   recipientPhone: string;
   messageType: string;
@@ -658,6 +660,8 @@ const WhatsAppMessageSchema = new Schema<IWhatsAppMessage>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
   customerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
   bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  leadId: { type: Schema.Types.ObjectId, ref: 'Lead' },
+  quotationId: { type: Schema.Types.ObjectId, ref: 'Quotation' },
   recipientType: { type: String, enum: ['customer', 'driver'], required: true },
   recipientPhone: { type: String, required: true },
   messageType: { type: String, required: true },
@@ -1591,6 +1595,495 @@ CustomerRequirementSchema.index({ tenantId: 1, customerId: 1, createdAt: -1 });
 CustomerRequirementSchema.index({ tenantId: 1, bookingId: 1 });
 export const CustomerRequirement = mongoose.model<ICustomerRequirement>('CustomerRequirement', CustomerRequirementSchema);
 
+// Inquiry — a real Customer/Sales pipeline entity distinct from Booking's
+// early 'enquiry'/'quotation_sent' statuses (see docs/INQUIRY_LEAD_STATUS_MAPPING.md).
+// Exists specifically so a phone call that may never become a trip doesn't
+// force premature creation of a real Booking (which requires a vehicleId).
+// Reuses CustomerRequirement's field vocabulary for requirement-capture
+// fields (see docs/INQUIRY_BOOKING_FIELD_INVENTORY.md) rather than
+// inventing a parallel shape.
+export type InquiryStatus =
+  | 'new' | 'unverified' | 'contact_attempted' | 'contacted'
+  | 'requirement_pending' | 'requirement_completed' | 'qualified'
+  | 'converted_to_lead' | 'future_follow_up' | 'duplicate' | 'invalid'
+  | 'lost' | 'cancelled';
+
+const INQUIRY_SOURCE_VALUES = [
+  'direct_customer', 'walk_in', 'phone_call', 'whatsapp', 'website', 'google_business_profile',
+  'google_ads', 'facebook', 'instagram', 'hotel', 'corporate_client', 'travel_agent', 'vendor_partner',
+  'referral', 'online_travel_platform', 'repeat_customer', 'other',
+] as const;
+
+const INQUIRY_TRIP_TYPE_VALUES = [
+  'local', 'airport_transfer', 'railway_transfer', 'one_way', 'round_trip', 'outstation',
+  'multi_city', 'religious_tour', 'corporate_duty', 'wedding_event', 'group_tour',
+  'self_drive', 'monthly_contract', 'employee_transport', 'custom',
+] as const;
+
+interface IInquiryVehicleRequirement {
+  vehicleCategoryId?: mongoose.Types.ObjectId;
+  requestedNameSnapshot: string;
+  quantity: number;
+  seatingCapacity?: number;
+  luggageCapacity?: number;
+  preferredModel?: string;
+  serviceType: 'with_driver' | 'self_drive';
+  alternativeAllowed: boolean;
+  notes?: string;
+}
+
+interface IInquiryCustomVehicleRequest {
+  customVehicleName: string;
+  brand?: string;
+  model?: string;
+  vehicleType?: string;
+  seatingCapacity?: number;
+  luggageCapacity?: number;
+  acNonAc?: string;
+  transmission?: string;
+  fuelType?: string;
+  luxuryLevel?: string;
+  quantity: number;
+  customerDescription?: string;
+  expectedBudget?: number;
+  alternativeAllowed: boolean;
+  notes?: string;
+}
+
+export interface IInquiry extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  inquiryNumber: string;
+  status: InquiryStatus;
+  priority: 'low' | 'medium' | 'high';
+
+  // Source attribution — deliberately separate from Booking.bookingSource
+  // (spec: "Original Inquiry Source" must never be conflated with later
+  // "Lead Conversion Source" / "Booking Source" / "Fulfilment Source").
+  source: typeof INQUIRY_SOURCE_VALUES[number];
+  sourceDetail?: string;
+  campaign?: string;
+  referrer?: string;
+
+  assignedExecutive?: string;
+  nextFollowUpAt?: Date;
+
+  // Contact capture — an Inquiry may exist with no linked Customer at all.
+  customerName: string;
+  primaryMobile: string;
+  whatsappNumber?: string;
+  alternateMobile?: string;
+  email?: string;
+  linkedCustomerId?: mongoose.Types.ObjectId;
+
+  tripType?: typeof INQUIRY_TRIP_TYPE_VALUES[number];
+  pickupDate?: Date;
+  pickupTime?: string;
+  returnDate?: Date;
+  returnTime?: string;
+  flexibleDate?: boolean;
+
+  pickupLocation?: string;
+  dropLocation?: string;
+  viaLocations?: string;
+  placesToVisit?: string;
+
+  numberOfPassengers?: number;
+  seniorCitizens?: number;
+  children?: number;
+  infants?: number;
+  luggageCount?: number;
+
+  // Requirement-capture fields — same vocabulary as CustomerRequirement.
+  route?: string;
+  vehicleCategory?: string;
+  driverPreference?: string;
+  languagePreference?: string;
+  acRequirement?: string;
+  paymentArrangement?: string;
+  tollParkingAgreement?: string;
+  customerVisibleInstructions?: string;
+  driverInstructions?: string;
+  officeOnlyNotes?: string;
+  billingInstructions?: string;
+
+  vehicleRequirements?: IInquiryVehicleRequirement[];
+  customVehicleRequests?: IInquiryCustomVehicleRequest[];
+
+  notes?: string;
+
+  convertedToLeadAt?: Date;
+  linkedBookingId?: mongoose.Types.ObjectId;
+
+  lostReason?: string;
+  lostNotes?: string;
+  futureReconnectDate?: Date;
+
+  createdBy: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const InquiryVehicleRequirementSchema = new Schema<IInquiryVehicleRequirement>({
+  vehicleCategoryId: { type: Schema.Types.ObjectId },
+  requestedNameSnapshot: { type: String, required: true },
+  quantity: { type: Number, required: true, default: 1 },
+  seatingCapacity: { type: Number },
+  luggageCapacity: { type: Number },
+  preferredModel: { type: String },
+  serviceType: { type: String, enum: ['with_driver', 'self_drive'], default: 'with_driver' },
+  alternativeAllowed: { type: Boolean, default: true },
+  notes: { type: String },
+}, { _id: true });
+
+const InquiryCustomVehicleRequestSchema = new Schema<IInquiryCustomVehicleRequest>({
+  customVehicleName: { type: String, required: true },
+  brand: { type: String },
+  model: { type: String },
+  vehicleType: { type: String },
+  seatingCapacity: { type: Number },
+  luggageCapacity: { type: Number },
+  acNonAc: { type: String },
+  transmission: { type: String },
+  fuelType: { type: String },
+  luxuryLevel: { type: String },
+  quantity: { type: Number, required: true, default: 1 },
+  customerDescription: { type: String },
+  expectedBudget: { type: Number },
+  alternativeAllowed: { type: Boolean, default: true },
+  notes: { type: String },
+}, { _id: true });
+
+const InquirySchema = new Schema<IInquiry>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  inquiryNumber: { type: String },
+  status: {
+    type: String,
+    enum: ['new', 'unverified', 'contact_attempted', 'contacted', 'requirement_pending',
+      'requirement_completed', 'qualified', 'converted_to_lead', 'future_follow_up',
+      'duplicate', 'invalid', 'lost', 'cancelled'],
+    default: 'new',
+  },
+  priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
+
+  source: { type: String, enum: INQUIRY_SOURCE_VALUES, default: 'phone_call' },
+  sourceDetail: { type: String },
+  campaign: { type: String },
+  referrer: { type: String },
+
+  assignedExecutive: { type: String },
+  nextFollowUpAt: { type: Date },
+
+  customerName: { type: String, required: true },
+  primaryMobile: { type: String, required: true },
+  whatsappNumber: { type: String },
+  alternateMobile: { type: String },
+  email: { type: String },
+  linkedCustomerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
+
+  tripType: { type: String, enum: INQUIRY_TRIP_TYPE_VALUES },
+  pickupDate: { type: Date },
+  pickupTime: { type: String },
+  returnDate: { type: Date },
+  returnTime: { type: String },
+  flexibleDate: { type: Boolean, default: false },
+
+  pickupLocation: { type: String },
+  dropLocation: { type: String },
+  viaLocations: { type: String },
+  placesToVisit: { type: String },
+
+  numberOfPassengers: { type: Number },
+  seniorCitizens: { type: Number },
+  children: { type: Number },
+  infants: { type: Number },
+  luggageCount: { type: Number },
+
+  route: { type: String },
+  vehicleCategory: { type: String },
+  driverPreference: { type: String },
+  languagePreference: { type: String },
+  acRequirement: { type: String },
+  paymentArrangement: { type: String },
+  tollParkingAgreement: { type: String },
+  customerVisibleInstructions: { type: String },
+  driverInstructions: { type: String },
+  officeOnlyNotes: { type: String },
+  billingInstructions: { type: String },
+
+  vehicleRequirements: { type: [InquiryVehicleRequirementSchema], default: [] },
+  customVehicleRequests: { type: [InquiryCustomVehicleRequestSchema], default: [] },
+
+  notes: { type: String },
+
+  convertedToLeadAt: { type: Date },
+  linkedBookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+
+  lostReason: { type: String },
+  lostNotes: { type: String },
+  futureReconnectDate: { type: Date },
+
+  createdBy: {
+    userId: { type: String, required: true },
+    role: { type: String, required: true },
+  },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+InquirySchema.index({ tenantId: 1, status: 1, createdAt: -1 });
+InquirySchema.index({ tenantId: 1, primaryMobile: 1 });
+InquirySchema.index({ tenantId: 1, nextFollowUpAt: 1 });
+InquirySchema.index(
+  { tenantId: 1, inquiryNumber: 1 },
+  { unique: true, partialFilterExpression: { inquiryNumber: { $type: 'string' } } },
+);
+export const Inquiry = mongoose.model<IInquiry>('Inquiry', InquirySchema);
+
+// Lead — a thin sales-pipeline-state wrapper around exactly one qualified
+// Inquiry (one-to-one, enforced by a unique index on inquiryId). Deliberately
+// does NOT duplicate the Inquiry's contact/requirement fields (customer
+// name, route, passengers, vehicle requirements, etc.) — those stay owned
+// by the Inquiry record and are read via inquiryId so editing the
+// requirement later (spec §28 "earlier steps remain editable") never
+// creates two divergent copies of the same fact. Lead adds only what's
+// genuinely new: pipeline status, executive assignment, and (later
+// phases) quotation/customer/booking linkage.
+export type LeadStatus =
+  | 'new' | 'assigned' | 'requirement_completed' | 'quotation_draft'
+  | 'quotation_under_review' | 'quotation_sent' | 'follow_up_due'
+  | 'negotiation' | 'customer_confirmed' | 'converted_to_customer'
+  | 'converted_to_booking' | 'future_requirement' | 'lost' | 'cancelled';
+
+export interface ILead extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  leadNumber: string;
+  inquiryId: mongoose.Types.ObjectId;
+  status: LeadStatus;
+  priority: 'low' | 'medium' | 'high';
+  assignedExecutive?: string;
+
+  linkedCustomerId?: mongoose.Types.ObjectId;
+  convertedToCustomerAt?: Date;
+  linkedBookingId?: mongoose.Types.ObjectId;
+  convertedToBookingAt?: Date;
+
+  lostReason?: string;
+  lostNotes?: string;
+
+  createdBy: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const LeadSchema = new Schema<ILead>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  leadNumber: { type: String },
+  inquiryId: { type: Schema.Types.ObjectId, ref: 'Inquiry', required: true },
+  status: {
+    type: String,
+    enum: ['new', 'assigned', 'requirement_completed', 'quotation_draft', 'quotation_under_review',
+      'quotation_sent', 'follow_up_due', 'negotiation', 'customer_confirmed', 'converted_to_customer',
+      'converted_to_booking', 'future_requirement', 'lost', 'cancelled'],
+    default: 'new',
+  },
+  priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
+  assignedExecutive: { type: String },
+
+  linkedCustomerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
+  convertedToCustomerAt: { type: Date },
+  linkedBookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  convertedToBookingAt: { type: Date },
+
+  lostReason: { type: String },
+  lostNotes: { type: String },
+
+  createdBy: {
+    userId: { type: String, required: true },
+    role: { type: String, required: true },
+  },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+LeadSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
+LeadSchema.index({ tenantId: 1, inquiryId: 1 }, { unique: true });
+LeadSchema.index(
+  { tenantId: 1, leadNumber: 1 },
+  { unique: true, partialFilterExpression: { leadNumber: { $type: 'string' } } },
+);
+export const Lead = mongoose.model<ILead>('Lead', LeadSchema);
+
+// Quotation — one or more priced vehicle/package options prepared against a
+// Lead. Money is stored as integer paise throughout (spec §18) to avoid the
+// float-drift class of bug already flagged for the older Booking/Payment
+// money fields elsewhere in this codebase (see docs/SECURITY_AND_DATA_RISK_AUDIT.md).
+// Options are embedded (not a separate collection) — same pattern already
+// used for Booking.extensionHistory/rescheduleHistory — since they only
+// ever exist in the context of their parent Quotation.
+export type QuotationStatus =
+  | 'draft' | 'under_review' | 'approved' | 'sent' | 'viewed' | 'customer_query'
+  | 'negotiation' | 'accepted' | 'rejected' | 'expired' | 'superseded' | 'converted';
+
+interface IQuotationOption {
+  optionNumber: number;
+  vehicleNameSnapshot: string;
+  quantity: number;
+  pricingType: 'fixed' | 'per_km' | 'per_day' | 'per_hour' | 'monthly' | 'custom';
+  baseRatePaise?: number;
+  includedKm?: number;
+  extraKmRatePaise?: number;
+  includedHours?: number;
+  extraHourRatePaise?: number;
+  minimumKmPerDay?: number;
+  driverAllowancePaise?: number;
+  nightHaltPaise?: number;
+  tollTreatment?: 'included' | 'excluded' | 'actual';
+  parkingTreatment?: 'included' | 'excluded' | 'actual';
+  stateTaxTreatment?: 'included' | 'excluded' | 'actual';
+  discountPaise?: number;
+  taxableAmountPaise?: number;
+  gstPaise?: number;
+  totalPaise: number;
+  notes?: string;
+}
+
+export interface IQuotation extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  quotationNumber?: string;
+  leadId: mongoose.Types.ObjectId;
+  status: QuotationStatus;
+  version: number;
+  parentQuotationId?: mongoose.Types.ObjectId;
+  options: IQuotationOption[];
+  acceptedOptionNumber?: number;
+  validTill?: Date;
+  paymentTerms?: string;
+  termsAndConditions?: string;
+  cancellationTerms?: string;
+  createdBy: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+  sentAt?: Date;
+  acceptedAt?: Date;
+}
+
+const QuotationOptionSchema = new Schema<IQuotationOption>({
+  optionNumber: { type: Number, required: true },
+  vehicleNameSnapshot: { type: String, required: true },
+  quantity: { type: Number, required: true, default: 1 },
+  pricingType: { type: String, enum: ['fixed', 'per_km', 'per_day', 'per_hour', 'monthly', 'custom'], default: 'fixed' },
+  baseRatePaise: { type: Number },
+  includedKm: { type: Number },
+  extraKmRatePaise: { type: Number },
+  includedHours: { type: Number },
+  extraHourRatePaise: { type: Number },
+  minimumKmPerDay: { type: Number },
+  driverAllowancePaise: { type: Number },
+  nightHaltPaise: { type: Number },
+  tollTreatment: { type: String, enum: ['included', 'excluded', 'actual'], default: 'excluded' },
+  parkingTreatment: { type: String, enum: ['included', 'excluded', 'actual'], default: 'excluded' },
+  stateTaxTreatment: { type: String, enum: ['included', 'excluded', 'actual'], default: 'excluded' },
+  discountPaise: { type: Number, default: 0 },
+  taxableAmountPaise: { type: Number },
+  gstPaise: { type: Number, default: 0 },
+  totalPaise: { type: Number, required: true },
+  notes: { type: String },
+}, { _id: false });
+
+const QuotationSchema = new Schema<IQuotation>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  quotationNumber: { type: String },
+  leadId: { type: Schema.Types.ObjectId, ref: 'Lead', required: true },
+  status: {
+    type: String,
+    enum: ['draft', 'under_review', 'approved', 'sent', 'viewed', 'customer_query', 'negotiation',
+      'accepted', 'rejected', 'expired', 'superseded', 'converted'],
+    default: 'draft',
+  },
+  version: { type: Number, default: 1 },
+  parentQuotationId: { type: Schema.Types.ObjectId, ref: 'Quotation' },
+  options: { type: [QuotationOptionSchema], default: [] },
+  acceptedOptionNumber: { type: Number },
+  validTill: { type: Date },
+  paymentTerms: { type: String },
+  termsAndConditions: { type: String },
+  cancellationTerms: { type: String },
+  createdBy: {
+    userId: { type: String, required: true },
+    role: { type: String, required: true },
+  },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  sentAt: { type: Date },
+  acceptedAt: { type: Date },
+});
+QuotationSchema.index({ tenantId: 1, leadId: 1, createdAt: -1 });
+QuotationSchema.index(
+  { tenantId: 1, quotationNumber: 1 },
+  { unique: true, partialFilterExpression: { quotationNumber: { $type: 'string' } } },
+);
+export const Quotation = mongoose.model<IQuotation>('Quotation', QuotationSchema);
+
+// LeadFollowUp — structured sales-pipeline follow-up tasks against a Lead
+// (spec §22). Deliberately a SEPARATE model from the existing
+// CustomerFollowUp (models/index.ts, "After-sales follow-up tasks —
+// auto-created on booking completion") — that one is post-trip customer
+// care; this one is pre-sales lead nurturing. Conflating the two would
+// mix "call this lead about their quotation" with "check if the
+// completed trip went well" in one list, which is exactly the kind of
+// mixed-purpose list the spec's Inquiry/Lead/Customer/Booking
+// terminology section warns against.
+export type LeadFollowUpOutcome =
+  | 'pending' | 'connected' | 'no_answer' | 'callback_requested' | 'quotation_requested'
+  | 'negotiation' | 'confirmed' | 'not_interested' | 'postponed' | 'lost';
+
+export interface ILeadFollowUp extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  leadId: mongoose.Types.ObjectId;
+  type: string;
+  scheduledAt: Date;
+  assignedTo?: string;
+  priority: 'low' | 'medium' | 'high';
+  purpose?: string;
+  previousDiscussion?: string;
+  customerResponse?: string;
+  internalNote?: string;
+  outcome: LeadFollowUpOutcome;
+  nextFollowUpAt?: Date;
+  completedAt?: Date;
+  completedBy?: string;
+  createdBy: { userId: string; role: string };
+  createdAt: Date;
+}
+
+const LeadFollowUpSchema = new Schema<ILeadFollowUp>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  leadId: { type: Schema.Types.ObjectId, ref: 'Lead', required: true },
+  type: { type: String, required: true },
+  scheduledAt: { type: Date, required: true },
+  assignedTo: { type: String },
+  priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
+  purpose: { type: String },
+  previousDiscussion: { type: String },
+  customerResponse: { type: String },
+  internalNote: { type: String },
+  outcome: {
+    type: String,
+    enum: ['pending', 'connected', 'no_answer', 'callback_requested', 'quotation_requested',
+      'negotiation', 'confirmed', 'not_interested', 'postponed', 'lost'],
+    default: 'pending',
+  },
+  nextFollowUpAt: { type: Date },
+  completedAt: { type: Date },
+  completedBy: { type: String },
+  createdBy: {
+    userId: { type: String, required: true },
+    role: { type: String, required: true },
+  },
+  createdAt: { type: Date, default: Date.now },
+});
+LeadFollowUpSchema.index({ tenantId: 1, leadId: 1, scheduledAt: -1 });
+LeadFollowUpSchema.index({ tenantId: 1, outcome: 1, scheduledAt: 1 });
+export const LeadFollowUp = mongoose.model<ILeadFollowUp>('LeadFollowUp', LeadFollowUpSchema);
+
 export interface ICustomerMerge extends Document {
   tenantId: mongoose.Types.ObjectId;
   sourceCustomerId: mongoose.Types.ObjectId;
@@ -2002,6 +2495,34 @@ const CampaignRecipientSchema = new Schema<ICampaignRecipient>({
 });
 CampaignRecipientSchema.index({ campaignId: 1, customerId: 1 }, { unique: true });
 export const CampaignRecipient = mongoose.model<ICampaignRecipient>('CampaignRecipient', CampaignRecipientSchema);
+
+// One in-progress "Add Booking" wizard draft per (tenant, user) — auto-saved
+// as the user moves through the existing EnhancedBookingForm steps so a
+// refresh or accidental navigation-away doesn't lose their progress. A
+// single slot per user (not a list) is a deliberate scope decision: the
+// spec asks not to lose in-progress work, not to build a drafts-management
+// UI, and a single "resume your unfinished booking?" prompt covers that.
+export interface IBookingDraft extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  userId: string;
+  step: number;
+  formData: any;
+  leadId?: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const BookingDraftSchema = new Schema<IBookingDraft>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  userId: { type: String, required: true },
+  step: { type: Number, default: 1 },
+  formData: { type: Schema.Types.Mixed, default: {} },
+  leadId: { type: Schema.Types.ObjectId, ref: 'Lead' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+BookingDraftSchema.index({ tenantId: 1, userId: 1 }, { unique: true });
+export const BookingDraft = mongoose.model<IBookingDraft>('BookingDraft', BookingDraftSchema);
 
 export const User = mongoose.model<IUser>('User', UserSchema);
 export const Vehicle = mongoose.model<IVehicle>('Vehicle', VehicleSchema);

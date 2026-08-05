@@ -102,3 +102,45 @@ export function buildUpcomingBookings(bookings: any[], now: Date = new Date(), d
 
   return buckets;
 }
+
+// Dashboard "Upcoming Bookings" (Today / Tomorrow / Future / All Upcoming)
+// needs the same centralized "is this booking upcoming" rule as
+// buildUpcomingBookings() above (same PRE_DISPATCH status set, same
+// tenant-local day boundary, same combined date+time comparison), but
+// callers need to reopen the existing full Booking Details dialog — which
+// reads many raw fields buildUpcomingBookings()'s summarize() step doesn't
+// keep — so this returns full booking documents instead of the summarized
+// shape, bucketed into today/tomorrow/future rather than a day-by-day array.
+// `future`/`all` are capped so this endpoint's response payload stays
+// bounded even though the underlying tenant booking query itself isn't.
+const MAX_FUTURE_ROWS = 200;
+
+export interface ClassifiedUpcomingBookings {
+  today: any[];
+  tomorrow: any[];
+  future: any[];
+  all: any[];
+  truncated: boolean;
+}
+
+export function classifyUpcomingBookings(bookings: any[], now: Date = new Date()): ClassifiedUpcomingBookings {
+  const todayStart = startOfDay(now);
+  const tomorrowStart = new Date(todayStart);
+  tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+  const dayAfterTomorrowStart = new Date(todayStart);
+  dayAfterTomorrowStart.setDate(dayAfterTomorrowStart.getDate() + 2);
+
+  const withPickupAt = bookings
+    .filter((b) => PRE_DISPATCH.includes(b.status))
+    .map((b) => ({ booking: b, pickupAt: combineDateTime(b.pickupDate, b.pickupTime) }))
+    .filter((x): x is { booking: any; pickupAt: Date } => x.pickupAt !== null && x.pickupAt >= todayStart)
+    .sort((a, b) => a.pickupAt.getTime() - b.pickupAt.getTime());
+
+  const today = withPickupAt.filter((x) => x.pickupAt < tomorrowStart).map((x) => x.booking);
+  const tomorrow = withPickupAt.filter((x) => x.pickupAt >= tomorrowStart && x.pickupAt < dayAfterTomorrowStart).map((x) => x.booking);
+  const futureAll = withPickupAt.filter((x) => x.pickupAt >= dayAfterTomorrowStart).map((x) => x.booking);
+  const future = futureAll.slice(0, MAX_FUTURE_ROWS);
+  const truncated = futureAll.length > MAX_FUTURE_ROWS;
+
+  return { today, tomorrow, future, all: [...today, ...tomorrow, ...future], truncated };
+}

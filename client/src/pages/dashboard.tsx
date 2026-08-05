@@ -17,10 +17,13 @@ import BusinessProfile from "../components/business-profile";
 import InvoiceSettingsPanel from "../components/invoice/invoice-settings-panel";
 import OnboardingWizard from "../components/onboarding/onboarding-wizard";
 import ManageExpenses from "./manage-expenses";
-import LiveBookings from "./live-bookings";
+import LiveBookings, { type Bucket as LiveOpsBucket } from "./live-bookings";
 import CustomersPage from "./customers";
 import AfterSalesPage from "./after-sales";
 import CampaignsPage from "./campaigns";
+import InquiriesPage from "./inquiries";
+import LeadsPage from "./leads";
+import FollowUpsPage from "./followups";
 import UpcomingBookings from "./upcoming-bookings";
 import PaymentDues from "./payment-dues";
 import DriverLeavePage from "./driver-leave";
@@ -40,13 +43,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Menu, LogOut, Star, Car, Users, UserCheck, Phone, Mail, MessageCircle, Banknote, Plus, User, FileText, Trash2 } from "lucide-react";
 
-type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "after-sales" | "campaigns";
+type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups";
+
+// apiRequest() throws Error("<status>: <raw response text>") on a non-2xx
+// response (queryClient.ts:throwIfResNotOk) — without this, a rejected
+// mutation's toast showed the whole raw JSON body instead of the actual
+// human-readable reason. Same fix already applied in leads.tsx /
+// quotation-panel.tsx for the same underlying gotcha.
+function extractApiErrorMessage(error: any): string {
+  const raw = String(error?.message || "");
+  const jsonStart = raw.indexOf("{");
+  if (jsonStart === -1) return raw;
+  try {
+    const parsed = JSON.parse(raw.slice(jsonStart));
+    return parsed.message || raw;
+  } catch {
+    return raw;
+  }
+}
 
 export default function Dashboard() {
   const params = useParams();
@@ -55,6 +76,31 @@ export default function Dashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  // Separate from statusFilter/typeFilter above (which are Booking History's
+  // own domain — booking statuses like "confirmed"/"cancelled") since
+  // Vehicle/Driver status values ("available"/"on_trip"/"maintenance" vs
+  // "available"/"on_duty"/"inactive") would otherwise collide with whatever
+  // was last selected on a completely different screen.
+  const [vehicleStatusFilter, setVehicleStatusFilter] = useState("all");
+  const [driverStatusFilter, setDriverStatusFilter] = useState("all");
+  // Set by the Dashboard Overview's Lead/Booking Source chart right before
+  // navigating into Booking History; own domain (booking source values)
+  // kept separate from statusFilter/typeFilter for the same reason
+  // vehicleStatusFilter/driverStatusFilter are — no collision with an
+  // unrelated filter left selected on this same "history" screen.
+  const [sourceFilter, setSourceFilter] = useState("all");
+  // Set right before navigating from the Dashboard Overview's Live
+  // Operations mini-board so the existing Live Bookings page opens on the
+  // matching tab; cleared whenever navigating anywhere else so a later
+  // normal sidebar click into Live Bookings still defaults normally.
+  const [liveOpsInitialTab, setLiveOpsInitialTab] = useState<LiveOpsBucket | undefined>(undefined);
+  // Set by LeadsPage's "Convert to Booking" action right before navigating
+  // here — pre-fills the existing, unmodified booking form (spec §24
+  // "Do not re-enter the same information manually") without skipping any
+  // of its own validation/availability checks. __leadId is carried along
+  // only so the booking-created callback below can link the two records;
+  // it is stripped before being handed to the form itself.
+  const [bookingPrefill, setBookingPrefill] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [showDriverForm, setShowDriverForm] = useState(false);
@@ -89,7 +135,7 @@ export default function Dashboard() {
   // Sync URL with current view on mount with role-based access control
   useEffect(() => {
     const section = params.section as ViewType;
-    const allowedSections = ["dashboard", "live-bookings", "upcoming-bookings", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "after-sales", "campaigns", "revenue", "expenses", "salary", "whatsapp", "profile"];
+    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "upcoming-bookings", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "after-sales", "campaigns", "revenue", "expenses", "salary", "whatsapp", "profile"];
     
     // Add "users" section only for admin and client roles
     if (user?.role === 'admin' || user?.role === 'client') {
@@ -134,8 +180,49 @@ export default function Dashboard() {
 
   // Update URL when view changes
   const handleViewChange = (view: ViewType) => {
+    if (view !== "live-bookings") setLiveOpsInitialTab(undefined);
+    if (view !== "bookings") setBookingPrefill(null);
+    if (view !== "history") setSourceFilter("all");
     setCurrentView(view);
     setLocation(`/dashboard/${view}`);
+  };
+
+  const handleConvertLeadToBooking = (prefill: any) => {
+    setBookingPrefill(prefill);
+    handleViewChange("bookings");
+  };
+
+  const linkBookingMutation = useMutation({
+    mutationFn: async ({ leadId, bookingId }: { leadId: string; bookingId: string }) =>
+      apiRequest("POST", `/api/leads/${leadId}/link-booking`, { bookingId }),
+  });
+
+  const handleBookingCreatedFromLead = (booking: any) => {
+    const leadId = bookingPrefill?.__leadId;
+    if (leadId && booking?._id) {
+      linkBookingMutation.mutate({ leadId, bookingId: booking._id });
+    }
+    setCurrentView("dashboard");
+  };
+
+  const goToLiveOpsBucket = (bucket: LiveOpsBucket) => {
+    setLiveOpsInitialTab(bucket);
+    handleViewChange("live-bookings");
+  };
+
+  const goToFleetStatus = (status: string) => {
+    setVehicleStatusFilter(status);
+    handleViewChange("fleet");
+  };
+
+  const goToDriverStatus = (status: string) => {
+    setDriverStatusFilter(status);
+    handleViewChange("drivers");
+  };
+
+  const goToBookingSource = (source: string) => {
+    setSourceFilter(source);
+    handleViewChange("history");
   };
 
   // Delete mutations
@@ -166,13 +253,39 @@ export default function Dashboard() {
   });
 
   const completeBookingMutation = useMutation({
+    // Was PUT /api/bookings/:id — that route explicitly rejects any
+    // `status` field ("Use POST /api/bookings/:id/status to change booking
+    // status") specifically so status changes always go through the one
+    // state-machine-validated path that also credits reward points and
+    // recomputes customer stats. This "Complete" button (Booking History)
+    // was therefore always failing with a 400 — and, with no onError
+    // handler below, failing completely silently. A completed booking
+    // credited via Live Bookings' own working status control was fine;
+    // this one, wherever it was used instead, never actually completed
+    // anything.
     mutationFn: async (id: string) => {
-      return await apiRequest('PUT', `/api/bookings/${id}`, { status: 'completed' });
+      const res = await apiRequest('POST', `/api/bookings/${id}/status`, { status: 'completed' });
+      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (booking: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
       queryClient.invalidateQueries({ queryKey: ['/api/bookings/upcoming'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/upcoming-bookings'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      const customerId = booking?.customerId ? String(booking.customerId) : undefined;
+      if (customerId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/rewards`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/bookings`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/payments`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/financial-summary`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/timeline`] });
+        queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      }
+      toast({ variant: "success", title: "Booking completed" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Could not complete booking", description: extractApiErrorMessage(error), variant: "destructive" });
     },
   });
 
@@ -183,6 +296,7 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
       queryClient.invalidateQueries({ queryKey: ['/api/bookings/upcoming'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/upcoming-bookings'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       setShowEditBookingForm(false);
       setEditingBooking(null);
@@ -208,6 +322,7 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
       queryClient.invalidateQueries({ queryKey: ['/api/bookings/upcoming'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/upcoming-bookings'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
       setShowCancelDialog(false);
       setCancellingBooking(null);
@@ -302,6 +417,58 @@ export default function Dashboard() {
     queryKey: ["/api/bookings/upcoming"],
   });
 
+  // Today/Tomorrow/Future/All Upcoming tabs on the Dashboard Overview's
+  // "Upcoming Bookings" card. Deliberately a separate query from
+  // upcomingBookings above (which stays wired to its existing invalidations
+  // untouched) — see docs/DASHBOARD_SAFE_CHANGE_PLAN.md for why the old
+  // /api/bookings/upcoming source isn't reused here (stale status filter).
+  const [upcomingTab, setUpcomingTab] = useState<"today" | "tomorrow" | "future" | "all">("today");
+  const {
+    data: classifiedUpcoming,
+    isLoading: isUpcomingLoading,
+    isError: isUpcomingError,
+    refetch: refetchUpcoming,
+    dataUpdatedAt: upcomingUpdatedAt,
+  } = useQuery<{ today: any[]; tomorrow: any[]; future: any[]; all: any[]; truncated: boolean }>({
+    queryKey: ["/api/dashboard/upcoming-bookings"],
+  });
+
+  // Live Operations mini-board on the Dashboard Overview. Reuses the
+  // already-existing, already-correct /api/operations/live-bookings
+  // endpoint (same one the standalone Live Bookings page uses) — no new
+  // backend aggregation needed here.
+  const {
+    data: liveOps,
+    isLoading: isLiveOpsLoading,
+    isError: isLiveOpsError,
+    refetch: refetchLiveOps,
+  } = useQuery<Record<string, any[]>>({
+    queryKey: ["/api/operations/live-bookings"],
+  });
+
+  // Finance overview (Today's cash/UPI/bank/card split) — ledger-sourced
+  // (PaymentTransaction, never a raw booking-field sum), role-gated behind
+  // the same canViewRevenue() check the Revenue KPI card already uses.
+  const {
+    data: financeSummary,
+    isLoading: isFinanceLoading,
+    isError: isFinanceError,
+    refetch: refetchFinance,
+  } = useQuery<{ cash: number; upi: number; bank: number; card: number; other: number; total: number }>({
+    queryKey: ["/api/dashboard/finance-summary"],
+    enabled: canViewRevenue(),
+  });
+
+  // Lead/Booking source chart — all-time count per Booking.bookingSource.
+  const {
+    data: leadSources,
+    isLoading: isLeadSourcesLoading,
+    isError: isLeadSourcesError,
+    refetch: refetchLeadSources,
+  } = useQuery<{ source: string; count: number }[]>({
+    queryKey: ["/api/dashboard/lead-sources"],
+  });
+
   const { data: vehicles = [] } = useQuery<any[]>({
     queryKey: ["/api/vehicles"],
   });
@@ -353,143 +520,386 @@ export default function Dashboard() {
               <CardHeader className="pb-4 lg:pb-6">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 lg:gap-4">
                   <CardTitle className="text-lg sm:text-xl lg:text-2xl">Upcoming Bookings</CardTitle>
+                  {upcomingUpdatedAt > 0 && (
+                    <span className="text-xs text-gray-500">
+                      Last updated {new Date(upcomingUpdatedAt).toLocaleTimeString()}
+                    </span>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
-                {/* Mobile Card View */}
-                <div className="block sm:hidden space-y-3">
-                  {upcomingBookings.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">
-                      No upcoming bookings
-                    </div>
-                  ) : (
-                    upcomingBookings.map((booking: any) => {
-                      const vehicle = vehicles.find((v: any) => (v._id || v.id) === booking.vehicleId);
-                      return (
-                        <div key={booking._id || booking.id} className="border rounded-lg p-4 space-y-2">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <div className="font-medium">{booking.customerName}</div>
-                              <div className="text-sm text-gray-500">{booking.customerPhone}</div>
-                            </div>
-                            <Badge variant="default">{booking.status}</Badge>
-                          </div>
-                          <div className="text-sm">
-                            <div><span className="font-medium">Vehicle:</span> {vehicle ? `${vehicle.make} ${vehicle.model}` : "N/A"}</div>
-                            <div><span className="font-medium">Route:</span> {booking.pickupLocation || "Not specified"} to {booking.dropoffLocation || "Not specified"}</div>
-                            <div><span className="font-medium">Type:</span> 
-                              <Badge variant={booking.bookingType === "self_drive" ? "default" : "secondary"} className="ml-2 text-xs">
-                                {booking.bookingType === "self_drive" ? "Self Drive" : "With Driver"}
-                              </Badge>
-                              <Badge variant="outline" className="ml-2 text-xs">
-                                {booking.tripType === "one_way" ? "One Way" :
-                                 booking.tripType === "round_trip" ? "Round Trip" :
-                                 booking.tripType === "local" ? "Local" :
-                                 booking.tripType === "airport" ? "Airport" : "One Way"}
-                              </Badge>
-                            </div>
-                            <div><span className="font-medium">Date:</span> {new Date(booking.pickupDate).toLocaleDateString()} - {new Date(booking.returnDate).toLocaleDateString()}</div>
-                            <div><span className="font-medium">Amount:</span> ₹{booking.totalAmount || booking.amount || 0}</div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+                {isUpcomingError ? (
+                  <div className="text-center py-10 space-y-3">
+                    <p className="text-sm text-red-600">Couldn't load upcoming bookings.</p>
+                    <Button variant="outline" size="sm" onClick={() => refetchUpcoming()}>Retry</Button>
+                  </div>
+                ) : isUpcomingLoading ? (
+                  <div className="space-y-3">
+                    {[...Array(3)].map((_, i) => (
+                      <div key={i} className="animate-pulse h-16 bg-gray-100 rounded-lg" />
+                    ))}
+                  </div>
+                ) : (
+                  <Tabs value={upcomingTab} onValueChange={(v) => setUpcomingTab(v as typeof upcomingTab)}>
+                    <TabsList>
+                      <TabsTrigger value="today">Today ({classifiedUpcoming?.today.length ?? 0})</TabsTrigger>
+                      <TabsTrigger value="tomorrow">Tomorrow ({classifiedUpcoming?.tomorrow.length ?? 0})</TabsTrigger>
+                      <TabsTrigger value="future">Future ({classifiedUpcoming?.future.length ?? 0})</TabsTrigger>
+                      <TabsTrigger value="all">All Upcoming ({classifiedUpcoming?.all.length ?? 0})</TabsTrigger>
+                    </TabsList>
 
-                {/* Desktop Table View */}
-                <div className="hidden sm:block overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-gray-50 lg:h-12">
-                        <TableHead className="font-semibold lg:text-base lg:px-6">Customer</TableHead>
-                        <TableHead className="font-semibold lg:text-base lg:px-6">Vehicle</TableHead>
-                        <TableHead className="font-semibold lg:text-base lg:px-6">Route</TableHead>
-                        <TableHead className="font-semibold lg:text-base lg:px-6">Type</TableHead>
-                        <TableHead className="font-semibold lg:text-base lg:px-6">Date</TableHead>
-                        <TableHead className="font-semibold lg:text-base lg:px-6">Amount</TableHead>
-                        <TableHead className="font-semibold lg:text-base lg:px-6">Status</TableHead>
-                        <TableHead className="font-semibold lg:text-base lg:px-6">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {upcomingBookings.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={8} className="text-center text-gray-500 py-12 lg:py-16">
-                            <div className="space-y-2">
-                              <div className="text-lg font-medium">No upcoming bookings</div>
-                              <div className="text-sm">Create your first booking to get started</div>
+                    {(["today", "tomorrow", "future", "all"] as const).map((tabKey) => {
+                      const list = classifiedUpcoming?.[tabKey] ?? [];
+                      const emptyMessage =
+                        tabKey === "today" ? "No upcoming bookings for today." :
+                        tabKey === "tomorrow" ? "No upcoming bookings for tomorrow." :
+                        tabKey === "future" ? "No bookings scheduled beyond tomorrow." :
+                        "No upcoming bookings.";
+                      return (
+                        <TabsContent key={tabKey} value={tabKey}>
+                          {list.length === 0 ? (
+                            <div className="text-center text-gray-500 py-12 space-y-3">
+                              <div className="text-base">{emptyMessage}</div>
+                              <Button size="sm" onClick={() => handleViewChange("bookings")}>Create Booking</Button>
                             </div>
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        upcomingBookings.map((booking: any) => {
-                          const vehicle = vehicles.find((v: any) => (v._id || v.id) === booking.vehicleId);
-                          return (
-                            <TableRow key={booking._id || booking.id} className="hover:bg-gray-50 lg:h-16">
-                              <TableCell className="lg:px-6 lg:py-4">
-                                <div>
-                                  <div className="font-medium lg:text-base">{booking.customerName}</div>
-                                  <div className="text-sm text-gray-500">{booking.customerPhone}</div>
-                                </div>
-                              </TableCell>
-                              <TableCell className="lg:px-6 lg:py-4">
-                                <div className="font-medium lg:text-base">
-                                  {vehicle ? `${vehicle.make} ${vehicle.model}` : "N/A"}
-                                </div>
-                                {vehicle?.licensePlate && (
-                                  <div className="text-sm text-gray-500">{vehicle.licensePlate}</div>
+                          ) : (
+                            <>
+                              {/* Mobile Card View */}
+                              <div className="block sm:hidden space-y-3">
+                                {list.map((booking: any) => {
+                                  const vehicle = booking.vehicleId && typeof booking.vehicleId === "object" ? booking.vehicleId : null;
+                                  const driver = booking.driverId && typeof booking.driverId === "object" ? booking.driverId : null;
+                                  const balanceDue = Math.max(0, (booking.totalAmount || 0) - (booking.advanceReceived || 0));
+                                  return (
+                                    <button
+                                      key={booking._id || booking.id}
+                                      type="button"
+                                      onClick={() => setViewingBooking(booking)}
+                                      className="w-full text-left border rounded-lg p-4 space-y-2 hover:bg-gray-50 transition-colors"
+                                    >
+                                      <div className="flex justify-between items-start">
+                                        <div>
+                                          <div className="font-medium">{booking.customerName}</div>
+                                          <div className="text-sm text-gray-500">{booking.customerPhone}</div>
+                                        </div>
+                                        <Badge variant="default">{booking.status}</Badge>
+                                      </div>
+                                      <div className="text-sm">
+                                        <div><span className="font-medium">Pickup:</span> {new Date(booking.pickupDate).toLocaleDateString()} at {booking.pickupTime} — {booking.pickupLocation || "Not specified"}</div>
+                                        <div><span className="font-medium">Route:</span> {booking.pickupLocation || "Not specified"} to {booking.dropoffLocation || "Not specified"}</div>
+                                        <div><span className="font-medium">Vehicle:</span> {vehicle ? `${vehicle.make || ""} ${vehicle.model || ""}`.trim() : "Not assigned"}</div>
+                                        <div><span className="font-medium">Driver:</span> {driver ? driver.name : (booking.bookingType === "self_drive" ? "Self Drive" : "Not assigned")}</div>
+                                        <div><span className="font-medium">Balance Due:</span> ₹{balanceDue}</div>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Desktop Table View */}
+                              <div className="hidden sm:block overflow-x-auto">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow className="bg-gray-50 lg:h-12">
+                                      <TableHead className="font-semibold lg:text-base lg:px-6">Booking</TableHead>
+                                      <TableHead className="font-semibold lg:text-base lg:px-6">Customer</TableHead>
+                                      <TableHead className="font-semibold lg:text-base lg:px-6">Pickup</TableHead>
+                                      <TableHead className="font-semibold lg:text-base lg:px-6">Route</TableHead>
+                                      <TableHead className="font-semibold lg:text-base lg:px-6">Vehicle</TableHead>
+                                      <TableHead className="font-semibold lg:text-base lg:px-6">Driver</TableHead>
+                                      <TableHead className="font-semibold lg:text-base lg:px-6">Status</TableHead>
+                                      <TableHead className="font-semibold lg:text-base lg:px-6">Payment</TableHead>
+                                      <TableHead className="font-semibold lg:text-base lg:px-6">Assignment</TableHead>
+                                      <TableHead className="font-semibold lg:text-base lg:px-6">Actions</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {list.map((booking: any) => {
+                                      const vehicle = booking.vehicleId && typeof booking.vehicleId === "object" ? booking.vehicleId : null;
+                                      const driver = booking.driverId && typeof booking.driverId === "object" ? booking.driverId : null;
+                                      const balanceDue = Math.max(0, (booking.totalAmount || 0) - (booking.advanceReceived || 0));
+                                      const vehicleAssigned = !!vehicle;
+                                      const driverAssigned = booking.bookingType === "self_drive" ? true : !!driver;
+                                      const assignmentLabel = vehicleAssigned && driverAssigned ? "Fully Assigned" : (!vehicleAssigned && !driverAssigned ? "Unassigned" : "Partially Assigned");
+                                      return (
+                                        <TableRow
+                                          key={booking._id || booking.id}
+                                          className="hover:bg-gray-50 lg:h-16 cursor-pointer"
+                                          onClick={() => setViewingBooking(booking)}
+                                        >
+                                          <TableCell className="lg:px-6 lg:py-4 font-medium">{booking.bookingId}</TableCell>
+                                          <TableCell className="lg:px-6 lg:py-4">
+                                            <div className="font-medium lg:text-base">{booking.customerName}</div>
+                                            <div className="text-sm text-gray-500">{booking.customerPhone}</div>
+                                          </TableCell>
+                                          <TableCell className="lg:px-6 lg:py-4">
+                                            <div className="lg:text-base">{new Date(booking.pickupDate).toLocaleDateString()}</div>
+                                            <div className="text-sm text-gray-500">{booking.pickupTime}</div>
+                                          </TableCell>
+                                          <TableCell className="lg:px-6 lg:py-4">
+                                            <div className="font-medium lg:text-base">{booking.pickupLocation || "Not specified"}</div>
+                                            <div className="text-sm text-gray-500">to {booking.dropoffLocation || "Not specified"}</div>
+                                          </TableCell>
+                                          <TableCell className="lg:px-6 lg:py-4">
+                                            {vehicle ? (
+                                              <>
+                                                <div className="font-medium lg:text-base">{vehicle.make} {vehicle.model}</div>
+                                                {vehicle.licensePlate && <div className="text-sm text-gray-500">{vehicle.licensePlate}</div>}
+                                              </>
+                                            ) : <span className="text-gray-400">Not assigned</span>}
+                                          </TableCell>
+                                          <TableCell className="lg:px-6 lg:py-4">
+                                            {driver ? (
+                                              <>
+                                                <div className="font-medium lg:text-base">{driver.name}</div>
+                                                {driver.phone && <div className="text-sm text-gray-500">{driver.phone}</div>}
+                                              </>
+                                            ) : booking.bookingType === "self_drive" ? (
+                                              <span className="text-gray-500">Self Drive</span>
+                                            ) : <span className="text-gray-400">Not assigned</span>}
+                                          </TableCell>
+                                          <TableCell className="lg:px-6 lg:py-4">
+                                            <Badge variant="default" className="lg:text-sm lg:px-3 lg:py-1">{booking.status}</Badge>
+                                          </TableCell>
+                                          <TableCell className="lg:px-6 lg:py-4">
+                                            <div className="font-semibold lg:text-base text-green-600">₹{booking.totalAmount || 0}</div>
+                                            <div className="text-sm text-gray-500">Due ₹{balanceDue}</div>
+                                          </TableCell>
+                                          <TableCell className="lg:px-6 lg:py-4">
+                                            <Badge variant={assignmentLabel === "Fully Assigned" ? "default" : assignmentLabel === "Unassigned" ? "destructive" : "secondary"} className="lg:text-sm lg:px-3 lg:py-1">
+                                              {assignmentLabel}
+                                            </Badge>
+                                          </TableCell>
+                                          <TableCell className="lg:px-6 lg:py-4">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={(e) => { e.stopPropagation(); setViewingBooking(booking); }}
+                                            >
+                                              View
+                                            </Button>
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })}
+                                  </TableBody>
+                                </Table>
+                                {tabKey !== "today" && tabKey !== "tomorrow" && classifiedUpcoming?.truncated && (
+                                  <div className="text-center py-4">
+                                    <Button variant="outline" size="sm" onClick={() => handleViewChange("history")}>
+                                      Showing first 200 — View All in Booking History
+                                    </Button>
+                                  </div>
                                 )}
-                              </TableCell>
-                              <TableCell className="lg:px-6 lg:py-4">
-                                <div className="font-medium lg:text-base">
-                                  {booking.pickupLocation || "Not specified"}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  to {booking.dropoffLocation || "Not specified"}
-                                </div>
-                              </TableCell>
-                              <TableCell className="lg:px-6 lg:py-4">
-                                <Badge variant={booking.bookingType === "self_drive" ? "default" : "secondary"} className="lg:text-sm lg:px-3 lg:py-1">
-                                  {booking.bookingType === "self_drive" ? "Self Drive" : "With Driver"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="lg:px-6 lg:py-4">
-                                <div className="lg:text-base">
-                                  {new Date(booking.pickupDate).toLocaleDateString()} at {booking.pickupTime}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  to {new Date(booking.returnDate).toLocaleDateString()} at {booking.returnTime}
-                                </div>
-                              </TableCell>
-                              <TableCell className="lg:px-6 lg:py-4">
-                                <div className="font-semibold lg:text-base text-green-600">₹{booking.totalAmount || booking.amount || 0}</div>
-                              </TableCell>
-                              <TableCell className="lg:px-6 lg:py-4">
-                                <Badge variant="default" className="lg:text-sm lg:px-3 lg:py-1">{booking.status}</Badge>
-                              </TableCell>
-                              <TableCell className="lg:px-6 lg:py-4">
-                                {booking.status === "confirmed" && (
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm"
-                                    onClick={() => handleCompleteBooking(booking._id || booking.id)}
-                                    disabled={completeBookingMutation.isPending}
-                                    className="text-green-600 hover:text-green-700"
-                                  >
-                                    Complete
-                                  </Button>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+                              </div>
+                            </>
+                          )}
+                        </TabsContent>
+                      );
+                    })}
+                  </Tabs>
+                )}
               </CardContent>
             </Card>
+
+            {/* Live Operations */}
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg sm:text-xl lg:text-2xl">Live Operations</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLiveOpsError ? (
+                  <div className="text-center py-8 space-y-3">
+                    <p className="text-sm text-red-600">Couldn't load live operations.</p>
+                    <Button variant="outline" size="sm" onClick={() => refetchLiveOps()}>Retry</Button>
+                  </div>
+                ) : isLiveOpsLoading ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {[...Array(4)].map((_, i) => <div key={i} className="animate-pulse h-20 bg-gray-100 rounded-lg" />)}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {([
+                      { key: "startDue", label: "Start Due", emphasis: "neutral" },
+                      { key: "startDelayed", label: "Delayed Pickup", emphasis: "critical" },
+                      { key: "ongoing", label: "Running Trips", emphasis: "neutral" },
+                      { key: "endingSoon", label: "Ending Soon", emphasis: "warn" },
+                      { key: "completionOverdue", label: "Completion Overdue", emphasis: "critical" },
+                      { key: "paymentPending", label: "Payment Pending", emphasis: "warn" },
+                      { key: "unassigned", label: "Unassigned", emphasis: "critical" },
+                    ] as const).map(({ key, label, emphasis }) => {
+                      const count = liveOps?.[key]?.length ?? 0;
+                      const colorClasses =
+                        emphasis === "critical" ? "border-red-200 bg-red-50 hover:bg-red-100" :
+                        emphasis === "warn" ? "border-amber-200 bg-amber-50 hover:bg-amber-100" :
+                        "border-blue-200 bg-blue-50 hover:bg-blue-100";
+                      const textClasses =
+                        emphasis === "critical" ? "text-red-700" :
+                        emphasis === "warn" ? "text-amber-700" :
+                        "text-blue-700";
+                      return (
+                        <button
+                          type="button"
+                          key={key}
+                          onClick={() => goToLiveOpsBucket(key)}
+                          className={`text-left border rounded-lg p-3 lg:p-4 transition-colors ${colorClasses}`}
+                        >
+                          <div className={`text-2xl font-bold ${textClasses}`}>{count}</div>
+                          <div className="text-xs lg:text-sm text-gray-700">{label}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Fleet and Driver Status */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+              <Card>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg sm:text-xl">Fleet Status</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-3">
+                    {([
+                      { status: "available", label: "Available", color: "bg-green-50 border-green-200 hover:bg-green-100 text-green-700" },
+                      { status: "on_trip", label: "On Trip", color: "bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-700" },
+                      { status: "maintenance", label: "Maintenance", color: "bg-red-50 border-red-200 hover:bg-red-100 text-red-700" },
+                    ] as const).map(({ status, label, color }) => (
+                      <button
+                        type="button"
+                        key={status}
+                        onClick={() => goToFleetStatus(status)}
+                        className={`text-left border rounded-lg p-3 transition-colors ${color}`}
+                      >
+                        <div className="text-xl font-bold">{vehicles.filter((v: any) => v.status === status).length}</div>
+                        <div className="text-xs text-gray-700">{label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg sm:text-xl">Driver Status</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-3 gap-3">
+                    {([
+                      { status: "available", label: "Available", color: "bg-green-50 border-green-200 hover:bg-green-100 text-green-700" },
+                      { status: "on_duty", label: "On Duty", color: "bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-700" },
+                      { status: "inactive", label: "Inactive", color: "bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-700" },
+                    ] as const).map(({ status, label, color }) => (
+                      <button
+                        type="button"
+                        key={status}
+                        onClick={() => goToDriverStatus(status)}
+                        className={`text-left border rounded-lg p-3 transition-colors ${color}`}
+                      >
+                        <div className="text-xl font-bold">{drivers.filter((d: any) => d.status === status).length}</div>
+                        <div className="text-xs text-gray-700">{label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Finance Overview and Lead/Booking Sources */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+              {canViewRevenue() && (
+                <Card
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleViewChange("revenue")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleViewChange("revenue"); } }}
+                  className="cursor-pointer hover:shadow-lg transition-shadow"
+                >
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg sm:text-xl">Today's Collection</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {isFinanceError ? (
+                      <div className="text-center py-6 space-y-3">
+                        <p className="text-sm text-red-600">Couldn't load today's collection.</p>
+                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); refetchFinance(); }}>Retry</Button>
+                      </div>
+                    ) : isFinanceLoading ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {[...Array(5)].map((_, i) => <div key={i} className="animate-pulse h-16 bg-gray-100 rounded-lg" />)}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="text-3xl font-bold text-green-700 mb-4">
+                          ₹{(financeSummary?.total ?? 0).toLocaleString('en-IN')}
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {([
+                            { key: "cash", label: "Cash" },
+                            { key: "upi", label: "UPI" },
+                            { key: "bank", label: "Bank" },
+                            { key: "card", label: "Card" },
+                            { key: "other", label: "Other" },
+                          ] as const).map(({ key, label }) => (
+                            <div key={key} className="border rounded-lg p-3 bg-gray-50">
+                              <div className="text-lg font-semibold text-gray-900">₹{(financeSummary?.[key] ?? 0).toLocaleString('en-IN')}</div>
+                              <div className="text-xs text-gray-600">{label}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg sm:text-xl">Booking Sources</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLeadSourcesError ? (
+                    <div className="text-center py-6 space-y-3">
+                      <p className="text-sm text-red-600">Couldn't load booking sources.</p>
+                      <Button variant="outline" size="sm" onClick={() => refetchLeadSources()}>Retry</Button>
+                    </div>
+                  ) : isLeadSourcesLoading ? (
+                    <div className="space-y-2">
+                      {[...Array(4)].map((_, i) => <div key={i} className="animate-pulse h-8 bg-gray-100 rounded-lg" />)}
+                    </div>
+                  ) : !leadSources || leadSources.length === 0 ? (
+                    <p className="text-sm text-gray-500 text-center py-6">No bookings yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {(() => {
+                        const maxCount = Math.max(...leadSources.map((s) => s.count), 1);
+                        return leadSources.map(({ source, count }) => (
+                          <button
+                            type="button"
+                            key={source}
+                            onClick={() => goToBookingSource(source)}
+                            className="w-full text-left group"
+                          >
+                            <div className="flex justify-between items-center text-sm mb-1">
+                              <span className="text-gray-700 capitalize group-hover:text-blue-700">{source.replace(/_/g, ' ')}</span>
+                              <span className="font-medium text-gray-900">{count}</span>
+                            </div>
+                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-blue-400 group-hover:bg-blue-600 transition-colors rounded-full"
+                                style={{ width: `${Math.max(4, Math.round((count / maxCount) * 100))}%` }}
+                              />
+                            </div>
+                          </button>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
             {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
@@ -535,15 +945,20 @@ export default function Dashboard() {
           </div>
         );
 
-      case "bookings":
+      case "bookings": {
+        const { __leadId, ...formPrefill } = bookingPrefill || {};
         return (
           <div>
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Create Booking</h1>
             </div>
-            <EnhancedBookingForm onSuccess={() => setCurrentView("dashboard")} />
+            <EnhancedBookingForm
+              onSuccess={bookingPrefill ? handleBookingCreatedFromLead : () => setCurrentView("dashboard")}
+              initialValues={bookingPrefill ? formPrefill : undefined}
+            />
           </div>
         );
+      }
 
       case "fleet":
         return (
@@ -656,7 +1071,7 @@ export default function Dashboard() {
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full sm:w-48 lg:w-64"
                     />
-                    <Select>
+                    <Select value={vehicleStatusFilter} onValueChange={setVehicleStatusFilter}>
                       <SelectTrigger className="w-full sm:w-32">
                         <SelectValue placeholder="Filter" />
                       </SelectTrigger>
@@ -671,14 +1086,25 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent>
+                {(() => {
+                  const filteredVehicles = vehicles.filter((v: any) => {
+                    const matchesStatus = vehicleStatusFilter === "all" || v.status === vehicleStatusFilter;
+                    const term = searchTerm.trim().toLowerCase();
+                    const matchesSearch = term === "" ||
+                      `${v.make || ""} ${v.vehicleModel || v.model || ""}`.toLowerCase().includes(term) ||
+                      (v.licensePlate || v.registrationNumber || "").toLowerCase().includes(term);
+                    return matchesStatus && matchesSearch;
+                  });
+                  return (
+                <>
                 {/* Mobile Card View */}
                 <div className="block sm:hidden space-y-3">
-                  {vehicles.length === 0 ? (
+                  {filteredVehicles.length === 0 ? (
                     <div className="text-center text-gray-500 py-8">
-                      No vehicles found
+                      {vehicles.length === 0 ? "No vehicles found" : "No vehicles match your search/filter"}
                     </div>
                   ) : (
-                    vehicles.map((vehicle: any) => (
+                    filteredVehicles.map((vehicle: any) => (
                       <div key={vehicle._id || vehicle.id} className="border rounded-lg p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
@@ -733,14 +1159,14 @@ export default function Dashboard() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {vehicles.length === 0 ? (
+                      {filteredVehicles.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={7} className="text-center text-gray-500 py-8">
-                            No vehicles found
+                            {vehicles.length === 0 ? "No vehicles found" : "No vehicles match your search/filter"}
                           </TableCell>
                         </TableRow>
                       ) : (
-                        vehicles.map((vehicle: any) => (
+                        filteredVehicles.map((vehicle: any) => (
                           <TableRow key={vehicle._id || vehicle.id}>
                             <TableCell>
                               <div className="flex items-center">
@@ -804,6 +1230,9 @@ export default function Dashboard() {
                     </TableBody>
                   </Table>
                 </div>
+                </>
+                  );
+                })()}
               </CardContent>
             </Card>
           </div>
@@ -854,7 +1283,7 @@ export default function Dashboard() {
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="w-full sm:w-48 lg:w-64"
                     />
-                    <Select>
+                    <Select value={driverStatusFilter} onValueChange={setDriverStatusFilter}>
                       <SelectTrigger className="w-full sm:w-32">
                         <SelectValue placeholder="Filter" />
                       </SelectTrigger>
@@ -869,14 +1298,25 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent>
+                {(() => {
+                  const filteredDrivers = drivers.filter((d: any) => {
+                    const matchesStatus = driverStatusFilter === "all" || d.status === driverStatusFilter;
+                    const term = searchTerm.trim().toLowerCase();
+                    const matchesSearch = term === "" ||
+                      (d.name || "").toLowerCase().includes(term) ||
+                      (d.phone || "").toLowerCase().includes(term);
+                    return matchesStatus && matchesSearch;
+                  });
+                  return (
+                <>
                 {/* Mobile Card View */}
                 <div className="block sm:hidden space-y-3">
-                  {drivers.length === 0 ? (
+                  {filteredDrivers.length === 0 ? (
                     <div className="text-center text-gray-500 py-8">
-                      No drivers found
+                      {drivers.length === 0 ? "No drivers found" : "No drivers match your search/filter"}
                     </div>
                   ) : (
-                    drivers.map((driver: any) => (
+                    filteredDrivers.map((driver: any) => (
                       <div key={driver._id || driver.id} className="border rounded-lg p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center">
@@ -932,14 +1372,14 @@ export default function Dashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {drivers.length === 0 ? (
+                    {filteredDrivers.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center text-gray-500 py-8">
-                          No drivers found
+                          {drivers.length === 0 ? "No drivers found" : "No drivers match your search/filter"}
                         </TableCell>
                       </TableRow>
                     ) : (
-                      drivers.map((driver: any) => (
+                      filteredDrivers.map((driver: any) => (
                         <TableRow key={driver._id || driver.id}>
                           <TableCell>
                             <div className="flex items-center">
@@ -1003,6 +1443,9 @@ export default function Dashboard() {
                   </TableBody>
                   </Table>
                 </div>
+                </>
+                  );
+                })()}
               </CardContent>
             </Card>
           </div>
@@ -1016,6 +1459,15 @@ export default function Dashboard() {
 
       case "campaigns":
         return <CampaignsPage />;
+
+      case "inquiries":
+        return <InquiriesPage />;
+
+      case "leads":
+        return <LeadsPage onConvertToBooking={handleConvertLeadToBooking} />;
+
+      case "followups":
+        return <FollowUpsPage />;
 
       case "history":
         return (
@@ -1052,15 +1504,16 @@ export default function Dashboard() {
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                   <div>
                     <CardTitle className="text-lg sm:text-xl">All Bookings</CardTitle>
-                    {(statusFilter !== "all" || typeFilter !== "all") && (
+                    {(statusFilter !== "all" || typeFilter !== "all" || sourceFilter !== "all") && (
                       <div className="flex items-center gap-2 mt-2">
                         <span className="text-sm text-gray-500">Filters active:</span>
                         {statusFilter !== "all" && <Badge variant="secondary" className="text-xs">{statusFilter}</Badge>}
                         {typeFilter !== "all" && <Badge variant="secondary" className="text-xs">{typeFilter.replace('_', ' ')}</Badge>}
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => {setStatusFilter("all"); setTypeFilter("all");}}
+                        {sourceFilter !== "all" && <Badge variant="secondary" className="text-xs capitalize">{sourceFilter.replace(/_/g, ' ')}</Badge>}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {setStatusFilter("all"); setTypeFilter("all"); setSourceFilter("all");}}
                           className="text-xs text-blue-600 hover:text-blue-700"
                         >
                           Clear filters
@@ -1116,8 +1569,15 @@ export default function Dashboard() {
                         
                         // Type filter
                         const matchesType = typeFilter === "all" || booking.bookingType === typeFilter;
-                        
-                        return matchesSearch && matchesStatus && matchesType;
+
+                        // Source filter — matches the same fallback the
+                        // /api/dashboard/lead-sources aggregation uses
+                        // (a booking with no bookingSource groups under
+                        // "direct_customer"), so clicking that bar there
+                        // actually shows the bookings it counted.
+                        const matchesSource = sourceFilter === "all" || (booking.bookingSource || "direct_customer") === sourceFilter;
+
+                        return matchesSearch && matchesStatus && matchesType && matchesSource;
                       })
                       .sort((a: any, b: any) => {
                         // Sort by createdAt date in descending order (newest first)
@@ -1268,24 +1728,15 @@ export default function Dashboard() {
                             </Button>
                             {booking.status === "confirmed" && (
                               <>
-                                <Button 
-                                  variant="ghost" 
+                                <Button
+                                  variant="ghost"
                                   size="sm"
                                   onClick={() => handleEditBooking(booking)}
                                 >
                                   Edit
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm"
-                                  onClick={() => handleCompleteBooking(booking._id || booking.id)}
-                                  disabled={completeBookingMutation.isPending}
-                                  className="text-green-600 hover:text-green-700"
-                                >
-                                  Complete
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
+                                <Button
+                                  variant="ghost"
                                   size="sm"
                                   onClick={() => handleCancelBooking(booking)}
                                   disabled={cancelBookingMutation.isPending}
@@ -1294,6 +1745,24 @@ export default function Dashboard() {
                                   Cancel
                                 </Button>
                               </>
+                            )}
+                            {/* "completed" is only a valid next status from these
+                                four (server/services/bookingStateMachine.ts) — a
+                                "confirmed" booking hasn't even had a vehicle/
+                                driver assigned or been dispatched yet. This
+                                button used to show (and only show) for
+                                "confirmed", where clicking it could never
+                                succeed regardless of which endpoint it called. */}
+                            {["trip_started", "ongoing", "extended", "return_pending"].includes(booking.status) && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCompleteBooking(booking._id || booking.id)}
+                                disabled={completeBookingMutation.isPending}
+                                className="text-green-600 hover:text-green-700"
+                              >
+                                Complete
+                              </Button>
                             )}
                           </div>
                         </TableCell>
@@ -1664,7 +2133,7 @@ export default function Dashboard() {
         return <ManageExpenses />;
 
       case "live-bookings":
-        return <LiveBookings />;
+        return <LiveBookings initialTab={liveOpsInitialTab} />;
 
       case "upcoming-bookings":
         return <UpcomingBookings />;

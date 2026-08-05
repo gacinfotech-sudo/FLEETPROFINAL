@@ -1,4 +1,4 @@
-import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone } from "lucide-react";
+import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -12,6 +12,9 @@ interface SidebarProps {
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: BarChart3 },
+  { id: "inquiries", label: "Inquiries", icon: PhoneIncoming },
+  { id: "leads", label: "Leads", icon: GitBranch },
+  { id: "followups", label: "Follow-ups", icon: ListChecks },
   { id: "live-bookings", label: "Live Bookings", icon: Radio },
   { id: "upcoming-bookings", label: "Upcoming Bookings", icon: CalendarClock },
   { id: "payment-dues", label: "Payment Collection Due", icon: Wallet },
@@ -80,7 +83,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
           </div>
         </div>
         
-        <nav className="mt-6 lg:mt-8 flex-1">
+        <nav className="mt-6 lg:mt-8 flex-1 overflow-y-auto min-h-0">
           <div className="px-3 lg:px-4 space-y-1 lg:space-y-2">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;

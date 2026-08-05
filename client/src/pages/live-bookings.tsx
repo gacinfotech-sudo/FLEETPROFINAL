@@ -10,7 +10,7 @@ import { Phone, MessageCircle, RefreshCw, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
-type Bucket = "startDue" | "startDelayed" | "startingSoon" | "ongoing" | "endingSoon" | "completionOverdue" | "paymentPending" | "completedToday" | "delayed" | "unassigned" | "cancelled";
+export type Bucket = "startDue" | "startDelayed" | "startingSoon" | "ongoing" | "endingSoon" | "completionOverdue" | "paymentPending" | "completedToday" | "delayed" | "unassigned" | "cancelled";
 
 const TABS: { key: Bucket; label: string }[] = [
   { key: "startDue", label: "Start Due" },
@@ -36,10 +36,10 @@ function formatMoney(n?: number) {
   return `₹${n.toLocaleString("en-IN")}`;
 }
 
-export default function LiveBookings() {
+export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<Bucket>("startDue");
+  const [activeTab, setActiveTab] = useState<Bucket>(initialTab || "startDue");
   const [startingWindow, setStartingWindow] = useState("today");
   const [endingWindow, setEndingWindow] = useState("today");
 
@@ -53,8 +53,25 @@ export default function LiveBookings() {
       const res = await apiRequest("POST", `/api/bookings/${id}/status`, { status });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (booking: any) => {
       queryClient.invalidateQueries({ queryKey: [`/api/operations/live-bookings?startingWindow=${startingWindow}&endingWindow=${endingWindow}`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      // Completing/closing a booking here is also the one place that
+      // credits reward points and recomputes spend/tier server-side (see
+      // POST /api/bookings/:id/status). Without this, a customer's 360
+      // view — reward balance, financial summary, booking/payment lists —
+      // stayed stale (showing pre-completion numbers) until an unrelated
+      // full page reload happened to refetch it.
+      const customerId = booking?.customerId ? String(booking.customerId) : undefined;
+      if (customerId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/rewards`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/bookings`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/payments`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/financial-summary`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/timeline`] });
+        queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      }
       toast({ title: "Status updated" });
     },
     onError: (err: any) => {

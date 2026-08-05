@@ -47,7 +47,7 @@ import {
   type BookingStatus,
 } from "./services/bookingStateMachine";
 import { buildLiveOperations } from "./services/liveOperations";
-import { buildUpcomingBookings } from "./services/upcomingBookings";
+import { buildUpcomingBookings, classifyUpcomingBookings } from "./services/upcomingBookings";
 import { buildPaymentDues } from "./services/paymentDues";
 import { whatsappProvider } from "./whatsapp/index";
 import { buildMessage, type MessageType } from "./whatsapp/templates";
@@ -56,13 +56,20 @@ import { WhatsAppMessage, Booking } from "./models/index";
 import { sendBookingMessage } from "./whatsapp/sendBookingMessage";
 import { buildCustomerTemplatePreviews, CUSTOMER_TEMPLATE_KEYS, type CustomerTemplateKey } from "./whatsapp/customerTemplates";
 import { findVehicleConflicts, checkDriverAvailability, combineDateTime } from "./services/availability";
-import { recordPayment, reversePayment, recomputeBookingPaymentSummary } from "./services/paymentLedger";
+import { recordPayment, reversePayment, recomputeBookingPaymentSummary, RECEIPT_TYPES } from "./services/paymentLedger";
 import { PaymentTransaction, Customer } from "./models/index";
 import { findOrCreateCustomer, recomputeCustomerStats, classifyCustomer } from "./services/customerService";
 import { creditBookingReward, reverseBookingReward, previewRedemption, commitRedemption, computeLoyaltyTier, getRewardRule, adjustRewardPoints, creditVerifiedGoogleReviewReward } from "./services/rewardService";
 import { RewardTransaction, RewardRule } from "./models/index";
 import { computeSegments, computeTagCounts, getSegmentFilter } from "./services/segmentService";
-import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerConsentEvent, CustomerBillingProfile, Invoice, Campaign, CampaignRecipient, GoogleReviewTracking } from "./models/index";
+import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerConsentEvent, CustomerBillingProfile, Invoice, Campaign, CampaignRecipient, GoogleReviewTracking, Inquiry, Lead, Quotation, LeadFollowUp, BookingDraft } from "./models/index";
+import { nextInquiryNumber } from "./services/inquiryNumbering";
+import { isTerminalInquiryStatus, assertValidInquiryTransition, getMissingQualificationFields, type InquiryStatusValue } from "./services/inquiryStatus";
+import { nextLeadNumber } from "./services/leadNumbering";
+import { assertValidLeadTransition, type LeadStatusValue } from "./services/leadStatus";
+import { nextQuotationNumber } from "./services/quotationNumbering";
+import { assertValidQuotationTransition, isImmutableQuotationStatus, computeOptionTotalPaise, type QuotationStatusValue } from "./services/quotationStatus";
+import { sendQuotationMessage } from "./whatsapp/sendQuotationMessage";
 import { computeCustomerTimeline } from "./services/timelineService";
 import { previewCampaign, sendCampaign } from "./services/campaignService";
 import { buildDriverPerformance } from "./services/driverPerformance";
@@ -1754,6 +1761,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dashboard Overview's Today/Tomorrow/Future/All Upcoming tabs. Reuses the
+  // same tenant booking fetch and the same centralized upcoming-booking rule
+  // as /api/operations/upcoming-bookings above, but returns full booking
+  // documents (not the summarized shape) so the dashboard can reopen the
+  // existing Booking Details dialog without a second, divergent definition
+  // of "upcoming" anywhere in the codebase.
+  app.get("/api/dashboard/upcoming-bookings", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const bookings = await storage.getBookingsByTenant(req.tenantId!);
+      res.json(classifyUpcomingBookings(bookings, new Date()));
+    } catch (error) {
+      console.error('Dashboard upcoming bookings error:', error);
+      res.status(500).json({ message: "Failed to load upcoming bookings" });
+    }
+  });
+
+  // Dashboard Overview's Finance section — today's collection split by
+  // payment mode. Sourced entirely from the PaymentTransaction ledger
+  // (never a raw sum of booking fields — see the payment-accuracy
+  // guidance in docs/SECURITY_AND_DATA_RISK_AUDIT.md), reusing the exact
+  // same RECEIPT_TYPES definition paymentLedger.ts uses to decide what
+  // counts as money actually received, so this can never silently drift
+  // from the balance shown on a booking/invoice.
+  app.get("/api/dashboard/finance-summary", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(todayStart);
+      todayEnd.setDate(todayEnd.getDate() + 1);
+
+      const transactions = await PaymentTransaction.find({
+        tenantId: req.tenantId,
+        status: 'completed',
+        paymentType: { $in: Array.from(RECEIPT_TYPES) },
+        receivedAt: { $gte: todayStart, $lt: todayEnd },
+      }).lean();
+
+      const summary = { cash: 0, upi: 0, bank: 0, card: 0, other: 0, total: 0 };
+      for (const t of transactions) {
+        const amount = t.amount || 0;
+        if (t.paymentMode === 'cash') summary.cash += amount;
+        else if (t.paymentMode === 'upi') summary.upi += amount;
+        else if (t.paymentMode === 'bank_transfer') summary.bank += amount;
+        else if (t.paymentMode === 'card') summary.card += amount;
+        else summary.other += amount;
+        summary.total += amount;
+      }
+      res.json(summary);
+    } catch (error) {
+      console.error('Dashboard finance summary error:', error);
+      res.status(500).json({ message: "Failed to load finance summary" });
+    }
+  });
+
+  // Dashboard Overview's booking-source chart — all-time count of bookings
+  // per source, from the existing Booking.bookingSource field (already
+  // populated at booking-creation time, no schema change).
+  app.get("/api/dashboard/lead-sources", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const rows = await Booking.aggregate([
+        { $match: { tenantId: new mongoose.Types.ObjectId(req.tenantId) } },
+        { $group: { _id: { $ifNull: ["$bookingSource", "direct_customer"] }, count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]);
+      res.json(rows.map((r) => ({ source: r._id, count: r.count })));
+    } catch (error) {
+      console.error('Dashboard lead sources error:', error);
+      res.status(500).json({ message: "Failed to load lead sources" });
+    }
+  });
+
   app.get("/api/operations/payment-dues", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const bookings = await storage.getBookingsByTenant(req.tenantId!);
@@ -1974,6 +2052,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Booking wizard draft persistence — one slot per (tenant, user). Purely
+  // additive: the Add Booking form works exactly as before if a caller never
+  // touches these routes. Scoped to authenticateUser + requireTenant only
+  // (same access level as creating the booking itself; a draft is not yet a
+  // real booking so it doesn't need its own permission key).
+  app.get("/api/booking-drafts/mine", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const draft = await BookingDraft.findOne({ tenantId: req.tenantId, userId: req.userId });
+      res.json(draft || null);
+    } catch (error: any) {
+      console.error('Get booking draft error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load booking draft" });
+    }
+  });
+
+  app.put("/api/booking-drafts/mine", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { step, formData, leadId } = req.body || {};
+      const draft = await BookingDraft.findOneAndUpdate(
+        { tenantId: req.tenantId, userId: req.userId },
+        {
+          $set: {
+            step: typeof step === 'number' ? step : 1,
+            formData: formData || {},
+            ...(leadId !== undefined ? { leadId } : {}),
+            updatedAt: new Date(),
+          },
+          $setOnInsert: { tenantId: req.tenantId, userId: req.userId, createdAt: new Date() },
+        },
+        { upsert: true, new: true },
+      );
+      res.json(draft);
+    } catch (error: any) {
+      console.error('Save booking draft error:', error?.message || error);
+      res.status(500).json({ message: "Failed to save booking draft" });
+    }
+  });
+
+  app.delete("/api/booking-drafts/mine", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      await BookingDraft.deleteOne({ tenantId: req.tenantId, userId: req.userId });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Delete booking draft error:', error?.message || error);
+      res.status(500).json({ message: "Failed to delete booking draft" });
+    }
+  });
+
   app.post("/api/bookings", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CREATE_BOOKING), async (req: AuthRequest, res) => {
     try {
       // Map frontend field names to MongoDB schema
@@ -2152,7 +2278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // conflicts, instead of silently creating a double-booked driver —
       // this is the hard backend stop that exists even if the frontend
       // dropdown incorrectly let the conflicting driver be selected).
-      if (error?.code === 'VEHICLE_DOUBLE_BOOKING' || error?.code === 'DRIVER_TIME_CONFLICT') {
+      if (error?.code === 'VEHICLE_DOUBLE_BOOKING' || error?.code === 'DRIVER_TIME_CONFLICT' || error?.code === 'VEHICLE_TENTATIVELY_HELD') {
         const c = error.conflict;
         return res.status(409).json({
           success: false,
@@ -3293,6 +3419,869 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Add customer requirement error:', error?.message || error);
       res.status(500).json({ message: "Failed to add customer requirement" });
+    }
+  });
+
+  // ── Inquiry CRM (additive — see docs/INQUIRY_LEAD_EXISTING_AUDIT.md) ──
+  // A real pre-sales pipeline entity, distinct from Booking's early
+  // 'enquiry'/'quotation_sent' statuses, so office staff can log a phone
+  // call that may never become a trip without creating a real Booking
+  // (which requires a vehicleId today).
+
+  const INQUIRY_ALLOWED_FIELDS = [
+    'priority', 'source', 'sourceDetail', 'campaign', 'referrer', 'assignedExecutive', 'nextFollowUpAt',
+    'customerName', 'primaryMobile', 'whatsappNumber', 'alternateMobile', 'email', 'linkedCustomerId',
+    'tripType', 'pickupDate', 'pickupTime', 'returnDate', 'returnTime', 'flexibleDate',
+    'pickupLocation', 'dropLocation', 'viaLocations', 'placesToVisit',
+    'numberOfPassengers', 'seniorCitizens', 'children', 'infants', 'luggageCount',
+    'route', 'vehicleCategory', 'driverPreference', 'languagePreference', 'acRequirement',
+    'paymentArrangement', 'tollParkingAgreement', 'customerVisibleInstructions', 'driverInstructions',
+    'officeOnlyNotes', 'billingInstructions', 'vehicleRequirements', 'customVehicleRequests', 'notes',
+  ];
+
+  function buildInquiryPayload(body: any): Record<string, any> {
+    const payload: Record<string, any> = {};
+    for (const key of INQUIRY_ALLOWED_FIELDS) if (body?.[key] !== undefined) payload[key] = body[key];
+    return payload;
+  }
+
+  app.get("/api/inquiries", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_INQUIRIES), async (req: AuthRequest, res) => {
+    try {
+      const query: Record<string, any> = { tenantId: req.tenantId };
+      if (req.query.status) query.status = req.query.status;
+      if (req.query.priority) query.priority = req.query.priority;
+      if (req.query.assignedExecutive) query.assignedExecutive = req.query.assignedExecutive;
+      if (req.query.search) {
+        const term = String(req.query.search).trim();
+        const normalizedPhone = normalizeIndianPhone(term);
+        query.$or = [
+          { customerName: { $regex: term, $options: 'i' } },
+          { primaryMobile: { $regex: normalizedPhone || term, $options: 'i' } },
+          { inquiryNumber: { $regex: term, $options: 'i' } },
+        ];
+      }
+      const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+      const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
+      const [rows, total] = await Promise.all([
+        Inquiry.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+        Inquiry.countDocuments(query),
+      ]);
+      res.json({ rows, total, limit, skip });
+    } catch (error: any) {
+      console.error('List inquiries error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load inquiries" });
+    }
+  });
+
+  app.get("/api/inquiries/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_INQUIRIES), async (req: AuthRequest, res) => {
+    try {
+      const inquiry = await Inquiry.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Inquiry not found" });
+      res.json(inquiry);
+    } catch (error: any) {
+      console.error('Get inquiry error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load inquiry" });
+    }
+  });
+
+  app.post("/api/inquiries", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CREATE_INQUIRY), async (req: AuthRequest, res) => {
+    try {
+      if (!req.body?.customerName?.trim()) return res.status(400).json({ message: "Customer name is required." });
+      if (!req.body?.primaryMobile?.trim()) return res.status(400).json({ message: "Primary mobile is required." });
+      const normalizedMobile = normalizeIndianPhone(req.body.primaryMobile);
+      if (!normalizedMobile) return res.status(400).json({ message: "Enter a valid 10-digit Indian mobile number." });
+
+      const payload = buildInquiryPayload(req.body);
+      payload.customerName = req.body.customerName.trim();
+      payload.primaryMobile = normalizedMobile;
+      if (!payload.source) payload.source = 'phone_call';
+
+      const inquiryNumber = await nextInquiryNumber(req.tenantId!);
+      const inquiry = await Inquiry.create({
+        tenantId: req.tenantId,
+        inquiryNumber,
+        status: 'new',
+        ...payload,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(inquiry);
+    } catch (error: any) {
+      console.error('Create inquiry error:', error?.message || error);
+      res.status(500).json({ message: "Failed to create inquiry" });
+    }
+  });
+
+  app.patch("/api/inquiries/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_INQUIRY), async (req: AuthRequest, res) => {
+    try {
+      const inquiry = await Inquiry.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Inquiry not found" });
+      if (isTerminalInquiryStatus(inquiry.status as InquiryStatusValue)) {
+        return res.status(400).json({ message: `Cannot edit an inquiry that is already "${inquiry.status}".` });
+      }
+
+      const payload = buildInquiryPayload(req.body);
+      if (payload.primaryMobile !== undefined) {
+        const normalized = normalizeIndianPhone(payload.primaryMobile);
+        if (!normalized) return res.status(400).json({ message: "Enter a valid 10-digit Indian mobile number." });
+        payload.primaryMobile = normalized;
+      }
+      for (const [key, value] of Object.entries(payload)) {
+        (inquiry as any)[key] = value;
+      }
+      inquiry.updatedAt = new Date();
+      await inquiry.save();
+      res.json(inquiry);
+    } catch (error: any) {
+      console.error('Update inquiry error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update inquiry" });
+    }
+  });
+
+  app.post("/api/inquiries/:id/qualify", authenticateUser, requireTenant, requirePermission(PERMISSIONS.QUALIFY_INQUIRY), async (req: AuthRequest, res) => {
+    try {
+      const inquiry = await Inquiry.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Inquiry not found" });
+
+      const missing = getMissingQualificationFields(inquiry as any);
+      if (missing.length > 0) {
+        return res.status(400).json({ message: "Missing required fields to qualify this inquiry.", missing });
+      }
+      try {
+        assertValidInquiryTransition(inquiry.status as InquiryStatusValue, 'qualified');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      inquiry.status = 'qualified';
+      inquiry.updatedAt = new Date();
+      await inquiry.save();
+      res.json(inquiry);
+    } catch (error: any) {
+      console.error('Qualify inquiry error:', error?.message || error);
+      res.status(500).json({ message: "Failed to qualify inquiry" });
+    }
+  });
+
+  // Converts a qualified Inquiry into a real Lead (one-to-one, enforced by
+  // Lead's unique inquiryId index) and marks the Inquiry converted. Wrapped
+  // in a transaction (with a standalone-MongoDB fallback, mirroring the
+  // exact pattern already used by storage-mongodb.ts's createBooking) so
+  // the two writes never partially succeed — an Inquiry is never left
+  // "converted_to_lead" without a real Lead behind it, and vice versa.
+  // The response now includes the created `lead` alongside the inquiry;
+  // existing callers that only read the top-level inquiry fields (Phase 1's
+  // UI) are unaffected by this additive response shape change.
+  app.post("/api/inquiries/:id/convert-to-lead", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CONVERT_INQUIRY_TO_LEAD), async (req: AuthRequest, res) => {
+    try {
+      const inquiry = await Inquiry.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Inquiry not found" });
+      if (inquiry.status === 'converted_to_lead') {
+        return res.status(400).json({ message: "This inquiry has already been converted to a lead.", code: 'ALREADY_CONVERTED' });
+      }
+      const existingLead = await Lead.findOne({ tenantId: req.tenantId, inquiryId: inquiry._id });
+      if (existingLead) {
+        return res.status(400).json({ message: "A lead already exists for this inquiry.", code: 'ALREADY_CONVERTED', lead: existingLead });
+      }
+      try {
+        assertValidInquiryTransition(inquiry.status as InquiryStatusValue, 'converted_to_lead');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+
+      const leadNumber = await nextLeadNumber(req.tenantId!);
+      const runConvert = async (session?: mongoose.ClientSession) => {
+        const [lead] = await Lead.create([{
+          tenantId: req.tenantId,
+          leadNumber,
+          inquiryId: inquiry._id,
+          status: 'new',
+          priority: inquiry.priority,
+          assignedExecutive: inquiry.assignedExecutive,
+          createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+        }], { session });
+        inquiry.status = 'converted_to_lead';
+        inquiry.convertedToLeadAt = new Date();
+        inquiry.updatedAt = new Date();
+        await inquiry.save({ session });
+        return lead;
+      };
+
+      let lead;
+      try {
+        const session = await mongoose.startSession();
+        try {
+          await session.withTransaction(async () => { lead = await runConvert(session); });
+        } finally {
+          await session.endSession();
+        }
+      } catch (error: any) {
+        if (typeof error?.message === 'string' && error.message.includes('Transaction numbers')) {
+          lead = await runConvert(undefined);
+        } else {
+          throw error;
+        }
+      }
+
+      res.json({ ...inquiry.toObject(), lead });
+    } catch (error: any) {
+      console.error('Convert inquiry to lead error:', error?.message || error);
+      res.status(500).json({ message: "Failed to convert inquiry to lead" });
+    }
+  });
+
+  app.post("/api/inquiries/:id/mark-lost", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MARK_INQUIRY_LOST), async (req: AuthRequest, res) => {
+    try {
+      if (!req.body?.lostReason?.trim()) return res.status(400).json({ message: "A lost reason is required." });
+      const inquiry = await Inquiry.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Inquiry not found" });
+      try {
+        assertValidInquiryTransition(inquiry.status as InquiryStatusValue, 'lost');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      inquiry.status = 'lost';
+      inquiry.lostReason = req.body.lostReason.trim();
+      if (req.body.lostNotes !== undefined) inquiry.lostNotes = req.body.lostNotes;
+      if (req.body.futureReconnectDate !== undefined) inquiry.futureReconnectDate = req.body.futureReconnectDate;
+      inquiry.updatedAt = new Date();
+      await inquiry.save();
+      res.json(inquiry);
+    } catch (error: any) {
+      console.error('Mark inquiry lost error:', error?.message || error);
+      res.status(500).json({ message: "Failed to mark inquiry as lost" });
+    }
+  });
+
+  app.post("/api/inquiries/:id/reopen", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_INQUIRY), async (req: AuthRequest, res) => {
+    try {
+      const inquiry = await Inquiry.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Inquiry not found" });
+      try {
+        assertValidInquiryTransition(inquiry.status as InquiryStatusValue, 'contacted');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      inquiry.status = 'contacted';
+      inquiry.updatedAt = new Date();
+      await inquiry.save();
+      res.json(inquiry);
+    } catch (error: any) {
+      console.error('Reopen inquiry error:', error?.message || error);
+      res.status(500).json({ message: "Failed to reopen inquiry" });
+    }
+  });
+
+  // ── Lead pipeline (additive) ──
+  // Every Lead references exactly one Inquiry (see the Lead model comment
+  // in models/index.ts for why requirement/contact fields are read from
+  // there rather than duplicated here).
+
+  app.get("/api/leads", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_LEADS), async (req: AuthRequest, res) => {
+    try {
+      const query: Record<string, any> = { tenantId: req.tenantId };
+      if (req.query.status) query.status = req.query.status;
+      if (req.query.assignedExecutive) query.assignedExecutive = req.query.assignedExecutive;
+      const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+      const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
+      const [rows, total] = await Promise.all([
+        Lead.find(query)
+          .populate('inquiryId')
+          .sort({ createdAt: -1 }).skip(skip).limit(limit),
+        Lead.countDocuments(query),
+      ]);
+      res.json({ rows, total, limit, skip });
+    } catch (error: any) {
+      console.error('List leads error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load leads" });
+    }
+  });
+
+  app.get("/api/leads/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_LEADS), async (req: AuthRequest, res) => {
+    try {
+      const lead = await Lead.findOne({ _id: req.params.id, tenantId: req.tenantId }).populate('inquiryId');
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      res.json(lead);
+    } catch (error: any) {
+      console.error('Get lead error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load lead" });
+    }
+  });
+
+  app.patch("/api/leads/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_LEAD), async (req: AuthRequest, res) => {
+    try {
+      const lead = await Lead.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+
+      if (req.body.status !== undefined) {
+        try {
+          assertValidLeadTransition(lead.status as LeadStatusValue, req.body.status);
+        } catch (e: any) {
+          return res.status(400).json({ message: e.message, code: e.code });
+        }
+        lead.status = req.body.status;
+      }
+      if (req.body.priority !== undefined) lead.priority = req.body.priority;
+      if (req.body.assignedExecutive !== undefined) lead.assignedExecutive = req.body.assignedExecutive;
+      lead.updatedAt = new Date();
+      await lead.save();
+      await lead.populate('inquiryId');
+      res.json(lead);
+    } catch (error: any) {
+      console.error('Update lead error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update lead" });
+    }
+  });
+
+  app.post("/api/leads/:id/mark-lost", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MARK_LEAD_LOST), async (req: AuthRequest, res) => {
+    try {
+      if (!req.body?.lostReason?.trim()) return res.status(400).json({ message: "A lost reason is required." });
+      const lead = await Lead.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      try {
+        assertValidLeadTransition(lead.status as LeadStatusValue, 'lost');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      lead.status = 'lost';
+      lead.lostReason = req.body.lostReason.trim();
+      if (req.body.lostNotes !== undefined) lead.lostNotes = req.body.lostNotes;
+      lead.updatedAt = new Date();
+      await lead.save();
+      res.json(lead);
+    } catch (error: any) {
+      console.error('Mark lead lost error:', error?.message || error);
+      res.status(500).json({ message: "Failed to mark lead as lost" });
+    }
+  });
+
+  // ── Quotations (additive) ──
+  // Options are validated and their totalPaise recomputed server-side from
+  // the same computeOptionTotalPaise() used everywhere else, so a client
+  // can never submit an inconsistent/manipulated total.
+
+  function sanitizeQuotationOptions(rawOptions: any): any[] {
+    if (!Array.isArray(rawOptions)) return [];
+    return rawOptions.map((opt: any, i: number) => {
+      const option = {
+        optionNumber: i + 1,
+        vehicleNameSnapshot: String(opt.vehicleNameSnapshot || '').trim(),
+        quantity: Number(opt.quantity) || 1,
+        pricingType: opt.pricingType || 'fixed',
+        baseRatePaise: opt.baseRatePaise !== undefined ? Number(opt.baseRatePaise) : undefined,
+        includedKm: opt.includedKm !== undefined ? Number(opt.includedKm) : undefined,
+        extraKmRatePaise: opt.extraKmRatePaise !== undefined ? Number(opt.extraKmRatePaise) : undefined,
+        includedHours: opt.includedHours !== undefined ? Number(opt.includedHours) : undefined,
+        extraHourRatePaise: opt.extraHourRatePaise !== undefined ? Number(opt.extraHourRatePaise) : undefined,
+        minimumKmPerDay: opt.minimumKmPerDay !== undefined ? Number(opt.minimumKmPerDay) : undefined,
+        driverAllowancePaise: opt.driverAllowancePaise !== undefined ? Number(opt.driverAllowancePaise) : undefined,
+        nightHaltPaise: opt.nightHaltPaise !== undefined ? Number(opt.nightHaltPaise) : undefined,
+        tollTreatment: opt.tollTreatment || 'excluded',
+        parkingTreatment: opt.parkingTreatment || 'excluded',
+        stateTaxTreatment: opt.stateTaxTreatment || 'excluded',
+        discountPaise: opt.discountPaise !== undefined ? Number(opt.discountPaise) : 0,
+        taxableAmountPaise: opt.taxableAmountPaise !== undefined ? Number(opt.taxableAmountPaise) : undefined,
+        gstPaise: opt.gstPaise !== undefined ? Number(opt.gstPaise) : 0,
+        notes: opt.notes,
+        totalPaise: 0,
+      };
+      option.totalPaise = computeOptionTotalPaise(option);
+      return option;
+    });
+  }
+
+  app.get("/api/leads/:leadId/quotations", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_QUOTATIONS), async (req: AuthRequest, res) => {
+    try {
+      const rows = await Quotation.find({ tenantId: req.tenantId, leadId: req.params.leadId }).sort({ version: -1, createdAt: -1 });
+      res.json(rows);
+    } catch (error: any) {
+      console.error('List quotations error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load quotations" });
+    }
+  });
+
+  app.post("/api/leads/:leadId/quotations", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CREATE_QUOTATION), async (req: AuthRequest, res) => {
+    try {
+      const lead = await Lead.findOne({ _id: req.params.leadId, tenantId: req.tenantId });
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+
+      const options = sanitizeQuotationOptions(req.body?.options);
+      if (options.length === 0) return res.status(400).json({ message: "At least one quotation option is required." });
+      if (options.some((o) => !o.vehicleNameSnapshot)) return res.status(400).json({ message: "Every option needs a vehicle name." });
+
+      const quotationNumber = await nextQuotationNumber(req.tenantId!);
+      const quotation = await Quotation.create({
+        tenantId: req.tenantId,
+        quotationNumber,
+        leadId: lead._id,
+        status: 'draft',
+        version: 1,
+        options,
+        validTill: req.body.validTill || undefined,
+        paymentTerms: req.body.paymentTerms,
+        termsAndConditions: req.body.termsAndConditions,
+        cancellationTerms: req.body.cancellationTerms,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(quotation);
+    } catch (error: any) {
+      console.error('Create quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to create quotation" });
+    }
+  });
+
+  app.get("/api/quotations/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_QUOTATIONS), async (req: AuthRequest, res) => {
+    try {
+      const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      res.json(quotation);
+    } catch (error: any) {
+      console.error('Get quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load quotation" });
+    }
+  });
+
+  app.patch("/api/quotations/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_QUOTATION_DRAFT), async (req: AuthRequest, res) => {
+    try {
+      const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      if (isImmutableQuotationStatus(quotation.status as QuotationStatusValue)) {
+        return res.status(400).json({ message: `Cannot edit a quotation that is already "${quotation.status}".` });
+      }
+      if (req.body.options !== undefined) {
+        const options = sanitizeQuotationOptions(req.body.options);
+        if (options.length === 0) return res.status(400).json({ message: "At least one quotation option is required." });
+        quotation.options = options;
+      }
+      if (req.body.validTill !== undefined) quotation.validTill = req.body.validTill;
+      if (req.body.paymentTerms !== undefined) quotation.paymentTerms = req.body.paymentTerms;
+      if (req.body.termsAndConditions !== undefined) quotation.termsAndConditions = req.body.termsAndConditions;
+      if (req.body.cancellationTerms !== undefined) quotation.cancellationTerms = req.body.cancellationTerms;
+      quotation.updatedAt = new Date();
+      await quotation.save();
+      res.json(quotation);
+    } catch (error: any) {
+      console.error('Update quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update quotation" });
+    }
+  });
+
+  // Generic status transition for the non-side-effecting moves (review,
+  // return-for-correction, viewed, customer_query, negotiation, reject,
+  // expire, supersede) — approve/send/revise/accept below have their own
+  // dedicated endpoints because each has a real side effect beyond the
+  // status field itself.
+  app.post("/api/quotations/:id/status", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_QUOTATION_DRAFT), async (req: AuthRequest, res) => {
+    try {
+      const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      const { status } = req.body;
+      if (!status) return res.status(400).json({ message: "A target status is required." });
+      try {
+        assertValidQuotationTransition(quotation.status as QuotationStatusValue, status);
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      quotation.status = status;
+      quotation.updatedAt = new Date();
+      await quotation.save();
+      res.json(quotation);
+    } catch (error: any) {
+      console.error('Quotation status change error:', error?.message || error);
+      res.status(500).json({ message: "Failed to change quotation status" });
+    }
+  });
+
+  app.post("/api/quotations/:id/approve", authenticateUser, requireTenant, requirePermission(PERMISSIONS.APPROVE_QUOTATION), async (req: AuthRequest, res) => {
+    try {
+      const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      try {
+        assertValidQuotationTransition(quotation.status as QuotationStatusValue, 'approved');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      quotation.status = 'approved';
+      quotation.updatedAt = new Date();
+      await quotation.save();
+      res.json(quotation);
+    } catch (error: any) {
+      console.error('Approve quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to approve quotation" });
+    }
+  });
+
+  // Sends the quotation via WhatsApp (text summary) and only flips status
+  // -> 'sent' if the send actually succeeded, so a failed send never
+  // silently leaves the quotation looking like it went out.
+  app.post("/api/quotations/:id/send-whatsapp", authenticateUser, requireTenant, requirePermission(PERMISSIONS.SEND_QUOTATION), async (req: AuthRequest, res) => {
+    try {
+      const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      if (quotation.status !== 'sent') {
+        try {
+          assertValidQuotationTransition(quotation.status as QuotationStatusValue, 'sent');
+        } catch (e: any) {
+          return res.status(400).json({ message: e.message, code: e.code });
+        }
+      }
+
+      const result = await sendQuotationMessage({
+        tenantId: req.tenantId!,
+        quotationId: quotation._id.toString(),
+        actor: { userId: req.userId!, role: req.user?.role || 'client' },
+        force: !!req.body?.force,
+      });
+      if (!result.ok) {
+        return res.status(result.code === 'ALREADY_SENT' ? 409 : 400).json(result);
+      }
+
+      if (quotation.status !== 'sent') {
+        quotation.status = 'sent';
+        quotation.sentAt = new Date();
+        quotation.updatedAt = new Date();
+        await quotation.save();
+      }
+      res.json({ quotation, messageDoc: result.messageDoc });
+    } catch (error: any) {
+      console.error('Send quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to send quotation" });
+    }
+  });
+
+  // Sends the ACTUAL Quotation PDF as a WhatsApp document (with the same
+  // Hinglish summary as its caption), closing the gap the text-only route
+  // above always documented as a deferred follow-up. PDF generation still
+  // happens client-side (the existing, already-tested html2pdf render used
+  // for "Download PDF") — no server-side PDF rendering is introduced; the
+  // client just uploads the resulting bytes here instead of only
+  // downloading them. Memory storage only (never touches disk) since the
+  // file is used once and discarded.
+  app.post(
+    "/api/quotations/:id/send-whatsapp-pdf",
+    authenticateUser, requireTenant, requirePermission(PERMISSIONS.SEND_QUOTATION),
+    multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
+      if (file.mimetype === 'application/pdf') cb(null, true);
+      else cb(new Error('Only PDF files are accepted.'));
+    } }).single('pdf'),
+    async (req: AuthRequest, res) => {
+      try {
+        const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+        if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+        if (!req.file) return res.status(400).json({ message: "A PDF file is required (field name: pdf)." });
+        if (quotation.status !== 'sent') {
+          try {
+            assertValidQuotationTransition(quotation.status as QuotationStatusValue, 'sent');
+          } catch (e: any) {
+            return res.status(400).json({ message: e.message, code: e.code });
+          }
+        }
+
+        const result = await sendQuotationMessage({
+          tenantId: req.tenantId!,
+          quotationId: quotation._id.toString(),
+          actor: { userId: req.userId!, role: req.user?.role || 'client' },
+          force: !!req.body?.force,
+          pdf: { buffer: req.file.buffer, fileName: `Quotation_${quotation.quotationNumber || quotation._id}.pdf` },
+        });
+        if (!result.ok) {
+          return res.status(result.code === 'ALREADY_SENT' ? 409 : 400).json(result);
+        }
+
+        if (quotation.status !== 'sent') {
+          quotation.status = 'sent';
+          quotation.sentAt = new Date();
+          quotation.updatedAt = new Date();
+          await quotation.save();
+        }
+        res.json({ quotation, messageDoc: result.messageDoc });
+      } catch (error: any) {
+        console.error('Send quotation PDF error:', error?.message || error);
+        res.status(500).json({ message: error?.message?.includes('PDF') ? error.message : "Failed to send quotation PDF" });
+      }
+    },
+  );
+
+  // Creates a new draft version copying the current options (spec §19:
+  // "Sent quotation revision creates a new version"); the original is
+  // marked superseded and stays visible/immutable for history.
+  app.post("/api/quotations/:id/revise", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_QUOTATION_DRAFT), async (req: AuthRequest, res) => {
+    try {
+      const original = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!original) return res.status(404).json({ message: "Quotation not found" });
+      if (original.status === 'draft' || original.status === 'under_review') {
+        return res.status(400).json({ message: "A draft or under-review quotation can be edited directly instead of revised." });
+      }
+      if (original.status === 'converted') {
+        return res.status(400).json({ message: "Cannot revise a quotation that has already been converted to a booking." });
+      }
+
+      const quotationNumber = await nextQuotationNumber(req.tenantId!);
+      const revision = await Quotation.create({
+        tenantId: req.tenantId,
+        quotationNumber,
+        leadId: original.leadId,
+        status: 'draft',
+        version: (original.version || 1) + 1,
+        parentQuotationId: original._id,
+        options: original.options,
+        validTill: original.validTill,
+        paymentTerms: original.paymentTerms,
+        termsAndConditions: original.termsAndConditions,
+        cancellationTerms: original.cancellationTerms,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+
+      original.status = 'superseded';
+      original.updatedAt = new Date();
+      await original.save();
+
+      res.status(201).json(revision);
+    } catch (error: any) {
+      console.error('Revise quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to revise quotation" });
+    }
+  });
+
+  // Accepting a quotation also moves its Lead to customer_confirmed (spec
+  // lifecycle: "Quotation Accepted -> Customer Confirmed"), and becomes
+  // immutable from this point (spec §19).
+  app.post("/api/quotations/:id/accept", authenticateUser, requireTenant, requirePermission(PERMISSIONS.ACCEPT_QUOTATION), async (req: AuthRequest, res) => {
+    try {
+      const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      const acceptedOptionNumber = Number(req.body?.acceptedOptionNumber);
+      if (!acceptedOptionNumber || !quotation.options.some((o: any) => o.optionNumber === acceptedOptionNumber)) {
+        return res.status(400).json({ message: "acceptedOptionNumber must match one of this quotation's options." });
+      }
+      try {
+        assertValidQuotationTransition(quotation.status as QuotationStatusValue, 'accepted');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      quotation.status = 'accepted';
+      quotation.acceptedOptionNumber = acceptedOptionNumber;
+      quotation.acceptedAt = new Date();
+      quotation.updatedAt = new Date();
+      await quotation.save();
+
+      const lead = await Lead.findOne({ _id: quotation.leadId, tenantId: req.tenantId });
+      if (lead && !['converted_to_customer', 'converted_to_booking', 'lost', 'cancelled'].includes(lead.status)) {
+        try {
+          assertValidLeadTransition(lead.status as LeadStatusValue, 'customer_confirmed');
+          lead.status = 'customer_confirmed';
+          lead.updatedAt = new Date();
+          await lead.save();
+        } catch {
+          // Lead already past this point in its own pipeline — accepting
+          // the quotation itself still succeeds; the lead status is a
+          // best-effort convenience sync, not a hard dependency.
+        }
+      }
+
+      res.json(quotation);
+    } catch (error: any) {
+      console.error('Accept quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to accept quotation" });
+    }
+  });
+
+  // ── Lead follow-ups (additive) ──
+  // Separate from the existing after-sales CustomerFollowUp — see the
+  // LeadFollowUp model comment in models/index.ts for why.
+
+  app.get("/api/leads/:leadId/followups", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_FOLLOWUPS), async (req: AuthRequest, res) => {
+    try {
+      const rows = await LeadFollowUp.find({ tenantId: req.tenantId, leadId: req.params.leadId }).sort({ scheduledAt: -1 });
+      res.json(rows);
+    } catch (error: any) {
+      console.error('List lead follow-ups error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load follow-ups" });
+    }
+  });
+
+  app.post("/api/leads/:leadId/followups", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CREATE_FOLLOWUP), async (req: AuthRequest, res) => {
+    try {
+      const lead = await Lead.findOne({ _id: req.params.leadId, tenantId: req.tenantId });
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      if (!req.body?.type?.trim()) return res.status(400).json({ message: "Follow-up type is required." });
+      if (!req.body?.scheduledAt) return res.status(400).json({ message: "scheduledAt is required." });
+
+      const followUp = await LeadFollowUp.create({
+        tenantId: req.tenantId,
+        leadId: lead._id,
+        type: req.body.type.trim(),
+        scheduledAt: req.body.scheduledAt,
+        assignedTo: req.body.assignedTo,
+        priority: req.body.priority || 'medium',
+        purpose: req.body.purpose,
+        previousDiscussion: req.body.previousDiscussion,
+        outcome: 'pending',
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(followUp);
+    } catch (error: any) {
+      console.error('Create lead follow-up error:', error?.message || error);
+      res.status(500).json({ message: "Failed to create follow-up" });
+    }
+  });
+
+  // Tenant-wide follow-up list for a dashboard-style view: Due Today,
+  // Overdue, Upcoming, or High-Priority (spec §22). Only 'pending' rows
+  // are ever "due" — a completed row (any other outcome) never appears
+  // here regardless of its scheduledAt, since it isn't waiting on anyone.
+  app.get("/api/followups", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_FOLLOWUPS), async (req: AuthRequest, res) => {
+    try {
+      const query: Record<string, any> = { tenantId: req.tenantId, outcome: 'pending' };
+      const now = new Date();
+      const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1);
+
+      // Mutually exclusive by actual urgency, not just calendar date — a
+      // follow-up scheduled for 9am that's still pending at 2pm the same
+      // day is genuinely overdue, not "due later today" (same distinction
+      // liveOperations.ts already makes between startDue/startDelayed).
+      const due = (req.query.due as string) || 'all';
+      if (due === 'today') query.scheduledAt = { $gte: now, $lt: todayEnd };
+      else if (due === 'overdue') query.scheduledAt = { $lt: now };
+      else if (due === 'upcoming') query.scheduledAt = { $gte: todayEnd };
+      if (req.query.priority) query.priority = req.query.priority;
+
+      const rows = await LeadFollowUp.find(query)
+        .populate({ path: 'leadId', select: 'leadNumber status inquiryId', populate: { path: 'inquiryId', select: 'inquiryNumber customerName primaryMobile' } })
+        .sort({ scheduledAt: 1 })
+        .limit(200);
+      res.json(rows);
+    } catch (error: any) {
+      console.error('List follow-ups error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load follow-ups" });
+    }
+  });
+
+  // Completing a follow-up can optionally chain a new one (nextFollowUpAt
+  // + type) — a real convenience for "finish this call, schedule the next
+  // one in the same action" rather than a required two-step flow.
+  app.post("/api/followups/:followupId/complete", authenticateUser, requireTenant, requirePermission(PERMISSIONS.COMPLETE_FOLLOWUP), async (req: AuthRequest, res) => {
+    try {
+      const followUp = await LeadFollowUp.findOne({ _id: req.params.followupId, tenantId: req.tenantId });
+      if (!followUp) return res.status(404).json({ message: "Follow-up not found" });
+      if (followUp.outcome !== 'pending') {
+        return res.status(400).json({ message: "This follow-up has already been completed." });
+      }
+      if (!req.body?.outcome || req.body.outcome === 'pending') {
+        return res.status(400).json({ message: "A real outcome is required to complete a follow-up." });
+      }
+
+      followUp.outcome = req.body.outcome;
+      if (req.body.customerResponse !== undefined) followUp.customerResponse = req.body.customerResponse;
+      if (req.body.internalNote !== undefined) followUp.internalNote = req.body.internalNote;
+      followUp.completedAt = new Date();
+      followUp.completedBy = req.userId!;
+
+      let nextFollowUp = null;
+      if (req.body.nextFollowUpAt) {
+        followUp.nextFollowUpAt = req.body.nextFollowUpAt;
+        nextFollowUp = await LeadFollowUp.create({
+          tenantId: req.tenantId,
+          leadId: followUp.leadId,
+          type: req.body.nextFollowUpType || followUp.type,
+          scheduledAt: req.body.nextFollowUpAt,
+          assignedTo: followUp.assignedTo,
+          priority: followUp.priority,
+          previousDiscussion: req.body.customerResponse || followUp.customerResponse,
+          outcome: 'pending',
+          createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+        });
+      }
+      await followUp.save();
+
+      res.json({ followUp, nextFollowUp });
+    } catch (error: any) {
+      console.error('Complete follow-up error:', error?.message || error);
+      res.status(500).json({ message: "Failed to complete follow-up" });
+    }
+  });
+
+  // One-click Lead -> Customer conversion (spec §23). Reuses
+  // findOrCreateCustomer() — the exact same dedupe-by-phone logic already
+  // used by booking creation — rather than a second, divergent
+  // duplicate-detection implementation. Neither the Inquiry nor the Lead
+  // is ever deleted; this only adds a link.
+  app.post("/api/leads/:id/convert-to-customer", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CONVERT_LEAD_TO_CUSTOMER), async (req: AuthRequest, res) => {
+    try {
+      const lead = await Lead.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      if (lead.linkedCustomerId) {
+        const existingCustomer = await Customer.findOne({ _id: lead.linkedCustomerId, tenantId: req.tenantId });
+        return res.status(400).json({ message: "This lead is already linked to a customer.", code: 'ALREADY_CONVERTED', customer: existingCustomer });
+      }
+
+      const inquiry = await Inquiry.findOne({ _id: lead.inquiryId, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Linked inquiry not found" });
+
+      let result;
+      try {
+        result = await findOrCreateCustomer(
+          req.tenantId!,
+          { name: inquiry.customerName, phone: inquiry.primaryMobile, email: inquiry.email },
+          { userId: req.userId!, role: req.user?.role || 'client' },
+        );
+      } catch (e: any) {
+        if (e.code === 'INVALID_PHONE') return res.status(400).json({ message: e.message, code: e.code });
+        throw e;
+      }
+
+      lead.linkedCustomerId = result.customer._id;
+      lead.convertedToCustomerAt = new Date();
+      if (!inquiry.linkedCustomerId) inquiry.linkedCustomerId = result.customer._id;
+      try {
+        assertValidLeadTransition(lead.status as LeadStatusValue, 'converted_to_customer');
+        lead.status = 'converted_to_customer';
+      } catch {
+        // Lead's own pipeline state doesn't allow this move yet (e.g. still
+        // 'new') — the customer link itself still succeeds; see the same
+        // best-effort-sync note on the quotation accept route above.
+      }
+      lead.updatedAt = new Date();
+      await lead.save();
+      await inquiry.save();
+
+      res.json({ customer: result.customer, wasCreated: result.wasCreated, lead });
+    } catch (error: any) {
+      console.error('Convert lead to customer error:', error?.message || error);
+      res.status(500).json({ message: "Failed to convert lead to customer" });
+    }
+  });
+
+  // Completes the Lead -> Booking conversion (spec §24) after the actual
+  // Booking has already been created through the existing, unmodified
+  // POST /api/bookings endpoint (with its own full availability
+  // validation) — this route only records the link, it never creates or
+  // touches a Booking document itself, so there is exactly one place a
+  // real booking gets created in this whole codebase.
+  app.post("/api/leads/:leadId/link-booking", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CONVERT_LEAD_TO_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      const lead = await Lead.findOne({ _id: req.params.leadId, tenantId: req.tenantId });
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      if (!req.body?.bookingId) return res.status(400).json({ message: "bookingId is required." });
+
+      const booking = await Booking.findOne({ _id: req.body.bookingId, tenantId: req.tenantId });
+      if (!booking) return res.status(404).json({ message: "Booking not found for this tenant." });
+
+      lead.linkedBookingId = booking._id;
+      lead.convertedToBookingAt = new Date();
+      try {
+        assertValidLeadTransition(lead.status as LeadStatusValue, 'converted_to_booking');
+        lead.status = 'converted_to_booking';
+      } catch {
+        // Best-effort sync, same pattern as the quotation-accept and
+        // convert-to-customer routes above — the link itself still succeeds.
+      }
+      lead.updatedAt = new Date();
+      await lead.save();
+
+      res.json(lead);
+    } catch (error: any) {
+      console.error('Link lead to booking error:', error?.message || error);
+      res.status(500).json({ message: "Failed to link booking to lead" });
     }
   });
 

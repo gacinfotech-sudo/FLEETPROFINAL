@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Booking, DriverLeave } from '../models/index';
+import { Booking, DriverLeave, BookingDraft } from '../models/index';
 
 // Bookings store the calendar date and the clock time as SEPARATE fields
 // (pickupDate is always midnight; the real time-of-day lives in the
@@ -65,14 +65,41 @@ function toConflict(b: any): ConflictingBooking {
 // fallback here on purpose, so a booking that's somehow missing them
 // (schema drift, manual DB edit) fails LOUD by never matching as a
 // conflict source, rather than silently reintroducing the midnight bug.
+// Reporting/return/rest buffers (spec §29-32) — genuinely new, additive
+// concept. All default to 0, which produces a query window byte-identical
+// to the pre-buffer behavior, so every existing call site that doesn't
+// pass this argument is completely unaffected. A non-zero buffer widens
+// which EXISTING bookings count as still occupying the resource around the
+// requested [start, end) window: a reporting buffer means the vehicle/
+// driver must already be free *reportingBufferMinutes before* the new
+// booking's start; return+rest buffers mean they must stay free *that
+// long after* an existing booking's end. Expressed as widening the query
+// window in the opposite direction (rather than the existing bookings'
+// stored times) so the same simple $lt/$gt shape still applies.
+export interface AvailabilityBuffers {
+  reportingBufferMinutes?: number;
+  returnBufferMinutes?: number;
+  restBufferMinutes?: number;
+}
+
+function widenWindowForBuffers(start: Date, end: Date, buffers?: AvailabilityBuffers): { queryStart: Date; queryEnd: Date } {
+  const reportingMs = (buffers?.reportingBufferMinutes ?? 0) * 60_000;
+  const returnRestMs = ((buffers?.returnBufferMinutes ?? 0) + (buffers?.restBufferMinutes ?? 0)) * 60_000;
+  return {
+    queryStart: returnRestMs > 0 ? new Date(start.getTime() - returnRestMs) : start,
+    queryEnd: reportingMs > 0 ? new Date(end.getTime() + reportingMs) : end,
+  };
+}
+
 export async function findVehicleConflicts(
-  tenantId: string, vehicleId: string, start: Date, end: Date, excludeBookingId?: string, session?: mongoose.ClientSession
+  tenantId: string, vehicleId: string, start: Date, end: Date, excludeBookingId?: string, session?: mongoose.ClientSession, buffers?: AvailabilityBuffers
 ): Promise<ConflictingBooking[]> {
+  const { queryStart, queryEnd } = widenWindowForBuffers(start, end, buffers);
   const query: any = {
     tenantId, vehicleId,
     status: { $in: OCCUPYING_STATUSES },
-    scheduledStartDateTime: { $lt: end },
-    scheduledEndDateTime: { $gt: start },
+    scheduledStartDateTime: { $lt: queryEnd },
+    scheduledEndDateTime: { $gt: queryStart },
   };
   if (excludeBookingId) query._id = { $ne: excludeBookingId };
   const rows = await Booking.find(query).session(session ?? null);
@@ -80,17 +107,28 @@ export async function findVehicleConflicts(
 }
 
 export async function findDriverConflicts(
-  tenantId: string, driverId: string, start: Date, end: Date, excludeBookingId?: string, session?: mongoose.ClientSession
+  tenantId: string, driverId: string, start: Date, end: Date, excludeBookingId?: string, session?: mongoose.ClientSession, buffers?: AvailabilityBuffers
 ): Promise<ConflictingBooking[]> {
+  const { queryStart, queryEnd } = widenWindowForBuffers(start, end, buffers);
   const query: any = {
     tenantId, driverId,
     status: { $in: OCCUPYING_STATUSES },
-    scheduledStartDateTime: { $lt: end },
-    scheduledEndDateTime: { $gt: start },
+    scheduledStartDateTime: { $lt: queryEnd },
+    scheduledEndDateTime: { $gt: queryStart },
   };
   if (excludeBookingId) query._id = { $ne: excludeBookingId };
   const rows = await Booking.find(query).session(session ?? null);
   return rows.map(toConflict);
+}
+
+// Parity wrapper — checkDriverAvailability already existed; no equivalent
+// existed for vehicles, so every call site did `findVehicleConflicts(...).length
+// === 0` directly (documented gap, see docs/AVAILABILITY_RULE_MATRIX.md).
+export async function checkVehicleAvailability(
+  tenantId: string, vehicleId: string, start: Date, end: Date, excludeBookingId?: string, session?: mongoose.ClientSession, buffers?: AvailabilityBuffers
+): Promise<{ available: boolean; bookingConflicts: ConflictingBooking[] }> {
+  const bookingConflicts = await findVehicleConflicts(tenantId, vehicleId, start, end, excludeBookingId, session, buffers);
+  return { available: bookingConflicts.length === 0, bookingConflicts };
 }
 
 export interface LeaveConflict {
@@ -138,4 +176,63 @@ export async function checkDriverAvailability(
     bookingConflicts,
     leaveConflicts,
   };
+}
+
+export interface TentativeDraftConflict {
+  userId: string;
+  pickupDate?: string;
+  pickupTime?: string;
+  returnDate?: string;
+  returnTime?: string;
+  updatedAt: Date;
+}
+
+// A real, minimal slice of the spec's "centralized zero-overlap
+// Availability Engine with reservations" (§29-38) — deliberately built as
+// a live read over the existing BookingDraft collection (Phase 8) rather
+// than a new ResourceReservation model with its own create/expire/release
+// lifecycle to keep in sync. BookingDraft already IS a per-user record of
+// "I have this vehicle provisionally selected, for these dates, right
+// now" — the moment two staff are filling out the wizard for the same
+// vehicle and overlapping dates at the same time is exactly what this
+// closes: whichever one actually submits first still wins (this is a
+// pre-submit guard, not a hold/lock), but the second one gets a clear,
+// specific "someone else is currently booking this vehicle" error instead
+// of either double-booking or a generic failure.
+//
+// Staleness window: a draft older than STALE_DRAFT_MINUTES is treated as
+// abandoned (the user closed the tab without discarding) and never counts
+// as a conflict — there is no background expiry job in this codebase, so
+// staleness is enforced lazily, at read time, exactly like every other
+// lazy-expiry pattern already used here.
+const STALE_DRAFT_MINUTES = 20;
+
+export async function findTentativeDraftConflicts(
+  tenantId: string, vehicleId: string, start: Date, end: Date, excludeUserId?: string, session?: mongoose.ClientSession
+): Promise<TentativeDraftConflict[]> {
+  const staleCutoff = new Date(Date.now() - STALE_DRAFT_MINUTES * 60_000);
+  const query: any = {
+    tenantId,
+    'formData.vehicleId': vehicleId,
+    updatedAt: { $gte: staleCutoff },
+  };
+  if (excludeUserId) query.userId = { $ne: excludeUserId };
+  const drafts = await BookingDraft.find(query).session(session ?? null);
+
+  const conflicts: TentativeDraftConflict[] = [];
+  for (const draft of drafts) {
+    const fd = draft.formData || {};
+    if (!fd.pickupDate) continue;
+    const draftStart = combineDateTime(fd.pickupDate, fd.pickupTime);
+    const draftEnd = fd.returnDate ? combineDateTime(fd.returnDate, fd.returnTime) : draftStart;
+    if (draftStart < end && draftEnd > start) {
+      conflicts.push({
+        userId: draft.userId,
+        pickupDate: fd.pickupDate, pickupTime: fd.pickupTime,
+        returnDate: fd.returnDate, returnTime: fd.returnTime,
+        updatedAt: draft.updatedAt,
+      });
+    }
+  }
+  return conflicts;
 }

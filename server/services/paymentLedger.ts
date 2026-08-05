@@ -6,7 +6,7 @@ import { Booking, PaymentTransaction } from '../models/index';
 // came from the customer, just handed to a driver/vendor instead of the
 // company directly, and that fact needs to be visible in the booking's
 // balance the same way a cash payment at the counter would be.
-const RECEIPT_TYPES = new Set(['advance', 'partial_payment', 'final_payment', 'driver_collection', 'vendor_collection']);
+export const RECEIPT_TYPES = new Set(['advance', 'partial_payment', 'final_payment', 'driver_collection', 'vendor_collection']);
 
 export interface PaymentSummary {
   totalReceived: number;

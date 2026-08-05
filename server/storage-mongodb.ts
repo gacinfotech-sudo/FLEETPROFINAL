@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import mongoose from 'mongoose';
 import { Tenant, User, Vehicle, Driver, Booking, Expense, ITenant, IUser, IVehicle, IDriver, IBooking, IExpense } from './models';
-import { findVehicleConflicts, findDriverConflicts, combineDateTime } from './services/availability';
+import { findVehicleConflicts, findDriverConflicts, findTentativeDraftConflicts, combineDateTime } from './services/availability';
 
 export interface IStorage {
   // Auth methods
@@ -632,6 +632,25 @@ export class MongoDBStorage implements IStorage {
           );
           err.code = 'VEHICLE_DOUBLE_BOOKING';
           err.conflict = conflicts[0];
+          throw err;
+        }
+
+        // Zero-overlap guard for the in-between window a real Booking
+        // document can't see: another user has this exact vehicle
+        // provisionally selected, for overlapping dates, in their own
+        // still-open Add Booking wizard right now (see
+        // findTentativeDraftConflicts). Excludes the current user's own
+        // draft — finishing your own booking is never blocked by your own
+        // in-progress work.
+        const draftConflicts = await findTentativeDraftConflicts(
+          bookingData.tenantId.toString(), bookingData.vehicleId.toString(), start!, end!,
+          bookingData.createdBy?.userId, session
+        );
+        if (draftConflicts.length > 0) {
+          const err: any = new Error(
+            `This vehicle is currently being booked by another user for an overlapping period. Please try again shortly or choose a different vehicle.`
+          );
+          err.code = 'VEHICLE_TENTATIVELY_HELD';
           throw err;
         }
       }

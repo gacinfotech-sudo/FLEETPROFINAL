@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -88,10 +88,17 @@ type BookingFormData = z.infer<typeof bookingSchema>;
 const EXTERNAL_SOURCE_TYPES = new Set(["hotel", "corporate_client", "travel_agent", "vendor_partner", "referral", "online_travel_platform"]);
 
 interface EnhancedBookingFormProps {
-  onSuccess: () => void;
+  onSuccess: (booking?: any) => void;
+  // Pre-fills the form (e.g. from a Lead/Inquiry/accepted Quotation being
+  // converted into a booking, spec §24 "Do not re-enter the same
+  // information manually") without skipping any validation, availability
+  // check, or the vehicle/driver picker itself — the user still completes
+  // and submits through this exact same form and the existing
+  // POST /api/bookings endpoint, unchanged.
+  initialValues?: Partial<BookingFormData>;
 }
 
-export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormProps) {
+export default function EnhancedBookingForm({ onSuccess, initialValues }: EnhancedBookingFormProps) {
   const [step, setStep] = useState(1);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
   const [selectedPricingType, setSelectedPricingType] = useState<"day" | "km" | "">("");
@@ -151,7 +158,85 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
     },
   });
 
+  // Applies a Lead-conversion prefill exactly once, on mount, without
+  // touching anything the user has already typed if this effect somehow
+  // re-ran (it shouldn't, since initialValues is only ever set once by
+  // the caller for a fresh "Convert to Booking" navigation).
+  useEffect(() => {
+    if (initialValues) {
+      form.reset({ ...form.getValues(), ...initialValues });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const watchedValues = form.watch();
+
+  // Booking wizard draft persistence (auto-save + resume). Deliberately
+  // scoped OFF for a Lead-conversion prefill session (initialValues present)
+  // — that flow already has its own source of truth (the Lead) and was
+  // built/tested as a self-contained path in the previous phase; layering
+  // draft-resume on top would only add risk to an already-verified flow for
+  // a case (someone abandoning a Lead-conversion mid-way) the spec's actual
+  // ask — "don't lose organic Add Booking progress" — doesn't cover.
+  const draftEnabled = !initialValues;
+  const [draftChecked, setDraftChecked] = useState(!draftEnabled);
+  const [pendingDraft, setPendingDraft] = useState<{ step: number; formData: any } | null>(null);
+  const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards against a race where the mount-time "is there an existing
+  // draft?" GET resolves only after the user has already started typing
+  // (slow network, or this session's own debounced autosave already fired)
+  // — without this, a fast typist could get interrupted by a "resume?"
+  // prompt for what is actually their own just-created progress.
+  const hasInteractedRef = useRef(false);
+
+  useEffect(() => {
+    if (form.formState.isDirty) hasInteractedRef.current = true;
+  }, [form.formState.isDirty]);
+
+  useEffect(() => {
+    if (!draftEnabled) return;
+    (async () => {
+      try {
+        const res = await apiRequest("GET", "/api/booking-drafts/mine");
+        const draft = await res.json();
+        if (!hasInteractedRef.current && draft && (draft.step > 1 || draft.formData?.customerName || draft.formData?.pickupLocation)) {
+          setPendingDraft({ step: draft.step || 1, formData: draft.formData || {} });
+        }
+      } catch {
+        // No draft, or the fetch failed — proceed with a fresh form either way.
+      } finally {
+        setDraftChecked(true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const resumeDraft = () => {
+    if (!pendingDraft) return;
+    form.reset({ ...form.getValues(), ...pendingDraft.formData });
+    setStep(pendingDraft.step);
+    setPendingDraft(null);
+  };
+
+  const discardDraft = () => {
+    setPendingDraft(null);
+    apiRequest("DELETE", "/api/booking-drafts/mine").catch(() => {});
+  };
+
+  // Debounced auto-save: only once the initial "resume?" decision is
+  // settled (so we never overwrite a just-fetched draft with the form's
+  // still-default values), only once the user has actually typed something,
+  // and never after a booking has already been confirmed in this session.
+  useEffect(() => {
+    if (!draftEnabled || !draftChecked || pendingDraft || bookingConfirmed) return;
+    if (!form.formState.isDirty) return;
+    if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
+    draftSaveTimer.current = setTimeout(() => {
+      apiRequest("PUT", "/api/booking-drafts/mine", { step, formData: watchedValues }).catch(() => {});
+    }, 1200);
+    return () => { if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedValues, step, draftChecked, pendingDraft, bookingConfirmed]);
 
   // Fetch available vehicles
   const { data: availableVehicles } = useQuery({
@@ -261,6 +346,9 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
     onSuccess: async (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      if (draftEnabled) {
+        apiRequest("DELETE", "/api/booking-drafts/mine").catch(() => {});
+      }
       setCreatedBooking(result);
       setBookingConfirmed(true);
       toast({
@@ -943,6 +1031,7 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
                                 
                                 {/* By Day Option */}
                                 <button
+                                  type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleVehicleAndPricingSelection(vehicleId, "day");
@@ -968,6 +1057,7 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
 
                                 {/* By Kilometer Option */}
                                 <button
+                                  type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (vehicle.pricePerKm && vehicle.pricePerKm > 0) {
@@ -1475,10 +1565,10 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
                         setStep(1);
                         setSelectedVehicleId("");
                         setSelectedPricingType("");
+                        onSuccess(createdBooking);
                         setCreatedBooking(null);
                         setBookingConfirmed(false);
                         setRouteType("custom");
-                        onSuccess();
                       }}
                       className="px-6 py-3"
                       size="lg"
@@ -2153,6 +2243,30 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
         </form>
       </Form>
 
+      {/* Resume unfinished booking draft */}
+      <Dialog open={!!pendingDraft} onOpenChange={(open) => { if (!open) discardDraft(); }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Resume your unfinished booking?</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <p className="text-sm text-gray-600 mb-6">
+              You have a booking in progress from earlier
+              {pendingDraft?.formData?.customerName ? ` for ${pendingDraft.formData.customerName}` : ""}.
+              Would you like to continue where you left off, or start a new booking?
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button onClick={resumeDraft} className="bg-blue-500 hover:bg-blue-600 text-white">
+                Resume Booking
+              </Button>
+              <Button variant="outline" onClick={discardDraft}>
+                Start Fresh
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* WhatsApp Share Modal */}
       <Dialog open={showConfirmationModal} onOpenChange={setShowConfirmationModal}>
         <DialogContent className="sm:max-w-[425px]">
@@ -2193,10 +2307,10 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
                   setStep(1);
                   setSelectedVehicleId("");
                   setSelectedPricingType("");
+                  onSuccess(createdBooking);
                   setCreatedBooking(null);
                   setShowConfirmationModal(false);
                   setRouteType("custom");
-                  onSuccess();
                 }}
                 className="w-full"
               >
