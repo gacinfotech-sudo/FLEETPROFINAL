@@ -2794,12 +2794,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .sort({ date: -1 });
 
       const approvedInternalExpenses = expenses.filter((e: any) => !e.customerChargeable && e.approvalStatus === 'approved');
-      const internalTripCost = approvedInternalExpenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
+      const expenseCost = approvedInternalExpenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
+      // Vendor Direct Cost (spec §15: "Expected Gross Contribution =
+      // Customer Revenue - Vendor Direct Cost") — only meaningful for a
+      // vendor-fulfilled booking (fulfilmentType/vendorAgreedRate are only
+      // ever set together, via assign-vendor or a selected sourcing-request
+      // quote). Additive to expense-based internal costs, not a
+      // replacement — a vendor-fulfilled trip can still separately incur
+      // internal expenses (e.g. a company-paid toll on the customer's
+      // behalf) on top of what's owed to the vendor.
+      const vendorDirectCost = (booking as any).fulfilmentType === 'vendor' ? ((booking as any).vendorAgreedRate || 0) : 0;
+      const internalTripCost = expenseCost + vendorDirectCost;
       const customerRevenue = (booking as any).totalAmount || 0;
       const collection = (booking as any).advanceReceived || 0;
 
       res.json({
         customerRevenue,
+        expenseCost,
+        vendorDirectCost,
         internalTripCost,
         collection,
         remainingBalance: Math.max(0, customerRevenue - collection),
