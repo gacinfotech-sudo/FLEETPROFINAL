@@ -1453,6 +1453,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vendor settlement (docs/PIPELINE_BUG_REPORT.md #12) — read-only
+  // reporting only, built entirely on the existing plain string/number
+  // vendor fields on Booking (fulfilmentType/vendorName/vendorAgreedRate/
+  // vendorAdvancePaid — "Scoped-down stand-in for a full vendor master...
+  // not a ledger", see the IBooking comment). No payment-recording here;
+  // that would need a real ledger, a larger scope than a settlement view.
+  // Gated the same way as Revenue Report — this is financial-outflow
+  // visibility, the same category of oversight data.
+  app.get("/api/vendors/settlement", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
+    try {
+      const bookings = await Booking.find({
+        tenantId: req.tenantId,
+        fulfilmentType: 'vendor',
+        vendorName: { $exists: true, $ne: '' },
+      })
+        .select('bookingId vendorName vendorContactPhone vendorAgreedRate vendorAdvancePaid pickupDate pickupLocation dropoffLocation status')
+        .sort({ pickupDate: -1 });
+
+      const byVendor = new Map<string, {
+        vendorName: string; vendorContactPhone?: string;
+        totalAgreed: number; totalPaid: number; bookingCount: number;
+        bookings: any[];
+      }>();
+
+      for (const b of bookings as any[]) {
+        const key = b.vendorName;
+        if (!byVendor.has(key)) {
+          byVendor.set(key, { vendorName: key, vendorContactPhone: b.vendorContactPhone, totalAgreed: 0, totalPaid: 0, bookingCount: 0, bookings: [] });
+        }
+        const entry = byVendor.get(key)!;
+        entry.totalAgreed += b.vendorAgreedRate || 0;
+        entry.totalPaid += b.vendorAdvancePaid || 0;
+        entry.bookingCount += 1;
+        entry.bookings.push({
+          bookingId: b.bookingId, pickupDate: b.pickupDate, pickupLocation: b.pickupLocation, dropoffLocation: b.dropoffLocation,
+          status: b.status, vendorAgreedRate: b.vendorAgreedRate || 0, vendorAdvancePaid: b.vendorAdvancePaid || 0,
+          outstanding: Math.max(0, (b.vendorAgreedRate || 0) - (b.vendorAdvancePaid || 0)),
+        });
+        // Most recent contact phone wins if it varies across bookings.
+        if (b.vendorContactPhone) entry.vendorContactPhone = b.vendorContactPhone;
+      }
+
+      const vendors = Array.from(byVendor.values())
+        .map((v) => ({ ...v, outstanding: Math.max(0, v.totalAgreed - v.totalPaid) }))
+        .sort((a, b) => b.outstanding - a.outstanding);
+
+      res.json({ vendors, totalOutstanding: vendors.reduce((sum, v) => sum + v.outstanding, 0) });
+    } catch (error: any) {
+      console.error('Vendor settlement error:', error?.message || error);
+      res.status(500).json({ message: "Failed to compute vendor settlement" });
+    }
+  });
+
   // Vehicle Routes
   app.get("/api/vehicles", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {

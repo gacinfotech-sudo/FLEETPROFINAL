@@ -17,12 +17,11 @@ New this phase:
 - `tests/e2e/pipeline-audit-timeline-clickthrough.spec.ts` — 2 tests (Repair 6: Customer 360° timeline click-through; Repair 7: WhatsApp "Configuration Required" messaging, verified against this dev tenant's genuinely disconnected WhatsApp session).
 - `tests/e2e/pipeline-audit-trip-cost-summary.spec.ts` — 3 tests (Repair 9: Expense.bookingId linkage, Trip Cost Summary permission enforcement and cost-calculation correctness).
 - `tests/e2e/pipeline-audit-lead-quoted-transition.spec.ts` — 3 tests (Repair 10: Lead auto-advances to quotation_draft/quotation_sent).
+- `tests/e2e/pipeline-audit-vendor-settlement.spec.ts` — 3 tests (Repair 11: Vendor Settlement aggregation correctness, permission enforcement, UI drill-down).
 
-## Full regression suite (final run, all repairs from this phase included — 10 repairs total)
+## Full regression suite (final run, all repairs from this phase included — 11 repairs total)
 
-129 tests total: **124 passed**, 6 failed, 1 skipped (largest run of the phase — 7.2 minutes — which visibly correlates with more shared-dev-DB contention flakes; see below).
-
-Three failures are deterministic and pre-existing, confirmed unrelated to any change this phase (root cause reproduces every run, in isolation or otherwise):
+134 tests total: **130 passed**, 3 failed, 1 skipped — back down to exactly the 3 deterministic, pre-existing, previously-characterized failures, no shared-DB-contention flakes this run:
 
 | Test | Cause | Related to this phase? |
 |---|---|---|
@@ -30,7 +29,9 @@ Three failures are deterministic and pre-existing, confirmed unrelated to any ch
 | `google-review.spec.ts` | WhatsApp session not connected for this tenant — no provider credentials configured in this dev environment (expected "Configuration Required" state, not a code defect) | No |
 | `review-rewards-campaign.spec.ts` | Same WhatsApp-not-configured cause — confirmed via `git stash` to fail identically with none of this phase's changes present | No |
 
-The other three (`advance-payment.spec.ts`, `booking-actions.spec.ts`, `invoice-settings.spec.ts`) are non-deterministic shared-dev-DB contention — each failed in this one full-suite run but passed cleanly on immediate isolated retry, and none touches any file this phase changed (confirmed by diff inspection: this phase's final round only edited `server/routes.ts`'s quotation-create/send handlers, plus new test/doc files). `dashboard-upcoming-bookings.spec.ts` and `customer-timeline.spec.ts` also intermittently failed at earlier points in this phase's iterative runs and likewise passed cleanly on retry — the full list of tests observed to flake at some point this phase, none reproducing outside a long concurrent full-suite run.
+Across all iterative runs this phase, the following additionally flaked at some point under full-suite shared-DB contention and passed cleanly on every isolated retry (confirmed non-deterministic, not real defects, none touching any file this phase changed): `advance-payment.spec.ts`, `booking-actions.spec.ts`, `invoice-settings.spec.ts`, `dashboard-upcoming-bookings.spec.ts`, `customer-timeline.spec.ts`.
+
+`navigation.spec.ts` (a pre-existing test enumerating every sidebar page from a hardcoded list, checking each loads and doesn't bounce back) was extended with the new "Vendor Settlement" entry — the list is hardcoded rather than derived from the sidebar's own nav array, so a newly added nav item doesn't get automatic coverage; this was caught and closed rather than left as a silent gap.
 
 **Process note on test-suite date collisions**: this phase's own new tests initially collided with `review-rewards-campaign.spec.ts`'s far-future date range (both picked overlapping day-offset windows against the shared dev DB's small vehicle fleet). Fixed by moving this phase's new tests to a `+40000..+52000` day-offset range confirmed clear of every other test file's range — see `docs/PIPELINE_REPAIR_REPORT.md`'s cross-cutting process note.
 

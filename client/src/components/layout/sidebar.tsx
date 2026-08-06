@@ -1,4 +1,4 @@
-import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks } from "lucide-react";
+import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -36,6 +36,7 @@ const navItems = [
   { id: "after-sales", label: "After-Sales", icon: HeartHandshake, restrictedForManagers: true },
   { id: "campaigns", label: "Campaigns", icon: Megaphone, restrictedForManagers: true },
   { id: "revenue", label: "Revenue Report", icon: TrendingUp, restrictedForManagers: true },
+  { id: "vendor-settlement", label: "Vendor Settlement", icon: Building2, restrictedForManagers: true },
   { id: "expenses", label: "Manage Expenses", icon: ReceiptIcon },
   { id: "salary", label: "Salary", icon: Banknote },
   { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },

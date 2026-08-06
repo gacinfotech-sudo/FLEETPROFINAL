@@ -197,6 +197,27 @@ A first draft of test 2 used `negotiation` as the "past quoting" example and fai
 
 ---
 
+## Repair 11 — Vendor Settlement view (P2, DISCONNECTED)
+
+**Previous status**: No way to see how much was owed to a given vendor across their outsourced bookings — `vendorAgreedRate`/`vendorAdvancePaid` existed per-booking but nothing aggregated them. User confirmed this as the next item to build, choosing it over the driver portal (which still needs an auth-approach decision from the user before it could be started responsibly).
+
+**Root cause**: No aggregation endpoint or UI existed on top of the already-present vendor fields.
+
+**Files changed**:
+- `server/routes.ts` — new `GET /api/vendors/settlement`: groups Booking rows with `fulfilmentType: 'vendor'` by `vendorName`, sums `vendorAgreedRate`/`vendorAdvancePaid` per vendor (and per booking, for the drill-down), sorts by outstanding descending. Gated behind the existing `PERMISSIONS.VIEW_REVENUE` — deliberately reused rather than minting a new permission, since this is the same category of financial-outflow oversight data as Revenue Report.
+- `client/src/pages/vendor-settlement.tsx` — new page: a total-outstanding summary card, one expandable card per vendor (booking count, agreed/paid/outstanding), drilling into a per-booking table on click.
+- `client/src/components/layout/sidebar.tsx`, `client/src/pages/dashboard.tsx` — new "Vendor Settlement" nav entry (manager-restricted, matching Revenue Report exactly) and `ViewType`/`allowedSections`/`restrictedSections`/render-switch wiring, following the identical existing Revenue Report template.
+
+**Database changes**: none — read-only, built entirely on the existing `Booking.vendorName`/`vendorAgreedRate`/`vendorAdvancePaid`/`vendorContactPhone` fields.
+
+**Scope note**: explicitly read-only reporting. No payment-recording to vendors (would need a real ledger — a larger, separate scope) and no new Vendor model (the existing "scoped-down stand-in... not a ledger" design on Booking is preserved as-is, not promoted to a full model).
+
+**Tests**: `tests/e2e/pipeline-audit-vendor-settlement.spec.ts` — 3 tests: (1) two bookings for the same vendor (one partially paid, one fully paid) aggregate to the correct total agreed/paid/outstanding; (2) a manager without `view_revenue` gets 403; (3) the UI renders the summary and drills into booking-level detail. Live-verified via screenshot against real accumulated vendor data already present in the shared dev DB from earlier sessions ("Legacy Free Text Vendor," 11 bookings, ₹6,600 outstanding) — confirms correct aggregation on real data, not just this test's synthetic records.
+
+**Final status**: Fixed, tested, regression-clean.
+
+---
+
 ## Cross-cutting process note
 
 Every server-side change in this repair round required a dev-server restart before its effect was visible to Playwright — the dev server runs via plain `tsx server/index.ts` (no watch mode configured in `package.json`'s `dev` script), so file edits are not hot-reloaded. This was discovered mid-repair (Repair 1's first test run gave a false "still broken" result against stale server code) and applied consistently for every subsequent change in this phase.

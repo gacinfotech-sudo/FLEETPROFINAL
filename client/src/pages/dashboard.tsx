@@ -10,6 +10,7 @@ import VehicleFeedbackProfile from "../components/fleet/vehicle-feedback-profile
 import DriverForm from "../components/drivers/driver-form";
 import DriverFeedbackProfile from "../components/drivers/driver-feedback-profile";
 import RevenueReport from "../components/reports/revenue-report";
+import VendorSettlementPage from "./vendor-settlement";
 import BookingHistoryPDF from "../components/reports/booking-history-pdf";
 import EnhancedInvoiceGenerator from "../components/invoice/enhanced-invoice-generator";
 import UserManagement from "../components/user-management";
@@ -51,7 +52,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Menu, LogOut, Star, Car, Users, UserCheck, Phone, Mail, MessageCircle, Banknote, Plus, User, FileText, Trash2 } from "lucide-react";
 
-type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups";
+type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups";
 
 // apiRequest() throws Error("<status>: <raw response text>") on a non-2xx
 // response (queryClient.ts:throwIfResNotOk) — without this, a rejected
@@ -151,7 +152,7 @@ export default function Dashboard() {
   // Sync URL with current view on mount with role-based access control
   useEffect(() => {
     const section = params.section as ViewType;
-    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "upcoming-bookings", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "after-sales", "campaigns", "revenue", "expenses", "salary", "whatsapp", "profile"];
+    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "upcoming-bookings", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "after-sales", "campaigns", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile"];
     
     // Add "users" section only for admin and client roles
     if (user?.role === 'admin' || user?.role === 'client') {
@@ -160,7 +161,7 @@ export default function Dashboard() {
     
     // Remove restricted sections for manager roles
     if (user?.role === 'manager') {
-      const restrictedSections = ["revenue", "drivers", "driver-leave", "driver-performance", "vehicle-performance", "driver-attendance", "after-sales", "campaigns"];
+      const restrictedSections = ["revenue", "vendor-settlement", "drivers", "driver-leave", "driver-performance", "vehicle-performance", "driver-attendance", "after-sales", "campaigns"];
       restrictedSections.forEach(section => {
         const index = allowedSections.indexOf(section);
         if (index > -1) {
@@ -1887,6 +1888,9 @@ export default function Dashboard() {
 
       case "revenue":
         return <RevenueReport />;
+
+      case "vendor-settlement":
+        return <VendorSettlementPage />;
 
       case "profile":
         return (
