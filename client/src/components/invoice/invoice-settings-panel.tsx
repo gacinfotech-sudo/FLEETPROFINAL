@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,11 +38,20 @@ export default function InvoiceSettingsPanel({ userRole }: Props) {
   const hasAccess = userRole === 'client' || userRole === 'admin';
   const [form, setForm] = useState<Record<string, any>>({});
   const [loaded, setLoaded] = useState(false);
+  // If the settings GET resolves AFTER the user has already started typing
+  // (a real race, not hypothetical — this page can carry other panels
+  // with their own slower fetches ahead of it), populating on `!loaded`
+  // alone overwrites their in-progress edit with the stale server value
+  // the instant it arrives. Same hasInteractedRef idiom already used for
+  // this exact class of problem in enhanced-booking-form.tsx's draft-resume
+  // logic: once the user has touched the form, the fetch may still populate
+  // (first load) but never clobber afterward.
+  const hasInteractedRef = useRef(false);
 
   const { data: settings } = useQuery<any>({ queryKey: ['/api/invoice-settings'], enabled: hasAccess });
 
   useEffect(() => {
-    if (settings && !loaded) { setForm(settings); setLoaded(true); }
+    if (settings && !loaded && !hasInteractedRef.current) { setForm(settings); setLoaded(true); }
   }, [settings, loaded]);
 
   const saveMutation = useMutation({
@@ -55,7 +64,7 @@ export default function InvoiceSettingsPanel({ userRole }: Props) {
     onError: (error: any) => toast({ title: 'Could not save invoice settings', description: error.message, variant: 'destructive' }),
   });
 
-  const set = (key: string, value: any) => setForm((f) => ({ ...f, [key]: value }));
+  const set = (key: string, value: any) => { hasInteractedRef.current = true; setForm((f) => ({ ...f, [key]: value })); };
 
   if (!hasAccess) return null;
 
