@@ -2511,15 +2511,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (search && typeof search === 'string' && search.trim()) {
         const normalized = normalizeIndianPhone(search) || search;
         const safeSearch = escapeRegex(search.trim().slice(0, 100));
+        const digitsOnly = normalized.replace(/\D/g, '');
         query.$or = [
           { name: { $regex: safeSearch, $options: 'i' } },
-          { primaryMobile: { $regex: normalized.replace(/\D/g, '') } },
-          { alternateMobile: { $regex: normalized.replace(/\D/g, '') } },
-          { whatsappNumber: { $regex: normalized.replace(/\D/g, '') } },
-          { phoneAliases: { $regex: normalized.replace(/\D/g, '') } },
           { email: { $regex: safeSearch, $options: 'i' } },
           { emailAliases: { $regex: safeSearch, $options: 'i' } },
           { companyAliases: { $regex: safeSearch, $options: 'i' } },
+          // A text search with no digits at all (the overwhelming majority
+          // of name/email searches) used to fall through to
+          // normalizeIndianPhone(search) returning null -> normalized
+          // defaulting to the raw text -> stripping non-digits from THAT
+          // producing an empty string -> {$regex: ''} on the phone fields,
+          // which matches every document in Mongo. The net effect: any
+          // name search silently ignored its own filter and returned the
+          // entire (500-row-capped) customer list via this $or. Only add
+          // the phone clauses when there's an actual digit to match.
+          ...(digitsOnly ? [
+            { primaryMobile: { $regex: digitsOnly } },
+            { alternateMobile: { $regex: digitsOnly } },
+            { whatsappNumber: { $regex: digitsOnly } },
+            { phoneAliases: { $regex: digitsOnly } },
+          ] : []),
         ];
       }
       const customers = await Customer.find(query).sort({ lastBookingDate: -1, createdAt: -1 }).limit(500);

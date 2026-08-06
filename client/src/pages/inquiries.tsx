@@ -32,6 +32,12 @@ export default function InquiriesPage() {
   const [showDetailedForm, setShowDetailedForm] = useState<any>(null);
   const [lostReason, setLostReason] = useState("");
   const [showLostDialog, setShowLostDialog] = useState<any>(null);
+  // The backend has always accepted limit/skip and returned {rows, total}
+  // (server/routes.ts) — this page just never sent/read either, silently
+  // capping the list at the server's default 50 rows with no indication
+  // more existed. Real pagination now, no backend change needed.
+  const PAGE_SIZE = 50;
+  const [page, setPage] = useState(0);
 
   // Array-form queryKey (base URL + separate filter elements, matching the
   // convention already used by customers.tsx) so a plain
@@ -40,11 +46,13 @@ export default function InquiriesPage() {
   // this query and actually refreshes the list — a single interpolated
   // string key would not match TanStack Query's array-prefix invalidation.
   const { data, isLoading, isError, refetch } = useQuery<{ rows: any[]; total: number }>({
-    queryKey: ["/api/inquiries", statusFilter, search],
+    queryKey: ["/api/inquiries", statusFilter, search, page],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (statusFilter !== "all") params.set("status", statusFilter);
       if (search.trim()) params.set("search", search.trim());
+      params.set("limit", String(PAGE_SIZE));
+      params.set("skip", String(page * PAGE_SIZE));
       const res = await apiRequest("GET", `/api/inquiries?${params.toString()}`);
       return res.json();
     },
@@ -101,8 +109,8 @@ export default function InquiriesPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <CardTitle className="text-lg sm:text-xl">All Inquiries</CardTitle>
             <div className="flex flex-col sm:flex-row gap-2">
-              <Input placeholder="Search name, mobile, inquiry #..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full sm:w-64" />
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Input placeholder="Search name, mobile, inquiry #..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }} className="w-full sm:w-64" />
+              <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(0); }}>
                 <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
@@ -190,6 +198,17 @@ export default function InquiriesPage() {
                   )}
                 </TableBody>
               </Table>
+              {(data?.total ?? 0) > PAGE_SIZE && (
+                <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
+                  <span>
+                    Showing {page * PAGE_SIZE + 1}-{Math.min((page + 1) * PAGE_SIZE, data?.total ?? 0)} of {data?.total ?? 0}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Previous</Button>
+                    <Button variant="outline" size="sm" disabled={(page + 1) * PAGE_SIZE >= (data?.total ?? 0)} onClick={() => setPage((p) => p + 1)}>Next</Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,11 @@ const SOURCE_OPTIONS = [
 interface QuickInquiryFormProps {
   onSuccess?: (inquiry: any) => void;
   onCancel?: () => void;
+  // Set when opened from "No Existing Customer Found" (customers.tsx) —
+  // the number the staff member already searched for, so they never have
+  // to retype it. The existing lookup-on-blur logic already handles
+  // confirming "still no customer" for whatever number ends up here.
+  initialMobile?: string;
 }
 
 const emptyForm = {
@@ -31,10 +36,10 @@ const emptyForm = {
   vehicleCategory: "", notes: "", assignedExecutive: "", priority: "medium", nextFollowUpAt: "",
 };
 
-export default function QuickInquiryForm({ onSuccess, onCancel }: QuickInquiryFormProps) {
+export default function QuickInquiryForm({ onSuccess, onCancel, initialMobile }: QuickInquiryFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ ...emptyForm });
+  const [form, setForm] = useState({ ...emptyForm, primaryMobile: initialMobile || "", whatsappNumber: initialMobile || "" });
   const [lookupResult, setLookupResult] = useState<any>(null);
   const [lookupChecked, setLookupChecked] = useState(false);
 
@@ -48,6 +53,12 @@ export default function QuickInquiryForm({ onSuccess, onCancel }: QuickInquiryFo
       setLookupChecked(true);
     },
   });
+
+  useEffect(() => {
+    const digits = (initialMobile || "").replace(/\D/g, "");
+    if (digits.length >= 10) lookupMutation.mutate(initialMobile!);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const createMutation = useMutation({
     mutationFn: async () => {

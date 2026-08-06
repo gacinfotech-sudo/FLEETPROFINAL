@@ -15,7 +15,8 @@ async function getCsrfToken(page: Page): Promise<string> {
 test('UI: Email/WhatsApp are disabled with an explanatory tooltip on a draft invoice, and become real send links once finalized', async ({ page }) => {
   await login(page, 'qaclient', 'QaFixed456!');
   const csrfToken = await getCsrfToken(page);
-  const customerName = `Send Gating Test ${Date.now()}`;
+  const marker = Date.now();
+  const customerName = `Send Gating Test ${marker}`;
 
   const day = new Date();
   day.setDate(day.getDate() + 19700 + Math.floor(Math.random() * 300));
@@ -25,7 +26,13 @@ test('UI: Email/WhatsApp are disabled with an explanatory tooltip on a draft inv
   const bookingRes = await page.request.post('/api/bookings', {
     headers: { 'X-CSRF-Token': csrfToken },
     data: {
-      customerName, customerPhone: '9' + String(Date.now()).slice(-9), customerEmail: 'sendgating@example.com',
+      // customerEmail must be unique per run: findOrCreateCustomer (server/
+      // services/customerService.ts) dedupes on email as well as phone, so
+      // a hardcoded literal here would silently reuse whichever customer
+      // first ran this test — with THEIR primaryMobile, not this run's
+      // freshly generated one — and the search step below would (correctly)
+      // find nothing for this run's phone number.
+      customerName, customerPhone: '9' + String(Date.now()).slice(-9), customerEmail: `sendgating+${marker}@example.com`,
       pickupLocation: 'Indore', dropoffLocation: 'Ujjain',
       pickupDate: dayStr, pickupTime: '09:00', returnDate: dayStr, returnTime: '13:00',
       bookingType: 'self_drive', tripType: 'one_way', vehicleId: vehicles[0]._id || vehicles[0].id,
@@ -44,7 +51,11 @@ test('UI: Email/WhatsApp are disabled with an explanatory tooltip on a draft inv
   await page.getByPlaceholder('Search name, mobile, or email').fill(booking.customerPhone);
   await page.locator('table tbody tr').first().click();
   const dashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });
-  await dashboard.getByRole('button', { name: 'View' }).first().click();
+  // exact: true — a loose substring match on "View" also matches any
+  // disabled button whose text contains "revieW" (e.g. Google Reviews'
+  // "Send Review Request"), which can win the .first() race and hang the
+  // click forever since that button is legitimately disabled here.
+  await dashboard.getByRole('button', { name: 'View', exact: true }).first().click();
   const doc = page.getByRole('dialog', { name: 'Invoice Document' });
 
   // Draft state: both buttons visible but disabled, with a clear reason.
@@ -57,12 +68,15 @@ test('UI: Email/WhatsApp are disabled with an explanatory tooltip on a draft inv
   await expect(whatsappBtn).toBeDisabled();
   await expect(whatsappBtn).toHaveAttribute('title', /finalize/i);
 
-  // Finalize, then re-open the same invoice.
+  // Finalize. The invoice viewer dialog stays open (finalizeMutation's
+  // onSuccess re-sets viewingInvoice with the finalized doc in place —
+  // client/src/components/customers/customer-invoices.tsx), so it already
+  // reflects the finalized state; no need to close and reopen it via the
+  // Customer Dashboard underneath (which Radix's modal stacking removes
+  // from the accessibility tree while this dialog is on top of it anyway).
   await doc.getByRole('button', { name: 'Finalize & Lock' }).click();
   await expect(page.getByText('Invoice finalized and locked')).toBeVisible({ timeout: 5000 });
 
-  const dashboard2 = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });
-  await dashboard2.getByRole('button', { name: 'View' }).first().click();
   const doc2 = page.getByRole('dialog', { name: 'Invoice Document' });
   const emailLink2 = doc2.getByRole('link', { name: /Email/ });
   const whatsappLink2 = doc2.getByRole('link', { name: /WhatsApp/ });

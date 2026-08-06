@@ -83,6 +83,12 @@ export default function Dashboard() {
   // was last selected on a completely different screen.
   const [vehicleStatusFilter, setVehicleStatusFilter] = useState("all");
   const [driverStatusFilter, setDriverStatusFilter] = useState("all");
+  // Fleet and Drivers each get their own search box state — they used to
+  // share the single `searchTerm` above (which Booking History also uses),
+  // so a search typed on one tab silently carried into another when
+  // switching tabs without clearing it first.
+  const [vehicleSearchTerm, setVehicleSearchTerm] = useState("");
+  const [driverSearchTerm, setDriverSearchTerm] = useState("");
   // Set by the Dashboard Overview's Lead/Booking Source chart right before
   // navigating into Booking History; own domain (booking source values)
   // kept separate from statusFilter/typeFilter for the same reason
@@ -101,6 +107,11 @@ export default function Dashboard() {
   // only so the booking-created callback below can link the two records;
   // it is stripped before being handed to the form itself.
   const [bookingPrefill, setBookingPrefill] = useState<any>(null);
+  // Set by the Sidebar's Global Customer Search right before navigating to
+  // the Customers view, so it can auto-open that customer's 360 dialog on
+  // arrival instead of landing on the plain, unfiltered list. Cleared
+  // whenever navigating anywhere else, same pattern as bookingPrefill above.
+  const [pendingCustomerId, setPendingCustomerId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [showDriverForm, setShowDriverForm] = useState(false);
@@ -183,6 +194,7 @@ export default function Dashboard() {
     if (view !== "live-bookings") setLiveOpsInitialTab(undefined);
     if (view !== "bookings") setBookingPrefill(null);
     if (view !== "history") setSourceFilter("all");
+    if (view !== "customers") setPendingCustomerId(null);
     setCurrentView(view);
     setLocation(`/dashboard/${view}`);
   };
@@ -190,6 +202,11 @@ export default function Dashboard() {
   const handleConvertLeadToBooking = (prefill: any) => {
     setBookingPrefill(prefill);
     handleViewChange("bookings");
+  };
+
+  const handleSelectCustomerFromSearch = (customerId: string) => {
+    setPendingCustomerId(customerId);
+    handleViewChange("customers");
   };
 
   const linkBookingMutation = useMutation({
@@ -1067,8 +1084,8 @@ export default function Dashboard() {
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                     <Input
                       placeholder="Search vehicles..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      value={vehicleSearchTerm}
+                      onChange={(e) => setVehicleSearchTerm(e.target.value)}
                       className="w-full sm:w-48 lg:w-64"
                     />
                     <Select value={vehicleStatusFilter} onValueChange={setVehicleStatusFilter}>
@@ -1089,7 +1106,7 @@ export default function Dashboard() {
                 {(() => {
                   const filteredVehicles = vehicles.filter((v: any) => {
                     const matchesStatus = vehicleStatusFilter === "all" || v.status === vehicleStatusFilter;
-                    const term = searchTerm.trim().toLowerCase();
+                    const term = vehicleSearchTerm.trim().toLowerCase();
                     const matchesSearch = term === "" ||
                       `${v.make || ""} ${v.vehicleModel || v.model || ""}`.toLowerCase().includes(term) ||
                       (v.licensePlate || v.registrationNumber || "").toLowerCase().includes(term);
@@ -1279,8 +1296,8 @@ export default function Dashboard() {
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                     <Input
                       placeholder="Search drivers..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      value={driverSearchTerm}
+                      onChange={(e) => setDriverSearchTerm(e.target.value)}
                       className="w-full sm:w-48 lg:w-64"
                     />
                     <Select value={driverStatusFilter} onValueChange={setDriverStatusFilter}>
@@ -1301,7 +1318,7 @@ export default function Dashboard() {
                 {(() => {
                   const filteredDrivers = drivers.filter((d: any) => {
                     const matchesStatus = driverStatusFilter === "all" || d.status === driverStatusFilter;
-                    const term = searchTerm.trim().toLowerCase();
+                    const term = driverSearchTerm.trim().toLowerCase();
                     const matchesSearch = term === "" ||
                       (d.name || "").toLowerCase().includes(term) ||
                       (d.phone || "").toLowerCase().includes(term);
@@ -1452,7 +1469,7 @@ export default function Dashboard() {
         );
 
       case "customers":
-        return <CustomersPage onEditBooking={handleEditBooking} />;
+        return <CustomersPage onEditBooking={handleEditBooking} onNewBooking={handleConvertLeadToBooking} initialCustomerId={pendingCustomerId} />;
 
       case "after-sales":
         return <AfterSalesPage />;
@@ -2478,11 +2495,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <Sidebar 
-        currentView={currentView} 
+      <Sidebar
+        currentView={currentView}
         onViewChange={(view) => handleViewChange(view as ViewType)}
         isOpen={sidebarOpen}
         onToggle={() => setSidebarOpen(!sidebarOpen)}
+        onSelectCustomer={handleSelectCustomerFromSearch}
       />
       
       <main className="flex-1 overflow-y-auto lg:ml-0 pt-16 lg:pt-0 transition-all duration-300 ease-in-out">

@@ -12,10 +12,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, Check, Phone, Mail, IndianRupee, Download } from "lucide-react";
+import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, Check, Phone, Mail, IndianRupee, Download, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import html2pdf from 'html2pdf.js';
 import BookingConfirmationPDF from "./booking-confirmation-pdf";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -106,6 +107,12 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [routeType, setRouteType] = useState<"custom" | "local" | "not_decided">("custom");
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
+  // Progressive disclosure for Review & Confirm (spec: "daily-use fields
+  // first, expandable detailed sections") — fuel deductions and misc.
+  // expenses are normally settled at trip-end, not at booking time, so
+  // they start collapsed. Purely a display toggle: no field, validation,
+  // or submit-payload change.
+  const [showMoreCharges, setShowMoreCharges] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -1805,116 +1812,151 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                           />
                         </div>
                         
-                        {/* Fuel Charges Section */}
-                        <div className="space-y-4 p-4 bg-red-50 rounded-lg">
-                          <h4 className="font-semibold text-red-800 flex items-center">
-                            <span className="mr-2">⛽</span>
-                            Fuel Charges (To be deducted from final amount)
-                          </h4>
-                          <div className="grid grid-cols-3 gap-4">
-                            <FormField
-                              control={form.control}
-                              name="petrolCharges"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium text-red-700">Petrol (₹)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number" 
-                                      placeholder="0"
-                                      value={field.value || 0}
-                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                      className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
+                        {/* Fuel deductions + misc. expenses are normally
+                            settled at trip-end, not at booking time — kept
+                            out of the daily-use path by default, per spec's
+                            progressive-disclosure ask. Auto-opens (and stays
+                            open) if a resumed draft already has any of these
+                            set, so existing data is never hidden. */}
+                        {(() => {
+                          const hasExtraCharges = !!(
+                            (watchedValues.petrolCharges && watchedValues.petrolCharges > 0) ||
+                            (watchedValues.dieselCharges && watchedValues.dieselCharges > 0) ||
+                            (watchedValues.cngCharges && watchedValues.cngCharges > 0) ||
+                            (watchedValues.miscellaneousAmount && watchedValues.miscellaneousAmount > 0)
+                          );
+                          const moreChargesOpen = showMoreCharges || hasExtraCharges;
+                          return (
+                            <Collapsible>
+                              <CollapsibleTrigger
+                                type="button"
+                                onClick={() => setShowMoreCharges(!moreChargesOpen)}
+                                className="border border-dashed border-gray-300 bg-gray-50/50"
+                              >
+                                <span className="text-sm font-medium text-gray-700">
+                                  More charges (fuel deductions, misc. expenses)
+                                </span>
+                                {moreChargesOpen ? (
+                                  <ChevronDown className="w-4 h-4 text-gray-500" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-gray-500" />
+                                )}
+                              </CollapsibleTrigger>
+                              <CollapsibleContent isOpen={moreChargesOpen} className="space-y-4 pt-2">
+                                {/* Fuel Charges Section */}
+                                <div className="space-y-4 p-4 bg-red-50 rounded-lg">
+                                  <h4 className="font-semibold text-red-800 flex items-center">
+                                    <span className="mr-2">⛽</span>
+                                    Fuel Charges (To be deducted from final amount)
+                                  </h4>
+                                  <div className="grid grid-cols-3 gap-4">
+                                    <FormField
+                                      control={form.control}
+                                      name="petrolCharges"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-sm font-medium text-red-700">Petrol (₹)</FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              type="number"
+                                              placeholder="0"
+                                              value={field.value || 0}
+                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
                                     />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="dieselCharges"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium text-red-700">Diesel (₹)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number" 
-                                      placeholder="0"
-                                      value={field.value || 0}
-                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                      className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
+                                    <FormField
+                                      control={form.control}
+                                      name="dieselCharges"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-sm font-medium text-red-700">Diesel (₹)</FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              type="number"
+                                              placeholder="0"
+                                              value={field.value || 0}
+                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
                                     />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="cngCharges"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium text-red-700">CNG (₹)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number" 
-                                      placeholder="0"
-                                      value={field.value || 0}
-                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                      className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
+                                    <FormField
+                                      control={form.control}
+                                      name="cngCharges"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-sm font-medium text-red-700">CNG (₹)</FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              type="number"
+                                              placeholder="0"
+                                              value={field.value || 0}
+                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
                                     />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-                        
-                        {/* Miscellaneous Expenses Section */}
-                        <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-                          <h4 className="font-semibold text-gray-800">Miscellaneous Expenses</h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <FormField
-                              control={form.control}
-                              name="miscellaneousAmount"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium">Amount (₹)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number" 
-                                      placeholder="0"
-                                      value={field.value || 0}
-                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                      className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
+                                  </div>
+                                </div>
+
+                                {/* Miscellaneous Expenses Section */}
+                                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                                  <h4 className="font-semibold text-gray-800">Miscellaneous Expenses</h4>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <FormField
+                                      control={form.control}
+                                      name="miscellaneousAmount"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-sm font-medium">Amount (₹)</FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              type="number"
+                                              placeholder="0"
+                                              value={field.value || 0}
+                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
                                     />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="miscellaneousDescription"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium">Description</FormLabel>
-                                  <FormControl>
-                                    <Textarea
-                                      placeholder="e.g., cleaning charges, late return fee, damage cost"
-                                      {...field}
-                                      className="h-20 text-sm border border-gray-300 focus:border-orange-500 rounded resize-none"
+                                    <FormField
+                                      control={form.control}
+                                      name="miscellaneousDescription"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-sm font-medium">Description</FormLabel>
+                                          <FormControl>
+                                            <Textarea
+                                              placeholder="e.g., cleaning charges, late return fee, damage cost"
+                                              {...field}
+                                              className="h-20 text-sm border border-gray-300 focus:border-orange-500 rounded resize-none"
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
                                     />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-                        
+                                  </div>
+                                </div>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          );
+                        })()}
+
                         {/* Summary of all charges */}
                         <div className="space-y-2 text-sm">
                           {/* Base amount display */}

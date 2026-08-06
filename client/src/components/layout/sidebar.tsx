@@ -2,12 +2,18 @@ import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, Log
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import GlobalCustomerSearch from "@/components/customers/global-customer-search";
 
 interface SidebarProps {
   currentView: string;
   onViewChange: (view: string) => void;
   isOpen: boolean;
   onToggle: () => void;
+  // Optional — when supplied, a "Search customers..." trigger renders at
+  // the top of the sidebar (the only element persistent across every page
+  // and both mobile/desktop layouts; the standalone header.tsx component
+  // is dead code, never mounted anywhere, so it couldn't host this).
+  onSelectCustomer?: (customerId: string) => void;
 }
 
 const navItems = [
@@ -37,7 +43,7 @@ const navItems = [
   { id: "profile", label: "Profile", icon: Shield },
 ];
 
-export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }: SidebarProps) {
+export default function Sidebar({ currentView, onViewChange, isOpen, onToggle, onSelectCustomer }: SidebarProps) {
   const { logout, user } = useAuth();
   
   // Filter navigation items based on user role
@@ -83,7 +89,20 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
           </div>
         </div>
         
-        <nav className="mt-6 lg:mt-8 flex-1 overflow-y-auto min-h-0">
+        {onSelectCustomer && (
+          <div className="pt-3 lg:pt-4">
+            <GlobalCustomerSearch
+              onSelectCustomer={(customerId) => {
+                onSelectCustomer(customerId);
+                if (window.innerWidth < 1024) {
+                  setTimeout(() => onToggle(), 200);
+                }
+              }}
+            />
+          </div>
+        )}
+
+        <nav className="mt-2 lg:mt-2 flex-1 overflow-y-auto min-h-0">
           <div className="px-3 lg:px-4 space-y-1 lg:space-y-2">
             {visibleNavItems.map((item) => {
               const Icon = item.icon;

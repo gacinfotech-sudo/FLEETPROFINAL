@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { X, Plus, Pencil, IndianRupee, Phone, MessageCircle, Car, UserRound, Eye, ReceiptText, CalendarClock, Download } from "lucide-react";
+import { X, Plus, Pencil, IndianRupee, Phone, MessageCircle, Car, UserRound, Eye, ReceiptText, CalendarClock, Download, Copy } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import CustomerService from "./customer-service";
@@ -115,9 +115,14 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
 interface Props {
   customerId: string;
   onEditBooking?: (booking: any) => void;
+  // Receives a booking-form prefill object and navigates to the existing
+  // Add Booking form — the exact same initialValues mechanism already
+  // built (and tested) for Lead→Booking conversion, reused verbatim here
+  // rather than a second prefill path.
+  onNewBooking?: (prefill: any) => void;
 }
 
-export default function CustomerDashboard({ customerId, onEditBooking }: Props) {
+export default function CustomerDashboard({ customerId, onEditBooking, onNewBooking }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [newTag, setNewTag] = useState("");
@@ -228,6 +233,18 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
         </div>
         <div className="flex gap-2 flex-wrap items-center">
           <CustomerDuplicateReview customerId={customerId} />
+          {onNewBooking && (
+            <Button
+              size="sm"
+              onClick={() => onNewBooking({
+                customerName: customer.name || "",
+                customerPhone: customer.primaryMobile || "",
+                customerEmail: customer.email || "",
+              })}
+            >
+              <Plus className="h-4 w-4 mr-1" /> New Booking
+            </Button>
+          )}
           <a href={`tel:${customer.primaryMobile || ''}`}><Button size="sm" variant="outline"><Phone className="h-4 w-4 mr-1" /> Call</Button></a>
           <a href="#customer-whatsapp"><Button size="sm" className="bg-green-600 hover:bg-green-700"><MessageCircle className="h-4 w-4 mr-1" /> Message</Button></a>
           <Badge variant="outline" className="border-purple-300 text-purple-700">{customer.loyaltyTier || "Regular"} Tier</Badge>
@@ -561,6 +578,22 @@ export default function CustomerDashboard({ customerId, onEditBooking }: Props) 
                         <div className="flex gap-1">
                           {!['cancelled', 'no_show'].includes(b.status) && <Button size="sm" variant="ghost" aria-label={`Create Invoice for ${b.bookingId}`} onClick={() => setInvoiceRequestBookingId(b._id)}><ReceiptText className="h-4 w-4" /></Button>}
                           <Button size="sm" variant="ghost" aria-label={`View ${b.bookingId}`} onClick={() => setViewingBooking(b)}><Eye className="h-4 w-4" /></Button>
+                          {onNewBooking && (
+                            <Button
+                              size="sm" variant="ghost" aria-label={`Use ${b.bookingId} as template`}
+                              title="Use as template — copies route and notes only, never dates, driver, vehicle, or payment"
+                              onClick={() => onNewBooking({
+                                customerName: customer.name || "",
+                                customerPhone: customer.primaryMobile || "",
+                                customerEmail: customer.email || "",
+                                pickupLocation: b.pickupLocation || "",
+                                dropoffLocation: b.dropoffLocation || "",
+                                notes: b.notes || "",
+                              })}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
