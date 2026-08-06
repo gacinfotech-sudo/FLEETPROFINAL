@@ -60,7 +60,7 @@ import { recordPayment, reversePayment, recomputeBookingPaymentSummary, RECEIPT_
 import { PaymentTransaction, Customer } from "./models/index";
 import { findOrCreateCustomer, recomputeCustomerStats, classifyCustomer } from "./services/customerService";
 import { creditBookingReward, reverseBookingReward, previewRedemption, commitRedemption, computeLoyaltyTier, getRewardRule, adjustRewardPoints, creditVerifiedGoogleReviewReward } from "./services/rewardService";
-import { getRewardEventRules, generateReferralCode, captureReferral, linkReferralToBooking, markReferralBookingCompleted, reverseReferralRewardsForBooking, findReferrerCustomer } from "./services/referralService";
+import { getRewardEventRules, generateReferralCode, captureReferral, linkReferralToBooking, markReferralBookingCompleted, reverseReferralRewardsForBooking, findReferrerCustomer, buildRewardsReferralDashboard } from "./services/referralService";
 import { RewardEventRule, Referral, type RewardEventKey } from "./models/index";
 import { RewardTransaction, RewardRule } from "./models/index";
 import { computeSegments, computeTagCounts, getSegmentFilter } from "./services/segmentService";
@@ -80,6 +80,8 @@ import { createVendorDriver, findVendorDriverByMobile, checkVendorDriverAvailabi
 import { createVendorVehicle, findVendorVehicleByRegistration, checkVendorVehicleAvailability, normalizeRegistrationNumber } from "./services/vendorVehicleService";
 import { VendorDuty } from "./models/index";
 import { upsertVendorDuty, cancelVendorDutyForBooking, completeVendorDutyForBooking } from "./services/vendorDutyService";
+import { createSourcingRequest, sendSourcingRequestToVendors, recordVendorResponse, selectVendorResponse, cancelSourcingRequest, rankResponses } from "./services/vendorSourcingService";
+import { VendorSourcingRequest, VendorSourcingResponse } from "./models/index";
 import { buildDriverPerformance } from "./services/driverPerformance";
 import { buildVehiclePerformance } from "./services/vehiclePerformance";
 import { findDuplicateCandidates, mergeCustomers } from "./services/customerMergeService";
@@ -1793,16 +1795,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/vehicles/available", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const { pickupDate, returnDate } = req.query;
-      
+      const { pickupDate, returnDate, pickupTime, returnTime } = req.query;
+
       if (!pickupDate || !returnDate) {
         return res.status(400).json({ message: "Pickup and return dates are required" });
       }
-      
+
       const vehicles = await storage.getAvailableVehicles(
         req.tenantId!,
         pickupDate as string,
-        returnDate as string
+        returnDate as string,
+        pickupTime as string | undefined,
+        returnTime as string | undefined
       );
       res.json(vehicles);
     } catch (error) {
@@ -2372,6 +2376,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // contains customer PII (name, phone, email) and financial amounts.
       const bookingData: any = mongoBookingSchema.parse(mappedData);
 
+      // Flexible fulfilment: vehicleId is no longer schema-required (a
+      // booking may be confirmed with the physical resource still
+      // unresolved — see docs/BOOKING_RESOURCE_DEAD_END_AUDIT.md), but
+      // SOME explicit resolution is still required so an old/unmodified
+      // client (which never sends resourceAssignmentPending) keeps
+      // getting today's exact "vehicleId required" behavior unchanged.
+      // Vendor-vehicle linkage is deliberately NOT accepted here — it
+      // goes through the existing, already-tested
+      // POST /api/bookings/:id/assign-vendor as an immediate follow-up
+      // call from the wizard, reusing its real overlap/duty checks
+      // rather than duplicating them on this path too.
+      if (!bookingData.vehicleId && !req.body.resourceAssignmentPending) {
+        return res.status(400).json({
+          message: "A vehicle is required, or set resourceAssignmentPending to confirm the booking with resource sourcing still pending.",
+          code: "VEHICLE_OR_ASSIGNMENT_PENDING_REQUIRED",
+        });
+      }
+      if (!bookingData.resourceFulfilmentStatus) {
+        bookingData.resourceFulfilmentStatus = bookingData.vehicleId ? 'own_fleet_assigned' : 'not_started';
+      }
+
       // Duplicate-request guard (pipeline audit finding: this route had no
       // idempotency protection at all — a double form-submit, a browser
       // back-then-resubmit, or a retried request after a dropped response
@@ -2769,12 +2794,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .sort({ date: -1 });
 
       const approvedInternalExpenses = expenses.filter((e: any) => !e.customerChargeable && e.approvalStatus === 'approved');
-      const internalTripCost = approvedInternalExpenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
+      const expenseCost = approvedInternalExpenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
+      // Vendor Direct Cost (spec §15: "Expected Gross Contribution =
+      // Customer Revenue - Vendor Direct Cost") — only meaningful for a
+      // vendor-fulfilled booking (fulfilmentType/vendorAgreedRate are only
+      // ever set together, via assign-vendor or a selected sourcing-request
+      // quote). Additive to expense-based internal costs, not a
+      // replacement — a vendor-fulfilled trip can still separately incur
+      // internal expenses (e.g. a company-paid toll on the customer's
+      // behalf) on top of what's owed to the vendor.
+      const vendorDirectCost = (booking as any).fulfilmentType === 'vendor' ? ((booking as any).vendorAgreedRate || 0) : 0;
+      const internalTripCost = expenseCost + vendorDirectCost;
       const customerRevenue = (booking as any).totalAmount || 0;
       const collection = (booking as any).advanceReceived || 0;
 
       res.json({
         customerRevenue,
+        expenseCost,
+        vendorDirectCost,
         internalTripCost,
         collection,
         remainingBalance: Math.max(0, customerRevenue - collection),
@@ -5441,9 +5478,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Time-window params are optional and additive — existing callers that
+  // send none still get the exact same status/expiry-only check as
+  // before. When a pickupDate/returnDate pair is sent (the Booking
+  // Wizard's Vendor Vehicle path does), this also runs the real
+  // VendorDuty overlap check, same as assign-vendor already does.
   app.get("/api/vendors/:vendorId/drivers/:driverId/availability", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
     try {
-      const result = await checkVendorDriverAvailability(req.tenantId!, req.params.vendorId, req.params.driverId);
+      const { pickupDate, pickupTime, returnDate, returnTime } = req.query;
+      const window = (pickupDate && returnDate)
+        ? { start: combineDateTime(pickupDate as string, pickupTime as string | undefined), end: combineDateTime(returnDate as string, returnTime as string | undefined) }
+        : undefined;
+      const result = await checkVendorDriverAvailability(req.tenantId!, req.params.vendorId, req.params.driverId, window);
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to check driver availability" });
@@ -5531,9 +5577,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Same additive time-window support as the driver-availability endpoint above.
   app.get("/api/vendors/:vendorId/vehicles/:vehicleId/availability", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
     try {
-      const result = await checkVendorVehicleAvailability(req.tenantId!, req.params.vendorId, req.params.vehicleId);
+      const { pickupDate, pickupTime, returnDate, returnTime } = req.query;
+      const window = (pickupDate && returnDate)
+        ? { start: combineDateTime(pickupDate as string, pickupTime as string | undefined), end: combineDateTime(returnDate as string, returnTime as string | undefined) }
+        : undefined;
+      const result = await checkVendorVehicleAvailability(req.tenantId!, req.params.vendorId, req.params.vehicleId, window);
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to check vehicle availability" });
@@ -5817,6 +5868,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(rows);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch customer referrals" });
+    }
+  });
+
+  // Rewards/Referral dashboard (spec §29) — every number here is read
+  // directly from the reward ledger / Referral / Booking collections, see
+  // buildRewardsReferralDashboard's own comment for the two metrics that
+  // deserve a definition (pointsExpiringSoon, pointsPendingReferral).
+  app.get("/api/rewards-referral-dashboard", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REFERRAL_VIEW), async (req: AuthRequest, res) => {
+    try {
+      res.json(await buildRewardsReferralDashboard(req.tenantId!));
+    } catch (error: any) {
+      console.error('Rewards/Referral dashboard error:', error?.message || error);
+      res.status(500).json({ message: "Failed to build rewards/referral dashboard" });
+    }
+  });
+
+  // Tenant-wide reward ledger view — every /api/customers/:id/rewards
+  // route that already existed is scoped to one customer; this backs the
+  // dashboard's clickable points cards (spec §29: "every card must open
+  // filtered records"), which need to show real rows across customers.
+  app.get("/api/reward-transactions", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REFERRAL_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const filter: any = { tenantId: req.tenantId };
+      if (req.query.transactionType) {
+        const types = String(req.query.transactionType).split(',');
+        filter.transactionType = types.length > 1 ? { $in: types } : types[0];
+      }
+      if (req.query.expiringWithinDays) {
+        const days = Number(req.query.expiringWithinDays);
+        const now = new Date();
+        filter.expiryDate = { $gte: now, $lte: new Date(now.getTime() + days * 24 * 60 * 60 * 1000) };
+      }
+      const rows = await RewardTransaction.find(filter).sort({ createdAt: -1 }).limit(200)
+        .populate('customerId', 'name primaryMobile');
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch reward transactions" });
     }
   });
 
@@ -6153,6 +6241,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       booking.fulfilmentVendorId = linkedVendor ? linkedVendor._id : undefined;
       booking.vendorDriverId = vendorDriverId || undefined;
       booking.vendorVehicleId = vendorVehicleId || undefined;
+      // Summary status for dashboards/filters/Trip Start gate — see
+      // docs/RESOURCE_FULFILMENT_MATRIX.md. Matches spec §9 step 10
+      // ("Mark status vendor_confirmation_pending") whether this call is
+      // the wizard's immediate follow-up to a vehicle-less creation, or a
+      // later assignment on a booking that already had a company vehicle.
+      booking.resourceFulfilmentStatus = linkedVendor ? 'vendor_confirmation_pending' : booking.resourceFulfilmentStatus;
 
       await booking.save();
 
@@ -6193,6 +6287,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Assign vendor error:', error?.message || error);
       res.status(500).json({ message: "Failed to assign vendor" });
+    }
+  });
+
+  // Outsource Vehicle sourcing workflow (spec §10-12). See
+  // docs/VENDOR_OUTSOURCE_WORKFLOW_AUDIT.md — genuinely new subsystem,
+  // built on top of the already-correct Vendor/VendorDriver/VendorVehicle
+  // availability checking and the existing WhatsApp send pipeline.
+  app.post("/api/bookings/:bookingId/sourcing-requests", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_CREATE), async (req: AuthRequest, res) => {
+    try {
+      const request = await createSourcingRequest({
+        tenantId: req.tenantId!, bookingId: req.params.bookingId,
+        vehicleCategory: req.body?.vehicleCategory, seatingCapacity: req.body?.seatingCapacity,
+        quantity: req.body?.quantity, targetVendorCost: req.body?.targetVendorCost,
+        responseDeadline: req.body?.responseDeadline ? new Date(req.body.responseDeadline) : undefined,
+        internalNotes: req.body?.internalNotes,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(request);
+    } catch (error: any) {
+      res.status(error?.message === 'Booking not found' ? 404 : 400).json({ message: error?.message || "Failed to create sourcing request" });
+    }
+  });
+
+  app.get("/api/bookings/:bookingId/sourcing-requests", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const requests = await VendorSourcingRequest.find({ tenantId: req.tenantId, bookingId: req.params.bookingId }).sort({ createdAt: -1 });
+      res.json(requests);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch sourcing requests" });
+    }
+  });
+
+  app.post("/api/sourcing-requests/:requestId/send", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_MANAGE), async (req: AuthRequest, res) => {
+    try {
+      const vendorIds: string[] = Array.isArray(req.body?.vendorIds) ? req.body.vendorIds : [];
+      if (vendorIds.length === 0) return res.status(400).json({ message: "At least one vendorId is required" });
+      const results = await sendSourcingRequestToVendors(
+        req.tenantId!, req.params.requestId, vendorIds, { userId: req.userId!, role: req.user?.role || 'client' }
+      );
+      res.json({ results });
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Failed to send sourcing request" });
+    }
+  });
+
+  app.get("/api/sourcing-requests/:requestId/responses", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const responses = await VendorSourcingResponse.find({ tenantId: req.tenantId, sourcingRequestId: req.params.requestId }).sort({ createdAt: 1 });
+      const ranked = rankResponses(responses as any);
+      res.json({
+        responses,
+        recommendations: ranked.map((r) => ({ responseId: r.response._id, reasons: r.reasons })),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch sourcing responses" });
+    }
+  });
+
+  app.post("/api/sourcing-requests/:requestId/responses", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_MANAGE), async (req: AuthRequest, res) => {
+    try {
+      const { vendorId, response, offeredVehicleCategory, offeredVendorVehicleId, offeredVehicleDetails,
+        offeredVendorDriverId, offeredDriverDetails, quotedCost, tollTreatment, parkingTreatment, notes } = req.body || {};
+      if (!vendorId) return res.status(400).json({ message: "vendorId is required" });
+      if (!['accepted', 'rejected', 'alternative_offered', 'negotiation'].includes(response)) {
+        return res.status(400).json({ message: "A valid response value is required" });
+      }
+      const updated = await recordVendorResponse({
+        tenantId: req.tenantId!, sourcingRequestId: req.params.requestId, vendorId, response,
+        offeredVehicleCategory, offeredVendorVehicleId, offeredVehicleDetails,
+        offeredVendorDriverId, offeredDriverDetails, quotedCost, tollTreatment, parkingTreatment, notes,
+        actor: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Failed to record vendor response" });
+    }
+  });
+
+  app.post("/api/sourcing-requests/:requestId/select-vendor", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_MANAGE), async (req: AuthRequest, res) => {
+    try {
+      const { responseId } = req.body || {};
+      if (!responseId) return res.status(400).json({ message: "responseId is required" });
+      const result = await selectVendorResponse({
+        tenantId: req.tenantId!, sourcingRequestId: req.params.requestId, responseId,
+        actor: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.json(result);
+    } catch (error: any) {
+      const code = error?.code;
+      res.status(code ? 409 : 400).json({ message: error?.message || "Failed to select vendor", code });
+    }
+  });
+
+  app.post("/api/sourcing-requests/:requestId/cancel", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_MANAGE), async (req: AuthRequest, res) => {
+    try {
+      const request = await cancelSourcingRequest(
+        req.tenantId!, req.params.requestId, { userId: req.userId!, role: req.user?.role || 'client' }, req.body?.reason
+      );
+      res.json(request);
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Failed to cancel sourcing request" });
     }
   });
 

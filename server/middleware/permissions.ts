@@ -117,4 +117,12 @@ export const PERMISSIONS = {
   REFERRAL_VIEW: 'referral.view',
   REFERRAL_CREATE: 'referral.create',
   REFERRAL_MANAGE: 'referral.manage',
+  // Outsource Vehicle sourcing workflow — see docs/VENDOR_OUTSOURCE_WORKFLOW_AUDIT.md.
+  // Consolidated to view/create/manage (send/record-response/select/cancel)
+  // rather than the spec's finer per-action split, matching this codebase's
+  // existing one-permission-per-action-class granularity elsewhere
+  // (e.g. VENDOR_EDIT covers several distinct vendor-record actions).
+  OUTSOURCING_VIEW: 'outsourcing.view',
+  OUTSOURCING_CREATE: 'outsourcing.create',
+  OUTSOURCING_MANAGE: 'outsourcing.manage',
 } as const;

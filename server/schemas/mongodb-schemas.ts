@@ -103,7 +103,12 @@ export const mongoBookingSchema = z.object({
   customerName: z.string().min(1, 'Customer name is required'),
   customerPhone: z.string().min(1, 'Customer phone is required'),
   customerEmail: z.string().email().optional(),
-  vehicleId: z.string(),
+  // Optional as of the flexible-fulfilment initiative — see
+  // docs/BOOKING_RESOURCE_DEAD_END_AUDIT.md. server/routes.ts's
+  // POST /api/bookings enforces the actual "own vehicle, vendor vehicle,
+  // or explicit assignment-pending" business rule; this schema only
+  // guards the field's type/shape when present.
+  vehicleId: z.string().optional(),
   driverId: z.string().optional(),
   pickupLocation: z.string().min(1, 'Pickup location is required'),
   dropoffLocation: z.string().optional(),
@@ -171,6 +176,9 @@ export const mongoBookingSchema = z.object({
   fulfilmentVendorId: z.string().optional(),
   vendorDriverId: z.string().optional(),
   vendorVehicleId: z.string().optional(),
+  resourceFulfilmentStatus: z.enum(['not_started', 'own_fleet_assigned', 'vendor_vehicle_selected',
+    'vendor_confirmation_pending', 'vendor_confirmed', 'outsourcing_requested', 'vendor_quotes_pending',
+    'resource_sourcing_pending', 'resource_secured', 'resource_rejected', 'resource_failed']).optional(),
   // Third-party driver fields
   useThirdPartyDriver: z.boolean().default(false),
   thirdPartyDriverName: z.string().optional(),

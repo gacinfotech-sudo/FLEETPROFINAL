@@ -16,12 +16,14 @@ import EnhancedInvoiceGenerator from "../components/invoice/enhanced-invoice-gen
 import UserManagement from "../components/user-management";
 import BusinessProfile from "../components/business-profile";
 import InvoiceSettingsPanel from "../components/invoice/invoice-settings-panel";
+import RewardReferralSettingsPanel from "../components/settings/reward-referral-settings-panel";
 import OnboardingWizard from "../components/onboarding/onboarding-wizard";
 import ManageExpenses from "./manage-expenses";
 import LiveBookings, { type Bucket as LiveOpsBucket } from "./live-bookings";
 import CustomersPage from "./customers";
 import AfterSalesPage from "./after-sales";
 import CampaignsPage from "./campaigns";
+import RewardsReferralsDashboard from "./rewards-referrals-dashboard";
 import InquiriesPage from "./inquiries";
 import LeadsPage from "./leads";
 import FollowUpsPage from "./followups";
@@ -37,6 +39,7 @@ import DailyOperationsPopup from "../components/dashboard/daily-operations-popup
 import BookingCommunication from "../components/booking/booking-communication";
 import ExtendBookingDialog from "../components/booking/extend-booking-dialog";
 import AssignVendorDialog from "../components/booking/assign-vendor-dialog";
+import ResourceFulfilmentPanel from "../components/booking/resource-fulfilment-panel";
 import PaymentSection from "../components/booking/payment-section";
 import TripCostSummary from "../components/booking/trip-cost-summary";
 import SetDriverPinDialog from "../components/drivers/set-driver-pin-dialog";
@@ -57,7 +60,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Menu, LogOut, Star, Car, Users, UserCheck, Phone, Mail, MessageCircle, Banknote, Plus, User, FileText, Trash2 } from "lucide-react";
 
-type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors";
+type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors" | "rewards-referrals";
 
 // apiRequest() throws Error("<status>: <raw response text>") on a non-2xx
 // response (queryClient.ts:throwIfResNotOk) — without this, a rejected
@@ -157,7 +160,7 @@ export default function Dashboard() {
   // Sync URL with current view on mount with role-based access control
   useEffect(() => {
     const section = params.section as ViewType;
-    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "upcoming-bookings", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "after-sales", "campaigns", "vendors", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile"];
+    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "upcoming-bookings", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "after-sales", "campaigns", "rewards-referrals", "vendors", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile"];
     
     // Add "users" section only for admin and client roles
     if (user?.role === 'admin' || user?.role === 'client') {
@@ -166,7 +169,7 @@ export default function Dashboard() {
     
     // Remove restricted sections for manager roles
     if (user?.role === 'manager') {
-      const restrictedSections = ["revenue", "vendor-settlement", "drivers", "driver-leave", "driver-performance", "vehicle-performance", "driver-attendance", "after-sales", "campaigns", "vendors"];
+      const restrictedSections = ["revenue", "vendor-settlement", "drivers", "driver-leave", "driver-performance", "vehicle-performance", "driver-attendance", "after-sales", "campaigns", "rewards-referrals", "vendors"];
       restrictedSections.forEach(section => {
         const index = allowedSections.indexOf(section);
         if (index > -1) {
@@ -1500,6 +1503,9 @@ export default function Dashboard() {
       case "campaigns":
         return <CampaignsPage />;
 
+      case "rewards-referrals":
+        return <RewardsReferralsDashboard />;
+
       case "inquiries":
         return <InquiriesPage initialInquiryId={pendingInquiryId} />;
 
@@ -2058,6 +2064,11 @@ export default function Dashboard() {
 
             {/* Invoice Settings Section */}
             <InvoiceSettingsPanel userRole={user?.role || ''} />
+
+            {/* Rewards and Referrals Settings Section */}
+            <div className="mb-6">
+              <RewardReferralSettingsPanel userRole={user?.role || ''} />
+            </div>
 
             {/* Security Section */}
             <Card>
@@ -2731,6 +2742,10 @@ export default function Dashboard() {
               {/* Renders nothing for users without trip.profitability.view —
                   not a permission-gated placeholder, genuinely absent. */}
               <TripCostSummary booking={viewingBooking} />
+
+              {/* Renders nothing once fulfilment is already resolved and no
+                  sourcing request was ever started — see the component. */}
+              <ResourceFulfilmentPanel booking={viewingBooking} />
 
               <div className="flex justify-end gap-2">
                 <AssignVendorDialog booking={viewingBooking} />

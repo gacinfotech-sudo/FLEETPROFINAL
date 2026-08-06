@@ -12,14 +12,14 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, Check, Phone, Mail, IndianRupee, Download, ChevronDown, ChevronRight } from "lucide-react";
+import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, Check, Phone, Mail, IndianRupee, Download, ChevronDown, ChevronRight, Building2, Send, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import html2pdf from 'html2pdf.js';
 import BookingConfirmationPDF from "./booking-confirmation-pdf";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 
 const bookingSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
@@ -43,7 +43,13 @@ const bookingSchema = z.object({
   sourceCommissionType: z.enum(["flat", "percentage"]).optional(),
   sourceCommissionAmount: z.number().min(0).optional(),
   sourceNotes: z.string().optional(),
-  vehicleId: z.string().min(1, "Please select a vehicle"),
+  // Optional as of the flexible-fulfilment initiative — a booking may be
+  // confirmed with the physical vehicle still unresolved (Vendor Vehicle
+  // or Outsource path). The step-2 Continue button and final submit both
+  // enforce the real business rule (own vehicle selected, OR a vendor
+  // vehicle selected, OR resourceMode acknowledges sourcing is pending)
+  // via resourceMode/resourceAssignmentPending, not this schema.
+  vehicleId: z.string().optional(),
   driverId: z.string().optional(),
   bookingType: z.enum(["self_drive", "with_driver"]),
   tripType: z.enum(["one_way", "round_trip", "local", "airport"]),
@@ -120,6 +126,27 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   const [step, setStep] = useState(1);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
   const [selectedPricingType, setSelectedPricingType] = useState<"day" | "km" | "">("");
+  // Flexible fulfilment (spec: "Non-Blocking Booking, Vendor/Outsource
+  // Vehicle Fulfilment"). "own_fleet" preserves today's exact flow.
+  // "vendor_vehicle"/"outsource" let Step 2 be completed without a
+  // resolved company vehicle — see docs/BOOKING_RESOURCE_DEAD_END_AUDIT.md.
+  const [resourceMode, setResourceMode] = useState<"own_fleet" | "vendor_vehicle" | "outsource">("own_fleet");
+  const [selectedVendorId, setSelectedVendorId] = useState<string>("");
+  const [selectedVendorVehicleId, setSelectedVendorVehicleId] = useState<string>("");
+  const [selectedVendorDriverId, setSelectedVendorDriverId] = useState<string>("");
+  // Quick Add (spec §13/§9) — add a new Vendor or a new vehicle for the
+  // selected Vendor without leaving the wizard. Both reuse the existing,
+  // already-tested POST /api/vendors and POST /api/vendors/:id/vehicles
+  // routes verbatim (duplicate-mobile / duplicate-registration rejection
+  // already enforced there) — no new backend logic, only this dialog UI.
+  const [showQuickAddVendor, setShowQuickAddVendor] = useState(false);
+  const [quickVendorName, setQuickVendorName] = useState("");
+  const [quickVendorContact, setQuickVendorContact] = useState("");
+  const [quickVendorMobile, setQuickVendorMobile] = useState("");
+  const [showQuickAddVehicle, setShowQuickAddVehicle] = useState(false);
+  const [quickVehicleReg, setQuickVehicleReg] = useState("");
+  const [quickVehicleModel, setQuickVehicleModel] = useState("");
+  const [quickVehicleCategory, setQuickVehicleCategory] = useState("");
   const [createdBooking, setCreatedBooking] = useState<any>(null);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [routeType, setRouteType] = useState<"custom" | "local" | "not_decided">("custom");
@@ -280,12 +307,21 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedValues, step, draftChecked, pendingDraft, bookingConfirmed]);
 
-  // Fetch available vehicles
+  // Fetch available vehicles.
+  // P0 FIX (flexible-fulfilment initiative): this used to omit
+  // pickupTime/returnTime entirely, same bug already fixed for driver
+  // availability just below — see docs/FLEXIBLE_PIPELINE_CURRENT_AUDIT.md §2.
   const { data: availableVehicles } = useQuery({
-    queryKey: ["/api/vehicles/available", watchedValues.pickupDate, watchedValues.returnDate],
+    queryKey: ["/api/vehicles/available", watchedValues.pickupDate, watchedValues.pickupTime, watchedValues.returnDate, watchedValues.returnTime],
     queryFn: async () => {
       if (!watchedValues.pickupDate || !watchedValues.returnDate) return [];
-      const response = await fetch(`/api/vehicles/available?pickupDate=${watchedValues.pickupDate}&returnDate=${watchedValues.returnDate}`);
+      const params = new URLSearchParams({
+        pickupDate: watchedValues.pickupDate,
+        returnDate: watchedValues.returnDate,
+      });
+      if (watchedValues.pickupTime) params.set('pickupTime', watchedValues.pickupTime);
+      if (watchedValues.returnTime) params.set('returnTime', watchedValues.returnTime);
+      const response = await fetch(`/api/vehicles/available?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch vehicles');
       return response.json();
     },
@@ -320,6 +356,98 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   });
   const availableDrivers = (driverAvailabilityRows || []).filter((d: any) => d.available !== false);
   const unavailableDrivers = (driverAvailabilityRows || []).filter((d: any) => d.available === false);
+
+  // Vendor Vehicle fulfilment path — reuses the existing, already-tested
+  // Vendor Master / VendorVehicle / VendorDriver data (see
+  // docs/VENDOR_OUTSOURCE_WORKFLOW_AUDIT.md); nothing here is new backend
+  // logic, only wiring it into the wizard at creation time. The
+  // active-vendors list itself is fetched once, below (activeVendors),
+  // shared with the pre-existing Booking Source panel's "link to Vendor
+  // Master" select — both need the identical `/api/vendors?status=active`
+  // data, so this path just widens that query's `enabled` condition
+  // instead of duplicating it.
+
+  const { data: vendorVehiclesList } = useQuery({
+    queryKey: ["/api/vendors", selectedVendorId, "vehicles", watchedValues.pickupDate, watchedValues.pickupTime, watchedValues.returnDate, watchedValues.returnTime],
+    queryFn: async () => {
+      const vehicles = await (await fetch(`/api/vendors/${selectedVendorId}/vehicles`)).json();
+      const params = new URLSearchParams();
+      if (watchedValues.pickupDate) params.set('pickupDate', watchedValues.pickupDate);
+      if (watchedValues.pickupTime) params.set('pickupTime', watchedValues.pickupTime);
+      if (watchedValues.returnDate) params.set('returnDate', watchedValues.returnDate);
+      if (watchedValues.returnTime) params.set('returnTime', watchedValues.returnTime);
+      const withAvailability = await Promise.all((vehicles || []).map(async (v: any) => {
+        const availRes = await fetch(`/api/vendors/${selectedVendorId}/vehicles/${v._id || v.id}/availability?${params.toString()}`);
+        const avail = availRes.ok ? await availRes.json() : { available: true };
+        return { ...v, ...avail };
+      }));
+      return withAvailability;
+    },
+    enabled: resourceMode === "vendor_vehicle" && !!selectedVendorId && !!watchedValues.pickupDate && !!watchedValues.returnDate,
+  });
+
+  const { data: vendorDriversList } = useQuery({
+    queryKey: ["/api/vendors", selectedVendorId, "drivers", watchedValues.pickupDate, watchedValues.pickupTime, watchedValues.returnDate, watchedValues.returnTime],
+    queryFn: async () => {
+      const drivers = await (await fetch(`/api/vendors/${selectedVendorId}/drivers`)).json();
+      const params = new URLSearchParams();
+      if (watchedValues.pickupDate) params.set('pickupDate', watchedValues.pickupDate);
+      if (watchedValues.pickupTime) params.set('pickupTime', watchedValues.pickupTime);
+      if (watchedValues.returnDate) params.set('returnDate', watchedValues.returnDate);
+      if (watchedValues.returnTime) params.set('returnTime', watchedValues.returnTime);
+      const withAvailability = await Promise.all((drivers || []).map(async (d: any) => {
+        const availRes = await fetch(`/api/vendors/${selectedVendorId}/drivers/${d._id || d.id}/availability?${params.toString()}`);
+        const avail = availRes.ok ? await availRes.json() : { available: true };
+        return { ...d, ...avail };
+      }));
+      return withAvailability;
+    },
+    enabled: resourceMode === "vendor_vehicle" && !!selectedVendorId && !!watchedValues.pickupDate && !!watchedValues.returnDate,
+  });
+
+  const quickAddVendorMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/vendors", {
+        companyName: quickVendorName.trim(),
+        contactPerson: quickVendorContact.trim(),
+        primaryMobile: quickVendorMobile.trim(),
+      });
+      return response.json();
+    },
+    onSuccess: async (vendor) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/vendors", "active"] });
+      setSelectedVendorId(vendor._id || vendor.id);
+      setSelectedVendorVehicleId("");
+      setSelectedVendorDriverId("");
+      setShowQuickAddVendor(false);
+      setQuickVendorName(""); setQuickVendorContact(""); setQuickVendorMobile("");
+      toast({ title: "Vendor added", description: `${vendor.companyName} is now available to select vehicles from.` });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not add vendor", description: err?.message || "Please check the details and try again.", variant: "destructive" });
+    },
+  });
+
+  const quickAddVehicleMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/vendors/${selectedVendorId}/vehicles`, {
+        registrationNumber: quickVehicleReg.trim(),
+        vehicleModel: quickVehicleModel.trim(),
+        category: quickVehicleCategory.trim(),
+      });
+      return response.json();
+    },
+    onSuccess: async (vehicle) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/vendors", selectedVendorId, "vehicles"] });
+      setSelectedVendorVehicleId(vehicle._id || vehicle.id);
+      setShowQuickAddVehicle(false);
+      setQuickVehicleReg(""); setQuickVehicleModel(""); setQuickVehicleCategory("");
+      toast({ title: "Vehicle added", description: `${vehicle.registrationNumber} is now selected for this booking.` });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not add vehicle", description: err?.message || "Please check the registration number and try again.", variant: "destructive" });
+    },
+  });
 
   // Backward-edit revalidation (spec: "Travel Date changed -> Driver
   // Availability, Vehicle Availability... require review"). The two
@@ -416,8 +544,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
     setResolvedReferrer(referrerLookup?.referrer || null);
   }, [referrerLookup]);
 
-  // Active vendors — only fetched when the Booking Source panel is
-  // actually showing, for the optional "link to Vendor Master" select.
+  // Active vendors — fetched when the Booking Source panel is showing
+  // (its "link to Vendor Master" select) OR the Vendor Vehicle fulfilment
+  // path is active (Step 2's vendor picker) — same data, two consumers.
   const { data: activeVendors } = useQuery<any[]>({
     queryKey: ["/api/vendors", "active"],
     queryFn: async () => {
@@ -425,7 +554,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       if (!res.ok) return [];
       return res.json();
     },
-    enabled: EXTERNAL_SOURCE_TYPES.has(watchedValues.bookingSource),
+    enabled: EXTERNAL_SOURCE_TYPES.has(watchedValues.bookingSource) || resourceMode === "vendor_vehicle",
   });
 
   // Fetch business profile for logo
@@ -472,6 +601,18 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
           : undefined,
       };
 
+      // Flexible fulfilment: outside the Own Fleet path, vehicleId is
+      // never resolved yet — an explicit resourceAssignmentPending
+      // acknowledgement is sent instead (see server/routes.ts's
+      // POST /api/bookings, docs/BOOKING_RESOURCE_DEAD_END_AUDIT.md).
+      // Vendor vehicle linkage itself is NOT sent here — it's applied via
+      // a follow-up assign-vendor call in onSuccess below, reusing that
+      // route's real overlap/duty checks rather than duplicating them.
+      if (resourceMode !== "own_fleet") {
+        delete (bookingData as any).vehicleId;
+        (bookingData as any).resourceAssignmentPending = true;
+      }
+
       const response = await apiRequest("POST", "/api/bookings", bookingData);
       return response.json();
     },
@@ -481,6 +622,50 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       if (draftEnabled) {
         apiRequest("DELETE", "/api/booking-drafts/mine").catch(() => {});
       }
+
+      // Vendor Vehicle path: link the selected vendor vehicle/driver via
+      // the existing, already-tested assign-vendor endpoint immediately
+      // after creation. Best-effort — a failure here (e.g. the vehicle
+      // was taken by someone else in the few seconds since selection)
+      // does not undo the booking itself; it just stays Resource Sourcing
+      // Pending and can be assigned again from the booking's detail view.
+      if (resourceMode === "vendor_vehicle" && selectedVendorId && selectedVendorVehicleId) {
+        try {
+          const assignRes = await apiRequest("POST", `/api/bookings/${result._id}/assign-vendor`, {
+            fulfilmentVendorId: selectedVendorId,
+            vendorVehicleId: selectedVendorVehicleId,
+            vendorDriverId: selectedVendorDriverId || undefined,
+          });
+          Object.assign(result, await assignRes.json());
+        } catch (err: any) {
+          toast({
+            title: "Booking saved, but vendor vehicle could not be linked",
+            description: "You can assign the vendor vehicle again from the booking's detail view.",
+            variant: "destructive",
+          });
+        }
+      }
+
+      // Outsource path: create the actual sourcing request so it's ready
+      // to send to vendors from the booking's Resource Fulfilment panel —
+      // best-effort, same reasoning as the vendor-vehicle follow-up above.
+      // The Add Booking wizard only captures enough to start sourcing
+      // (booking's own route/schedule); vendor selection, sending, and
+      // quote comparison happen from that panel.
+      if (resourceMode === "outsource") {
+        try {
+          await apiRequest("POST", `/api/bookings/${result._id}/sourcing-requests`, {
+            quantity: 1,
+          });
+        } catch (err: any) {
+          toast({
+            title: "Booking saved, but a sourcing request could not be started",
+            description: "You can start one from the booking's detail view.",
+            variant: "destructive",
+          });
+        }
+      }
+
       setCreatedBooking(result);
       setBookingConfirmed(true);
       toast({
@@ -1125,7 +1310,39 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
 
               <Separator className="my-8" />
 
-              {/* Vehicle Selection with Pricing Options */}
+              {/* Resource Fulfilment mode — always visible, even when the
+                  own fleet is empty (spec: a Booking must never be lost
+                  merely because the company fleet is unavailable). See
+                  docs/RESOURCE_FULFILMENT_MATRIX.md. */}
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">How will this Booking be fulfilled?</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {([
+                    { id: "own_fleet" as const, icon: Car, title: "Own Fleet", desc: "Assign a currently available company vehicle." },
+                    { id: "vendor_vehicle" as const, icon: Building2, title: "Vendor Vehicle", desc: "Select a vehicle already registered with an existing vendor." },
+                    { id: "outsource" as const, icon: Send, title: "Outsource Vehicle", desc: "Continue now; source a vehicle from a vendor afterward." },
+                  ]).map((mode) => (
+                    <button
+                      type="button"
+                      key={mode.id}
+                      id={`resource-mode-${mode.id}`}
+                      onClick={() => setResourceMode(mode.id)}
+                      className={`p-4 border-2 rounded-lg text-left transition-all ${
+                        resourceMode === mode.id ? 'border-green-500 bg-green-50 shadow-md' : 'border-gray-200 hover:border-green-300'
+                      }`}
+                    >
+                      <mode.icon className={`w-6 h-6 mb-2 ${resourceMode === mode.id ? 'text-green-600' : 'text-gray-500'}`} />
+                      <div className="font-medium">{mode.title}</div>
+                      <div className="text-xs text-gray-500">{mode.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Own Fleet path — unchanged from the original implementation
+                  except that the empty state below is no longer a dead
+                  end (spec §7). */}
+              {resourceMode === "own_fleet" && (
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Available Vehicles</h3>
                 {(() => {
@@ -1136,7 +1353,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                         {vehicles.map((vehicle: any) => {
                           const vehicleId = vehicle._id || vehicle.id;
                           const isSelected = selectedVehicleId === vehicleId;
-                          
+
                           return (
                             <div
                               key={vehicleId}
@@ -1160,7 +1377,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                               {/* Pricing Options */}
                               <div className="space-y-2">
                                 <h5 className="text-sm font-medium text-gray-700 text-center mb-3">Choose Pricing Method</h5>
-                                
+
                                 {/* By Day Option */}
                                 <button
                                   type="button"
@@ -1209,7 +1426,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                     <div>
                                       <div className="font-medium text-sm">By Kilometer</div>
                                       <div className="text-xs text-gray-600">
-                                        {vehicle.pricePerKm && vehicle.pricePerKm > 0 
+                                        {vehicle.pricePerKm && vehicle.pricePerKm > 0
                                           ? `₹${vehicle.pricePerKm}/km`
                                           : 'Not available'
                                         }
@@ -1227,15 +1444,162 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                       </div>
                     );
                   } else {
+                    // Non-blocking empty state (spec §7) — the original
+                    // dead-end message is replaced with real alternatives.
+                    // The booking is never lost merely because the
+                    // company fleet is unavailable for these dates.
                     return (
-                      <div className="text-center py-8 text-gray-500">
-                        <Car className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                        <p>No vehicles available for selected dates</p>
+                      <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
+                        <AlertTriangle className="w-10 h-10 mx-auto mb-3 text-amber-500" />
+                        <p className="font-medium text-gray-700 mb-1">No own-fleet vehicles are available for the selected schedule.</p>
+                        <p className="text-sm text-gray-500 mb-5">You can continue using Vendor Vehicle, Outsource Vehicle, or save with assignment pending.</p>
+                        <div className="flex flex-wrap justify-center gap-3">
+                          <Button type="button" variant="outline" id="empty-state-select-vendor-vehicle" onClick={() => setResourceMode("vendor_vehicle")}>
+                            <Building2 className="w-4 h-4 mr-2" /> Select Vendor Vehicle
+                          </Button>
+                          <Button type="button" variant="outline" id="empty-state-create-outsource-request" onClick={() => setResourceMode("outsource")}>
+                            <Send className="w-4 h-4 mr-2" /> Create Outsource Request
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            id="empty-state-save-assignment-pending"
+                            onClick={() => {
+                              setResourceMode("outsource");
+                              toast({ title: "You can now continue — resource assignment will show as pending." });
+                            }}
+                          >
+                            <ArrowRight className="w-4 h-4 mr-2" /> Continue with Assignment Pending
+                          </Button>
+                        </div>
                       </div>
                     );
                   }
                 })()}
               </div>
+              )}
+
+              {/* Vendor Vehicle path — reuses the existing Vendor Master /
+                  VendorVehicle / VendorDriver data and their already-correct
+                  availability checks (docs/VENDOR_OUTSOURCE_WORKFLOW_AUDIT.md).
+                  Actual linkage happens via the existing, tested
+                  assign-vendor endpoint right after the booking is created
+                  (see createBookingMutation's onSuccess below). */}
+              {resourceMode === "vendor_vehicle" && (
+              <div className="mb-8 space-y-4">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Vendor Vehicle</h3>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label>Vendor</Label>
+                    <Button type="button" variant="ghost" size="sm" id="quick-add-vendor-open" onClick={() => setShowQuickAddVendor(true)} className="h-7 px-2 text-xs">
+                      <Building2 className="w-3.5 h-3.5 mr-1" /> Quick Add Vendor
+                    </Button>
+                  </div>
+                  <Select
+                    value={selectedVendorId}
+                    onValueChange={(value) => { setSelectedVendorId(value); setSelectedVendorVehicleId(""); setSelectedVendorDriverId(""); }}
+                  >
+                    <SelectTrigger id="vendor-vehicle-select-vendor" className="h-12">
+                      <SelectValue placeholder="Select a vendor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(activeVendors || []).length === 0 && (
+                        <div className="px-2 py-1.5 text-sm text-gray-400">No active vendors yet</div>
+                      )}
+                      {(activeVendors || []).map((v: any) => (
+                        <SelectItem key={v._id || v.id} value={v._id || v.id}>{v.companyName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedVendorId && (
+                  <>
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <Label>Vendor Vehicle</Label>
+                        <Button type="button" variant="ghost" size="sm" id="quick-add-vehicle-open" onClick={() => setShowQuickAddVehicle(true)} className="h-7 px-2 text-xs">
+                          <Car className="w-3.5 h-3.5 mr-1" /> Quick Add Vehicle
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                        {(vendorVehiclesList || []).length === 0 && (
+                          <p className="text-sm text-gray-400 col-span-2">No vehicles registered for this vendor yet.</p>
+                        )}
+                        {(vendorVehiclesList || []).map((vv: any) => {
+                          const id = vv._id || vv.id;
+                          const isSelected = selectedVendorVehicleId === id;
+                          const isAvailable = vv.available !== false;
+                          return (
+                            <button
+                              type="button"
+                              key={id}
+                              disabled={!isAvailable}
+                              onClick={() => setSelectedVendorVehicleId(id)}
+                              className={`p-3 border-2 rounded-lg text-left transition-all ${
+                                !isAvailable
+                                  ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                                  : isSelected ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-green-300'
+                              }`}
+                            >
+                              <div className="font-medium text-sm">{vv.make ? `${vv.make} ` : ''}{vv.vehicleModel} ({vv.registrationNumber})</div>
+                              <div className="text-xs text-gray-500">{vv.category}{vv.seatingCapacity ? ` · ${vv.seatingCapacity} seats` : ''}</div>
+                              {!isAvailable && <div className="text-xs text-red-600 mt-1">{vv.reason}</div>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Vendor Driver (optional)</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                        {(vendorDriversList || []).length === 0 && (
+                          <p className="text-sm text-gray-400 col-span-2">No drivers registered for this vendor yet.</p>
+                        )}
+                        {(vendorDriversList || []).map((vd: any) => {
+                          const id = vd._id || vd.id;
+                          const isSelected = selectedVendorDriverId === id;
+                          const isAvailable = vd.available !== false;
+                          return (
+                            <button
+                              type="button"
+                              key={id}
+                              disabled={!isAvailable}
+                              onClick={() => setSelectedVendorDriverId(id)}
+                              className={`p-3 border-2 rounded-lg text-left transition-all ${
+                                !isAvailable
+                                  ? 'border-gray-200 bg-gray-50 text-gray-400 cursor-not-allowed'
+                                  : isSelected ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-green-300'
+                              }`}
+                            >
+                              <div className="font-medium text-sm">{vd.name}</div>
+                              <div className="text-xs text-gray-500">{vd.primaryMobile}</div>
+                              {!isAvailable && <div className="text-xs text-red-600 mt-1">{vd.reason}</div>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {selectedVendorVehicleId && (
+                      <p className="text-sm text-green-700">Vendor vehicle selected — a confirmation request will be recorded once you save this booking. Vendor commercials (rate, advance) can be set from Assign Vendor after saving.</p>
+                    )}
+                  </>
+                )}
+              </div>
+              )}
+
+              {/* Outsource path — Phase 3 covers the "continue without
+                  blocking" acknowledgement; the full sourcing-request /
+                  multi-vendor comparison workflow is a separate, larger
+                  build (docs/VENDOR_OUTSOURCE_WORKFLOW_AUDIT.md). */}
+              {resourceMode === "outsource" && (
+              <div className="mb-8 p-4 border-2 border-dashed border-gray-200 rounded-lg">
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Outsource Vehicle</h3>
+                <p className="text-sm text-gray-500">The booking will be confirmed now with Resource Sourcing Pending. Vendors can be contacted and a vehicle finalized afterward from the booking's Resource Fulfilment panel.</p>
+              </div>
+              )}
 
               {/* Driver Selection */}
               {watchedValues.bookingType === "with_driver" && (
@@ -1310,23 +1674,44 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
                 </Button>
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   onClick={() => {
-                    if (selectedVehicleId && selectedPricingType) {
-                      nextStep();
-                    } else if (!selectedVehicleId) {
-                      toast({
-                        title: "Please select a vehicle",
-                        description: "Choose a vehicle and pricing method to continue.",
-                        variant: "destructive"
-                      });
+                    // Non-blocking: the Next action is never disabled purely
+                    // because no company vehicle is available (spec §20) —
+                    // each resourceMode has its own, real completion
+                    // requirement instead of a single global one.
+                    if (resourceMode === "own_fleet") {
+                      if (selectedVehicleId && selectedPricingType) {
+                        nextStep();
+                      } else if (!selectedVehicleId) {
+                        toast({
+                          title: "Please select a vehicle",
+                          description: "Choose a vehicle and pricing method to continue.",
+                          variant: "destructive"
+                        });
+                      } else {
+                        toast({
+                          title: "Please select a pricing method",
+                          description: "Choose either 'By Day' or 'By Kilometer' pricing to continue.",
+                          variant: "destructive"
+                        });
+                      }
+                    } else if (resourceMode === "vendor_vehicle") {
+                      if (selectedVendorId && selectedVendorVehicleId) {
+                        nextStep();
+                      } else {
+                        toast({
+                          title: "Please select a vendor vehicle",
+                          description: "Choose a vendor and one of their vehicles to continue.",
+                          variant: "destructive"
+                        });
+                      }
                     } else {
-                      toast({
-                        title: "Please select a pricing method",
-                        description: "Choose either 'By Day' or 'By Kilometer' pricing to continue.",
-                        variant: "destructive"
-                      });
+                      // outsource — always allowed to continue; the
+                      // physical vehicle/driver will be sourced afterward
+                      // and are only required before Trip Start.
+                      nextStep();
                     }
                   }}
                   className="w-full sm:w-auto px-4 sm:px-8 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700"
@@ -1852,13 +2237,32 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Vehicle & Service</h3>
                     <div className="space-y-3 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Vehicle:</span>
-                        <span className="font-medium">{selectedVehicle?.make} {selectedVehicle?.vehicleModel || selectedVehicle?.model || ''}</span>
+                        <span className="text-gray-600">Fulfilment:</span>
+                        <Badge variant="outline">
+                          {resourceMode === "own_fleet" ? "Own Fleet" : resourceMode === "vendor_vehicle" ? "Vendor Vehicle" : "Outsource (sourcing pending)"}
+                        </Badge>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Type:</span>
-                        <span className="font-medium">{selectedVehicle?.type || selectedVehicle?.vehicleType || 'Standard'}</span>
-                      </div>
+                      {resourceMode === "own_fleet" ? (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Vehicle:</span>
+                            <span className="font-medium">{selectedVehicle?.make} {selectedVehicle?.vehicleModel || selectedVehicle?.model || ''}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Type:</span>
+                            <span className="font-medium">{selectedVehicle?.type || selectedVehicle?.vehicleType || 'Standard'}</span>
+                          </div>
+                        </>
+                      ) : resourceMode === "vendor_vehicle" ? (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Vendor Vehicle:</span>
+                          <span className="font-medium">
+                            {(vendorVehiclesList || []).find((v: any) => (v._id || v.id) === selectedVendorVehicleId)?.registrationNumber || 'Not selected'}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="text-gray-500">A vehicle will be sourced from a vendor after this booking is confirmed.</div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-gray-600">Service:</span>
                         <Badge variant="outline">{watchedValues.bookingType.replace('_', ' ')}</Badge>
@@ -2495,6 +2899,83 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
           {renderStep()}
         </form>
       </Form>
+
+      {/* Quick Add Vendor (spec §13) — same duplicate-mobile rejection as
+          the standalone Vendor Database page, since both go through the
+          identical POST /api/vendors route. Current Booking data is
+          untouched by opening/closing this dialog (no navigation). */}
+      <Dialog open={showQuickAddVendor} onOpenChange={setShowQuickAddVendor}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Quick Add Vendor</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="quick-vendor-name">Company / Vendor Name</Label>
+              <Input id="quick-vendor-name" value={quickVendorName} onChange={(e) => setQuickVendorName(e.target.value)} placeholder="e.g. Shree Travels" />
+            </div>
+            <div>
+              <Label htmlFor="quick-vendor-contact">Contact Person</Label>
+              <Input id="quick-vendor-contact" value={quickVendorContact} onChange={(e) => setQuickVendorContact(e.target.value)} placeholder="e.g. Ramesh" />
+            </div>
+            <div>
+              <Label htmlFor="quick-vendor-mobile">Primary Mobile</Label>
+              <Input id="quick-vendor-mobile" value={quickVendorMobile} onChange={(e) => setQuickVendorMobile(e.target.value)} placeholder="10-digit mobile" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowQuickAddVendor(false)}>Cancel</Button>
+            <Button
+              type="button"
+              id="quick-add-vendor-save"
+              disabled={!quickVendorName.trim() || !quickVendorContact.trim() || !quickVendorMobile.trim() || quickAddVendorMutation.isPending}
+              onClick={() => quickAddVendorMutation.mutate()}
+            >
+              {quickAddVendorMutation.isPending ? "Adding..." : "Add Vendor"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Add Vendor Vehicle — a REAL vehicle with a real
+          registration number, same as the standalone Vendor detail page's
+          "Add Vehicle" (POST /api/vendors/:id/vehicles, same duplicate-
+          registration rejection). If the registration isn't known yet,
+          the Outsource path (not this dialog) is the correct choice —
+          spec §9's "no fake physical vehicle" rule means this form never
+          accepts a placeholder registration. */}
+      <Dialog open={showQuickAddVehicle} onOpenChange={setShowQuickAddVehicle}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Quick Add Vehicle</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="quick-vehicle-reg">Registration Number</Label>
+              <Input id="quick-vehicle-reg" value={quickVehicleReg} onChange={(e) => setQuickVehicleReg(e.target.value)} placeholder="e.g. MP09AB1234" />
+            </div>
+            <div>
+              <Label htmlFor="quick-vehicle-model">Vehicle Model</Label>
+              <Input id="quick-vehicle-model" value={quickVehicleModel} onChange={(e) => setQuickVehicleModel(e.target.value)} placeholder="e.g. Swift Dzire" />
+            </div>
+            <div>
+              <Label htmlFor="quick-vehicle-category">Category</Label>
+              <Input id="quick-vehicle-category" value={quickVehicleCategory} onChange={(e) => setQuickVehicleCategory(e.target.value)} placeholder="e.g. sedan, suv" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowQuickAddVehicle(false)}>Cancel</Button>
+            <Button
+              type="button"
+              id="quick-add-vehicle-save"
+              disabled={!quickVehicleReg.trim() || !quickVehicleModel.trim() || !quickVehicleCategory.trim() || quickAddVehicleMutation.isPending}
+              onClick={() => quickAddVehicleMutation.mutate()}
+            >
+              {quickAddVehicleMutation.isPending ? "Adding..." : "Add Vehicle"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Resume unfinished booking draft */}
       <Dialog open={!!pendingDraft} onOpenChange={(open) => { if (!open) discardDraft(); }}>

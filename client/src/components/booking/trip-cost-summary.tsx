@@ -94,6 +94,9 @@ export default function TripCostSummary({ booking }: Props) {
         <div><p className="text-xs text-gray-500">Collected</p><p className="font-semibold text-green-600">{fmtMoney(summary.collection)}</p></div>
         <div><p className="text-xs text-gray-500">Gross Contribution</p><p className={`font-semibold ${summary.grossContribution >= 0 ? "text-green-700" : "text-red-700"}`}>{fmtMoney(summary.grossContribution)}</p></div>
       </div>
+      {summary.vendorDirectCost > 0 && (
+        <p className="text-xs text-gray-500">Includes {fmtMoney(summary.vendorDirectCost)} vendor direct cost (this booking is vendor-fulfilled) + {fmtMoney(summary.expenseCost)} approved internal expenses.</p>
+      )}
       {summary.pendingApprovalCount > 0 && (
         <p className="text-xs text-amber-700">{summary.pendingApprovalCount} expense{summary.pendingApprovalCount === 1 ? "" : "s"} awaiting approval — not yet counted in Internal Trip Cost above.</p>
       )}

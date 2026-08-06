@@ -1,5 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
+import mongoose from 'mongoose';
 import { login } from './helpers';
+import { Referral, RewardTransaction, Customer } from '../../server/models/index';
 
 async function getCsrfToken(page: Page): Promise<string> {
   const res = await page.request.get('/api/csrf-token');
@@ -400,5 +402,125 @@ test.describe('Referral capture + configurable reward event rules', () => {
     // while building this panel).
     await expect(dialog.getByText('Referred contact (pending)')).toBeVisible();
     await expect(dialog.getByText(`Panel Referrer ${marker}`, { exact: true })).toHaveCount(1);
+  });
+
+  test('UI: Rewards and Referrals Settings panel on Profile saves an event rule and it reloads with the new value', async ({ page }) => {
+    await login(page, 'qaclient', 'QaFixed456!');
+    const csrf = await getCsrfToken(page);
+
+    await page.goto('/dashboard/profile');
+    await page.waitForLoadState('networkidle');
+    await page.locator('text=Referral & Review Events').scrollIntoViewIfNeeded();
+
+    // Stable ids (rrs-ev-<eventKey>-points / -save), not text-based div
+    // filters — this codebase has repeatedly hit ambiguous-match issues
+    // with hasText filters matching oversized ancestor divs.
+    const pointsInput = page.locator('[id="rrs-ev-review.verified-points"]');
+    await pointsInput.fill('1.5');
+    await page.locator('[id="rrs-ev-review.verified-save"]').click();
+    await expect(page.getByText('Verified Review Submitted saved')).toBeVisible({ timeout: 5000 });
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await page.locator('text=Referral & Review Events').scrollIntoViewIfNeeded();
+    await expect(page.locator('[id="rrs-ev-review.verified-points"]')).toHaveValue('1.5');
+
+    // Restore the default so this test stays safely re-runnable and
+    // doesn't leak a changed rule into other tests sharing this tenant.
+    await page.request.put('/api/reward-event-rules/review.verified', {
+      headers: { 'X-CSRF-Token': csrf }, data: { points: 0.5 },
+    });
+  });
+
+  test('API: rewards/referral dashboard reflects a real captured referral and a redemption in its own numbers', async ({ page }) => {
+    await login(page, 'qaclient', 'QaFixed456!');
+    const csrf = await getCsrfToken(page);
+    const marker = String(Date.now());
+
+    const before = await (await page.request.get('/api/rewards-referral-dashboard')).json();
+
+    const { customer: referrer } = await createCustomerViaBooking(page, csrf, `Dashboard Referrer ${marker}`, freshMobile());
+    const captureRes = await page.request.post('/api/referrals', {
+      headers: { 'X-CSRF-Token': csrf },
+      data: { referrerCustomerId: referrer._id, referredMobile: freshMobile(), source: 'existing_customer_search' },
+    });
+    expect(captureRes.status()).toBe(201);
+
+    const after = await (await page.request.get('/api/rewards-referral-dashboard')).json();
+    expect(after.activeReferrers).toBeGreaterThanOrEqual(before.activeReferrers + 1);
+    expect(after.totalPointsIssued).toBeGreaterThanOrEqual(before.totalPointsIssued + 0.5);
+    // Not asserting this new referrer appears in topReferrers — it's
+    // limited to the top 5 by count, and this shared dev DB already has
+    // dozens of referrers tied at count=1, so a fresh single-referral
+    // entry has no guaranteed rank among ties.
+
+    // The transaction list backing the "Points Issued" card must contain
+    // this exact new credit, not just a bumped total.
+    const transactions = await (await page.request.get('/api/reward-transactions?transactionType=referral_bonus')).json();
+    expect(transactions.some((t: any) => t.customerId?._id === referrer._id && t.points === 0.5)).toBe(true);
+  });
+
+  test('UI: Rewards & Referrals dashboard renders real metric cards and a clickable drill-down table', async ({ page }) => {
+    await login(page, 'qaclient', 'QaFixed456!');
+    await page.locator('nav').getByRole('button', { name: 'Rewards & Referrals' }).click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByText('Total Points Issued')).toBeVisible();
+    await expect(page.getByText('Active Referrers')).toBeVisible();
+    await expect(page.getByText('Top Referrers')).toBeVisible();
+
+    await page.getByText('Active Referrers').click();
+    await expect(page.getByText('All Referrals')).toBeVisible({ timeout: 5000 });
+  });
+
+  // Tenant isolation (spec §33: "Tenant A must never access Tenant B...
+  // referral codes, point balances, referral customers, reports,
+  // transactions"). Same pattern already established in
+  // gps-vehicle-assignment.spec.ts: create a record directly with a
+  // fresh, unrelated tenantId (simulating a real second tenant), then
+  // confirm the logged-in tenant's own API surface never returns it.
+  test('API: another tenant\'s referrals, reward transactions, and dashboard totals are never visible', async ({ page }) => {
+    test.setTimeout(30_000);
+    if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI is required for tenant isolation verification.');
+    await mongoose.connect(process.env.MONGODB_URI);
+    try {
+      const otherTenantId = new mongoose.Types.ObjectId();
+      const otherCustomer = await Customer.create({
+        tenantId: otherTenantId, name: 'Other Tenant Customer', primaryMobile: '9' + String(Date.now()).slice(-9),
+        createdBy: { userId: 'system', role: 'admin' },
+      });
+      const otherReferral = await Referral.create({
+        tenantId: otherTenantId, referrerCustomerId: otherCustomer._id,
+        referrerDisplaySnapshot: { name: otherCustomer.name, mobile: otherCustomer.primaryMobile },
+        source: 'existing_customer_search', status: 'captured',
+        statusHistory: [{ status: 'captured', at: new Date() }],
+        createdBy: { userId: 'system', role: 'admin' },
+      });
+      const otherTransaction = await RewardTransaction.create({
+        tenantId: otherTenantId, customerId: otherCustomer._id,
+        transactionType: 'manual_credit', points: 999999, balanceAfter: 999999,
+        reason: 'Cross-tenant isolation probe — must never be visible to qaclient',
+        createdBy: { userId: 'system', role: 'admin' },
+      });
+
+      await login(page, 'qaclient', 'QaFixed456!');
+
+      const referrals = await (await page.request.get('/api/referrals')).json();
+      expect(referrals.find((r: any) => r._id === otherReferral._id.toString())).toBeUndefined();
+
+      const transactions = await (await page.request.get('/api/reward-transactions')).json();
+      expect(transactions.find((t: any) => t._id === otherTransaction._id.toString())).toBeUndefined();
+
+      // The other tenant's 999,999-point transaction would be impossible
+      // to miss in the aggregated total if tenant scoping leaked anywhere
+      // in buildRewardsReferralDashboard's Mongo aggregation pipelines.
+      const dashboard = await (await page.request.get('/api/rewards-referral-dashboard')).json();
+      expect(dashboard.totalPointsIssued).toBeLessThan(900000);
+
+      const referrerLookup = await (await page.request.get(`/api/referrals/resolve-referrer?customerId=${otherCustomer._id}`)).json();
+      expect(referrerLookup.referrer).toBeNull();
+    } finally {
+      await mongoose.disconnect();
+    }
   });
 });
