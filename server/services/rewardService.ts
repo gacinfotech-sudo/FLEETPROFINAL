@@ -45,6 +45,14 @@ async function createTransaction(input: {
     if (existing) return existing;
   }
 
+  // Rounded once, here, at the single choke point every ledger row passes
+  // through — so no caller (existing or future) can let binary-float
+  // drift accumulate in the ledger, without migrating points'/
+  // balanceAfter's underlying Number type. Exact for the halves this
+  // project's own examples use (0.5 = 2^-1, exact in IEEE754); this
+  // guards owner-configured values like 0.1/0.3 that are not.
+  input = { ...input, points: Math.round(input.points * 100) / 100 };
+
   const session = await mongoose.startSession();
   try {
     let created: any;
@@ -232,7 +240,12 @@ export async function creditVerifiedGoogleReviewReward(
   if (!review) throw Object.assign(new Error('Only an evidence-confirmed Google review can earn review points.'), { status: 400 });
 
   const rule = await getRewardRule(tenantId);
-  const points = Math.floor(Number(rule.reviewBonusPoints) || 0);
+  // Not floored — reviewBonusPoints is allowed to be fractional (e.g. 0.5,
+  // per docs/REWARDS_REFERRAL_CURRENT_AUDIT.md's finding #1: flooring here
+  // silently zeroed any owner-configured fractional review bonus).
+  // Rounded to 2dp to avoid binary-float drift accumulating across many
+  // transactions, without migrating the ledger's underlying Number type.
+  const points = Math.round((Number(rule.reviewBonusPoints) || 0) * 100) / 100;
   if (points <= 0) return null;
   const expiryDate = rule.expiryDays ? new Date(Date.now() + rule.expiryDays * 24 * 60 * 60 * 1000) : undefined;
   return createTransaction({
