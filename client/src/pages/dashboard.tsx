@@ -39,6 +39,7 @@ import DailyOperationsPopup from "../components/dashboard/daily-operations-popup
 import BookingCommunication from "../components/booking/booking-communication";
 import ExtendBookingDialog from "../components/booking/extend-booking-dialog";
 import AssignVendorDialog from "../components/booking/assign-vendor-dialog";
+import ResourceFulfilmentPanel from "../components/booking/resource-fulfilment-panel";
 import PaymentSection from "../components/booking/payment-section";
 import TripCostSummary from "../components/booking/trip-cost-summary";
 import SetDriverPinDialog from "../components/drivers/set-driver-pin-dialog";
@@ -2741,6 +2742,10 @@ export default function Dashboard() {
               {/* Renders nothing for users without trip.profitability.view —
                   not a permission-gated placeholder, genuinely absent. */}
               <TripCostSummary booking={viewingBooking} />
+
+              {/* Renders nothing once fulfilment is already resolved and no
+                  sourcing request was ever started — see the component. */}
+              <ResourceFulfilmentPanel booking={viewingBooking} />
 
               <div className="flex justify-end gap-2">
                 <AssignVendorDialog booking={viewingBooking} />

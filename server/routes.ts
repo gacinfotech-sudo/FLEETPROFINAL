@@ -80,6 +80,8 @@ import { createVendorDriver, findVendorDriverByMobile, checkVendorDriverAvailabi
 import { createVendorVehicle, findVendorVehicleByRegistration, checkVendorVehicleAvailability, normalizeRegistrationNumber } from "./services/vendorVehicleService";
 import { VendorDuty } from "./models/index";
 import { upsertVendorDuty, cancelVendorDutyForBooking, completeVendorDutyForBooking } from "./services/vendorDutyService";
+import { createSourcingRequest, sendSourcingRequestToVendors, recordVendorResponse, selectVendorResponse, cancelSourcingRequest, rankResponses } from "./services/vendorSourcingService";
+import { VendorSourcingRequest, VendorSourcingResponse } from "./models/index";
 import { buildDriverPerformance } from "./services/driverPerformance";
 import { buildVehiclePerformance } from "./services/vehiclePerformance";
 import { findDuplicateCandidates, mergeCustomers } from "./services/customerMergeService";
@@ -6273,6 +6275,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Assign vendor error:', error?.message || error);
       res.status(500).json({ message: "Failed to assign vendor" });
+    }
+  });
+
+  // Outsource Vehicle sourcing workflow (spec §10-12). See
+  // docs/VENDOR_OUTSOURCE_WORKFLOW_AUDIT.md — genuinely new subsystem,
+  // built on top of the already-correct Vendor/VendorDriver/VendorVehicle
+  // availability checking and the existing WhatsApp send pipeline.
+  app.post("/api/bookings/:bookingId/sourcing-requests", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_CREATE), async (req: AuthRequest, res) => {
+    try {
+      const request = await createSourcingRequest({
+        tenantId: req.tenantId!, bookingId: req.params.bookingId,
+        vehicleCategory: req.body?.vehicleCategory, seatingCapacity: req.body?.seatingCapacity,
+        quantity: req.body?.quantity, targetVendorCost: req.body?.targetVendorCost,
+        responseDeadline: req.body?.responseDeadline ? new Date(req.body.responseDeadline) : undefined,
+        internalNotes: req.body?.internalNotes,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(request);
+    } catch (error: any) {
+      res.status(error?.message === 'Booking not found' ? 404 : 400).json({ message: error?.message || "Failed to create sourcing request" });
+    }
+  });
+
+  app.get("/api/bookings/:bookingId/sourcing-requests", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const requests = await VendorSourcingRequest.find({ tenantId: req.tenantId, bookingId: req.params.bookingId }).sort({ createdAt: -1 });
+      res.json(requests);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch sourcing requests" });
+    }
+  });
+
+  app.post("/api/sourcing-requests/:requestId/send", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_MANAGE), async (req: AuthRequest, res) => {
+    try {
+      const vendorIds: string[] = Array.isArray(req.body?.vendorIds) ? req.body.vendorIds : [];
+      if (vendorIds.length === 0) return res.status(400).json({ message: "At least one vendorId is required" });
+      const results = await sendSourcingRequestToVendors(
+        req.tenantId!, req.params.requestId, vendorIds, { userId: req.userId!, role: req.user?.role || 'client' }
+      );
+      res.json({ results });
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Failed to send sourcing request" });
+    }
+  });
+
+  app.get("/api/sourcing-requests/:requestId/responses", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const responses = await VendorSourcingResponse.find({ tenantId: req.tenantId, sourcingRequestId: req.params.requestId }).sort({ createdAt: 1 });
+      const ranked = rankResponses(responses as any);
+      res.json({
+        responses,
+        recommendations: ranked.map((r) => ({ responseId: r.response._id, reasons: r.reasons })),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch sourcing responses" });
+    }
+  });
+
+  app.post("/api/sourcing-requests/:requestId/responses", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_MANAGE), async (req: AuthRequest, res) => {
+    try {
+      const { vendorId, response, offeredVehicleCategory, offeredVendorVehicleId, offeredVehicleDetails,
+        offeredVendorDriverId, offeredDriverDetails, quotedCost, tollTreatment, parkingTreatment, notes } = req.body || {};
+      if (!vendorId) return res.status(400).json({ message: "vendorId is required" });
+      if (!['accepted', 'rejected', 'alternative_offered', 'negotiation'].includes(response)) {
+        return res.status(400).json({ message: "A valid response value is required" });
+      }
+      const updated = await recordVendorResponse({
+        tenantId: req.tenantId!, sourcingRequestId: req.params.requestId, vendorId, response,
+        offeredVehicleCategory, offeredVendorVehicleId, offeredVehicleDetails,
+        offeredVendorDriverId, offeredDriverDetails, quotedCost, tollTreatment, parkingTreatment, notes,
+        actor: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Failed to record vendor response" });
+    }
+  });
+
+  app.post("/api/sourcing-requests/:requestId/select-vendor", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_MANAGE), async (req: AuthRequest, res) => {
+    try {
+      const { responseId } = req.body || {};
+      if (!responseId) return res.status(400).json({ message: "responseId is required" });
+      const result = await selectVendorResponse({
+        tenantId: req.tenantId!, sourcingRequestId: req.params.requestId, responseId,
+        actor: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.json(result);
+    } catch (error: any) {
+      const code = error?.code;
+      res.status(code ? 409 : 400).json({ message: error?.message || "Failed to select vendor", code });
+    }
+  });
+
+  app.post("/api/sourcing-requests/:requestId/cancel", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_MANAGE), async (req: AuthRequest, res) => {
+    try {
+      const request = await cancelSourcingRequest(
+        req.tenantId!, req.params.requestId, { userId: req.userId!, role: req.user?.role || 'client' }, req.body?.reason
+      );
+      res.json(request);
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Failed to cancel sourcing request" });
     }
   });
 

@@ -646,6 +646,26 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
         }
       }
 
+      // Outsource path: create the actual sourcing request so it's ready
+      // to send to vendors from the booking's Resource Fulfilment panel —
+      // best-effort, same reasoning as the vendor-vehicle follow-up above.
+      // The Add Booking wizard only captures enough to start sourcing
+      // (booking's own route/schedule); vendor selection, sending, and
+      // quote comparison happen from that panel.
+      if (resourceMode === "outsource") {
+        try {
+          await apiRequest("POST", `/api/bookings/${result._id}/sourcing-requests`, {
+            quantity: 1,
+          });
+        } catch (err: any) {
+          toast({
+            title: "Booking saved, but a sourcing request could not be started",
+            description: "You can start one from the booking's detail view.",
+            variant: "destructive",
+          });
+        }
+      }
+
       setCreatedBooking(result);
       setBookingConfirmed(true);
       toast({

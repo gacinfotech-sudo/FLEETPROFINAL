@@ -740,7 +740,12 @@ export interface IWhatsAppMessage extends Document {
   bookingId?: mongoose.Types.ObjectId;
   leadId?: mongoose.Types.ObjectId;
   quotationId?: mongoose.Types.ObjectId;
-  recipientType: 'customer' | 'driver';
+  // Vendor Sourcing (spec §17) — additive, mirrors the existing optional
+  // link fields above so the outsourcing workflow reuses this same
+  // ledger/audit trail rather than a second WhatsApp log.
+  vendorId?: mongoose.Types.ObjectId;
+  sourcingRequestId?: mongoose.Types.ObjectId;
+  recipientType: 'customer' | 'driver' | 'vendor';
   recipientPhone: string;
   messageType: string;
   content: string;
@@ -761,7 +766,9 @@ const WhatsAppMessageSchema = new Schema<IWhatsAppMessage>({
   bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
   leadId: { type: Schema.Types.ObjectId, ref: 'Lead' },
   quotationId: { type: Schema.Types.ObjectId, ref: 'Quotation' },
-  recipientType: { type: String, enum: ['customer', 'driver'], required: true },
+  vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor' },
+  sourcingRequestId: { type: Schema.Types.ObjectId, ref: 'VendorSourcingRequest' },
+  recipientType: { type: String, enum: ['customer', 'driver', 'vendor'], required: true },
   recipientPhone: { type: String, required: true },
   messageType: { type: String, required: true },
   content: { type: String, required: true },
@@ -3149,6 +3156,119 @@ VendorDutySchema.index({ tenantId: 1, vendorVehicleId: 1, status: 1 });
 VendorDutySchema.index({ tenantId: 1, fulfilmentVendorId: 1, status: 1 });
 VendorDutySchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
 export const VendorDuty = mongoose.model<IVendorDuty>('VendorDuty', VendorDutySchema);
+
+// Outsource Vehicle workflow (spec §10-12) — a Booking's own request to
+// source a vehicle from one or more Vendors when nothing was resolved at
+// creation time. Deliberately separate from VendorDuty: a duty is a real,
+// time-windowed commitment against a specific vendor driver/vehicle,
+// created only once a quote is actually accepted; this request tracks the
+// broader "who did we ask, who responded, what did they offer" history
+// even for vendors who were never awarded the work.
+export type VendorSourcingRequestStatus =
+  | 'draft' | 'sent' | 'responses_pending' | 'quotes_received' | 'vendor_selected'
+  | 'resource_secured' | 'cancelled' | 'expired';
+export interface IVendorSourcingRequest extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  requestNumber: string;
+  bookingId: mongoose.Types.ObjectId;
+  vehicleCategory?: string;
+  seatingCapacity?: number;
+  quantity: number;
+  routeSnapshot?: string;
+  scheduledStartDateTime?: Date;
+  scheduledEndDateTime?: Date;
+  passengerCount?: number;
+  targetVendorCost?: number;
+  responseDeadline?: Date;
+  internalNotes?: string;
+  status: VendorSourcingRequestStatus;
+  selectedResponseId?: mongoose.Types.ObjectId;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+const VendorSourcingRequestSchema = new Schema<IVendorSourcingRequest>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  requestNumber: { type: String, required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
+  vehicleCategory: { type: String },
+  seatingCapacity: { type: Number },
+  quantity: { type: Number, default: 1 },
+  routeSnapshot: { type: String },
+  scheduledStartDateTime: { type: Date },
+  scheduledEndDateTime: { type: Date },
+  passengerCount: { type: Number },
+  targetVendorCost: { type: Number },
+  responseDeadline: { type: Date },
+  internalNotes: { type: String },
+  status: {
+    type: String,
+    enum: ['draft', 'sent', 'responses_pending', 'quotes_received', 'vendor_selected', 'resource_secured', 'cancelled', 'expired'],
+    default: 'draft',
+  },
+  selectedResponseId: { type: Schema.Types.ObjectId },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+VendorSourcingRequestSchema.index({ tenantId: 1, requestNumber: 1 }, { unique: true });
+VendorSourcingRequestSchema.index({ tenantId: 1, bookingId: 1 });
+VendorSourcingRequestSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const VendorSourcingRequest = mongoose.model<IVendorSourcingRequest>('VendorSourcingRequest', VendorSourcingRequestSchema);
+
+// One row per Vendor contacted for a given sourcing request — the
+// comparison table (spec §12) reads directly off these. A Vendor can be
+// contacted only once per request (unique index below); re-sending is a
+// reminder (see vendorSourcingService), not a second row.
+export type VendorSourcingResponseStatus = 'pending' | 'accepted' | 'rejected' | 'alternative_offered' | 'negotiation' | 'expired';
+export interface IVendorSourcingResponse extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  sourcingRequestId: mongoose.Types.ObjectId;
+  vendorId: mongoose.Types.ObjectId;
+  vendorNameSnapshot: string;
+  response: VendorSourcingResponseStatus;
+  offeredVehicleCategory?: string;
+  offeredVendorVehicleId?: mongoose.Types.ObjectId;
+  offeredVehicleDetails?: string;
+  offeredVendorDriverId?: mongoose.Types.ObjectId;
+  offeredDriverDetails?: string;
+  quotedCost?: number;
+  tollTreatment?: string;
+  parkingTreatment?: string;
+  notes?: string;
+  sentAt?: Date;
+  respondedAt?: Date;
+  respondedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+const VendorSourcingResponseSchema = new Schema<IVendorSourcingResponse>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  sourcingRequestId: { type: Schema.Types.ObjectId, ref: 'VendorSourcingRequest', required: true },
+  vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  vendorNameSnapshot: { type: String, required: true },
+  response: { type: String, enum: ['pending', 'accepted', 'rejected', 'alternative_offered', 'negotiation', 'expired'], default: 'pending' },
+  offeredVehicleCategory: { type: String },
+  offeredVendorVehicleId: { type: Schema.Types.ObjectId, ref: 'VendorVehicle' },
+  offeredVehicleDetails: { type: String },
+  offeredVendorDriverId: { type: Schema.Types.ObjectId, ref: 'VendorDriver' },
+  offeredDriverDetails: { type: String },
+  quotedCost: { type: Number },
+  tollTreatment: { type: String },
+  parkingTreatment: { type: String },
+  notes: { type: String },
+  sentAt: { type: Date },
+  respondedAt: { type: Date },
+  respondedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+VendorSourcingResponseSchema.index({ tenantId: 1, sourcingRequestId: 1, vendorId: 1 }, { unique: true });
+VendorSourcingResponseSchema.index({ tenantId: 1, sourcingRequestId: 1 });
+VendorSourcingResponseSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const VendorSourcingResponse = mongoose.model<IVendorSourcingResponse>('VendorSourcingResponse', VendorSourcingResponseSchema);
 
 export const User = mongoose.model<IUser>('User', UserSchema);
 export const Vehicle = mongoose.model<IVehicle>('Vehicle', VehicleSchema);
