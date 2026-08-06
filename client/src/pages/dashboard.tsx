@@ -35,6 +35,7 @@ import DailyOperationsPopup from "../components/dashboard/daily-operations-popup
 import BookingCommunication from "../components/booking/booking-communication";
 import ExtendBookingDialog from "../components/booking/extend-booking-dialog";
 import PaymentSection from "../components/booking/payment-section";
+import TripCostSummary from "../components/booking/trip-cost-summary";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -2707,6 +2708,10 @@ export default function Dashboard() {
                 <Label className="text-sm font-medium text-gray-700 mb-2 block">Payment</Label>
                 <PaymentSection booking={viewingBooking} />
               </div>
+
+              {/* Renders nothing for users without trip.profitability.view —
+                  not a permission-gated placeholder, genuinely absent. */}
+              <TripCostSummary booking={viewingBooking} />
 
               <div className="flex justify-end">
                 <ExtendBookingDialog booking={viewingBooking} />

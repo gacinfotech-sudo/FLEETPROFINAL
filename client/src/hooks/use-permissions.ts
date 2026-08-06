@@ -32,6 +32,8 @@ export function usePermissions() {
   const canViewBookings = () => hasPermission('view_bookings');
   const canViewRevenue = () => hasPermission('view_revenue');
   const canManageUsers = () => user?.role === 'admin' || user?.role === 'client';
+  const canApproveExpense = () => hasPermission('expense.approve');
+  const canViewTripProfitability = () => hasPermission('trip.profitability.view');
 
   return {
     hasPermission,
@@ -44,6 +46,8 @@ export function usePermissions() {
     canViewBookings,
     canViewRevenue,
     canManageUsers,
+    canApproveExpense,
+    canViewTripProfitability,
     user
   };
 }

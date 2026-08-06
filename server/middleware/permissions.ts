@@ -80,4 +80,7 @@ export const PERMISSIONS = {
   // One-click Lead conversions (additive)
   CONVERT_LEAD_TO_CUSTOMER: 'lead.convert_to_customer',
   CONVERT_LEAD_TO_BOOKING: 'lead.convert_to_booking',
+  // Trip costing / driver expense (additive — see docs/TRIP_COSTING_DATA_MAPPING.md)
+  APPROVE_EXPENSE: 'expense.approve',
+  VIEW_TRIP_PROFITABILITY: 'trip.profitability.view',
 } as const;

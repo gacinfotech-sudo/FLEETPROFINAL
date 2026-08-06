@@ -81,6 +81,7 @@ import { getInvoiceSettings, upsertInvoiceSettings } from "./services/invoiceSet
 import { buildCustomerDriverHistory, buildDriverFeedbackProfile } from "./services/driverFeedbackService";
 import { buildCustomerVehicleHistory, buildVehicleFeedbackProfile } from "./services/vehicleFeedbackService";
 import { DriverLeave, DriverAttendance } from "./models/index";
+import { Expense } from "./models/index";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -2464,6 +2465,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Payment history error:', error?.message || error);
       res.status(500).json({ message: "Failed to fetch payment history" });
+    }
+  });
+
+  // Trip Cost Summary (docs/TRIP_COSTING_DATA_MAPPING.md) — Customer Revenue
+  // from the booking's own charge fields (unchanged), Internal Trip Cost
+  // from approved, customer-non-chargeable Expense rows linked to this
+  // booking, Collection from the existing payment ledger. Gross
+  // Contribution is computed here, never stored, and gated behind a
+  // dedicated permission — this is internal margin data, not something
+  // every booking viewer (or a customer-facing surface) should see.
+  app.get("/api/bookings/:id/trip-cost-summary", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_TRIP_PROFITABILITY), async (req: AuthRequest, res) => {
+    try {
+      const booking = await storage.getBooking(req.params.id, scopeTenant(req));
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const expenses = await Expense.find({ tenantId: req.tenantId, bookingId: req.params.id })
+        .populate('driverId', 'name')
+        .sort({ date: -1 });
+
+      const approvedInternalExpenses = expenses.filter((e: any) => !e.customerChargeable && e.approvalStatus === 'approved');
+      const internalTripCost = approvedInternalExpenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
+      const customerRevenue = (booking as any).totalAmount || 0;
+      const collection = (booking as any).advanceReceived || 0;
+
+      res.json({
+        customerRevenue,
+        internalTripCost,
+        collection,
+        remainingBalance: Math.max(0, customerRevenue - collection),
+        grossContribution: customerRevenue - internalTripCost,
+        expenses,
+        pendingApprovalCount: expenses.filter((e: any) => e.approvalStatus === 'pending').length,
+      });
+    } catch (error: any) {
+      console.error('Trip cost summary error:', error?.message || error);
+      res.status(500).json({ message: "Failed to compute trip cost summary" });
     }
   });
 
@@ -5689,13 +5726,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/expenses", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       // Basic validation
-      const { vehicleId, category, amount, date, description, attachmentUrl } = req.body;
-      
+      const { vehicleId, category, amount, date, description, attachmentUrl, bookingId, driverId, customerChargeable, reimbursable } = req.body;
+
       if (!vehicleId || !category || !amount || !date) {
         return res.status(400).json({ message: "Vehicle, category, amount, and date are required" });
       }
 
-      const expenseData = {
+      const expenseData: any = {
         tenantId: req.tenantId!,
         vehicleId,
         category,
@@ -5708,6 +5745,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: req.user?.role || 'client'
         }
       };
+      // Trip-linkage fields (docs/TRIP_COSTING_DATA_MAPPING.md) — optional,
+      // only set when the caller actually links this expense to a trip.
+      // approvalStatus/approvedBy/approvedAt are deliberately NOT accepted
+      // here — they can only be set by POST /api/expenses/:id/approve or
+      // /reject, so the approval audit trail is always server-derived, not
+      // client-supplied.
+      if (bookingId) expenseData.bookingId = bookingId;
+      if (driverId) expenseData.driverId = driverId;
+      if (customerChargeable !== undefined) expenseData.customerChargeable = !!customerChargeable;
+      if (reimbursable !== undefined) expenseData.reimbursable = !!reimbursable;
 
       const expense = await storage.createExpense(expenseData);
       res.status(201).json(expense);
@@ -5739,6 +5786,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updateData.date) {
         updateData.date = new Date(updateData.date);
       }
+      // Approval fields are server-derived only — see POST /api/expenses/:id/approve
+      // and /reject. A generic edit must never be able to spoof an approval.
+      delete updateData.approvalStatus;
+      delete updateData.approvedBy;
+      delete updateData.approvedAt;
 
       const expense = await storage.updateExpense(req.params.id, updateData, scopeTenant(req));
       if (!expense) {
@@ -5748,6 +5800,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Update expense error:', error);
       res.status(500).json({ message: "Failed to update expense" });
+    }
+  });
+
+  // Trip-costing approval workflow (docs/TRIP_COSTING_DATA_MAPPING.md) — a
+  // booking-linked expense only counts toward the Trip Cost Summary's
+  // Internal Trip Cost once approved, mirroring the driver-leave approve/
+  // reject pattern above (server-derived approvedBy/approvedAt, never
+  // client-supplied).
+  app.post("/api/expenses/:id/approve", authenticateUser, requireTenant, requirePermission(PERMISSIONS.APPROVE_EXPENSE), async (req: AuthRequest, res) => {
+    try {
+      const expense: any = await Expense.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!expense) return res.status(404).json({ message: "Expense not found" });
+      expense.approvalStatus = 'approved';
+      expense.approvedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      expense.approvedAt = new Date();
+      await expense.save();
+      res.json(expense);
+    } catch (error: any) {
+      console.error('Approve expense error:', error?.message || error);
+      res.status(500).json({ message: "Failed to approve expense" });
+    }
+  });
+
+  app.post("/api/expenses/:id/reject", authenticateUser, requireTenant, requirePermission(PERMISSIONS.APPROVE_EXPENSE), async (req: AuthRequest, res) => {
+    try {
+      const expense: any = await Expense.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!expense) return res.status(404).json({ message: "Expense not found" });
+      expense.approvalStatus = 'rejected';
+      expense.approvedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      expense.approvedAt = new Date();
+      await expense.save();
+      res.json(expense);
+    } catch (error: any) {
+      console.error('Reject expense error:', error?.message || error);
+      res.status(500).json({ message: "Failed to reject expense" });
     }
   });
 

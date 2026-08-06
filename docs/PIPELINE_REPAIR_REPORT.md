@@ -150,6 +150,30 @@ Full detail on the 5 repairs applied this initiative. See `docs/PIPELINE_BUG_REP
 
 ---
 
+## Repair 9 — Expense had no bookingId/driverId link, so no Trip Cost Summary was possible (P1, DISCONNECTED / FINANCIAL_RISK)
+
+**Previous status**: `Expense` was vehicle-scoped only (general maintenance/damage/tires/fuel cost tracking) with no way to attribute a cost to a specific trip. Confirmed independently by two research passes and already scoped as a planned additive change in `docs/TRIP_COSTING_DATA_MAPPING.md` from the prior initiative (never built).
+
+**Root cause**: The model predates any per-trip cost concept.
+
+**Files changed**:
+- `server/models/index.ts` — additive `IExpense.bookingId?`/`driverId?`/`customerChargeable?`/`reimbursable?`/`approvalStatus?`/`approvedBy?`/`approvedAt?` fields (all optional, `vehicleId` stays required and unchanged); new index `{tenantId, bookingId}` backing the Trip Cost Summary lookup.
+- `server/middleware/permissions.ts` — two new permission constants: `APPROVE_EXPENSE` (`expense.approve`) and `VIEW_TRIP_PROFITABILITY` (`trip.profitability.view`). Deliberately new, not retrofitted onto an existing permission — this is internal margin data, distinct from ordinary booking-edit or expense-tracking access.
+- `server/routes.ts` — `POST /api/expenses` accepts the new optional linkage fields (`bookingId`, `driverId`, `customerChargeable`, `reimbursable`); approval fields are explicitly NOT accepted here or via the generic `PUT /api/expenses/:id` (stripped from the update body) — they can only be set by two new routes, `POST /api/expenses/:id/approve` and `/reject`, which server-derive `approvedBy`/`approvedAt` exactly like the existing driver-leave approve/reject routes. New `GET /api/bookings/:id/trip-cost-summary` computes Customer Revenue (`booking.totalAmount`, unchanged), Internal Trip Cost (sum of linked expenses where `customerChargeable: false` AND `approvalStatus: 'approved'` — a pending or customer-chargeable expense never counts), Collection (`booking.advanceReceived`, the existing ledger-derived cached field), and Gross Contribution (computed on read, never stored).
+- `client/src/hooks/use-permissions.ts` — new `canApproveExpense()`/`canViewTripProfitability()` helpers, matching the hook's existing convention.
+- `client/src/components/booking/trip-cost-summary.tsx` — new component: summary cards, a per-expense line-item list with approval-status/chargeable/reimbursable badges, an "Add Trip Expense" dialog, and inline approve/reject actions (visible only to `canApproveExpense()`). Renders `null` entirely for a user without `canViewTripProfitability()` — genuinely absent, not a disabled placeholder.
+- `client/src/pages/dashboard.tsx` — mounted in the Booking Details dialog, directly below the existing Payment section.
+
+**Database changes**: additive fields + one new index; no existing Expense document affected (all new fields optional/defaulted), no migration needed.
+
+**Tests**: `tests/e2e/pipeline-audit-trip-cost-summary.spec.ts` — 3 tests: (1) end-to-end setup proving a pending internal expense and an approved customer-chargeable expense both correctly do NOT count toward Internal Trip Cost; (2) a manager without the new permissions gets 403 from both the summary view and the approve action; (3) approving the internal expense makes it count, and Gross Contribution computes correctly. Live-verified via screenshot — the Booking Details dialog correctly shows Customer Revenue ₹5,000, Internal Trip Cost ₹800 (excluding the ₹200 customer-chargeable toll), Gross Contribution ₹4,200.
+
+**Scope note**: this implements the schema/API/permission layer and a functional UI surface, matching what `docs/TRIP_COSTING_DATA_MAPPING.md` scoped as "Phase 6." It does not implement a separate dedicated "Driver Ledger" view or bulk-approval queue — those remain future work if wanted.
+
+**Final status**: Fixed, tested, regression-clean.
+
+---
+
 ## Cross-cutting process note
 
 Every server-side change in this repair round required a dev-server restart before its effect was visible to Playwright — the dev server runs via plain `tsx server/index.ts` (no watch mode configured in `package.json`'s `dev` script), so file edits are not hot-reloaded. This was discovered mid-repair (Repair 1's first test run gave a false "still broken" result against stale server code) and applied consistently for every subsequent change in this phase.

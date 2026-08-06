@@ -276,6 +276,21 @@ export interface IExpense extends Document {
     role: string;
   };
   createdAt: Date;
+  // Additive trip-linkage fields (docs/TRIP_COSTING_DATA_MAPPING.md). All
+  // optional — an Expense with none of these set is exactly the original
+  // "general vehicle cost, no trip attached" record (maintenance/damage/
+  // tires/etc.), unchanged. Only expenses deliberately linked to a booking
+  // via bookingId feed the Trip Cost Summary.
+  bookingId?: mongoose.Types.ObjectId;
+  driverId?: mongoose.Types.ObjectId;
+  customerChargeable?: boolean;
+  reimbursable?: boolean;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedBy?: {
+    userId: string;
+    role: string;
+  };
+  approvedAt?: Date;
 }
 
 // Tenant Schema
@@ -640,7 +655,17 @@ const ExpenseSchema = new Schema<IExpense>({
     userId: { type: String, required: false },
     role: { type: String, required: false }
   },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  driverId: { type: Schema.Types.ObjectId, ref: 'Driver' },
+  customerChargeable: { type: Boolean, default: false },
+  reimbursable: { type: Boolean, default: false },
+  approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+  approvedBy: {
+    userId: { type: String, required: false },
+    role: { type: String, required: false }
+  },
+  approvedAt: { type: Date },
 });
 
 export interface IWhatsAppMessage extends Document {
@@ -1232,6 +1257,8 @@ BookingSchema.index({ tenantId: 1, driverId: 1, status: 1, scheduledStartDateTim
 BookingSchema.index({ tenantId: 1, vehicleId: 1, status: 1, scheduledStartDateTime: 1, scheduledEndDateTime: 1 });
 ExpenseSchema.index({ tenantId: 1, date: 1 });
 ExpenseSchema.index({ tenantId: 1, vehicleId: 1 });
+// Backs the Trip Cost Summary's per-booking expense lookup.
+ExpenseSchema.index({ tenantId: 1, bookingId: 1 });
 
 // Export models
 export const Tenant = mongoose.model<ITenant>('Tenant', TenantSchema);
