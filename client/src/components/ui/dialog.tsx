@@ -43,7 +43,16 @@ const DialogContent = React.forwardRef<
         // max-h-[85vh]+overflow-y-auto: previously unbounded, so a tall
         // dialog's footer/actions could render entirely below the fold
         // with no way to reach them on short/mobile viewports.
-        "fixed left-[50%] top-[50%] z-50 grid w-[calc(100%-2rem)] max-w-lg max-h-[85vh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+        // [&>*]:min-w-0: this is `grid` with a single implicit column, so
+        // every direct child (DialogHeader, and whatever content div the
+        // caller renders) is a grid item with the default min-width:auto —
+        // any one of them containing an unbreakable run wider than the
+        // dialog forces the shared column track wider, and *every* row
+        // visually spills past the dialog's edge by that same amount
+        // (confirmed live: every element in a Booking Details dialog
+        // overflowed its box by an identical 105px). min-w-0 lets each
+        // child actually shrink to the dialog's width instead.
+        "fixed left-[50%] top-[50%] z-50 grid w-[calc(100%-2rem)] max-w-lg max-h-[85vh] overflow-y-auto [&>*]:min-w-0 translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
         className
       )}
       {...props}
