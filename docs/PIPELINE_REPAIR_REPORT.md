@@ -174,6 +174,29 @@ Full detail on the 5 repairs applied this initiative. See `docs/PIPELINE_BUG_REP
 
 ---
 
+## Repair 10 — Lead status never auto-advanced through the quoting stage (P2, PARTIALLY_WORKING)
+
+**Previous status**: `Lead.status` only ever moved automatically on quotation *accept* (`→ customer_confirmed`). Creating or sending a quotation never touched it, even though `quotation_draft`/`quotation_sent` enum values existed for exactly this. User confirmed (via `AskUserQuestion`) this was the desired next fix and that the behavior should be "auto-set on successful send."
+
+**Root cause**: No code path at quotation-creation or quotation-send time ever wrote `lead.status`.
+
+**Design consideration surfaced during implementation**: a "send → quotation_sent" transition alone would rarely fire in practice, since `assertValidLeadTransition` only allows `quotation_sent` from `quotation_draft`/`quotation_under_review`/`follow_up_due`/`future_requirement` — and a fresh Lead converted from an Inquiry always starts at `new`, with `quotation_draft` not directly reachable from `new` (staff must first move it through `assigned`/`requirement_completed`, matching the domain's real workflow). Implementing only the send-side sync would have made the fix largely inert for the common case, so the equivalent creation-side sync (`→ quotation_draft`, from `assigned`/`requirement_completed` only) was added too — same category of fix, same established pattern, not a scope expansion beyond what "auto-set on successful send" implies once its actual precondition chain is accounted for.
+
+**Files changed**: `server/routes.ts` — three insertions, all following the exact `assertValidLeadTransition` + try/catch "best-effort sync, never blocks the primary action" pattern already used by `POST /api/quotations/:id/accept`:
+- `POST /api/leads/:leadId/quotations` (creation) — advances `assigned`/`requirement_completed` → `quotation_draft`.
+- `POST /api/quotations/:id/send-whatsapp` (text send) — advances → `quotation_sent`, only inside the existing `if (!result.ok) return ...` guard's success branch (i.e. only on a genuine, confirmed send, never merely on attempting one).
+- `POST /api/quotations/:id/send-whatsapp-pdf` (PDF send) — same, mirrored for consistency between the two send surfaces.
+
+**Database changes**: none (uses the existing `Lead.status` field and its existing enum values).
+
+**Tests**: `tests/e2e/pipeline-audit-lead-quoted-transition.spec.ts` — 3 tests. (1) A lead at `requirement_completed` auto-advances to `quotation_draft` on quotation creation. (2) A `lost` lead is left alone by the same creation call (never silently reopened). (3) A WhatsApp send that fails — this dev tenant has no connected WhatsApp session, confirmed throughout this session — correctly does NOT advance the lead to `quotation_sent`, proving the sync is gated on real success. The successful-send path itself could not be live-tested in this environment (no WhatsApp credentials configured) — its correctness rests on using the identical, already-tested pattern as the accept-route, executed only inside the pre-existing `result.ok` success branch.
+
+A first draft of test 2 used `negotiation` as the "past quoting" example and failed — `negotiation → quotation_draft` turned out to be a legitimate transition already in `leadStatus.ts` (re-drafting after a negotiation), not a bug. Corrected to use `lost`, which the sync explicitly excludes.
+
+**Final status**: Fixed, tested (to the extent this environment allows), regression-clean.
+
+---
+
 ## Cross-cutting process note
 
 Every server-side change in this repair round required a dev-server restart before its effect was visible to Playwright — the dev server runs via plain `tsx server/index.ts` (no watch mode configured in `package.json`'s `dev` script), so file edits are not hot-reloaded. This was discovered mid-repair (Repair 1's first test run gave a false "still broken" result against stale server code) and applied consistently for every subsequent change in this phase.

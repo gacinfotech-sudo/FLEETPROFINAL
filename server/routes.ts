@@ -3916,6 +3916,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         cancellationTerms: req.body.cancellationTerms,
         createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
       });
+
+      // Best-effort Lead status sync (same pattern as the accept/send
+      // routes) — only advances a lead that's already at 'assigned' or
+      // 'requirement_completed'; a lead still sitting at 'new' is left
+      // alone rather than skipping the assign/gather-requirements steps
+      // for it. Quotation creation itself always succeeds either way.
+      if (!['converted_to_customer', 'converted_to_booking', 'lost', 'cancelled'].includes(lead.status)) {
+        try {
+          assertValidLeadTransition(lead.status as LeadStatusValue, 'quotation_draft');
+          lead.status = 'quotation_draft';
+          lead.updatedAt = new Date();
+          await lead.save();
+        } catch {
+          // Not a valid transition from wherever this lead currently is.
+        }
+      }
+
       res.status(201).json(quotation);
     } catch (error: any) {
       console.error('Create quotation error:', error?.message || error);
@@ -4034,6 +4051,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quotation.sentAt = new Date();
         quotation.updatedAt = new Date();
         await quotation.save();
+
+        // Best-effort Lead status sync, same pattern as quotation-accept's
+        // customer_confirmed sync above: a lead already further along its
+        // own pipeline (e.g. negotiation, or already lost) is left alone —
+        // the quotation send itself must never fail because of lead state.
+        const lead = await Lead.findOne({ _id: quotation.leadId, tenantId: req.tenantId });
+        if (lead && !['converted_to_customer', 'converted_to_booking', 'lost', 'cancelled'].includes(lead.status)) {
+          try {
+            assertValidLeadTransition(lead.status as LeadStatusValue, 'quotation_sent');
+            lead.status = 'quotation_sent';
+            lead.updatedAt = new Date();
+            await lead.save();
+          } catch {
+            // Not a valid transition from wherever this lead currently is
+            // (e.g. still 'new', never moved through quotation_draft) —
+            // skip silently, matching the accept-route's own convention.
+          }
+        }
       }
       res.json({ quotation, messageDoc: result.messageDoc });
     } catch (error: any) {
@@ -4086,6 +4121,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           quotation.sentAt = new Date();
           quotation.updatedAt = new Date();
           await quotation.save();
+
+          // Same best-effort Lead status sync as the text-send route above.
+          const lead = await Lead.findOne({ _id: quotation.leadId, tenantId: req.tenantId });
+          if (lead && !['converted_to_customer', 'converted_to_booking', 'lost', 'cancelled'].includes(lead.status)) {
+            try {
+              assertValidLeadTransition(lead.status as LeadStatusValue, 'quotation_sent');
+              lead.status = 'quotation_sent';
+              lead.updatedAt = new Date();
+              await lead.save();
+            } catch {
+              // Not a valid transition from wherever this lead currently is.
+            }
+          }
         }
         res.json({ quotation, messageDoc: result.messageDoc });
       } catch (error: any) {
