@@ -17,9 +17,15 @@ async function fillTripDetailsAndContinue(page: Page, dateStr: string) {
   await page.goto('/dashboard/bookings');
   await page.waitForLoadState('networkidle');
   const resumePrompt = page.getByText('Resume your unfinished booking?');
-  if (await resumePrompt.isVisible({ timeout: 2000 }).catch(() => false)) {
+  // A generous timeout here, not the usual 2s — this dev server has run
+  // many heavy suites back to back in this session and the draft-check
+  // response can lag past a short window, which previously let the
+  // prompt appear AFTER this check passed and then block every fill
+  // below for the rest of the 30s test timeout.
+  if (await resumePrompt.isVisible({ timeout: 6000 }).catch(() => false)) {
     await page.getByRole('button', { name: 'Start Fresh' }).click();
   }
+  await page.locator('input[name="pickupDate"]').waitFor({ state: 'visible', timeout: 15000 });
   await page.locator('input[name="pickupDate"]').fill(dateStr);
   await page.locator('input[name="returnDate"]').fill(dateStr);
   await page.locator('input[name="pickupTime"]').fill('09:00');
@@ -112,5 +118,48 @@ test.describe('Flexible Resource Fulfilment — Booking Wizard Step 2 UI', () =>
     expect(created.vendorVehicleId).toBe(vendorVehicle._id);
     expect(created.fulfilmentType).toBe('vendor');
     expect(created.resourceFulfilmentStatus).toBe('vendor_confirmation_pending');
+  });
+
+  test('UI: Quick Add Vendor + Quick Add Vehicle inline in the wizard, no navigation away from the booking (spec §13/§9)', async ({ page }) => {
+    await login(page, 'qaclient', 'QaFixed456!');
+    const marker = String(Date.now());
+    const dateStr = farFutureDate(76000, 2000);
+    await fillTripDetailsAndContinue(page, dateStr);
+
+    await page.locator('#resource-mode-vendor_vehicle').click();
+    await page.locator('#quick-add-vendor-open').click();
+    await page.locator('#quick-vendor-name').fill(`Quick Add Vendor ${marker}`);
+    await page.locator('#quick-vendor-contact').fill('Suresh QA');
+    await page.locator('#quick-vendor-mobile').fill('96' + marker.slice(-8));
+    await page.locator('#quick-add-vendor-save').click();
+    await expect(page.getByText('Vendor added').first()).toBeVisible({ timeout: 5000 });
+
+    // The new vendor is auto-selected — no need to reopen the Select.
+    await expect(page.locator('#vendor-vehicle-select-vendor')).toContainText(`Quick Add Vendor ${marker}`);
+
+    await page.locator('#quick-add-vehicle-open').click();
+    const reg = `MP09QA${marker.slice(-4)}`;
+    await page.locator('#quick-vehicle-reg').fill(reg);
+    await page.locator('#quick-vehicle-model').fill('Ertiga');
+    await page.locator('#quick-vehicle-category').fill('suv');
+    await page.locator('#quick-add-vehicle-save').click();
+    await expect(page.getByText('Vehicle added').first()).toBeVisible({ timeout: 5000 });
+
+    // The new vehicle is shown as selected in the grid — booking wizard
+    // state was never lost by opening/closing either dialog.
+    await expect(page.getByText(reg).first()).toBeVisible();
+
+    await page.getByRole('button', { name: /Continue to Customer Info/i }).click();
+    await page.getByLabel('Customer Name').fill(`Quick Add UI Test ${marker}`);
+    await page.getByLabel('Phone Number').fill('95' + marker.slice(-8));
+    await page.getByRole('button', { name: 'Review Booking' }).click();
+    await page.getByPlaceholder('Enter final amount').fill('2800');
+    await page.getByRole('button', { name: 'Confirm Booking' }).click();
+    await expect(page.getByText('Booking created successfully!').first()).toBeVisible({ timeout: 10000 });
+
+    const allBookings = await (await page.request.get('/api/bookings')).json();
+    const created = allBookings.find((b: any) => b.customerName === `Quick Add UI Test ${marker}`);
+    expect(created).toBeTruthy();
+    expect(created.vendorVehicleDetails).toContain(reg);
   });
 });

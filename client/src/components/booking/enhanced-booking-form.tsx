@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import html2pdf from 'html2pdf.js';
 import BookingConfirmationPDF from "./booking-confirmation-pdf";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 
 const bookingSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
@@ -134,6 +134,19 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
   const [selectedVendorVehicleId, setSelectedVendorVehicleId] = useState<string>("");
   const [selectedVendorDriverId, setSelectedVendorDriverId] = useState<string>("");
+  // Quick Add (spec §13/§9) — add a new Vendor or a new vehicle for the
+  // selected Vendor without leaving the wizard. Both reuse the existing,
+  // already-tested POST /api/vendors and POST /api/vendors/:id/vehicles
+  // routes verbatim (duplicate-mobile / duplicate-registration rejection
+  // already enforced there) — no new backend logic, only this dialog UI.
+  const [showQuickAddVendor, setShowQuickAddVendor] = useState(false);
+  const [quickVendorName, setQuickVendorName] = useState("");
+  const [quickVendorContact, setQuickVendorContact] = useState("");
+  const [quickVendorMobile, setQuickVendorMobile] = useState("");
+  const [showQuickAddVehicle, setShowQuickAddVehicle] = useState(false);
+  const [quickVehicleReg, setQuickVehicleReg] = useState("");
+  const [quickVehicleModel, setQuickVehicleModel] = useState("");
+  const [quickVehicleCategory, setQuickVehicleCategory] = useState("");
   const [createdBooking, setCreatedBooking] = useState<any>(null);
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [routeType, setRouteType] = useState<"custom" | "local" | "not_decided">("custom");
@@ -390,6 +403,50 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       return withAvailability;
     },
     enabled: resourceMode === "vendor_vehicle" && !!selectedVendorId && !!watchedValues.pickupDate && !!watchedValues.returnDate,
+  });
+
+  const quickAddVendorMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/vendors", {
+        companyName: quickVendorName.trim(),
+        contactPerson: quickVendorContact.trim(),
+        primaryMobile: quickVendorMobile.trim(),
+      });
+      return response.json();
+    },
+    onSuccess: async (vendor) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/vendors", "active"] });
+      setSelectedVendorId(vendor._id || vendor.id);
+      setSelectedVendorVehicleId("");
+      setSelectedVendorDriverId("");
+      setShowQuickAddVendor(false);
+      setQuickVendorName(""); setQuickVendorContact(""); setQuickVendorMobile("");
+      toast({ title: "Vendor added", description: `${vendor.companyName} is now available to select vehicles from.` });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not add vendor", description: err?.message || "Please check the details and try again.", variant: "destructive" });
+    },
+  });
+
+  const quickAddVehicleMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/vendors/${selectedVendorId}/vehicles`, {
+        registrationNumber: quickVehicleReg.trim(),
+        vehicleModel: quickVehicleModel.trim(),
+        category: quickVehicleCategory.trim(),
+      });
+      return response.json();
+    },
+    onSuccess: async (vehicle) => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/vendors", selectedVendorId, "vehicles"] });
+      setSelectedVendorVehicleId(vehicle._id || vehicle.id);
+      setShowQuickAddVehicle(false);
+      setQuickVehicleReg(""); setQuickVehicleModel(""); setQuickVehicleCategory("");
+      toast({ title: "Vehicle added", description: `${vehicle.registrationNumber} is now selected for this booking.` });
+    },
+    onError: (err: any) => {
+      toast({ title: "Could not add vehicle", description: err?.message || "Please check the registration number and try again.", variant: "destructive" });
+    },
   });
 
   // Backward-edit revalidation (spec: "Travel Date changed -> Driver
@@ -1412,7 +1469,12 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
               <div className="mb-8 space-y-4">
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">Vendor Vehicle</h3>
                 <div>
-                  <Label>Vendor</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Vendor</Label>
+                    <Button type="button" variant="ghost" size="sm" id="quick-add-vendor-open" onClick={() => setShowQuickAddVendor(true)} className="h-7 px-2 text-xs">
+                      <Building2 className="w-3.5 h-3.5 mr-1" /> Quick Add Vendor
+                    </Button>
+                  </div>
                   <Select
                     value={selectedVendorId}
                     onValueChange={(value) => { setSelectedVendorId(value); setSelectedVendorVehicleId(""); setSelectedVendorDriverId(""); }}
@@ -1434,7 +1496,12 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                 {selectedVendorId && (
                   <>
                     <div>
-                      <Label>Vendor Vehicle</Label>
+                      <div className="flex items-center justify-between">
+                        <Label>Vendor Vehicle</Label>
+                        <Button type="button" variant="ghost" size="sm" id="quick-add-vehicle-open" onClick={() => setShowQuickAddVehicle(true)} className="h-7 px-2 text-xs">
+                          <Car className="w-3.5 h-3.5 mr-1" /> Quick Add Vehicle
+                        </Button>
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
                         {(vendorVehiclesList || []).length === 0 && (
                           <p className="text-sm text-gray-400 col-span-2">No vehicles registered for this vendor yet.</p>
@@ -2812,6 +2879,83 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
           {renderStep()}
         </form>
       </Form>
+
+      {/* Quick Add Vendor (spec §13) — same duplicate-mobile rejection as
+          the standalone Vendor Database page, since both go through the
+          identical POST /api/vendors route. Current Booking data is
+          untouched by opening/closing this dialog (no navigation). */}
+      <Dialog open={showQuickAddVendor} onOpenChange={setShowQuickAddVendor}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Quick Add Vendor</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="quick-vendor-name">Company / Vendor Name</Label>
+              <Input id="quick-vendor-name" value={quickVendorName} onChange={(e) => setQuickVendorName(e.target.value)} placeholder="e.g. Shree Travels" />
+            </div>
+            <div>
+              <Label htmlFor="quick-vendor-contact">Contact Person</Label>
+              <Input id="quick-vendor-contact" value={quickVendorContact} onChange={(e) => setQuickVendorContact(e.target.value)} placeholder="e.g. Ramesh" />
+            </div>
+            <div>
+              <Label htmlFor="quick-vendor-mobile">Primary Mobile</Label>
+              <Input id="quick-vendor-mobile" value={quickVendorMobile} onChange={(e) => setQuickVendorMobile(e.target.value)} placeholder="10-digit mobile" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowQuickAddVendor(false)}>Cancel</Button>
+            <Button
+              type="button"
+              id="quick-add-vendor-save"
+              disabled={!quickVendorName.trim() || !quickVendorContact.trim() || !quickVendorMobile.trim() || quickAddVendorMutation.isPending}
+              onClick={() => quickAddVendorMutation.mutate()}
+            >
+              {quickAddVendorMutation.isPending ? "Adding..." : "Add Vendor"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Add Vendor Vehicle — a REAL vehicle with a real
+          registration number, same as the standalone Vendor detail page's
+          "Add Vehicle" (POST /api/vendors/:id/vehicles, same duplicate-
+          registration rejection). If the registration isn't known yet,
+          the Outsource path (not this dialog) is the correct choice —
+          spec §9's "no fake physical vehicle" rule means this form never
+          accepts a placeholder registration. */}
+      <Dialog open={showQuickAddVehicle} onOpenChange={setShowQuickAddVehicle}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Quick Add Vehicle</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="quick-vehicle-reg">Registration Number</Label>
+              <Input id="quick-vehicle-reg" value={quickVehicleReg} onChange={(e) => setQuickVehicleReg(e.target.value)} placeholder="e.g. MP09AB1234" />
+            </div>
+            <div>
+              <Label htmlFor="quick-vehicle-model">Vehicle Model</Label>
+              <Input id="quick-vehicle-model" value={quickVehicleModel} onChange={(e) => setQuickVehicleModel(e.target.value)} placeholder="e.g. Swift Dzire" />
+            </div>
+            <div>
+              <Label htmlFor="quick-vehicle-category">Category</Label>
+              <Input id="quick-vehicle-category" value={quickVehicleCategory} onChange={(e) => setQuickVehicleCategory(e.target.value)} placeholder="e.g. sedan, suv" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowQuickAddVehicle(false)}>Cancel</Button>
+            <Button
+              type="button"
+              id="quick-add-vehicle-save"
+              disabled={!quickVehicleReg.trim() || !quickVehicleModel.trim() || !quickVehicleCategory.trim() || quickAddVehicleMutation.isPending}
+              onClick={() => quickAddVehicleMutation.mutate()}
+            >
+              {quickAddVehicleMutation.isPending ? "Adding..." : "Add Vehicle"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Resume unfinished booking draft */}
       <Dialog open={!!pendingDraft} onOpenChange={(open) => { if (!open) discardDraft(); }}>
