@@ -373,3 +373,68 @@ export async function cancelSourcingRequest(tenantId: string, sourcingRequestId:
   await request.save();
   return request;
 }
+
+// Monitoring (spec §26) — every count here has a matching bookingsByCategory
+// query below returning the real rows, so no card shows a number with no
+// way to see what it's made of. TERMINAL_STATUSES bookings are excluded
+// from every "still needs a resource" count — a cancelled or completed
+// booking is never actionable, whatever its resourceFulfilmentStatus.
+const TERMINAL_STATUSES = ['cancelled', 'no_show', 'completed', 'closed'];
+
+export async function buildResourceFulfilmentDashboard(tenantId: string) {
+  const activeBookingFilter = { tenantId, status: { $nin: TERMINAL_STATUSES } };
+  const [
+    ownFleetAssigned, vendorConfirmationPending, resourceSecured, resourceNotSecured,
+    outsourcingRequestsPending, vendorResponsesPending, upcomingWithoutResource,
+  ] = await Promise.all([
+    Booking.countDocuments({ ...activeBookingFilter, vehicleId: { $ne: null, $exists: true } }),
+    Booking.countDocuments({ ...activeBookingFilter, resourceFulfilmentStatus: 'vendor_confirmation_pending' }),
+    Booking.countDocuments({ ...activeBookingFilter, resourceFulfilmentStatus: 'resource_secured' }),
+    Booking.countDocuments({
+      ...activeBookingFilter,
+      $and: [{ $or: [{ vehicleId: null }, { vehicleId: { $exists: false } }] }, { $or: [{ vendorVehicleId: null }, { vendorVehicleId: { $exists: false } }] }],
+    }),
+    VendorSourcingRequest.countDocuments({ tenantId, status: { $in: ['draft', 'sent', 'responses_pending', 'quotes_received'] } }),
+    VendorSourcingResponse.countDocuments({ tenantId, response: 'pending', sentAt: { $ne: null } }),
+    Booking.countDocuments({
+      ...activeBookingFilter,
+      pickupDate: { $gte: new Date(), $lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) },
+      $and: [{ $or: [{ vehicleId: null }, { vehicleId: { $exists: false } }] }, { $or: [{ vendorVehicleId: null }, { vendorVehicleId: { $exists: false } }] }],
+    }),
+  ]);
+
+  return {
+    ownFleetAssigned, vendorConfirmationPending, resourceSecured, resourceNotSecured,
+    outsourcingRequestsPending, vendorResponsesPending, upcomingWithoutResource,
+  };
+}
+
+export type FulfilmentBookingCategory =
+  | 'own_fleet_assigned' | 'vendor_confirmation_pending' | 'resource_secured'
+  | 'resource_not_secured' | 'upcoming_without_resource';
+
+export async function findBookingsByFulfilmentCategory(tenantId: string, category: FulfilmentBookingCategory) {
+  const activeBookingFilter = { tenantId, status: { $nin: TERMINAL_STATUSES } };
+  const unresolvedFilter = { $and: [{ $or: [{ vehicleId: null }, { vehicleId: { $exists: false } }] }, { $or: [{ vendorVehicleId: null }, { vendorVehicleId: { $exists: false } }] }] };
+  let query: any;
+  switch (category) {
+    case 'own_fleet_assigned':
+      query = { ...activeBookingFilter, vehicleId: { $ne: null, $exists: true } };
+      break;
+    case 'vendor_confirmation_pending':
+      query = { ...activeBookingFilter, resourceFulfilmentStatus: 'vendor_confirmation_pending' };
+      break;
+    case 'resource_secured':
+      query = { ...activeBookingFilter, resourceFulfilmentStatus: 'resource_secured' };
+      break;
+    case 'resource_not_secured':
+      query = { ...activeBookingFilter, ...unresolvedFilter };
+      break;
+    case 'upcoming_without_resource':
+      query = { ...activeBookingFilter, ...unresolvedFilter, pickupDate: { $gte: new Date(), $lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) } };
+      break;
+    default:
+      throw new Error(`Unknown fulfilment category: ${category}`);
+  }
+  return Booking.find(query).sort({ pickupDate: 1 }).limit(200);
+}

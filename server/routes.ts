@@ -80,7 +80,7 @@ import { createVendorDriver, findVendorDriverByMobile, checkVendorDriverAvailabi
 import { createVendorVehicle, findVendorVehicleByRegistration, checkVendorVehicleAvailability, normalizeRegistrationNumber } from "./services/vendorVehicleService";
 import { VendorDuty } from "./models/index";
 import { upsertVendorDuty, cancelVendorDutyForBooking, completeVendorDutyForBooking } from "./services/vendorDutyService";
-import { createSourcingRequest, sendSourcingRequestToVendors, recordVendorResponse, selectVendorResponse, cancelSourcingRequest, rankResponses } from "./services/vendorSourcingService";
+import { createSourcingRequest, sendSourcingRequestToVendors, recordVendorResponse, selectVendorResponse, cancelSourcingRequest, rankResponses, buildResourceFulfilmentDashboard, findBookingsByFulfilmentCategory, FulfilmentBookingCategory } from "./services/vendorSourcingService";
 import { VendorSourcingRequest, VendorSourcingResponse } from "./models/index";
 import { buildDriverPerformance } from "./services/driverPerformance";
 import { buildVehiclePerformance } from "./services/vehiclePerformance";
@@ -6388,6 +6388,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(request);
     } catch (error: any) {
       res.status(400).json({ message: error?.message || "Failed to cancel sourcing request" });
+    }
+  });
+
+  // Resource Fulfilment monitoring (spec §26) — every count has a matching
+  // drill-down below returning the real rows, same clickable-card pattern
+  // as the Rewards & Referrals dashboard from the prior initiative.
+  app.get("/api/resource-fulfilment-dashboard", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const dashboard = await buildResourceFulfilmentDashboard(req.tenantId!);
+      res.json(dashboard);
+    } catch (error: any) {
+      console.error('Resource fulfilment dashboard error:', error?.message || error);
+      res.status(500).json({ message: "Failed to build resource fulfilment dashboard" });
+    }
+  });
+
+  const FULFILMENT_CATEGORIES: FulfilmentBookingCategory[] = [
+    'own_fleet_assigned', 'vendor_confirmation_pending', 'resource_secured', 'resource_not_secured', 'upcoming_without_resource',
+  ];
+  app.get("/api/resource-fulfilment-bookings", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const category = req.query.category as FulfilmentBookingCategory;
+      if (!FULFILMENT_CATEGORIES.includes(category)) {
+        return res.status(400).json({ message: `category must be one of: ${FULFILMENT_CATEGORIES.join(', ')}` });
+      }
+      const bookings = await findBookingsByFulfilmentCategory(req.tenantId!, category);
+      res.json(bookings);
+    } catch (error: any) {
+      console.error('Resource fulfilment bookings error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch bookings for this category" });
     }
   });
 

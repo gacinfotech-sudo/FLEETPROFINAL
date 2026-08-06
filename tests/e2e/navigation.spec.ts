@@ -22,6 +22,7 @@ const SIDEBAR_PAGES: { label: string; path: string; expectedText: RegExp }[] = [
   { label: 'Revenue Report', path: '/dashboard/revenue', expectedText: /revenue/i },
   { label: 'Vendor Settlement', path: '/dashboard/vendor-settlement', expectedText: /vendor settlement/i },
   { label: 'Rewards & Referrals', path: '/dashboard/rewards-referrals', expectedText: /Total Points Issued/i },
+  { label: 'Resource Fulfilment', path: '/dashboard/resource-fulfilment', expectedText: /Resource Not Secured/i },
   { label: 'Manage Expenses', path: '/dashboard/expenses', expectedText: /expense/i },
   { label: 'WhatsApp', path: '/dashboard/whatsapp', expectedText: /WhatsApp/i },
   { label: 'Salary', path: '/dashboard/salary', expectedText: /Coming Soon/i },

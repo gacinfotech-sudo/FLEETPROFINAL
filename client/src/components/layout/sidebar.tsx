@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks, Building2, ChevronDown, ChevronRight, Gift } from "lucide-react";
+import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks, Building2, ChevronDown, ChevronRight, Gift, Compass } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -46,6 +46,7 @@ const navItems = [
   { id: "campaigns", label: "Campaigns", icon: Megaphone, restrictedForManagers: true },
   { id: "rewards-referrals", label: "Rewards & Referrals", icon: Gift, restrictedForManagers: true },
   { id: "vendors", label: "Vendors", icon: Building2, restrictedForManagers: true },
+  { id: "resource-fulfilment", label: "Resource Fulfilment", icon: Compass, restrictedForManagers: true },
   { id: "revenue", label: "Revenue Report", icon: TrendingUp, restrictedForManagers: true },
   { id: "vendor-settlement", label: "Vendor Settlement", icon: Building2, restrictedForManagers: true },
   { id: "expenses", label: "Manage Expenses", icon: ReceiptIcon },
