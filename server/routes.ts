@@ -5464,9 +5464,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Time-window params are optional and additive — existing callers that
+  // send none still get the exact same status/expiry-only check as
+  // before. When a pickupDate/returnDate pair is sent (the Booking
+  // Wizard's Vendor Vehicle path does), this also runs the real
+  // VendorDuty overlap check, same as assign-vendor already does.
   app.get("/api/vendors/:vendorId/drivers/:driverId/availability", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
     try {
-      const result = await checkVendorDriverAvailability(req.tenantId!, req.params.vendorId, req.params.driverId);
+      const { pickupDate, pickupTime, returnDate, returnTime } = req.query;
+      const window = (pickupDate && returnDate)
+        ? { start: combineDateTime(pickupDate as string, pickupTime as string | undefined), end: combineDateTime(returnDate as string, returnTime as string | undefined) }
+        : undefined;
+      const result = await checkVendorDriverAvailability(req.tenantId!, req.params.vendorId, req.params.driverId, window);
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to check driver availability" });
@@ -5554,9 +5563,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Same additive time-window support as the driver-availability endpoint above.
   app.get("/api/vendors/:vendorId/vehicles/:vehicleId/availability", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
     try {
-      const result = await checkVendorVehicleAvailability(req.tenantId!, req.params.vendorId, req.params.vehicleId);
+      const { pickupDate, pickupTime, returnDate, returnTime } = req.query;
+      const window = (pickupDate && returnDate)
+        ? { start: combineDateTime(pickupDate as string, pickupTime as string | undefined), end: combineDateTime(returnDate as string, returnTime as string | undefined) }
+        : undefined;
+      const result = await checkVendorVehicleAvailability(req.tenantId!, req.params.vendorId, req.params.vehicleId, window);
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to check vehicle availability" });
