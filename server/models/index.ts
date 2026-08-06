@@ -97,6 +97,18 @@ export interface IDriver extends Document {
   panNumber?: string;
   dateOfJoining?: Date;
   createdAt: Date;
+  // Driver portal login (additive) — a deliberately separate, minimal auth
+  // surface from the staff User/role system, not a new User.role value.
+  // Reasoning: this codebase has 100+ routes gated only by
+  // `authenticateUser, requireTenant` with no further per-route permission
+  // check, all written assuming only admin/client/manager roles exist —
+  // adding a 'driver' role to User would silently pass those, a much
+  // larger and riskier surface than intended. A driver session can only
+  // ever authenticate against the small, explicit set of /api/driver-*
+  // routes built for it.
+  loginPin?: string; // bcrypt hash, never the raw PIN
+  loginPinSetAt?: Date;
+  sessionId?: string;
 }
 
 export interface IBooking extends Document {
@@ -121,6 +133,11 @@ export interface IBooking extends Document {
   customerEmail?: string;
   vehicleId: mongoose.Types.ObjectId;
   driverId?: mongoose.Types.ObjectId;
+  // Set once, by the assigned driver themselves via the driver portal
+  // (POST /api/driver-portal/bookings/:id/accept-duty) — trip start is
+  // unaffected by this either way (spec: don't block on it), it's
+  // visibility for ops, not a gate.
+  dutyAcceptedAt?: Date;
   pickupLocation: string;
   dropoffLocation?: string;
   pickupDate: Date;
@@ -406,8 +423,13 @@ const DriverSchema = new Schema<IDriver>({
   aadharNumber: { type: String },
   panNumber: { type: String },
   dateOfJoining: { type: Date },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  loginPin: { type: String },
+  loginPinSetAt: { type: Date },
+  sessionId: { type: String },
 });
+// Backs authenticateDriver's per-request session lookup.
+DriverSchema.index({ sessionId: 1 });
 
 // Booking Schema
 const BookingSchema = new Schema<IBooking>({
@@ -420,6 +442,7 @@ const BookingSchema = new Schema<IBooking>({
   customerEmail: { type: String },
   vehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle', required: true },
   driverId: { type: Schema.Types.ObjectId, ref: 'Driver' },
+  dutyAcceptedAt: { type: Date },
   pickupLocation: { type: String, required: true },
   dropoffLocation: { type: String },
   pickupDate: { type: Date, required: true },

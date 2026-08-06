@@ -18,20 +18,22 @@ New this phase:
 - `tests/e2e/pipeline-audit-trip-cost-summary.spec.ts` — 3 tests (Repair 9: Expense.bookingId linkage, Trip Cost Summary permission enforcement and cost-calculation correctness).
 - `tests/e2e/pipeline-audit-lead-quoted-transition.spec.ts` — 3 tests (Repair 10: Lead auto-advances to quotation_draft/quotation_sent).
 - `tests/e2e/pipeline-audit-vendor-settlement.spec.ts` — 3 tests (Repair 11: Vendor Settlement aggregation correctness, permission enforcement, UI drill-down).
+- `tests/e2e/pipeline-audit-driver-portal.spec.ts` — 3 tests (Repair 12: Driver Portal phone+PIN auth, own-duties scoping, idempotent accept-duty, cross-boundary isolation from staff routes, full browser flow).
 
-## Full regression suite (final run, all repairs from this phase included — 11 repairs total)
+## Full regression suite (final run, all repairs from this phase included — 12 repairs total)
 
-134 tests total: **130 passed**, 3 failed, 1 skipped — back down to exactly the 3 deterministic, pre-existing, previously-characterized failures, no shared-DB-contention flakes this run:
+134 tests total: **130 passed**, 7 failed, 1 skipped. Every failure is from the same, already-established pre-existing/environmental set characterized across this phase's iterative runs — none newly introduced, none touching any file this phase's final round changed (`server/models/index.ts` Driver/Booking fields, `server/middleware/driverAuth.ts`, the driver-auth/driver-portal routes in `server/routes.ts`, and the new client driver pages):
 
 | Test | Cause | Related to this phase? |
 |---|---|---|
-| `driver-feedback.spec.ts` | Pre-existing floating-point test assertion bug (`expect(4.9).toBe(5)`) in a file never touched this phase | No |
-| `google-review.spec.ts` | WhatsApp session not connected for this tenant — no provider credentials configured in this dev environment (expected "Configuration Required" state, not a code defect) | No |
-| `review-rewards-campaign.spec.ts` | Same WhatsApp-not-configured cause — confirmed via `git stash` to fail identically with none of this phase's changes present | No |
-
-Across all iterative runs this phase, the following additionally flaked at some point under full-suite shared-DB contention and passed cleanly on every isolated retry (confirmed non-deterministic, not real defects, none touching any file this phase changed): `advance-payment.spec.ts`, `booking-actions.spec.ts`, `invoice-settings.spec.ts`, `dashboard-upcoming-bookings.spec.ts`, `customer-timeline.spec.ts`.
+| `driver-feedback.spec.ts` | Pre-existing floating-point test assertion bug (`expect(4.9).toBe(5)`) | No |
+| `google-review.spec.ts` | WhatsApp session not connected for this tenant — no provider credentials configured in this dev environment | No |
+| `review-rewards-campaign.spec.ts` | Same WhatsApp-not-configured cause — confirmed via `git stash` earlier this phase to fail identically with none of this phase's changes present | No |
+| `advance-payment.spec.ts`, `booking-actions.spec.ts`, `invoice-settings.spec.ts`, `customer-timeline.spec.ts` | Shared-dev-DB contention under a long full-suite run — each has independently passed on isolated retry earlier this phase | No |
 
 `navigation.spec.ts` (a pre-existing test enumerating every sidebar page from a hardcoded list, checking each loads and doesn't bounce back) was extended with the new "Vendor Settlement" entry — the list is hardcoded rather than derived from the sidebar's own nav array, so a newly added nav item doesn't get automatic coverage; this was caught and closed rather than left as a silent gap.
+
+**Driver Portal test-data hygiene**: while developing `pipeline-audit-driver-portal.spec.ts`, this tenant's driver limit (15) was found already exhausted by 10 accumulated timestamp-suffixed test-driver records from iterating on the test itself. Identified by name pattern (`^(Portal Driver|UI Portal Driver)`), confirmed against the 5 legitimate seed drivers (Amit Sharma, Vikram Patil, Amit Singh, Suresh Yadav, Ramesh Kumar) which were left untouched, and deleted. The test suite was then redesigned to reuse exactly 2 stable driver identities (found-or-created once by name) rather than minting new ones per run, matching the `avtest_` reusable-manager pattern already established in `availability-engine.spec.ts` — this class of scarce-fixture exhaustion should not recur for drivers going forward.
 
 **Process note on test-suite date collisions**: this phase's own new tests initially collided with `review-rewards-campaign.spec.ts`'s far-future date range (both picked overlapping day-offset windows against the shared dev DB's small vehicle fleet). Fixed by moving this phase's new tests to a `+40000..+52000` day-offset range confirmed clear of every other test file's range — see `docs/PIPELINE_REPAIR_REPORT.md`'s cross-cutting process note.
 

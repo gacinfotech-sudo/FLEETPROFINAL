@@ -81,7 +81,9 @@ import { getInvoiceSettings, upsertInvoiceSettings } from "./services/invoiceSet
 import { buildCustomerDriverHistory, buildDriverFeedbackProfile } from "./services/driverFeedbackService";
 import { buildCustomerVehicleHistory, buildVehicleFeedbackProfile } from "./services/vehicleFeedbackService";
 import { DriverLeave, DriverAttendance } from "./models/index";
-import { Expense } from "./models/index";
+import { Expense, Driver } from "./models/index";
+import bcrypt from "bcrypt";
+import { authenticateDriver, type DriverAuthRequest } from "./middleware/driverAuth";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -534,6 +536,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error in /api/auth/me:', error);
       res.status(500).json({ message: "Failed to fetch user data" });
+    }
+  });
+
+  // ===== Driver portal auth (additive, separate from staff auth above) =====
+  // See the IDriver.loginPin comment in server/models/index.ts for why this
+  // is a deliberately parallel, minimal session mechanism rather than a
+  // new User.role. Reuses the exact same brute-force protections already
+  // built for staff login (loginRateLimit/loginSpeedLimit/checkUserLockout/
+  // trackLoginAttempt) — a short numeric PIN is if anything MORE guessable
+  // than a staff password, so this protection matters at least as much here.
+  app.post("/api/driver-auth/login", loginRateLimit, loginSpeedLimit, checkUserLockout, async (req, res) => {
+    try {
+      const { phone, pin } = req.body || {};
+      const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+      const userAgent = req.get('User-Agent') || 'unknown';
+
+      if (!phone || !pin) {
+        return res.status(400).json({ message: "Phone and PIN are required" });
+      }
+      const normalized = normalizeIndianPhone(phone);
+      if (!normalized) {
+        return res.status(400).json({ message: "Enter a valid 10-digit Indian mobile number." });
+      }
+
+      // checkUserLockout above already read req.body.userId (not set here,
+      // since this isn't the staff login body shape) — track attempts
+      // under the normalized phone explicitly so the same 5-strikes lockout
+      // actually applies to repeated PIN guesses against one driver.
+      const recentFailedAttempts = getRecentFailedAttempts(normalized);
+      if (recentFailedAttempts >= 5) {
+        trackLoginAttempt(normalized, clientIP, false, userAgent);
+        return res.status(429).json({
+          message: "Too many failed attempts. Please wait 5 minutes.",
+          lockoutTime: 5 * 60,
+        });
+      }
+
+      // Phone is not guaranteed globally unique across tenants (nothing
+      // enforces that today), and a driver has no tenant context to supply
+      // at login — so every same-phone candidate is checked, and whichever
+      // one the PIN actually matches resolves the tenant automatically.
+      const last10 = normalized.replace(/^91/, '');
+      const candidates = await Driver.find({ phone: new RegExp(last10 + '$'), loginPin: { $exists: true, $ne: null } });
+
+      let matched: any = null;
+      for (const candidate of candidates) {
+        if (candidate.loginPin && await bcrypt.compare(String(pin), candidate.loginPin)) {
+          matched = candidate;
+          break;
+        }
+      }
+
+      if (!matched) {
+        trackLoginAttempt(normalized, clientIP, false, userAgent);
+        return res.status(401).json({ message: "Invalid phone number or PIN" });
+      }
+
+      trackLoginAttempt(normalized, clientIP, true, userAgent);
+
+      const sessionId = nanoid();
+      matched.sessionId = sessionId;
+      await matched.save();
+
+      // A driver session and a staff session are independent keys on the
+      // same cookie-backed session object (see authenticateDriver) — clearing
+      // userId here is just defensive hygiene, not required for correctness.
+      delete (req.session as any).userId;
+      (req.session as any).driverSessionId = sessionId;
+
+      req.session.save((err) => {
+        if (err) {
+          console.error('Error saving driver session:', err);
+          return res.status(500).json({ message: "Failed to save session" });
+        }
+        res.json({ driver: { id: matched._id, name: matched.name, phone: matched.phone } });
+      });
+    } catch (error: any) {
+      console.error('Driver login error:', error?.message || error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.post("/api/driver-auth/logout", authenticateDriver, async (req: DriverAuthRequest, res) => {
+    try {
+      if (req.driver) {
+        req.driver.sessionId = undefined;
+        await req.driver.save();
+      }
+      req.session.destroy((err) => {
+        if (err) console.error('Error destroying driver session:', err);
+        res.json({ message: "Logged out" });
+      });
+    } catch (error: any) {
+      console.error('Driver logout error:', error?.message || error);
+      res.status(500).json({ message: "Logout failed" });
+    }
+  });
+
+  app.get("/api/driver-portal/me", authenticateDriver, async (req: DriverAuthRequest, res) => {
+    res.json({ id: req.driver._id, name: req.driver.name, phone: req.driver.phone, status: req.driver.status });
+  });
+
+  // A driver's own assigned duties only — scoped by BOTH driverId and the
+  // driver's own tenantId (never client-supplied), so this can never leak
+  // another driver's or another tenant's bookings even though the driver
+  // session itself carries no separate tenant-selection step.
+  app.get("/api/driver-portal/my-duties", authenticateDriver, async (req: DriverAuthRequest, res) => {
+    try {
+      const bookings = await Booking.find({
+        tenantId: req.driver.tenantId,
+        driverId: req.driver._id,
+        status: { $nin: ['cancelled', 'no_show'] },
+      })
+        .select('bookingId customerName customerPhone pickupLocation dropoffLocation pickupDate pickupTime returnDate returnTime status totalAmount advanceReceived dutyAcceptedAt')
+        .sort({ pickupDate: -1 });
+      res.json(bookings);
+    } catch (error: any) {
+      console.error('Driver duties error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load duties" });
+    }
+  });
+
+  app.post("/api/driver-portal/bookings/:id/accept-duty", authenticateDriver, async (req: DriverAuthRequest, res) => {
+    try {
+      const booking: any = await Booking.findOne({ _id: req.params.id, tenantId: req.driver.tenantId, driverId: req.driver._id });
+      if (!booking) return res.status(404).json({ message: "Duty not found" });
+      if (!booking.dutyAcceptedAt) {
+        booking.dutyAcceptedAt = new Date();
+        await booking.save();
+      }
+      res.json({ dutyAcceptedAt: booking.dutyAcceptedAt });
+    } catch (error: any) {
+      console.error('Accept duty error:', error?.message || error);
+      res.status(500).json({ message: "Failed to accept duty" });
+    }
+  });
+
+  // Staff-side PIN management — a driver can never set/see their own PIN
+  // hash; only office staff with MANAGE_DRIVERS can set or reset one, the
+  // same permission that already gates every other driver-record edit.
+  // Setting a new PIN also force-logs-out any existing driver session
+  // (defense in depth: a lost/compromised PIN shouldn't leave an old
+  // session valid after it's reset).
+  app.post("/api/drivers/:id/set-login-pin", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+    try {
+      const { pin } = req.body || {};
+      if (!pin || !/^\d{4,6}$/.test(String(pin))) {
+        return res.status(400).json({ message: "PIN must be 4-6 digits." });
+      }
+      const driver: any = await Driver.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!driver) return res.status(404).json({ message: "Driver not found" });
+      driver.loginPin = await bcrypt.hash(String(pin), 12);
+      driver.loginPinSetAt = new Date();
+      driver.sessionId = undefined;
+      await driver.save();
+      res.json({ loginPinSetAt: driver.loginPinSetAt });
+    } catch (error: any) {
+      console.error('Set driver PIN error:', error?.message || error);
+      res.status(500).json({ message: "Failed to set PIN" });
     }
   });
 

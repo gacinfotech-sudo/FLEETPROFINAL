@@ -12,6 +12,8 @@ import Dashboard from "./pages/dashboard";
 import ForcedPasswordResetPage from "./pages/forced-password-reset";
 import NotFound from "@/pages/not-found";
 import ProtectedRoute from "@/components/auth/protected-route";
+import DriverLoginPage from "./pages/driver-login";
+import DriverPortalPage from "./pages/driver-portal";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -52,6 +54,13 @@ function AuthenticatedApp() {
           <AdminPanel key={user?.userId} />
         </ProtectedRoute>
       </Route>
+
+      {/* Driver portal — deliberately outside the staff AuthProvider/
+          ProtectedRoute context above (separate session mechanism, see
+          server/middleware/driverAuth.ts); each page manages its own
+          driver-auth state independently. */}
+      <Route path="/driver-login" component={DriverLoginPage} />
+      <Route path="/driver" component={DriverPortalPage} />
 
       {/* Dashboard */}
       <Route path="/dashboard/:section?">

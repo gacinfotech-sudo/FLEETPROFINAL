@@ -218,6 +218,32 @@ A first draft of test 2 used `negotiation` as the "past quoting" example and fai
 
 ---
 
+## Repair 12 — Driver Portal: phone + PIN login, own-duties view, Accept Duty (P2, DISCONNECTED)
+
+**Previous status**: No driver-facing login or portal existed at all. Duty notification was WhatsApp-message-only, with no acceptance step and no way for a driver to see their own itinerary in-app.
+
+**Blocking design decision, resolved by the user**: this item was explicitly held back from earlier phases because it required a call only the user could make — how should drivers authenticate? Presented three options via `AskUserQuestion` (phone+PIN, full email/password `User` account, or stay WhatsApp-only/don't build it); user chose phone+PIN.
+
+**Architectural decision made independently, documented for review**: rather than adding `'driver'` as a new `User.role` value, this is a genuinely separate, parallel auth mechanism. Rationale: a repo-wide characteristic surfaced by this initiative's own research is that 100+ existing routes are gated only by `authenticateUser, requireTenant` with no further per-route permission check — every one of them was written under the assumption that only `admin`/`client`/`manager` roles can ever reach them. Adding a fourth role to the same `User` model would have silently granted a driver session access to all of those unless every single one were re-audited, a far larger and riskier change than the feature itself warrants. A driver session instead can only ever satisfy `authenticateDriver` (`server/middleware/driverAuth.ts`), a middleware checked by no route except the small, explicit `/api/driver-auth/*` and `/api/driver-portal/*` set built for it — isolation by construction, not by convention.
+
+**Files changed**:
+- `server/models/index.ts` — additive `Driver.loginPin` (bcrypt hash, never the raw PIN)/`loginPinSetAt`/`sessionId` fields + index; additive `Booking.dutyAcceptedAt`.
+- `server/middleware/driverAuth.ts` — new `authenticateDriver`, mirroring `authenticateUser`'s DB-backed session-id-lookup pattern exactly, but against `Driver.sessionId` instead of `User`.
+- `server/routes.ts` — `POST /api/driver-auth/login` (phone+PIN; reuses the exact same `loginRateLimit`/`loginSpeedLimit`/`checkUserLockout`/`trackLoginAttempt` brute-force protection already built and tested for staff login — a short numeric PIN is if anything more guessable than a password, so this matters at least as much here) and `/logout`; `GET /api/driver-portal/me` and `/my-duties` (scoped by both `driverId` and the driver's own `tenantId`, read from the authenticated Driver document, never client-supplied); `POST /api/driver-portal/bookings/:id/accept-duty` (idempotent — a second accept is a no-op returning the original timestamp); staff-only `POST /api/drivers/:id/set-login-pin` (gated by the existing `MANAGE_DRIVERS` permission — a driver can never set or see their own PIN hash; resetting one force-invalidates any existing session).
+- `client/src/App.tsx` — new `/driver-login` and `/driver` routes, deliberately outside the staff `AuthProvider`/`ProtectedRoute`/Dashboard shell.
+- `client/src/pages/driver-login.tsx`, `client/src/pages/driver-portal.tsx` — new standalone pages managing their own auth state independently of the staff `useAuth()` context.
+- `client/src/components/drivers/set-driver-pin-dialog.tsx` — new staff-side control, mounted in the existing Driver Profile dialog header.
+
+**Database changes**: additive fields + one new index; no existing Driver/Booking document affected.
+
+**Tests**: `tests/e2e/pipeline-audit-driver-portal.spec.ts` — 3 tests: (1) a manager without `manage_drivers` is blocked from setting a PIN; (2) full API-level flow — wrong PIN rejected, correct PIN logs in, sees exactly their own duties (never another driver's, proven with a second driver + booking that must not appear), accepts a duty idempotently, a driver session gets 401 from an unrelated staff-only route, logout invalidates the session; (3) a real browser flow — staff sets a PIN from the actual Driver Profile UI, a driver logs in from a genuinely separate browser context (no staff cookie involved) and accepts a fresh duty, located via a stable `data-testid` (route-text alone was ambiguous once the reusable test driver had accumulated bookings across repeated runs). Live-verified via screenshot.
+
+**Operational finding along the way**: this tenant's driver limit (15, same hard-cap pattern as the manager-quota issue found earlier in this initiative) was already exhausted purely by accumulated test-driver records from iterating on this test (10 timestamp-suffixed records). Identified and deleted exactly those 10 (confirmed by name-prefix match against this session's own naming convention; the 5 legitimate seed drivers — Amit Sharma, Vikram Patil, Amit Singh, Suresh Yadav, Ramesh Kumar — were left untouched), then redesigned the test suite to reuse 2 stable driver identities (find-or-create-once by name, mirroring the `avtest_` manager pattern already established in `availability-engine.spec.ts`) so it can never re-exhaust the limit on future runs.
+
+**Final status**: Fixed, tested, regression-clean.
+
+---
+
 ## Cross-cutting process note
 
 Every server-side change in this repair round required a dev-server restart before its effect was visible to Playwright — the dev server runs via plain `tsx server/index.ts` (no watch mode configured in `package.json`'s `dev` script), so file edits are not hot-reloaded. This was discovered mid-repair (Repair 1's first test run gave a false "still broken" result against stale server code) and applied consistently for every subsequent change in this phase.

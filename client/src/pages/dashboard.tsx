@@ -37,6 +37,7 @@ import BookingCommunication from "../components/booking/booking-communication";
 import ExtendBookingDialog from "../components/booking/extend-booking-dialog";
 import PaymentSection from "../components/booking/payment-section";
 import TripCostSummary from "../components/booking/trip-cost-summary";
+import SetDriverPinDialog from "../components/drivers/set-driver-pin-dialog";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -3054,12 +3055,15 @@ export default function Dashboard() {
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">{viewingDriver.name}</h2>
                   <p className="text-gray-600">{viewingDriver.phone}</p>
-                  <Badge 
-                    variant={viewingDriver.status === "available" ? "default" : 
+                  <Badge
+                    variant={viewingDriver.status === "available" ? "default" :
                             viewingDriver.status === "on_duty" ? "secondary" : "destructive"}
                   >
                     {viewingDriver.status}
                   </Badge>
+                </div>
+                <div className="ml-auto">
+                  <SetDriverPinDialog driverId={viewingDriver._id || viewingDriver.id} driverName={viewingDriver.name} />
                 </div>
               </div>
 
