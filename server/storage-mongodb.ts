@@ -3,6 +3,13 @@ import { nanoid } from 'nanoid';
 import mongoose from 'mongoose';
 import { Tenant, User, Vehicle, Driver, Booking, Expense, ITenant, IUser, IVehicle, IDriver, IBooking, IExpense } from './models';
 import { findVehicleConflicts, findDriverConflicts, findTentativeDraftConflicts, combineDateTime } from './services/availability';
+// TASK-02 (telephony/RBAC isolation) additive import — CallSession/
+// TelephonyIdentity are owned by server/telephony/models/* (a separate
+// collection outside the shared server/models/index.ts, which this task is
+// forbidden from editing; see .claude/tasks/reports/TASK-02-report.md).
+// Only new, additively-named methods below reference these — no existing
+// method in this file was touched to add telephony support.
+import { CallSession, ICallSession, TelephonyIdentity, ITelephonyIdentity } from './telephony/models';
 
 export interface IStorage {
   // Auth methods
@@ -1480,6 +1487,221 @@ export class MongoDBStorage implements IStorage {
       console.error('Error getting total expenses:', error);
       return 0;
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // TASK-02: telephony / multi-user RBAC + data isolation.
+  // All methods below are new and additively named — none of the methods
+  // above were modified to add this feature (see MANIFEST.md's note on why
+  // TASK-02 and TASK-03 can both append to this file without colliding).
+  // Ownership scoping (who may see which CallSessions) intentionally lives
+  // here as plain query shape, not permission logic — callers
+  // (server/telephony/services/callService.ts) decide *which* of these to
+  // call based on req.user.role, mirroring the existing scopeTenant()
+  // convention in server/routes.ts where admins bypass tenant scoping.
+  // ---------------------------------------------------------------------
+
+  /** An executive's own calls only — Ram never sees Shyam's calls and vice
+   * versa, even within the same tenant. */
+  async getCallSessionsForUser(
+    tenantId: string,
+    userId: string,
+    filters: { status?: string; limit?: number } = {},
+  ): Promise<ICallSession[]> {
+    try {
+      const query: any = { tenantId, userId: userId.toLowerCase() };
+      if (filters.status) query.status = filters.status;
+      return await CallSession.find(query)
+        .sort({ createdAt: -1 })
+        .limit(Math.min(filters.limit ?? 200, 500));
+    } catch (error) {
+      console.error('Error getting call sessions for user:', error);
+      return [];
+    }
+  }
+
+  /** Tenant-owner/manager combined view across the whole team, optionally
+   * filtered down to one executive (Ankit filtering by Ram or by Shyam). */
+  async getCallSessionsForTenant(
+    tenantId: string,
+    filters: { executiveUserId?: string; status?: string; limit?: number } = {},
+  ): Promise<ICallSession[]> {
+    try {
+      const query: any = { tenantId };
+      if (filters.executiveUserId) query.userId = filters.executiveUserId.toLowerCase();
+      if (filters.status) query.status = filters.status;
+      return await CallSession.find(query)
+        .sort({ createdAt: -1 })
+        .limit(Math.min(filters.limit ?? 500, 1000));
+    } catch (error) {
+      console.error('Error getting call sessions for tenant:', error);
+      return [];
+    }
+  }
+
+  /** Single-record read, tenant-scoped by default (pass tenantId=undefined
+   * only for the admin cross-tenant bypass, same convention as
+   * getBooking/getDriver elsewhere in this file). A different tenant's
+   * CallSession._id must never resolve here — direct ID manipulation from
+   * another tenant returns undefined, which routes.ts turns into 404. */
+  async getCallSessionById(id: string, tenantId?: string): Promise<ICallSession | null> {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(id)) return null;
+      const query: any = { _id: id };
+      if (tenantId) query.tenantId = tenantId;
+      return await CallSession.findOne(query);
+    } catch (error) {
+      console.error('Error getting call session by id:', error);
+      return null;
+    }
+  }
+
+  /** Duplicate-event protection for inbound provider webhooks — the
+   * (tenantId, providerCallId) unique index backs this, this is just the
+   * lookup half of "check before insert". */
+  async findCallSessionByProviderCallId(tenantId: string, providerCallId: string): Promise<ICallSession | null> {
+    try {
+      return await CallSession.findOne({ tenantId, providerCallId });
+    } catch (error) {
+      console.error('Error finding call session by providerCallId:', error);
+      return null;
+    }
+  }
+
+  async createCallSessionRecord(data: Partial<ICallSession>): Promise<ICallSession> {
+    return CallSession.create(data as any);
+  }
+
+  /** Generic tenant-scoped field patch (status/timing/provider linkage
+   * updates) — never touches userId/createdBy, so historical ownership
+   * attribution is preserved by construction (callers simply don't pass
+   * those fields; see callService.ts). */
+  async updateCallSessionFields(
+    id: string,
+    tenantId: string,
+    update: Partial<ICallSession>,
+  ): Promise<ICallSession | null> {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(id)) return null;
+      return await CallSession.findOneAndUpdate({ _id: id, tenantId }, { $set: update }, { new: true });
+    } catch (error) {
+      console.error('Error updating call session:', error);
+      return null;
+    }
+  }
+
+  /** Appends a note without ever rewriting an existing note's attribution
+   * (push-only array update). */
+  async addCallSessionNote(
+    id: string,
+    tenantId: string,
+    note: { text: string; createdBy: { userId: string; role: string } },
+  ): Promise<ICallSession | null> {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(id)) return null;
+      return await CallSession.findOneAndUpdate(
+        { _id: id, tenantId },
+        { $push: { notes: { ...note, createdAt: new Date() } } },
+        { new: true },
+      );
+    } catch (error) {
+      console.error('Error adding call session note:', error);
+      return null;
+    }
+  }
+
+  /** Reassigns follow-up ownership (assignedUserId) and appends an
+   * immutable history entry — the original creator/owner (`userId`) and
+   * every prior note's `createdBy` are never rewritten by this. */
+  async reassignCallSession(
+    id: string,
+    tenantId: string,
+    event: { toUserId: string; changedBy: { userId: string; role: string }; reason?: string },
+  ): Promise<ICallSession | null> {
+    try {
+      if (!mongoose.Types.ObjectId.isValid(id)) return null;
+      const existing = await CallSession.findOne({ _id: id, tenantId });
+      if (!existing) return null;
+      const fromUserId = existing.assignedUserId;
+      const toUserId = event.toUserId.toLowerCase();
+      return await CallSession.findOneAndUpdate(
+        { _id: id, tenantId },
+        {
+          $set: { assignedUserId: toUserId },
+          $push: {
+            reassignmentHistory: {
+              fromUserId,
+              toUserId,
+              changedBy: event.changedBy,
+              changedAt: new Date(),
+              reason: event.reason,
+            },
+          },
+        },
+        { new: true },
+      );
+    } catch (error) {
+      console.error('Error reassigning call session:', error);
+      return null;
+    }
+  }
+
+  /** Looks up a user's own telephony identity — used both to select "which
+   * identity places this outbound call" and to answer GET /identities/:userId. */
+  async getTelephonyIdentityForUser(tenantId: string, userId: string): Promise<ITelephonyIdentity | null> {
+    try {
+      return await TelephonyIdentity.findOne({ tenantId, userId: userId.toLowerCase() });
+    } catch (error) {
+      console.error('Error getting telephony identity:', error);
+      return null;
+    }
+  }
+
+  /** Inbound-webhook tenant/executive resolution has no session context to
+   * scope by, so this intentionally searches across tenants by the
+   * provider's virtual number/DID — callers must not trust the result
+   * without also verifying the webhook signature first (see
+   * server/telephony/routes/webhook.ts). */
+  async getTelephonyIdentityByVirtualNumber(virtualNumber: string): Promise<ITelephonyIdentity | null> {
+    try {
+      return await TelephonyIdentity.findOne({ virtualNumber, incomingEnabled: true });
+    } catch (error) {
+      console.error('Error resolving telephony identity by virtual number:', error);
+      return null;
+    }
+  }
+
+  async getTelephonyIdentitiesForTenant(tenantId: string): Promise<ITelephonyIdentity[]> {
+    try {
+      return await TelephonyIdentity.find({ tenantId }).sort({ userId: 1 });
+    } catch (error) {
+      console.error('Error listing telephony identities:', error);
+      return [];
+    }
+  }
+
+  /** Owner/admin-only write path (enforced by the route's requirePermission,
+   * not here) — creates or updates the one identity per (tenantId, userId).
+   * `encryptedCredentials` is expected to already be an encrypted envelope
+   * (see server/telephony/security/credentialEncryption.ts) — this method
+   * never receives or stores plaintext provider secrets itself. */
+  async upsertTelephonyIdentityRecord(
+    tenantId: string,
+    userId: string,
+    data: Partial<ITelephonyIdentity>,
+    actorUserId: string,
+  ): Promise<ITelephonyIdentity> {
+    const normalizedUserId = userId.toLowerCase();
+    const update: any = { ...data, tenantId, userId: normalizedUserId, updatedBy: actorUserId };
+    const result = await TelephonyIdentity.findOneAndUpdate(
+      { tenantId, userId: normalizedUserId },
+      {
+        $set: update,
+        $setOnInsert: { createdBy: actorUserId },
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true },
+    );
+    return result!;
   }
 }
 
