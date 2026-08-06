@@ -298,6 +298,55 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   const availableDrivers = (driverAvailabilityRows || []).filter((d: any) => d.available !== false);
   const unavailableDrivers = (driverAvailabilityRows || []).filter((d: any) => d.available === false);
 
+  // Backward-edit revalidation (spec: "Travel Date changed -> Driver
+  // Availability, Vehicle Availability... require review"). The two
+  // queries above already refetch reactively when the date/time window
+  // changes, but the SELECTED vehicleId/driverId already sitting in form
+  // state was never revalidated against the new list — going back to
+  // step 1, changing the date, then returning to step 2 could silently
+  // carry forward a vehicle/driver that's no longer actually available,
+  // surfacing only as a generic error at final submit. This clears a
+  // stale selection and explains why, the moment fresh availability data
+  // for the new window arrives — never on first load (only a real
+  // in-place edit), and never a false clear of a still-valid selection.
+  const availabilityWindowKey = `${watchedValues.pickupDate}|${watchedValues.pickupTime}|${watchedValues.returnDate}|${watchedValues.returnTime}`;
+  const prevAvailabilityWindowKeyRef = useRef(availabilityWindowKey);
+  const revalidationArmedRef = useRef(false);
+  useEffect(() => {
+    if (prevAvailabilityWindowKeyRef.current !== availabilityWindowKey) {
+      prevAvailabilityWindowKeyRef.current = availabilityWindowKey;
+      revalidationArmedRef.current = true;
+    }
+  }, [availabilityWindowKey]);
+  useEffect(() => {
+    if (!revalidationArmedRef.current) return;
+    if (availableVehicles === undefined && driverAvailabilityRows === undefined) return; // still refetching
+    revalidationArmedRef.current = false;
+
+    const vehicleList = Array.isArray(availableVehicles) ? availableVehicles : [];
+    if (watchedValues.vehicleId && !vehicleList.some((v: any) => (v._id || v.id) === watchedValues.vehicleId)) {
+      form.setValue("vehicleId", "");
+      setSelectedVehicleId("");
+      toast({
+        title: "Review required: Vehicle selection",
+        description: "The travel date/time changed, and your previously selected vehicle is no longer available for this window. Please choose again.",
+        variant: "destructive",
+      });
+    }
+    if (watchedValues.driverId && driverAvailabilityRows !== undefined) {
+      const stillAvailable = availableDrivers.some((d: any) => (d._id || d.id) === watchedValues.driverId);
+      if (!stillAvailable) {
+        form.setValue("driverId", "");
+        toast({
+          title: "Review required: Driver selection",
+          description: "The travel date/time changed, and your previously selected driver is no longer available for this window. Please choose again.",
+          variant: "destructive",
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [availableVehicles, driverAvailabilityRows]);
+
   // Reward points lookup by the phone number already entered on step 3 —
   // shows the customer's real balance for "Apply Reward Points" on step
   // 4 without adding a separate customer-search step to the form.
