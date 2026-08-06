@@ -98,12 +98,21 @@ test.describe('Invoice Settings + atomic financial-year-aware numbering', () => 
 
     await page.locator('nav').getByRole('button', { name: 'Profile' }).click();
     await expect(page.getByText('Invoice Settings', { exact: true })).toBeVisible();
+    // The "Invoice Settings" title renders immediately; GET /api/invoice-settings
+    // populating the form is a separate, slightly later async step (this
+    // page also mounts BusinessProfile/RewardReferralSettingsPanel, each
+    // with their own fetches). Typing before that GET resolves raced with
+    // the populate-on-load effect — production code now guards against it
+    // (InvoiceSettingsPanel's hasInteractedRef), but the test itself
+    // should not rely on winning that race either.
+    await page.waitForLoadState('networkidle');
 
     await page.getByLabel('Brand Name').fill(brandName);
     await page.getByRole('button', { name: 'Save Invoice Settings' }).click();
     await expect(page.getByText('Invoice settings saved')).toBeVisible({ timeout: 5000 });
 
     await page.reload();
+    await page.waitForLoadState('networkidle');
     await expect(page.getByLabel('Brand Name')).toHaveValue(brandName, { timeout: 5000 });
   });
 });
