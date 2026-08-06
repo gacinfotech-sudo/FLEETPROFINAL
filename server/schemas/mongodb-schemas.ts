@@ -89,6 +89,10 @@ export const mongoDriverSchema = z.object({
 export const mongoBookingSchema = z.object({
   tenantId: z.string(),
   bookingId: z.string().optional(),
+  // Same "must be declared or Zod silently strips it" trap noted on
+  // createdBy just below — declared explicitly so the duplicate-booking
+  // idempotency check in server/routes.ts actually receives this field.
+  idempotencyKey: z.string().optional(),
   // Was never declared here, so the default Zod object behavior (strip
   // unrecognized keys) silently dropped it from every booking ever created
   // through this schema — server/routes.ts has built this object correctly

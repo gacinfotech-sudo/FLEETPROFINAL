@@ -1388,7 +1388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
 
-  app.delete("/api/users/sub-users/:userId", authenticateUser, async (req: AuthRequest, res) => {
+  app.delete("/api/users/sub-users/:userId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       // Only allow admin and client users to deactivate sub-users
       if (req.user?.role !== 'admin' && req.user?.role !== 'client') {
@@ -1405,7 +1405,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/users/sub-users/:userId/reactivate", authenticateUser, async (req: AuthRequest, res) => {
+  app.patch("/api/users/sub-users/:userId/reactivate", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       // Only allow admin and client users to reactivate sub-users
       if (req.user?.role !== 'admin' && req.user?.role !== 'client') {
@@ -1423,7 +1423,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Revenue Report
-  app.get("/api/reports/revenue", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+  app.get("/api/reports/revenue", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
     try {
       const { startDate, endDate } = req.query;
       console.log('Revenue Report API Debug:', {
@@ -2135,6 +2135,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // contains customer PII (name, phone, email) and financial amounts.
       const bookingData: any = mongoBookingSchema.parse(mappedData);
 
+      // Duplicate-request guard (pipeline audit finding: this route had no
+      // idempotency protection at all — a double form-submit, a browser
+      // back-then-resubmit, or a retried request after a dropped response
+      // created two distinct Booking documents, each with its own vehicle/
+      // driver hold and its own revenue count). Checked before any of the
+      // customer-linking/reward-redemption/payment side effects below run,
+      // so a retry is a true no-op rather than a partial re-do. Optional:
+      // callers that don't send a key (imports, migrations, older clients)
+      // keep today's behavior unchanged.
+      if (bookingData.idempotencyKey) {
+        const existingBooking = await Booking.findOne({
+          tenantId: req.tenantId,
+          idempotencyKey: bookingData.idempotencyKey,
+        });
+        if (existingBooking) {
+          return res.status(200).json(existingBooking);
+        }
+      }
+
       // Customer Database linking — resolved BEFORE the booking is
       // created (not after) so an "Apply Reward Points" redemption can be
       // validated against a real customer/balance and its discount
@@ -2180,7 +2199,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bookingData.rewardDiscountApplied = redemption.discountValue;
       }
 
-      let booking = await storage.createBooking(bookingData);
+      let booking;
+      try {
+        booking = await storage.createBooking(bookingData);
+      } catch (error: any) {
+        // Two truly simultaneous requests carrying the same idempotencyKey
+        // can both pass the pre-check above before either has saved — the
+        // unique partial index (tenantId+idempotencyKey) is the real
+        // guard, this just turns that race into the same "return the
+        // existing booking" response instead of a raw 500.
+        if (error?.code === 11000 && bookingData.idempotencyKey) {
+          const existingBooking = await Booking.findOne({
+            tenantId: req.tenantId,
+            idempotencyKey: bookingData.idempotencyKey,
+          });
+          if (existingBooking) return res.status(200).json(existingBooking);
+        }
+        throw error;
+      }
 
       if (resolvedCustomer) {
         try {
@@ -2321,6 +2357,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // through POST /api/bookings/:id/payments instead; that route
       // recomputes this field itself after inserting a transaction.
       delete bookingData.advanceReceived;
+      // idempotencyKey is a create-time-only dedupe token — never editable
+      // after the fact (an edit changing it would defeat the point).
+      delete bookingData.idempotencyKey;
 
       const existing = await storage.getBooking(id, scopeTenant(req));
       if (!existing) {
@@ -2430,7 +2469,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/bookings/:id/payments", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const { amount, paymentType, paymentMode, transactionReference, receivedBy, receivedAt, notes } = req.body || {};
+      const { amount, paymentType, paymentMode, transactionReference, receivedBy, receivedAt, notes, idempotencyKey } = req.body || {};
       if (!amount || amount <= 0) {
         return res.status(400).json({ message: "A positive amount is required." });
       }
@@ -2457,6 +2496,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receivedAt: receivedAt ? new Date(receivedAt) : undefined,
         notes,
         createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+        // Client-generated, one per "open the Record Payment dialog"
+        // session (not per click) — lets a double-click or a retried
+        // request after a dropped response resolve to the SAME
+        // PaymentTransaction instead of creating a duplicate. Optional:
+        // callers that don't send one (e.g. the initial-advance write at
+        // booking creation) keep today's behavior unchanged.
+        idempotencyKey: typeof idempotencyKey === 'string' && idempotencyKey.trim() ? idempotencyKey.trim() : undefined,
       });
 
       res.json(result);
@@ -5392,7 +5438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Monthly Driver Performance. ?month=YYYY-MM (defaults to current month).
   // Every figure is derived live from bookings — nothing is stored
   // separately, so it can never drift out of sync with the actual data.
-  app.get("/api/reports/driver-performance", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+  app.get("/api/reports/driver-performance", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
     try {
       const monthParam = req.query.month as string | undefined;
       const now = new Date();
@@ -5411,7 +5457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/reports/vehicle-performance", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+  app.get("/api/reports/vehicle-performance", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
     try {
       const monthParam = req.query.month as string | undefined;
       const now = new Date();

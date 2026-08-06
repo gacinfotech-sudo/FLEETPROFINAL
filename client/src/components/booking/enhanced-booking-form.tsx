@@ -113,6 +113,13 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   // they start collapsed. Purely a display toggle: no field, validation,
   // or submit-payload change.
   const [showMoreCharges, setShowMoreCharges] = useState(false);
+  // One key per booking-creation attempt (this mount, or since the last
+  // "Create New Booking" reset) — reused across a retried submit of the
+  // SAME booking (e.g. clicking Confirm again after a dropped response),
+  // regenerated whenever the form is deliberately reset to start a
+  // genuinely new booking. See server/routes.ts's POST /api/bookings
+  // duplicate-request guard.
+  const bookingIdempotencyKeyRef = useRef<string>(crypto.randomUUID());
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -345,8 +352,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
         useThirdPartyDriver: false,
         thirdPartyDriverName: "",
         thirdPartyDriverCharges: 0,
+        idempotencyKey: bookingIdempotencyKeyRef.current,
       };
-      
+
       const response = await apiRequest("POST", "/api/bookings", bookingData);
       return response.json();
     },
@@ -1569,6 +1577,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                       variant="outline"
                       onClick={() => {
                         form.reset();
+                        bookingIdempotencyKeyRef.current = crypto.randomUUID();
                         setStep(1);
                         setSelectedVehicleId("");
                         setSelectedPricingType("");
@@ -2346,6 +2355,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                 variant="outline"
                 onClick={() => {
                   form.reset();
+                  bookingIdempotencyKeyRef.current = crypto.randomUUID();
                   setStep(1);
                   setSelectedVehicleId("");
                   setSelectedPricingType("");

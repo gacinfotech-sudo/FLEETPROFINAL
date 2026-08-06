@@ -129,6 +129,13 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
   const [showEdit, setShowEdit] = useState(false);
   const [editForm, setEditForm] = useState(editFormFromCustomer({}));
   const [payingBooking, setPayingBooking] = useState<any>(null);
+  // Generated fresh each time the Record Payment dialog is opened (not
+  // reused across separate payments on the same booking), then held
+  // constant for the lifetime of that one dialog session so a retried
+  // submit (double-click, or the user clicking again after a dropped
+  // response) hits the same server-side idempotency check instead of
+  // creating a second PaymentTransaction — see server/services/paymentLedger.ts.
+  const [paymentIdempotencyKey, setPaymentIdempotencyKey] = useState<string>("");
   const [viewingBooking, setViewingBooking] = useState<any>(null);
   const [invoiceRequestBookingId, setInvoiceRequestBookingId] = useState<string | null>(null);
   const [paymentForm, setPaymentForm] = useState({ amount: "", paymentType: "advance", paymentMode: "cash", transactionReference: "", receivedBy: "", notes: "" });
@@ -184,7 +191,7 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
       const amount = Number(paymentForm.amount);
       if (!amount || amount <= 0) throw new Error("Enter a valid amount");
       return (await apiRequest("POST", `/api/bookings/${payingBooking._id}/payments`, {
-        ...paymentForm, amount,
+        ...paymentForm, amount, idempotencyKey: paymentIdempotencyKey,
       })).json();
     },
     onSuccess: () => {
@@ -505,6 +512,7 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
                     <Button size="sm" onClick={() => {
                       const due = Math.max(0, currentBooking.totalAmount - (currentBooking.advanceReceived || 0));
                       setPayingBooking(currentBooking);
+                      setPaymentIdempotencyKey(crypto.randomUUID());
                       setPaymentForm({ amount: String(due), paymentType: currentBooking.advanceReceived ? 'final_payment' : 'advance', paymentMode: 'cash', transactionReference: '', receivedBy: '', notes: '' });
                     }}><IndianRupee className="h-4 w-4 mr-1" /> Record Payment</Button>
                   )}
@@ -562,7 +570,7 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
                       <TableCell>
                         {due > 0 ? (
                           <button
-                            onClick={() => { setPayingBooking(b); setPaymentForm({ amount: String(due), paymentType: b.advanceReceived ? 'final_payment' : 'advance', paymentMode: 'cash', transactionReference: '', receivedBy: '', notes: '' }); }}
+                            onClick={() => { setPayingBooking(b); setPaymentIdempotencyKey(crypto.randomUUID()); setPaymentForm({ amount: String(due), paymentType: b.advanceReceived ? 'final_payment' : 'advance', paymentMode: 'cash', transactionReference: '', receivedBy: '', notes: '' }); }}
                             className="flex items-center gap-1 text-red-600 hover:underline font-medium"
                             title="Tap to record a payment"
                           >

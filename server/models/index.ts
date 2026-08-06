@@ -102,6 +102,13 @@ export interface IDriver extends Document {
 export interface IBooking extends Document {
   tenantId: mongoose.Types.ObjectId;
   bookingId: string;
+  // Client-generated, one per booking-form submission session (not
+  // persisted/reused across a genuinely new booking) — lets a double
+  // form-submit or a retried request after a dropped response resolve to
+  // the SAME booking instead of creating a duplicate. Optional so every
+  // booking created before this field existed, and every non-UI caller
+  // (imports, migrations, tests) that doesn't send one, is unaffected.
+  idempotencyKey?: string;
   // customerName/customerPhone stay exactly as they were — the booking-time
   // snapshot, preserved for audit/history even if the Customer record is
   // edited later. customerId links to the actual Customer Database record
@@ -391,6 +398,7 @@ const DriverSchema = new Schema<IDriver>({
 const BookingSchema = new Schema<IBooking>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
   bookingId: { type: String, required: true, unique: true },
+  idempotencyKey: { type: String },
   customerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
   customerName: { type: String, required: true },
   customerPhone: { type: String, required: true },
@@ -1212,6 +1220,10 @@ UserSchema.index({ sessionId: 1 });
 VehicleSchema.index({ tenantId: 1, status: 1 });
 DriverSchema.index({ tenantId: 1, status: 1 });
 BookingSchema.index({ tenantId: 1, status: 1 });
+BookingSchema.index(
+  { tenantId: 1, idempotencyKey: 1 },
+  { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } }
+);
 // Backs findDriverConflicts / findVehicleConflicts (services/availability.ts)
 // — every driver- and vehicle-assignment mutation runs one of these
 // queries, so an unindexed scan here would get slower as booking volume
