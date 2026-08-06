@@ -3,6 +3,12 @@ import { nanoid } from 'nanoid';
 import mongoose from 'mongoose';
 import { Tenant, User, Vehicle, Driver, Booking, Expense, ITenant, IUser, IVehicle, IDriver, IBooking, IExpense } from './models';
 import { findVehicleConflicts, findDriverConflicts, findTentativeDraftConflicts, combineDateTime } from './services/availability';
+// TASK-03 (performance QA) — additive import for the new paginated/lean
+// query helpers appended below (getCustomersListPaginated). The existing
+// import above is left untouched; Customer wasn't previously imported
+// into this file at all (GET /api/customers queries the model directly
+// in server/routes.ts today).
+import { Customer, ICustomer } from './models';
 
 export interface IStorage {
   // Auth methods
@@ -60,6 +66,21 @@ export interface IStorage {
   updateBooking(id: string, data: any, tenantId?: string): Promise<IBooking | undefined>;
   deleteBooking(id: string, tenantId?: string): Promise<void>;
   getUpcomingBookings(tenantId: string): Promise<IBooking[]>;
+
+  // ---- TASK-03 (performance QA) — additive, opt-in helpers ----
+  // Never wired into an existing route (server/routes.ts is protected);
+  // see TASK-03-report.md for the exact proposed diffs and measured
+  // before/after. Existing methods above (getBookingsByTenant etc.) are
+  // untouched — these are new, backward-compatible alternatives.
+  getBookingsByTenantPaginated(
+    tenantId: string,
+    options?: { limit?: number; skip?: number },
+  ): Promise<{ rows: IBooking[]; total: number }>;
+  getCustomersListPaginated(
+    query: Record<string, any>,
+    options?: { limit?: number; skip?: number; sort?: Record<string, 1 | -1> },
+  ): Promise<{ rows: ICustomer[]; total: number }>;
+
   getTenantStats(tenantId: string): Promise<{
     totalRevenue: number;
     totalBookings: number;
@@ -1481,6 +1502,64 @@ export class MongoDBStorage implements IStorage {
       console.error('Error getting total expenses:', error);
       return 0;
     }
+  }
+
+  // ==== TASK-03 (performance QA) — additive, opt-in query helpers ====
+  // Not called by any route today (server/routes.ts is protected — see
+  // TASK-03-report.md for the proposed diffs). Existing methods
+  // (getBookingsByTenant, and the inline Customer.find(...) in
+  // GET /api/customers) are untouched.
+
+  // Fixes the "large unpaginated lists" hotspot documented in
+  // TASK-03-report.md: getBookingsByTenant() above fetches the tenant's
+  // ENTIRE booking history, unbounded, on every one of the 9 route
+  // handlers that call it (GET /api/bookings, live-ops, upcoming-bookings,
+  // dashboard stats, etc.) — cost grows linearly with total booking count
+  // forever, not with what's actually displayed. This paginated variant
+  // returns one bounded page plus a total count, `.lean()`'d since none
+  // of these list views need full Mongoose document methods.
+  async getBookingsByTenantPaginated(
+    tenantId: string,
+    options: { limit?: number; skip?: number } = {},
+  ): Promise<{ rows: IBooking[]; total: number }> {
+    const limit = Math.min(500, Math.max(1, options.limit ?? 100));
+    const skip = Math.max(0, options.skip ?? 0);
+    const [rows, total] = await Promise.all([
+      Booking.find({ tenantId })
+        .populate('vehicleId')
+        .populate('driverId')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean() as unknown as Promise<IBooking[]>,
+      Booking.countDocuments({ tenantId }),
+    ]);
+    return { rows, total };
+  }
+
+  // Fixes the "slow customer search" / "customer data fully loaded in
+  // browser" hotspot: GET /api/customers (server/routes.ts) builds its
+  // own `query` object inline and calls
+  // `Customer.find(query).sort({lastBookingDate:-1,createdAt:-1}).limit(500)`
+  // with no `.lean()` and no real pagination (just a hard 500-row cap).
+  // This helper accepts that SAME pre-built query object (so a future
+  // route change is a small diff, not a rewrite of the filter-building
+  // logic) and adds `.lean()`, real skip/limit pagination, and a total
+  // count — see TASK-03-report.md for the measured before/after
+  // (eliminates the blocking in-memory SORT stage once the proposed
+  // index is applied, and cuts wall time via `.lean()`).
+  async getCustomersListPaginated(
+    query: Record<string, any>,
+    options: { limit?: number; skip?: number; sort?: Record<string, 1 | -1> } = {},
+  ): Promise<{ rows: ICustomer[]; total: number }> {
+    const limit = Math.min(500, Math.max(1, options.limit ?? 50));
+    const skip = Math.max(0, options.skip ?? 0);
+    const sort = options.sort ?? { lastBookingDate: -1, createdAt: -1 };
+    const [rows, total] = await Promise.all([
+      Customer.find(query).sort(sort).skip(skip).limit(limit).lean() as unknown as Promise<ICustomer[]>,
+      Customer.countDocuments(query),
+    ]);
+    return { rows, total };
   }
 }
 
