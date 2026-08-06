@@ -103,7 +103,7 @@ export default function CustomerReferralPanel({ customerId }: Props) {
           )}
         </div>
 
-        <div className="grid grid-cols-4 gap-2 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
           <div className="rounded-lg bg-white border p-2">
             <p className="text-lg font-bold text-emerald-700">{asReferrer.length}</p>
             <p className="text-[11px] text-gray-500">Total Referrals</p>
