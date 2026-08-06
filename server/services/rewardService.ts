@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Customer, RewardRule, RewardTransaction, LoyaltyTier, Booking, GoogleReviewTracking } from '../models/index';
+import { Customer, RewardRule, RewardTransaction, LoyaltyTier, Booking, GoogleReviewTracking, type IRewardEventRule } from '../models/index';
 
 const DEFAULT_RULE = {
   earningRatePerAmount: 1,
@@ -283,6 +283,32 @@ export async function reverseBookingReward(tenantId: string, customerId: string,
   return reversals;
 }
 
+// Same "offsetting reversal row, never edit the original" rule as
+// reverseBookingReward above, generalized to an explicit list of
+// transaction ids — used by referralService, whose reward transactions
+// aren't all reliably findable by a single bookingId (referral.registered
+// fires at capture time, before any booking exists).
+export async function reverseRewardTransactionsByIds(
+  tenantId: string, transactionIds: string[], reason: string, actor: { userId: string; role: string },
+) {
+  const originals = await RewardTransaction.find({ tenantId, _id: { $in: transactionIds } });
+  const reversals = [];
+  for (const original of originals as any[]) {
+    const alreadyReversed = await RewardTransaction.findOne({ reversalOf: original._id });
+    if (alreadyReversed) continue;
+    reversals.push(await createTransaction({
+      tenantId, customerId: original.customerId.toString(), bookingId: original.bookingId?.toString(),
+      transactionType: 'reversal',
+      points: -original.points,
+      reason,
+      reversalOf: original._id.toString(),
+      idempotencyKey: `${tenantId}_${original._id}_reversal`,
+      createdBy: actor,
+    }));
+  }
+  return reversals;
+}
+
 export interface RedeemResult {
   transaction: any;
   discountValue: number;
@@ -333,6 +359,60 @@ export async function commitRedemption(
     idempotencyKey: `${tenantId}_${bookingId}_redemption`,
     createdBy: actor,
   });
+}
+
+// Credits a configurable Referral/Review reward event (RewardEventRule) —
+// the one place that new, multi-rule engine's points ever actually reach
+// the ledger, still funneled through createTransaction above so every
+// invariant that function enforces (atomic balance update, idempotency,
+// rounding) applies here identically. Enabled/validity/limit checks are
+// generic across all four event keys rather than hard-coded per event.
+export async function creditReferralEventReward(
+  tenantId: string,
+  customerId: string,
+  rule: Pick<IRewardEventRule, 'eventKey' | 'points' | 'enabled' | 'validFrom' | 'validUntil' | 'maximumPerCustomer' | 'maximumPerMonth'>,
+  opts: { idempotencyKey: string; referralId?: string; bookingId?: string; reason: string; actor: { userId: string; role: string } },
+): Promise<any> {
+  if (!rule.enabled) return null;
+  const now = new Date();
+  if (rule.validFrom && now < new Date(rule.validFrom)) return null;
+  if (rule.validUntil && now > new Date(rule.validUntil)) return null;
+  if (rule.points <= 0) return null;
+
+  if (rule.maximumPerCustomer) {
+    const customerCount = await RewardTransaction.countDocuments({
+      tenantId, customerId, sourceEvent: rule.eventKey, transactionType: { $ne: 'reversal' },
+    });
+    if (customerCount >= rule.maximumPerCustomer) return null;
+  }
+  if (rule.maximumPerMonth) {
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthCount = await RewardTransaction.countDocuments({
+      tenantId, sourceEvent: rule.eventKey, transactionType: { $ne: 'reversal' },
+      createdAt: { $gte: monthStart },
+    });
+    if (monthCount >= rule.maximumPerMonth) return null;
+  }
+
+  const transactionType = rule.eventKey === 'review.verified' ? 'review_bonus' : 'referral_bonus';
+  const tx = await createTransaction({
+    tenantId, customerId, bookingId: opts.bookingId,
+    transactionType, points: rule.points,
+    reason: opts.reason,
+    idempotencyKey: opts.idempotencyKey,
+    createdBy: opts.actor,
+  });
+  if (tx && opts.referralId && !(tx as any).sourceEvent) {
+    // createTransaction doesn't accept sourceEvent/referralId (kept
+    // generic for its other, older callers) — set them in a single
+    // follow-up update rather than widening every existing call site's
+    // input shape for two optional fields only this caller uses.
+    await RewardTransaction.updateOne(
+      { _id: (tx as any)._id },
+      { $set: { sourceEvent: rule.eventKey, referralId: opts.referralId } }
+    );
+  }
+  return tx;
 }
 
 const TIER_DEFAULT = { name: 'Regular', rank: 0, discountPercent: 0, benefits: [] as string[] };

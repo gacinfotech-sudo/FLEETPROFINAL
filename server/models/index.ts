@@ -193,6 +193,12 @@ export interface IBooking extends Document {
   // free-text sourceName/sourceContact above remain the display fields
   // either way — set from the linked vendor when this is present.
   sourceVendorId?: mongoose.Types.ObjectId;
+  // Kept distinct from sourceVendorId/sourceName above — a customer
+  // Referral (spec §28: "keep separate: customer referral reward vs
+  // hotel commission vs travel agent commission vs vendor commission")
+  // is a rewarded relationship between two Customer records, not a
+  // source-category attribution tag.
+  referralId?: mongoose.Types.ObjectId;
   // Fulfilment: who is actually providing the vehicle/driver for this
   // booking. fulfilmentVendorId/vendorDriverId/vendorVehicleId are
   // optional links to real Vendor 360° records (set via
@@ -495,6 +501,7 @@ const BookingSchema = new Schema<IBooking>({
   sourceReferenceNumber: { type: String },
   sourceNotes: { type: String },
   sourceVendorId: { type: Schema.Types.ObjectId, ref: 'Vendor' },
+  referralId: { type: Schema.Types.ObjectId, ref: 'Referral' },
   fulfilmentType: { type: String, enum: ['own', 'vendor'], default: 'own' },
   vendorName: { type: String },
   vendorContactPhone: { type: String },
@@ -1006,6 +1013,12 @@ export interface ICustomer extends Document {
   // edited, same rule as totalSpending etc. above.
   rewardPointsBalance: number;
   loyaltyTier: string;
+  // Optional, tenant-scoped, customer-facing code for the Referral program
+  // (spec §17) — generated on demand (see referralService.ts), not for
+  // every customer up front. `referralCodeActive` lets a code be disabled
+  // without losing history of referrals already captured against it.
+  referralCode?: string;
+  referralCodeActive?: boolean;
   // Denormalized onto Customer for fast list/filter queries — the actual
   // audit trail of who added/removed each tag and when lives in
   // CustomerTagEvent, this array is just "what's currently applied".
@@ -1121,6 +1134,8 @@ const CustomerSchema = new Schema<ICustomer>({
     default: 'new',
   },
   rewardPointsBalance: { type: Number, default: 0 },
+  referralCode: { type: String },
+  referralCodeActive: { type: Boolean, default: true },
   loyaltyTier: { type: String, default: 'Regular' },
   tags: { type: [String], default: [] },
   consent: {
@@ -1150,6 +1165,10 @@ CustomerSchema.index({ tenantId: 1, gstNumber: 1 });
 CustomerSchema.index({ tenantId: 1, gstAliases: 1 });
 CustomerSchema.index({ tenantId: 1, customerCode: 1 }, { unique: true, sparse: true });
 CustomerSchema.index({ tenantId: 1, customerStatus: 1 });
+CustomerSchema.index(
+  { tenantId: 1, referralCode: 1 },
+  { unique: true, partialFilterExpression: { referralCode: { $type: 'string' } } }
+);
 CustomerSchema.pre('save', function (next) { this.updatedAt = new Date(); next(); });
 
 // Reward rules — tenant-configurable, not hard-coded (spec explicitly
@@ -1219,6 +1238,13 @@ export interface IRewardTransaction extends Document {
   // mechanism, not application-level "check then insert" logic.
   idempotencyKey?: string;
   reversalOf?: mongoose.Types.ObjectId;
+  // Optional, finer-grained than transactionType — e.g. distinguishes
+  // 'referral.registered' from 'referral.booking_completed', both of
+  // which use transactionType 'referral_bonus'. Unset on rows created
+  // before this field existed; per-event limit checks and reporting
+  // treat a missing value as "unknown event", never as a false match.
+  sourceEvent?: string;
+  referralId?: mongoose.Types.ObjectId;
   createdBy: { userId: string; role: string };
   createdAt: Date;
 }
@@ -1239,6 +1265,8 @@ const RewardTransactionSchema = new Schema<IRewardTransaction>({
   expiryDate: { type: Date },
   idempotencyKey: { type: String },
   reversalOf: { type: Schema.Types.ObjectId, ref: 'RewardTransaction' },
+  sourceEvent: { type: String },
+  referralId: { type: Schema.Types.ObjectId, ref: 'Referral' },
   createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
   createdAt: { type: Date, default: Date.now },
 });
@@ -1276,6 +1304,162 @@ const LoyaltyTierSchema = new Schema<ILoyaltyTier>({
   createdAt: { type: Date, default: Date.now },
 });
 LoyaltyTierSchema.index({ tenantId: 1, rank: 1 });
+
+// ---------------------------------------------------------------------
+// Configurable Reward Event Rules (Referral / Review) — Booking-First UI
+// + Referral/Rewards initiative, docs/REWARDS_REFERRAL_CURRENT_AUDIT.md.
+// Deliberately separate from RewardRule above rather than a schema
+// migration of it: RewardRule is one flat, heavily-tested document per
+// tenant covering booking-completion earning rate + linear redemption
+// terms; this covers the new, genuinely multi-rule, per-event-key surface
+// the spec asks for (independent award timing, limits, validity window,
+// enable/disable) without touching that already-working path. One rule
+// per (tenantId, eventKey) — named-multiple-rules-per-event was in the
+// spec's suggested shape but not something any of this project's actual
+// events need yet; kept to what's real rather than speculative.
+// ---------------------------------------------------------------------
+export type RewardEventKey =
+  | 'referral.registered' | 'referral.booking_confirmed' | 'referral.booking_completed' | 'review.verified';
+
+export interface IRewardEventRule extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  eventKey: RewardEventKey;
+  name: string;
+  points: number; // fractional allowed, e.g. 0.5 — see rewardService.createTransaction's rounding
+  awardTiming: 'immediate' | 'after_booking_completed';
+  maximumPerCustomer?: number; // lifetime cap on how many times this event can pay out for one customer
+  maximumPerMonth?: number; // tenant-wide cap for this event per calendar month
+  validFrom?: Date;
+  validUntil?: Date;
+  enabled: boolean;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const RewardEventRuleSchema = new Schema<IRewardEventRule>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  eventKey: {
+    type: String,
+    enum: ['referral.registered', 'referral.booking_confirmed', 'referral.booking_completed', 'review.verified'],
+    required: true,
+  },
+  name: { type: String, required: true },
+  points: { type: Number, required: true, default: 0.5 },
+  awardTiming: { type: String, enum: ['immediate', 'after_booking_completed'], default: 'immediate' },
+  maximumPerCustomer: { type: Number },
+  maximumPerMonth: { type: Number },
+  validFrom: { type: Date },
+  validUntil: { type: Date },
+  enabled: { type: Boolean, default: true },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+RewardEventRuleSchema.index({ tenantId: 1, eventKey: 1 }, { unique: true });
+RewardEventRuleSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const RewardEventRule = mongoose.model<IRewardEventRule>('RewardEventRule', RewardEventRuleSchema);
+
+// Referral — the one real structural gap the audit found: "referral" had
+// previously only existed as a free-text source-category tag (Booking
+// Source / Inquiry Source dropdowns, left completely untouched by this),
+// never a tracked, rewardable relationship between two real Customer
+// records. referredCustomerId is optional because a referral can be
+// captured as early as Inquiry stage, before a Customer record exists
+// yet — referredInquiryId/referredLeadId carry it until one does.
+export type ReferralStatus =
+  | 'captured' | 'booking_confirmed' | 'booking_completed'
+  | 'invalid' | 'duplicate' | 'self_referral' | 'cancelled' | 'reversed' | 'fraud_review';
+
+export interface IReferral extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  referrerCustomerId: mongoose.Types.ObjectId;
+  // Preserved at capture time so referral history still reads sensibly
+  // even if the referrer's own name/mobile later changes or the record
+  // is merged — same "display snapshot" pattern used for quotations.
+  referrerDisplaySnapshot: { name: string; mobile: string };
+  referredCustomerId?: mongoose.Types.ObjectId;
+  referredInquiryId?: mongoose.Types.ObjectId;
+  referredLeadId?: mongoose.Types.ObjectId;
+  referredBookingId?: mongoose.Types.ObjectId;
+  referralCodeUsed?: string;
+  source: 'existing_customer_search' | 'referral_code' | 'external' | 'hotel_agent_vendor';
+  status: ReferralStatus;
+  statusHistory: { status: ReferralStatus; at: Date; actorId?: string }[];
+  // Which reward events have actually paid out for this referral —
+  // independent booleans, not mutually exclusive with `status`, because
+  // spec §19's fractional example awards registered + booking_completed +
+  // review.verified as three separate events on the SAME referral, not
+  // as sequential exclusive states.
+  rewardsIssued: { registered?: boolean; bookingCompleted?: boolean };
+  rewardTransactionIds: mongoose.Types.ObjectId[];
+  notes?: string;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const ReferralSchema = new Schema<IReferral>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  referrerCustomerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  referrerDisplaySnapshot: {
+    name: { type: String, required: true },
+    mobile: { type: String, required: true },
+  },
+  referredCustomerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
+  referredInquiryId: { type: Schema.Types.ObjectId, ref: 'Inquiry' },
+  referredLeadId: { type: Schema.Types.ObjectId, ref: 'Lead' },
+  referredBookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  referralCodeUsed: { type: String },
+  source: {
+    type: String,
+    enum: ['existing_customer_search', 'referral_code', 'external', 'hotel_agent_vendor'],
+    required: true,
+  },
+  status: {
+    type: String,
+    enum: ['captured', 'booking_confirmed', 'booking_completed', 'invalid', 'duplicate', 'self_referral', 'cancelled', 'reversed', 'fraud_review'],
+    default: 'captured',
+  },
+  statusHistory: [{
+    status: { type: String, required: true },
+    at: { type: Date, default: Date.now },
+    actorId: { type: String },
+  }],
+  rewardsIssued: {
+    registered: { type: Boolean, default: false },
+    bookingCompleted: { type: Boolean, default: false },
+  },
+  rewardTransactionIds: [{ type: Schema.Types.ObjectId, ref: 'RewardTransaction' }],
+  notes: { type: String },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+ReferralSchema.index({ tenantId: 1, referrerCustomerId: 1 });
+// One active (non-invalid/duplicate/self-referral) referral per referred
+// customer — a second capture attempt for the same already-referred
+// customer is flagged `duplicate` by referralService rather than
+// inserted as a second live row, so this partial-unique index is a real
+// duplicate-protection mechanism, not just an advisory lookup (same
+// pattern as VendorDriver's normalizedMobile index).
+ReferralSchema.index(
+  { tenantId: 1, referredCustomerId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      referredCustomerId: { $type: 'objectId' },
+      status: { $nin: ['invalid', 'duplicate', 'self_referral', 'cancelled', 'reversed'] },
+    },
+  }
+);
+ReferralSchema.index({ tenantId: 1, referredBookingId: 1 });
+ReferralSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const Referral = mongoose.model<IReferral>('Referral', ReferralSchema);
 
 // Create indexes for better performance
 UserSchema.index({ sessionId: 1 });

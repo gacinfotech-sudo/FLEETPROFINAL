@@ -60,6 +60,8 @@ import { recordPayment, reversePayment, recomputeBookingPaymentSummary, RECEIPT_
 import { PaymentTransaction, Customer } from "./models/index";
 import { findOrCreateCustomer, recomputeCustomerStats, classifyCustomer } from "./services/customerService";
 import { creditBookingReward, reverseBookingReward, previewRedemption, commitRedemption, computeLoyaltyTier, getRewardRule, adjustRewardPoints, creditVerifiedGoogleReviewReward } from "./services/rewardService";
+import { getRewardEventRules, generateReferralCode, captureReferral, linkReferralToBooking, markReferralBookingCompleted, reverseReferralRewardsForBooking, findReferrerCustomer } from "./services/referralService";
+import { RewardEventRule, Referral, type RewardEventKey } from "./models/index";
 import { RewardTransaction, RewardRule } from "./models/index";
 import { computeSegments, computeTagCounts, getSegmentFilter } from "./services/segmentService";
 import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerConsentEvent, CustomerBillingProfile, Invoice, Campaign, CampaignRecipient, GoogleReviewTracking, Inquiry, Lead, Quotation, LeadFollowUp, BookingDraft } from "./models/index";
@@ -2492,6 +2494,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (err: any) {
           console.error('Customer linking failed:', err?.message || err);
+        }
+      }
+
+      // Optional Referral link (spec §28's "Was this Booking referred by
+      // someone?") — only a real existing-customer or referral-code
+      // referrer creates a tracked, rewardable Referral; "external"/
+      // "hotel_agent_vendor" sources are recorded as free text on the
+      // booking (sourceName/sourceVendorId above), never fabricated into
+      // a fake Customer-to-Customer referral relationship. Best-effort:
+      // a referral-capture failure (e.g. bad referrer id, self-referral)
+      // must never block the booking itself from being created.
+      const referralInput = req.body.referral;
+      if (referralInput && referralInput.mode && referralInput.mode !== 'none' && resolvedCustomer
+        && (referralInput.mode === 'existing_customer' || referralInput.mode === 'referral_code')) {
+        try {
+          const referral = await captureReferral({
+            tenantId: req.tenantId!,
+            referrer: referralInput.mode === 'referral_code'
+              ? { referralCode: referralInput.referralCode }
+              : { customerId: referralInput.referrerCustomerId, mobile: referralInput.referrerMobile },
+            referredCustomerId: resolvedCustomer._id.toString(),
+            referredMobile: bookingData.customerPhone,
+            source: referralInput.mode === 'referral_code' ? 'referral_code' : 'existing_customer_search',
+            actor: { userId: req.userId!, role: req.user?.role || 'client' },
+          });
+          await linkReferralToBooking(req.tenantId!, referral._id.toString(), (booking as any)._id.toString(), req.userId);
+          (booking as any).referralId = referral._id;
+          await (booking as any).save();
+        } catch (err: any) {
+          console.error('Referral capture failed (booking still created):', err?.message || err);
         }
       }
 
@@ -5656,6 +5688,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Configurable multi-event Reward Rules (Referral/Review) — additive,
+  // separate collection from RewardRule above, see server/models/index.ts's
+  // IRewardEventRule comment for why. GET returns all 4 event keys, each
+  // either the tenant's saved override or the in-memory default.
+  const REWARD_EVENT_KEYS: RewardEventKey[] = ['referral.registered', 'referral.booking_confirmed', 'referral.booking_completed', 'review.verified'];
+  app.get("/api/reward-event-rules", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      res.json(await getRewardEventRules(req.tenantId!));
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch reward event rules" });
+    }
+  });
+
+  app.put("/api/reward-event-rules/:eventKey", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REWARD_RULE_MANAGE), async (req: AuthRequest, res) => {
+    try {
+      const eventKey = req.params.eventKey as RewardEventKey;
+      if (!REWARD_EVENT_KEYS.includes(eventKey)) {
+        return res.status(400).json({ message: `Unknown event key. Must be one of: ${REWARD_EVENT_KEYS.join(', ')}` });
+      }
+      const { name, points, awardTiming, maximumPerCustomer, maximumPerMonth, validFrom, validUntil, enabled } = req.body || {};
+      if (points !== undefined && (typeof points !== 'number' || points < 0)) {
+        return res.status(400).json({ message: "points must be a non-negative number." });
+      }
+      // Mongo rejects $set and $setOnInsert touching the same path in one
+      // update, even though only one would ever actually apply — every
+      // field with a caller-or-existing-or-default value goes in $set;
+      // $setOnInsert is left with only the fields that truly exist solely
+      // at insert time (tenantId/eventKey/createdBy). A partial update
+      // (e.g. {points: 1.5} alone) must preserve the rule's own existing
+      // name/awardTiming, not silently reset them to the generic default —
+      // so the existing row (if any) is read first.
+      const existingRule = await RewardEventRule.findOne({ tenantId: req.tenantId, eventKey });
+      const update: any = {
+        updatedBy: { userId: req.userId!, role: req.user?.role || 'client' },
+        name: name !== undefined ? name : (existingRule?.name ?? eventKey),
+        points: points !== undefined ? points : (existingRule?.points ?? 0.5),
+        awardTiming: awardTiming !== undefined ? awardTiming : (existingRule?.awardTiming ?? 'immediate'),
+      };
+      if (maximumPerCustomer !== undefined) update.maximumPerCustomer = maximumPerCustomer;
+      if (maximumPerMonth !== undefined) update.maximumPerMonth = maximumPerMonth;
+      if (validFrom !== undefined) update.validFrom = validFrom ? new Date(validFrom) : undefined;
+      if (validUntil !== undefined) update.validUntil = validUntil ? new Date(validUntil) : undefined;
+      if (enabled !== undefined) update.enabled = enabled;
+
+      const rule = await RewardEventRule.findOneAndUpdate(
+        { tenantId: req.tenantId, eventKey },
+        {
+          $set: update,
+          $setOnInsert: {
+            tenantId: req.tenantId, eventKey,
+            createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+          },
+        },
+        { new: true, upsert: true }
+      );
+      res.json(rule);
+    } catch (error: any) {
+      console.error('Update reward event rule error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update reward event rule" });
+    }
+  });
+
+  // Referral code — generated on demand, idempotent (re-calling returns
+  // the same code rather than issuing a new one).
+  app.post("/api/customers/:id/referral-code", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REFERRAL_CREATE), async (req: AuthRequest, res) => {
+    try {
+      const code = await generateReferralCode(req.tenantId!, req.params.id);
+      res.json({ referralCode: code });
+    } catch (error: any) {
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to generate referral code" });
+    }
+  });
+
+  // Resolves a referrer by mobile/code before capture — lets the UI show
+  // "Referrer found: <name>" for confirmation instead of capturing blind.
+  app.get("/api/referrals/resolve-referrer", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REFERRAL_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const { mobile, referralCode, customerId } = req.query;
+      const referrer = await findReferrerCustomer(req.tenantId!, {
+        mobile: mobile as string, referralCode: referralCode as string, customerId: customerId as string,
+      });
+      res.json({ referrer: referrer ? { _id: referrer._id, name: referrer.name, primaryMobile: referrer.primaryMobile } : null });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to resolve referrer" });
+    }
+  });
+
+  app.post("/api/referrals", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REFERRAL_CREATE), async (req: AuthRequest, res) => {
+    try {
+      const { referrerCustomerId, referrerMobile, referralCode, referredCustomerId, referredMobile, referredInquiryId, referredLeadId, source, notes } = req.body || {};
+      if (!source) return res.status(400).json({ message: "source is required." });
+      const referral = await captureReferral({
+        tenantId: req.tenantId!,
+        referrer: { customerId: referrerCustomerId, mobile: referrerMobile, referralCode },
+        referredCustomerId, referredMobile, referredInquiryId, referredLeadId,
+        source, notes,
+        actor: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(referral);
+    } catch (error: any) {
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to capture referral", code: error?.code });
+    }
+  });
+
+  app.get("/api/referrals", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REFERRAL_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const filter: any = { tenantId: req.tenantId };
+      if (req.query.status) filter.status = req.query.status;
+      if (req.query.referrerCustomerId) filter.referrerCustomerId = req.query.referrerCustomerId;
+      const rows = await Referral.find(filter).sort({ createdAt: -1 }).limit(200)
+        .populate('referrerCustomerId', 'name primaryMobile')
+        .populate('referredCustomerId', 'name primaryMobile');
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch referrals" });
+    }
+  });
+
+  app.get("/api/customers/:id/referrals", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REFERRAL_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const rows = await Referral.find({
+        tenantId: req.tenantId,
+        $or: [{ referrerCustomerId: req.params.id }, { referredCustomerId: req.params.id }],
+      }).sort({ createdAt: -1 })
+        .populate('referrerCustomerId', 'name primaryMobile')
+        .populate('referredCustomerId', 'name primaryMobile');
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch customer referrals" });
+    }
+  });
+
   // Customer-linked side effects must be identical whether completion is
   // requested through the generic status action or the dedicated Complete
   // Trip action. Keeping them here prevents one UI path from silently
@@ -5668,6 +5832,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await recomputeCustomerStats(customerId);
       if (['completed', 'closed'].includes(status)) {
         await creditBookingReward(req.tenantId!, customerId, bookingRecordId, booking.totalAmount, actor, result?.completedBookings);
+        // No-ops if this booking isn't linked to a Referral — most bookings
+        // aren't, and that's the normal case, not an error.
+        await markReferralBookingCompleted(req.tenantId!, bookingRecordId, actor);
       }
       if (status === 'completed') {
         const alreadyCreated = await CustomerFollowUp.exists({ tenantId: req.tenantId, bookingId: bookingRecordId });
@@ -5683,6 +5850,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (['cancelled', 'no_show'].includes(status)) {
         await reverseBookingReward(req.tenantId!, customerId, bookingRecordId, actor);
+        await reverseReferralRewardsForBooking(req.tenantId!, bookingRecordId, actor);
       }
       if (result) {
         const tier = await computeLoyaltyTier(req.tenantId!, result);

@@ -108,4 +108,13 @@ export const PERMISSIONS = {
   GPS_SETTINGS_MANAGE: 'gps.settings.manage',
   GPS_REPORT_EXPORT: 'gps.report.export',
   GPS_RAW_DATA_VIEW: 'gps.raw_data.view',
+  // Referral/Rewards Engine — see docs/REWARDS_REFERRAL_CURRENT_AUDIT.md.
+  // Existing view_revenue/manage_users are reused where a spec-suggested
+  // permission would duplicate one already enforced (e.g. financial
+  // redemption approval already fits under existing owner/admin checks).
+  REWARD_RULE_MANAGE: 'reward.rule.manage',
+  REWARD_ADJUST: 'reward.adjust',
+  REFERRAL_VIEW: 'referral.view',
+  REFERRAL_CREATE: 'referral.create',
+  REFERRAL_MANAGE: 'referral.manage',
 } as const;
