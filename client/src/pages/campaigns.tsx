@@ -266,7 +266,7 @@ function CampaignDetail({ campaignId, onClose }: { campaignId: string; onClose: 
           )}
 
           {campaign.stats && (
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-green-50 rounded-lg p-3"><Label className="text-xs text-gray-500">Sent</Label><p className="text-lg font-semibold text-green-700">{campaign.stats.sent}</p></div>
               <div className="bg-red-50 rounded-lg p-3"><Label className="text-xs text-gray-500">Failed</Label><p className="text-lg font-semibold text-red-700">{campaign.stats.failed}</p></div>
               <div className="bg-amber-50 rounded-lg p-3"><Label className="text-xs text-gray-500">Excluded (Consent)</Label><p className="text-lg font-semibold text-amber-700">{campaign.stats.excludedOptedOut}</p></div>
