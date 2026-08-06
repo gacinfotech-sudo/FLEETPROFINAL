@@ -95,6 +95,9 @@ import { authenticateDriver, type DriverAuthRequest } from "./middleware/driverA
 import { registerGpsConnectionRoutes } from "./gps/routes/connections";
 import { registerGpsDeviceRoutes } from "./gps/routes/devices";
 import { registerGpsAssignmentRoutes } from "./gps/routes/assignments";
+// TASK-02 (telephony/RBAC isolation) additive import — new namespace only,
+// no existing route/import in this file was touched.
+import { registerTelephonyRoutes } from "./telephony/index";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -289,6 +292,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerGpsConnectionRoutes(app);
   registerGpsDeviceRoutes(app);
   registerGpsAssignmentRoutes(app);
+  // TASK-02 (telephony/RBAC isolation) additive registration — new
+  // /api/telephony/* namespace only, appended after the existing GPS
+  // registrations without reordering or editing any existing line.
+  registerTelephonyRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
