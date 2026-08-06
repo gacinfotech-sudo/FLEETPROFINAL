@@ -319,4 +319,54 @@ test.describe('Referral capture + configurable reward event rules', () => {
     expect(res.status()).toBe(403);
     await managerContext.close();
   });
+
+  test('UI: capturing a referral through the real Add Booking form creates a linked Referral and credits the referrer', async ({ page }) => {
+    await login(page, 'qaclient', 'QaFixed456!');
+    const csrf = await getCsrfToken(page);
+    const marker = String(Date.now());
+
+    const { customer: referrer } = await createCustomerViaBooking(page, csrf, `UI Referrer ${marker}`, freshMobile());
+    const balanceBefore = referrer.rewardPointsBalance || 0;
+
+    const day = new Date();
+    day.setDate(day.getDate() + 85000 + Math.floor(Math.random() * 2000));
+    const dayStr = day.toISOString().slice(0, 10);
+    const referredMobile = freshMobile();
+
+    await page.goto('/dashboard/bookings');
+    await page.waitForLoadState('networkidle');
+    const resumePrompt = page.getByText('Resume your unfinished booking?');
+    if (await resumePrompt.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await page.getByRole('button', { name: 'Start Fresh' }).click();
+    }
+
+    await page.locator('input[name="pickupDate"]').fill(dayStr);
+    await page.locator('input[name="returnDate"]').fill(dayStr);
+    await page.locator('input[name="pickupTime"]').fill('09:00');
+    await page.locator('input[name="returnTime"]').fill('17:00');
+    await page.locator('input[name="pickupLocation"]').fill('Indore');
+    await page.locator('input[name="dropoffLocation"]').fill('Ujjain');
+    await page.getByRole('button', { name: 'Continue to Vehicle Selection' }).click();
+    const noVehicles = await page.getByText('No vehicles available for selected dates').isVisible({ timeout: 3000 }).catch(() => false);
+    test.skip(noVehicles, 'No vehicle available for the randomly chosen far-future date — environmental.');
+    await page.locator('button:has-text("By Day")').first().click();
+    await page.getByRole('button', { name: 'Continue to Customer Info' }).click();
+
+    await page.getByRole('button', { name: 'Search Existing Customer' }).click();
+    await page.getByPlaceholder("Referrer's mobile number").fill(referrer.primaryMobile);
+    await expect(page.getByText(`Referrer found: ${referrer.name}`)).toBeVisible({ timeout: 5000 });
+
+    await page.locator('input[name="customerName"]').fill(`UI Referred ${marker}`);
+    await page.locator('input[name="customerPhone"]').fill(referredMobile);
+    await page.getByRole('button', { name: 'Review Booking' }).click();
+    await page.getByRole('button', { name: 'Confirm Booking' }).click();
+    await expect(page.getByText('Booking Confirmed Successfully!')).toBeVisible({ timeout: 10000 });
+
+    const allBookings = await (await page.request.get('/api/bookings')).json();
+    const created = allBookings.find((b: any) => b.customerPhone?.endsWith(referredMobile));
+    expect(created?.referralId, 'Booking must be linked to a captured Referral').toBeTruthy();
+
+    const referrerAfter = await (await page.request.get(`/api/customers/${referrer._id}`)).json();
+    expect(referrerAfter.rewardPointsBalance).toBe(balanceBefore + 0.5);
+  });
 });

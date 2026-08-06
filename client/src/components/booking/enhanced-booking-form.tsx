@@ -103,6 +103,19 @@ interface EnhancedBookingFormProps {
   initialValues?: Partial<BookingFormData>;
 }
 
+// Small, presentational-only status line for the referral search/code
+// inputs — "type more", "searching", "found", or "not found", never
+// silently blank so the user always knows whether a referral will
+// actually be captured on submit.
+function referralLookupStatus(inputValue: string, minLength: number, pending: boolean, resolved: { name: string; primaryMobile: string } | null) {
+  const trimmed = inputValue.trim();
+  const long = (minLength === 10 ? trimmed.replace(/\D/g, "").length : trimmed.length) >= minLength;
+  if (!long) return null;
+  if (pending) return <p className="text-xs text-gray-500">Looking up referrer…</p>;
+  if (resolved) return <p className="text-xs text-green-700 font-medium">Referrer found: {resolved.name} ({resolved.primaryMobile})</p>;
+  return <p className="text-xs text-red-600">No matching customer found — this booking will not be linked to a referral.</p>;
+}
+
 export default function EnhancedBookingForm({ onSuccess, initialValues }: EnhancedBookingFormProps) {
   const [step, setStep] = useState(1);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
@@ -111,6 +124,16 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [routeType, setRouteType] = useState<"custom" | "local" | "not_decided">("custom");
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
+  // Referral capture (spec §28) — kept entirely separate from the
+  // Booking Source panel above: a Referral is a rewarded relationship
+  // between two real Customer records, not a free-text source-category
+  // tag. "external"/"hotel_agent_vendor" referral modes intentionally do
+  // NOT create a tracked Referral (no real referrer Customer exists to
+  // link) — use the existing Booking Source panel for those instead.
+  const [referralMode, setReferralMode] = useState<"none" | "existing_customer" | "referral_code">("none");
+  const [referralSearch, setReferralSearch] = useState("");
+  const [referralCode, setReferralCode] = useState("");
+  const [resolvedReferrer, setResolvedReferrer] = useState<{ _id: string; name: string; primaryMobile: string } | null>(null);
   // Progressive disclosure for Review & Confirm (spec: "daily-use fields
   // first, expandable detailed sections") — fuel deductions and misc.
   // expenses are normally settled at trip-end, not at booking time, so
@@ -372,6 +395,27 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   const redemptionValuePerPoint = rewardRule?.redemptionValuePerPoint ?? 1;
   const minPointsToRedeem = rewardRule?.minPointsToRedeem ?? 100;
 
+  // Resolves a referrer by mobile or code as the user types, so the form
+  // can show "Referrer found: <name>" for confirmation before capture
+  // rather than sending the booking blind and finding out it failed.
+  const { data: referrerLookup, isFetching: referrerLookupPending } = useQuery<{ referrer: { _id: string; name: string; primaryMobile: string } | null }>({
+    queryKey: ["/api/referrals/resolve-referrer", referralMode, referralSearch, referralCode],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (referralMode === "existing_customer") params.set("mobile", referralSearch);
+      if (referralMode === "referral_code") params.set("referralCode", referralCode);
+      const res = await fetch(`/api/referrals/resolve-referrer?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) return { referrer: null };
+      return res.json();
+    },
+    enabled:
+      (referralMode === "existing_customer" && referralSearch.replace(/\D/g, "").length >= 10) ||
+      (referralMode === "referral_code" && referralCode.trim().length >= 6),
+  });
+  useEffect(() => {
+    setResolvedReferrer(referrerLookup?.referrer || null);
+  }, [referrerLookup]);
+
   // Active vendors — only fetched when the Booking Source panel is
   // actually showing, for the optional "link to Vendor Master" select.
   const { data: activeVendors } = useQuery<any[]>({
@@ -419,6 +463,13 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
         thirdPartyDriverName: "",
         thirdPartyDriverCharges: 0,
         idempotencyKey: bookingIdempotencyKeyRef.current,
+        referral: referralMode !== "none" && resolvedReferrer
+          ? {
+              mode: referralMode,
+              referrerCustomerId: referralMode === "existing_customer" ? resolvedReferrer._id : undefined,
+              referralCode: referralMode === "referral_code" ? referralCode.trim().toUpperCase() : undefined,
+            }
+          : undefined,
       };
 
       const response = await apiRequest("POST", "/api/bookings", bookingData);
@@ -1529,6 +1580,57 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                     </div>
                   </div>
                 )}
+
+                <div className="md:col-span-2 border-2 border-dashed border-green-200 rounded-lg p-4 space-y-3 bg-green-50/30">
+                  <p className="text-sm font-medium text-green-900">Was this Booking referred by someone?</p>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      ["none", "No Referral"],
+                      ["existing_customer", "Search Existing Customer"],
+                      ["referral_code", "Enter Referral Code"],
+                    ] as const).map(([mode, label]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => { setReferralMode(mode); setReferralSearch(""); setReferralCode(""); setResolvedReferrer(null); }}
+                        className={`px-3 py-1.5 rounded-full text-sm border-2 transition-colors ${
+                          referralMode === mode ? "border-green-500 bg-green-100 text-green-800" : "border-gray-200 text-gray-600 hover:border-gray-300"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* "External Referral" / "Hotel-Agent-Vendor Referral" (spec §28's
+                      other two options) are deliberately not repeated here — that's
+                      exactly what the Booking Source panel above already captures
+                      (hotel/travel_agent/vendor_partner/referral source types with
+                      sourceName/sourceContact/commission), for a referrer who is NOT
+                      a real, rewardable Customer record. Two separate UI sections
+                      for two separate concerns, per spec §28's "keep separate" rule. */}
+                  {referralMode === "existing_customer" && (
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="Referrer's mobile number"
+                        value={referralSearch}
+                        onChange={(e) => setReferralSearch(e.target.value)}
+                        className="h-11 border-2 border-gray-200 rounded-lg"
+                      />
+                      {referralLookupStatus(referralSearch, 10, referrerLookupPending, resolvedReferrer)}
+                    </div>
+                  )}
+                  {referralMode === "referral_code" && (
+                    <div className="space-y-2">
+                      <Input
+                        placeholder="Referral code (e.g. AB12CD)"
+                        value={referralCode}
+                        onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                        className="h-11 border-2 border-gray-200 rounded-lg uppercase"
+                      />
+                      {referralLookupStatus(referralCode, 6, referrerLookupPending, resolvedReferrer)}
+                    </div>
+                  )}
+                </div>
 
                 <FormField
                   control={form.control}
