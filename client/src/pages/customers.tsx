@@ -31,9 +31,12 @@ interface CustomersPageProps {
   // navigating here — opens that customer's 360 dialog immediately instead
   // of landing on the plain list.
   initialCustomerId?: string | null;
+  // Forwarded to CustomerDashboard's timeline — see its own prop comment.
+  onNavigateToInquiry?: (inquiryId: string) => void;
+  onNavigateToLead?: (leadId: string) => void;
 }
 
-export default function CustomersPage({ onEditBooking, onNewBooking, initialCustomerId }: CustomersPageProps) {
+export default function CustomersPage({ onEditBooking, onNewBooking, initialCustomerId, onNavigateToInquiry, onNavigateToLead }: CustomersPageProps) {
   const [search, setSearch] = useState("");
   const [activeSegment, setActiveSegment] = useState<{ key: string; label: string } | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
@@ -210,6 +213,14 @@ export default function CustomersPage({ onEditBooking, onNewBooking, initialCust
               onNewBooking={(prefill) => {
                 setViewingCustomerId(null);
                 onNewBooking?.(prefill);
+              }}
+              onNavigateToInquiry={(inquiryId) => {
+                setViewingCustomerId(null);
+                onNavigateToInquiry?.(inquiryId);
+              }}
+              onNavigateToLead={(leadId) => {
+                setViewingCustomerId(null);
+                onNavigateToLead?.(leadId);
               }}
             />
           )}

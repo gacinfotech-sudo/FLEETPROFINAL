@@ -120,9 +120,12 @@ interface Props {
   // built (and tested) for Lead→Booking conversion, reused verbatim here
   // rather than a second prefill path.
   onNewBooking?: (prefill: any) => void;
+  // Forwarded to CustomerTimeline — see its own prop comment.
+  onNavigateToInquiry?: (inquiryId: string) => void;
+  onNavigateToLead?: (leadId: string) => void;
 }
 
-export default function CustomerDashboard({ customerId, onEditBooking, onNewBooking }: Props) {
+export default function CustomerDashboard({ customerId, onEditBooking, onNewBooking, onNavigateToInquiry, onNavigateToLead }: Props) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [newTag, setNewTag] = useState("");
@@ -777,7 +780,7 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
 
       <div>
         <Label className="text-sm font-medium text-gray-700 mb-2 block">Timeline</Label>
-        <CustomerTimeline customerId={customerId} />
+        <CustomerTimeline customerId={customerId} onNavigateToInquiry={onNavigateToInquiry} onNavigateToLead={onNavigateToLead} />
       </div>
     </div>
   );

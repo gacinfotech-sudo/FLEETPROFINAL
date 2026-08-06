@@ -112,6 +112,10 @@ export default function Dashboard() {
   // arrival instead of landing on the plain, unfiltered list. Cleared
   // whenever navigating anywhere else, same pattern as bookingPrefill above.
   const [pendingCustomerId, setPendingCustomerId] = useState<string | null>(null);
+  // Same pattern, for Customer 360°'s timeline click-through to the
+  // originating Inquiry/Lead record (docs/PIPELINE_BUG_REPORT.md #10).
+  const [pendingInquiryId, setPendingInquiryId] = useState<string | null>(null);
+  const [pendingLeadId, setPendingLeadId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showVehicleForm, setShowVehicleForm] = useState(false);
   const [showDriverForm, setShowDriverForm] = useState(false);
@@ -195,6 +199,8 @@ export default function Dashboard() {
     if (view !== "bookings") setBookingPrefill(null);
     if (view !== "history") setSourceFilter("all");
     if (view !== "customers") setPendingCustomerId(null);
+    if (view !== "inquiries") setPendingInquiryId(null);
+    if (view !== "leads") setPendingLeadId(null);
     setCurrentView(view);
     setLocation(`/dashboard/${view}`);
   };
@@ -207,6 +213,16 @@ export default function Dashboard() {
   const handleSelectCustomerFromSearch = (customerId: string) => {
     setPendingCustomerId(customerId);
     handleViewChange("customers");
+  };
+
+  const handleNavigateToInquiry = (inquiryId: string) => {
+    setPendingInquiryId(inquiryId);
+    handleViewChange("inquiries");
+  };
+
+  const handleNavigateToLead = (leadId: string) => {
+    setPendingLeadId(leadId);
+    handleViewChange("leads");
   };
 
   const linkBookingMutation = useMutation({
@@ -1469,7 +1485,7 @@ export default function Dashboard() {
         );
 
       case "customers":
-        return <CustomersPage onEditBooking={handleEditBooking} onNewBooking={handleConvertLeadToBooking} initialCustomerId={pendingCustomerId} />;
+        return <CustomersPage onEditBooking={handleEditBooking} onNewBooking={handleConvertLeadToBooking} initialCustomerId={pendingCustomerId} onNavigateToInquiry={handleNavigateToInquiry} onNavigateToLead={handleNavigateToLead} />;
 
       case "after-sales":
         return <AfterSalesPage />;
@@ -1478,10 +1494,10 @@ export default function Dashboard() {
         return <CampaignsPage />;
 
       case "inquiries":
-        return <InquiriesPage />;
+        return <InquiriesPage initialInquiryId={pendingInquiryId} />;
 
       case "leads":
-        return <LeadsPage onConvertToBooking={handleConvertLeadToBooking} />;
+        return <LeadsPage onConvertToBooking={handleConvertLeadToBooking} initialLeadId={pendingLeadId} />;
 
       case "followups":
         return <FollowUpsPage />;

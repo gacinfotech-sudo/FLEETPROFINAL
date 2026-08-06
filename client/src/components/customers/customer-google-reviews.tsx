@@ -47,6 +47,12 @@ export default function CustomerGoogleReviews({ customerId, bookings }: { custom
   const latest = reviews[0];
   const receivedBookingIds = new Set(reviews.filter((review: any) => review.reviewReceived && review.bookingId).map((review: any) => review.bookingId._id || review.bookingId));
   const requestableBookings = eligibleBookings.filter((booking) => !receivedBookingIds.has(booking._id));
+  // Not received yet still legitimately doesn't equal "never asked" — a
+  // staff member may deliberately follow up again. Rather than hiding an
+  // already-requested booking (which would block a real, intended
+  // re-request), it's still selectable but visually flagged, so a repeat
+  // send is a conscious choice, not an accidental duplicate WhatsApp message.
+  const requestedBookingIds = new Set(reviews.filter((review: any) => review.reviewRequested && !review.reviewReceived && review.bookingId).map((review: any) => review.bookingId._id || review.bookingId));
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/google-reviews`] });
@@ -162,7 +168,7 @@ export default function CustomerGoogleReviews({ customerId, bookings }: { custom
         <DialogContent>
           <DialogHeader><DialogTitle>Send Google Review Request</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div><Label>Completed Booking</Label><Select value={requestForm.bookingId} onValueChange={(value) => setRequestForm({ ...requestForm, bookingId: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{requestableBookings.map((booking) => <SelectItem key={booking._id} value={booking._id}>{booking.bookingId} · {booking.pickupLocation} → {booking.dropoffLocation || '-'}</SelectItem>)}</SelectContent></Select></div>
+            <div><Label>Completed Booking</Label><Select value={requestForm.bookingId} onValueChange={(value) => setRequestForm({ ...requestForm, bookingId: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{requestableBookings.map((booking) => <SelectItem key={booking._id} value={booking._id}>{booking.bookingId} · {booking.pickupLocation} → {booking.dropoffLocation || '-'}{requestedBookingIds.has(booking._id) ? ' (already requested)' : ''}</SelectItem>)}</SelectContent></Select></div>
             <div><Label>Request Sent Through</Label><Select value={requestForm.channel} onValueChange={(value) => setRequestForm({ ...requestForm, channel: value, confirmedSent: false })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="whatsapp">WhatsApp</SelectItem><SelectItem value="email">Email</SelectItem><SelectItem value="sms">SMS</SelectItem><SelectItem value="phone">Phone</SelectItem><SelectItem value="in_person">In person</SelectItem><SelectItem value="other">Other</SelectItem></SelectContent></Select></div>
             <div><Label>Google Review Page URL</Label><Input type="url" placeholder="https://g.page/r/.../review" value={requestForm.reviewPageUrl} onChange={(event) => setRequestForm({ ...requestForm, reviewPageUrl: event.target.value })} /></div>
             {requestForm.channel === 'whatsapp' ? <div className="rounded-md bg-green-50 border border-green-100 p-3 text-sm flex gap-2"><MessageCircle className="h-4 w-4 text-green-700 mt-0.5" /> The consent-aware WhatsApp sender will log the message and prevent duplicate processing.</div> : <label className="flex items-center gap-2 text-sm"><Checkbox checked={requestForm.confirmedSent} onCheckedChange={(value) => setRequestForm({ ...requestForm, confirmedSent: !!value })} /> I confirm this request was actually sent through the selected channel.</label>}

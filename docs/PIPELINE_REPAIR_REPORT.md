@@ -93,6 +93,65 @@ Full detail on the 5 repairs applied this initiative. See `docs/PIPELINE_BUG_REP
 
 ---
 
+## Repair 6 — Customer 360° timeline had no click-through to the originating Inquiry/Lead (P3, UI_ONLY)
+
+**Previous status**: `inquiry_linked`/`inquiry_converted_to_lead`/`lead_converted_to_customer` timeline events rendered as plain text even though the underlying Inquiry/Lead records and their linking fields exist.
+
+**Root cause**: `TimelineEvent` never carried the actual `inquiryId`/`leadId` values, and `customer-timeline.tsx` had no navigation wiring.
+
+**Files changed**:
+- `server/services/timelineService.ts` — additive `inquiryId?`/`leadId?` fields on `TimelineEvent`, populated on the 3 relevant push calls.
+- `client/src/components/customers/customer-timeline.tsx` — new optional `onNavigateToInquiry`/`onNavigateToLead` props; rows with an id render as clickable links (lead preferred over inquiry when both are present, since it's the "further along" record).
+- `client/src/components/customers/customer-dashboard.tsx`, `client/src/pages/customers.tsx` — forward the two new callbacks down to the timeline.
+- `client/src/pages/dashboard.tsx` — new `pendingInquiryId`/`pendingLeadId` state (same set-before-navigate/clear-on-navigate-away pattern as `pendingCustomerId`), new `handleNavigateToInquiry`/`handleNavigateToLead` handlers, threaded into new `initialInquiryId`/`initialLeadId` props.
+- `client/src/pages/inquiries.tsx`, `client/src/pages/leads.tsx` — accept the new prop, fetch that exact record by id (`GET /api/inquiries/:id` / `GET /api/leads/:id`, both pre-existing routes) and open its detail dialog on arrival — fetched directly rather than found in the current page's loaded list, since the target record may not be on the currently filtered/paginated page.
+
+**Database changes**: none.
+
+**Tests**: `tests/e2e/pipeline-audit-timeline-clickthrough.spec.ts` test 1 — builds a real Inquiry→Lead→Customer chain via the actual APIs, clicks the "converted to lead" timeline row, confirms navigation to `/dashboard/leads` with that exact lead open.
+
+**Scope note**: only wired for the primary Customer 360° view (`customers.tsx`); the secondary nested `CustomerDashboard` mount inside `leads.tsx` (viewing a lead's linked customer) was left with the plain-text-only behavior to avoid a deeper prop-threading chain through a page with its own complex state — no regression there, just not enhanced.
+
+**Final status**: Fixed, tested, regression-clean.
+
+---
+
+## Repair 7 — WhatsApp send failures didn't distinguish "not configured" from a real failure (P2, PARTIALLY_WORKING)
+
+**Previous status**: Every WhatsApp-send error handler forwarded the raw provider error string in a generic destructive toast, identical in presentation to an actual send failure (bad number, provider outage, etc.).
+
+**Root cause**: No handler special-cased the specific "WhatsApp session not connected for this tenant" error that `baileysProvider.ts` returns when a tenant hasn't linked a session.
+
+**Files changed**:
+- `client/src/lib/whatsapp-error.ts` — new shared helper (`isWhatsAppNotConnectedError`, `whatsappErrorToast`) detecting the specific error substring and returning a distinct "WhatsApp Not Connected — Configuration Required" toast.
+- `client/src/components/booking/booking-communication.tsx`, `client/src/components/customers/customer-message-center.tsx` — both WhatsApp-send `onError` handlers now use the shared helper.
+
+**Database changes**: none.
+
+**Tests**: `pipeline-audit-timeline-clickthrough.spec.ts` test 2 — triggers a real send against this dev tenant's genuinely disconnected WhatsApp session (confirmed disconnected by every other WhatsApp-touching test in the suite) and asserts the new toast text appears.
+
+**Final status**: Fixed, tested, regression-clean.
+
+---
+
+## Repair 8 — Google Review request picker didn't distinguish "already requested" bookings (P2/P3, PARTIALLY_WORKING)
+
+**Previous status**: The booking picker in the "Send Review Request" dialog only excluded bookings whose review was already *received*, not ones already *requested* — a staff member could send a second real request with no indication one was already sent, since idempotency only protects an exact-retry (same `requestId`), not a fresh request for the same booking.
+
+**Root cause**: `requestableBookings` filtering only checked `receivedBookingIds`.
+
+**Files changed**: `client/src/components/customers/customer-google-reviews.tsx` — new `requestedBookingIds` set (un-received but requested), booking options now show "(already requested)" — still selectable, since a genuine follow-up re-request is a legitimate action, just no longer an accidental-looking duplicate.
+
+**Database changes**: none.
+
+**Tests**: No dedicated new test — presentation-only change; `google-review.spec.ts`/`review-rewards-campaign.spec.ts` continue to exercise the underlying request flow unaffected.
+
+**Final status**: Fixed, regression-clean.
+
+---
+
 ## Cross-cutting process note
 
 Every server-side change in this repair round required a dev-server restart before its effect was visible to Playwright — the dev server runs via plain `tsx server/index.ts` (no watch mode configured in `package.json`'s `dev` script), so file edits are not hot-reloaded. This was discovered mid-repair (Repair 1's first test run gave a false "still broken" result against stale server code) and applied consistently for every subsequent change in this phase.
+
+**Shared-dev-DB far-future-date collision risk across the whole test suite**: this repo's E2E tests create real bookings against a shared, long-lived dev MongoDB with a small, fixed vehicle fleet, and avoid colliding with real/near-term data by picking a "far future" pickup date (a random offset thousands of days out). Because many independent test files each pick their own offset/window (observed range: +1 to +27000 days across the existing suite), two tests can legitimately land on the same vehicle+date and collide with a `VEHICLE_DOUBLE_BOOKING` error — this is what caused `pipeline-audit-idempotency-repairs.spec.ts`'s new tests to intermittently fail against unrelated pre-existing tests (and vice versa: it briefly broke `review-rewards-campaign.spec.ts`, whose `+27000` offset overlapped this phase's first choice of `+20000..27000`). Fixed by moving this phase's new date offsets to a `+40000..50000` range, clear of every existing offset found via a repo-wide search — not a code defect, a test-fixture spacing issue. Worth a future dedicated pass (a shared constants file enumerating each test file's reserved offset range) if this class of flake keeps recurring.

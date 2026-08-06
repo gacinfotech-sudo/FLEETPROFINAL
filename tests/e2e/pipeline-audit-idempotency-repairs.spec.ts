@@ -27,7 +27,7 @@ test.describe('Pipeline audit — duplicate-request (idempotency) repairs', () =
     const vehicle = await pickAvailableVehicle(page);
     const marker = String(Date.now());
     const mobile = '9' + marker.slice(-9);
-    const dayStr = farFutureDate(4200);
+    const dayStr = farFutureDate(40000, 2000);
     const idempotencyKey = `idem-test-${marker}`;
 
     const payload = {
@@ -66,7 +66,7 @@ test.describe('Pipeline audit — duplicate-request (idempotency) repairs', () =
     const vehicle = await pickAvailableVehicle(page);
     const marker = String(Date.now());
     const mobile = '9' + marker.slice(-9);
-    const dayStr = farFutureDate(4500);
+    const dayStr = farFutureDate(44000, 2000);
 
     const bookingRes = await page.request.post('/api/bookings', {
       headers: { 'X-CSRF-Token': csrf },
@@ -112,7 +112,7 @@ test.describe('Pipeline audit — duplicate-request (idempotency) repairs', () =
 
     const marker = String(Date.now());
     const mobile = '9' + marker.slice(-9);
-    const dayStr = farFutureDate(4800);
+    const dayStr = farFutureDate(48000, 2000);
     await page.locator('input[name="pickupDate"]').fill(dayStr);
     await page.locator('input[name="returnDate"]').fill(dayStr);
     await page.locator('input[name="pickupTime"]').fill('09:00');

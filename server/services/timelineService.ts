@@ -10,6 +10,11 @@ export interface TimelineEvent {
   description: string;
   bookingId?: string;
   employee?: string;
+  // Mongo _id (not a human-readable number, unlike bookingId above) — lets
+  // the Customer 360° timeline link directly to the originating Inquiry/
+  // Lead record instead of just describing it in text.
+  inquiryId?: string;
+  leadId?: string;
 }
 
 // Assembled on read from the real collections that already exist —
@@ -180,17 +185,21 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
       type: 'inquiry_linked', date: inq.createdAt,
       description: `Inquiry ${inq.inquiryNumber || inq._id} logged (source: ${(inq.source || 'other').replace(/_/g, ' ')})`,
       employee: inq.createdBy?.userId,
+      inquiryId: inq._id.toString(),
     });
     if (inq.convertedToLeadAt) {
       const lead: any = await Lead.findOne({ tenantId, inquiryId: inq._id });
       events.push({
         type: 'inquiry_converted_to_lead', date: inq.convertedToLeadAt,
         description: `Inquiry ${inq.inquiryNumber || inq._id} converted to lead ${lead?.leadNumber || ''}`.trim(),
+        inquiryId: inq._id.toString(),
+        leadId: lead?._id?.toString(),
       });
       if (lead?.convertedToCustomerAt) {
         events.push({
           type: 'lead_converted_to_customer', date: lead.convertedToCustomerAt,
           description: `Lead ${lead.leadNumber} converted to this customer record`,
+          leadId: lead._id.toString(),
         });
       }
     }

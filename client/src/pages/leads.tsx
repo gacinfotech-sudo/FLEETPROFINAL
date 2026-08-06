@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -54,13 +54,26 @@ interface LeadsPageProps {
   // Add Booking form — see docs/RECOMMENDED_IMPLEMENTATION_ROADMAP.md for
   // why this reuses that form entirely instead of a new Booking Wizard.
   onConvertToBooking?: (prefill: any) => void;
+  // Set by Customer 360°'s timeline (click-through on a "converted to
+  // lead" event) — opens that specific lead's detail dialog directly.
+  initialLeadId?: string | null;
 }
 
-export default function LeadsPage({ onConvertToBooking }: LeadsPageProps) {
+export default function LeadsPage({ onConvertToBooking, initialLeadId }: LeadsPageProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewingLead, setViewingLead] = useState<any>(null);
+
+  // The target lead may not be on the current (filtered/paginated) page,
+  // so it's fetched directly by id rather than found in the loaded list.
+  useEffect(() => {
+    if (!initialLeadId) return;
+    apiRequest("GET", `/api/leads/${initialLeadId}`)
+      .then((res) => res.json())
+      .then((lead) => setViewingLead(lead))
+      .catch(() => {});
+  }, [initialLeadId]);
   const [lostReason, setLostReason] = useState("");
   const [showLostDialog, setShowLostDialog] = useState<any>(null);
   const [viewingCustomerId, setViewingCustomerId] = useState<string | null>(null);

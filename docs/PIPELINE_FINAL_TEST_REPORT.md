@@ -14,21 +14,23 @@
 New this phase:
 - `tests/e2e/pipeline-audit-permission-repairs.spec.ts` — 6 tests (Repair 1: revenue/performance report permission enforcement).
 - `tests/e2e/pipeline-audit-idempotency-repairs.spec.ts` — 3 tests (Repairs 2 & 3: booking and payment duplicate-request protection).
+- `tests/e2e/pipeline-audit-timeline-clickthrough.spec.ts` — 2 tests (Repair 6: Customer 360° timeline click-through; Repair 7: WhatsApp "Configuration Required" messaging, verified against this dev tenant's genuinely disconnected WhatsApp session).
 
-## Full regression suite (final run, this phase's code)
+## Full regression suite (final run, all repairs from this phase included)
 
-123 tests total: **118 passed**, 4 failed, 1 skipped.
+125 tests total: **121 passed**, 3 failed, 1 skipped.
 
-The 4 failures are the same pre-existing, environmental failures already characterized and confirmed unrelated to any change made this session (verified in the prior "Professional Booking" initiative via `git stash` against an earlier baseline, and reconfirmed present again in this run with no change in cause):
+The 3 failures are pre-existing, environmental failures, each independently confirmed unrelated to this phase's changes via `git stash` against the pre-phase baseline (same failures occur with this phase's entire diff removed):
 
 | Test | Cause | Related to this phase? |
 |---|---|---|
-| `advance-payment.spec.ts` | Flaky under shared-dev-DB contention (a UI selector race, unrelated to server logic) | No |
 | `driver-feedback.spec.ts` | Pre-existing floating-point test assertion bug (`expect(4.9).toBe(5)`) in a file never touched this phase | No |
 | `google-review.spec.ts` | WhatsApp session not connected for this tenant — no provider credentials configured in this dev environment (expected "Configuration Required" state, not a code defect) | No |
-| `review-rewards-campaign.spec.ts` | Same WhatsApp-not-configured cause | No |
+| `review-rewards-campaign.spec.ts` | Same WhatsApp-not-configured cause — confirmed via `git stash` to fail identically with none of this phase's changes present | No |
 
-`dashboard-upcoming-bookings.spec.ts`, which failed intermittently earlier in this session due to a random-date vehicle double-booking collision in the shared dev DB, passed cleanly in this run — consistent with that being non-deterministic environmental flakiness rather than a real defect.
+`advance-payment.spec.ts`, `dashboard-upcoming-bookings.spec.ts`, and `customer-timeline.spec.ts` each intermittently failed at some point during this phase's iterative test runs (shared-dev-DB contention / random-date vehicle collisions) but passed cleanly in this final run and in isolated retries — confirmed as non-deterministic environmental flakiness, not real defects.
+
+**Process note on test-suite date collisions**: this phase's own new tests initially collided with `review-rewards-campaign.spec.ts`'s far-future date range (both picked overlapping day-offset windows against the shared dev DB's small vehicle fleet). Fixed by moving this phase's new tests to a `+40000..+52000` day-offset range confirmed clear of every other test file's range — see `docs/PIPELINE_REPAIR_REPORT.md`'s cross-cutting process note.
 
 ## Ten-level verification (per repair, summarized — full detail in PIPELINE_REPAIR_REPORT.md)
 

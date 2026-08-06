@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -22,13 +22,30 @@ const STATUS_BADGE: Record<string, "default" | "secondary" | "destructive" | "ou
   duplicate: "destructive", invalid: "destructive", lost: "destructive", cancelled: "destructive",
 };
 
-export default function InquiriesPage() {
+interface InquiriesPageProps {
+  // Set by Customer 360°'s timeline (click-through on an "Inquiry logged"
+  // event) — opens that specific inquiry's detail dialog directly instead
+  // of landing on the plain, unfiltered list.
+  initialInquiryId?: string | null;
+}
+
+export default function InquiriesPage({ initialInquiryId }: InquiriesPageProps = {}) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showNewForm, setShowNewForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [viewingInquiry, setViewingInquiry] = useState<any>(null);
+
+  // The target inquiry may not be on the current (filtered/paginated) page,
+  // so it's fetched directly by id rather than found in the loaded list.
+  useEffect(() => {
+    if (!initialInquiryId) return;
+    apiRequest("GET", `/api/inquiries/${initialInquiryId}`)
+      .then((res) => res.json())
+      .then((inquiry) => setViewingInquiry(inquiry))
+      .catch(() => {});
+  }, [initialInquiryId]);
   const [showDetailedForm, setShowDetailedForm] = useState<any>(null);
   const [lostReason, setLostReason] = useState("");
   const [showLostDialog, setShowLostDialog] = useState<any>(null);
