@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { Customer, Referral, RewardEventRule, type IReferral, type ReferralStatus, type RewardEventKey } from '../models/index';
+import { Customer, Referral, RewardEventRule, RewardTransaction, Booking, GoogleReviewTracking, type IReferral, type ReferralStatus, type RewardEventKey } from '../models/index';
 import { normalizeIndianPhone } from '../whatsapp/phone';
 import { creditReferralEventReward, reverseRewardTransactionsByIds } from './rewardService';
 
@@ -225,4 +225,92 @@ export async function reverseReferralRewardsForBooking(tenantId: string, booking
   );
   await appendStatus(referral, 'reversed', actor.userId);
   return referral;
+}
+
+const EARN_TYPES = ['booking_reward', 'repeat_booking_bonus', 'referral_bonus', 'review_bonus', 'campaign_reward', 'manual_credit'];
+const SUSPICIOUS_STATUSES: ReferralStatus[] = ['self_referral', 'duplicate', 'fraud_review'];
+
+async function sumPoints(tenantId: string, match: Record<string, any>): Promise<number> {
+  const rows = await RewardTransaction.aggregate([
+    { $match: { tenantId: new mongoose.Types.ObjectId(tenantId), ...match } },
+    { $group: { _id: null, total: { $sum: '$points' } } },
+  ]);
+  return Math.round((rows[0]?.total || 0) * 100) / 100;
+}
+
+// Every number here is read directly from the reward ledger / Referral
+// collection / Booking collection — nothing here is estimated or
+// simulated (spec §29: "Use real APIs and ledger data"). Two metrics
+// deserve a note on what they actually measure, since this codebase's
+// ledger doesn't implement a per-batch "remaining balance" or a
+// scheduled expiry sweep:
+//   - pointsExpiringSoon: the face value of ledger rows whose expiryDate
+//     falls in the next 30 days — an upper bound (it doesn't subtract
+//     points from that batch already redeemed), not a promise those
+//     exact points are still spendable.
+//   - pointsPendingReferral: the configured referral.booking_completed
+//     reward for every referral whose booking hasn't completed yet —
+//     a real, computable "would be paid if this booking completes"
+//     figure, not a stored ledger status (this ledger has no 'pending'
+//     transaction state; every credit is immediate on the event that
+//     earns it).
+export async function buildRewardsReferralDashboard(tenantId: string) {
+  const tid = new mongoose.Types.ObjectId(tenantId);
+  const now = new Date();
+  const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [
+    totalPointsIssued, pointsRedeemed, pointsReversed, pointsExpiringSoon, reviewRewardPoints,
+    activeReferrersRows, newReferralsThisMonth, referralBookings, referralRevenueRows,
+    topReferrersRows, verifiedReviews, suspiciousReferrals,
+    pendingReferrals, bookingCompletedRule,
+  ] = await Promise.all([
+    sumPoints(tenantId, { points: { $gt: 0 }, transactionType: { $in: EARN_TYPES } }),
+    sumPoints(tenantId, { transactionType: 'redemption' }).then((v) => Math.abs(v)),
+    sumPoints(tenantId, { transactionType: 'reversal' }).then((v) => Math.abs(v)),
+    sumPoints(tenantId, { points: { $gt: 0 }, expiryDate: { $gte: now, $lte: in30Days } }),
+    sumPoints(tenantId, { transactionType: 'review_bonus' }),
+    Referral.distinct('referrerCustomerId', { tenantId: tid }),
+    Referral.countDocuments({ tenantId: tid, createdAt: { $gte: monthStart } }),
+    Referral.countDocuments({ tenantId: tid, referredBookingId: { $exists: true, $ne: null } }),
+    Booking.aggregate([
+      { $match: { tenantId: tid, referralId: { $exists: true, $ne: null } } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } },
+    ]),
+    Referral.aggregate([
+      { $match: { tenantId: tid } },
+      { $group: { _id: '$referrerCustomerId', referralCount: { $sum: 1 } } },
+      { $sort: { referralCount: -1 } },
+      { $limit: 5 },
+      { $lookup: { from: 'customers', localField: '_id', foreignField: '_id', as: 'customer' } },
+      { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true } },
+      { $project: { _id: 1, referralCount: 1, name: '$customer.name', primaryMobile: '$customer.primaryMobile' } },
+    ]),
+    GoogleReviewTracking.countDocuments({
+      tenantId: tid, reviewReceived: true, reviewRating: { $gte: 1, $lte: 5 },
+      $or: [{ reviewLink: { $exists: true, $nin: [null, ''] } }, { reviewReference: { $exists: true, $nin: [null, ''] } }],
+    }),
+    Referral.countDocuments({ tenantId: tid, status: { $in: SUSPICIOUS_STATUSES } }),
+    Referral.countDocuments({ tenantId: tid, status: { $nin: [...SUSPICIOUS_STATUSES, 'cancelled', 'reversed', 'booking_completed'] }, 'rewardsIssued.bookingCompleted': false }),
+    getRewardEventRule(tenantId, 'referral.booking_completed'),
+  ]);
+
+  return {
+    totalPointsIssued,
+    pointsRedeemed,
+    pointsReversed,
+    pointsExpiringSoon,
+    pointsPendingReferral: bookingCompletedRule.enabled ? Math.round(pendingReferrals * bookingCompletedRule.points * 100) / 100 : 0,
+    activeReferrers: activeReferrersRows.length,
+    newReferralsThisMonth,
+    referralBookings,
+    referralRevenue: referralRevenueRows[0]?.total || 0,
+    topReferrers: topReferrersRows.map((r: any) => ({
+      customerId: r._id, name: r.name || 'Unknown', primaryMobile: r.primaryMobile, referralCount: r.referralCount,
+    })),
+    verifiedReviews,
+    reviewRewardPoints,
+    suspiciousReferrals,
+  };
 }

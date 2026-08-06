@@ -60,7 +60,7 @@ import { recordPayment, reversePayment, recomputeBookingPaymentSummary, RECEIPT_
 import { PaymentTransaction, Customer } from "./models/index";
 import { findOrCreateCustomer, recomputeCustomerStats, classifyCustomer } from "./services/customerService";
 import { creditBookingReward, reverseBookingReward, previewRedemption, commitRedemption, computeLoyaltyTier, getRewardRule, adjustRewardPoints, creditVerifiedGoogleReviewReward } from "./services/rewardService";
-import { getRewardEventRules, generateReferralCode, captureReferral, linkReferralToBooking, markReferralBookingCompleted, reverseReferralRewardsForBooking, findReferrerCustomer } from "./services/referralService";
+import { getRewardEventRules, generateReferralCode, captureReferral, linkReferralToBooking, markReferralBookingCompleted, reverseReferralRewardsForBooking, findReferrerCustomer, buildRewardsReferralDashboard } from "./services/referralService";
 import { RewardEventRule, Referral, type RewardEventKey } from "./models/index";
 import { RewardTransaction, RewardRule } from "./models/index";
 import { computeSegments, computeTagCounts, getSegmentFilter } from "./services/segmentService";
@@ -5817,6 +5817,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(rows);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch customer referrals" });
+    }
+  });
+
+  // Rewards/Referral dashboard (spec §29) — every number here is read
+  // directly from the reward ledger / Referral / Booking collections, see
+  // buildRewardsReferralDashboard's own comment for the two metrics that
+  // deserve a definition (pointsExpiringSoon, pointsPendingReferral).
+  app.get("/api/rewards-referral-dashboard", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REFERRAL_VIEW), async (req: AuthRequest, res) => {
+    try {
+      res.json(await buildRewardsReferralDashboard(req.tenantId!));
+    } catch (error: any) {
+      console.error('Rewards/Referral dashboard error:', error?.message || error);
+      res.status(500).json({ message: "Failed to build rewards/referral dashboard" });
+    }
+  });
+
+  // Tenant-wide reward ledger view — every /api/customers/:id/rewards
+  // route that already existed is scoped to one customer; this backs the
+  // dashboard's clickable points cards (spec §29: "every card must open
+  // filtered records"), which need to show real rows across customers.
+  app.get("/api/reward-transactions", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REFERRAL_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const filter: any = { tenantId: req.tenantId };
+      if (req.query.transactionType) {
+        const types = String(req.query.transactionType).split(',');
+        filter.transactionType = types.length > 1 ? { $in: types } : types[0];
+      }
+      if (req.query.expiringWithinDays) {
+        const days = Number(req.query.expiringWithinDays);
+        const now = new Date();
+        filter.expiryDate = { $gte: now, $lte: new Date(now.getTime() + days * 24 * 60 * 60 * 1000) };
+      }
+      const rows = await RewardTransaction.find(filter).sort({ createdAt: -1 }).limit(200)
+        .populate('customerId', 'name primaryMobile');
+      res.json(rows);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch reward transactions" });
     }
   });
 

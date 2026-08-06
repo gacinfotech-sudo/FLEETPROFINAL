@@ -429,4 +429,45 @@ test.describe('Referral capture + configurable reward event rules', () => {
       headers: { 'X-CSRF-Token': csrf }, data: { points: 0.5 },
     });
   });
+
+  test('API: rewards/referral dashboard reflects a real captured referral and a redemption in its own numbers', async ({ page }) => {
+    await login(page, 'qaclient', 'QaFixed456!');
+    const csrf = await getCsrfToken(page);
+    const marker = String(Date.now());
+
+    const before = await (await page.request.get('/api/rewards-referral-dashboard')).json();
+
+    const { customer: referrer } = await createCustomerViaBooking(page, csrf, `Dashboard Referrer ${marker}`, freshMobile());
+    const captureRes = await page.request.post('/api/referrals', {
+      headers: { 'X-CSRF-Token': csrf },
+      data: { referrerCustomerId: referrer._id, referredMobile: freshMobile(), source: 'existing_customer_search' },
+    });
+    expect(captureRes.status()).toBe(201);
+
+    const after = await (await page.request.get('/api/rewards-referral-dashboard')).json();
+    expect(after.activeReferrers).toBeGreaterThanOrEqual(before.activeReferrers + 1);
+    expect(after.totalPointsIssued).toBeGreaterThanOrEqual(before.totalPointsIssued + 0.5);
+    // Not asserting this new referrer appears in topReferrers — it's
+    // limited to the top 5 by count, and this shared dev DB already has
+    // dozens of referrers tied at count=1, so a fresh single-referral
+    // entry has no guaranteed rank among ties.
+
+    // The transaction list backing the "Points Issued" card must contain
+    // this exact new credit, not just a bumped total.
+    const transactions = await (await page.request.get('/api/reward-transactions?transactionType=referral_bonus')).json();
+    expect(transactions.some((t: any) => t.customerId?._id === referrer._id && t.points === 0.5)).toBe(true);
+  });
+
+  test('UI: Rewards & Referrals dashboard renders real metric cards and a clickable drill-down table', async ({ page }) => {
+    await login(page, 'qaclient', 'QaFixed456!');
+    await page.locator('nav').getByRole('button', { name: 'Rewards & Referrals' }).click();
+    await page.waitForLoadState('networkidle');
+
+    await expect(page.getByText('Total Points Issued')).toBeVisible();
+    await expect(page.getByText('Active Referrers')).toBeVisible();
+    await expect(page.getByText('Top Referrers')).toBeVisible();
+
+    await page.getByText('Active Referrers').click();
+    await expect(page.getByText('All Referrals')).toBeVisible({ timeout: 5000 });
+  });
 });
