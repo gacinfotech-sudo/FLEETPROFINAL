@@ -47,7 +47,7 @@ import {
   type BookingStatus,
 } from "./services/bookingStateMachine";
 import { buildLiveOperations } from "./services/liveOperations";
-import { buildUpcomingBookings } from "./services/upcomingBookings";
+import { buildUpcomingBookings, classifyUpcomingBookings } from "./services/upcomingBookings";
 import { buildPaymentDues } from "./services/paymentDues";
 import { whatsappProvider } from "./whatsapp/index";
 import { buildMessage, type MessageType } from "./whatsapp/templates";
@@ -56,18 +56,34 @@ import { WhatsAppMessage, Booking } from "./models/index";
 import { sendBookingMessage } from "./whatsapp/sendBookingMessage";
 import { buildCustomerTemplatePreviews, CUSTOMER_TEMPLATE_KEYS, type CustomerTemplateKey } from "./whatsapp/customerTemplates";
 import { findVehicleConflicts, checkDriverAvailability, combineDateTime } from "./services/availability";
-import { recordPayment, reversePayment, recomputeBookingPaymentSummary } from "./services/paymentLedger";
+import { recordPayment, reversePayment, recomputeBookingPaymentSummary, RECEIPT_TYPES } from "./services/paymentLedger";
 import { PaymentTransaction, Customer } from "./models/index";
 import { findOrCreateCustomer, recomputeCustomerStats, classifyCustomer } from "./services/customerService";
-import { creditBookingReward, reverseBookingReward, previewRedemption, commitRedemption, computeLoyaltyTier, getRewardRule, adjustRewardPoints } from "./services/rewardService";
+import { creditBookingReward, reverseBookingReward, previewRedemption, commitRedemption, computeLoyaltyTier, getRewardRule, adjustRewardPoints, creditVerifiedGoogleReviewReward } from "./services/rewardService";
 import { RewardTransaction, RewardRule } from "./models/index";
 import { computeSegments, computeTagCounts, getSegmentFilter } from "./services/segmentService";
-import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerConsentEvent, Campaign, CampaignRecipient } from "./models/index";
+import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerConsentEvent, CustomerBillingProfile, Invoice, Campaign, CampaignRecipient, GoogleReviewTracking, Inquiry, Lead, Quotation, LeadFollowUp, BookingDraft } from "./models/index";
+import { nextInquiryNumber } from "./services/inquiryNumbering";
+import { isTerminalInquiryStatus, assertValidInquiryTransition, getMissingQualificationFields, type InquiryStatusValue } from "./services/inquiryStatus";
+import { nextLeadNumber } from "./services/leadNumbering";
+import { assertValidLeadTransition, type LeadStatusValue } from "./services/leadStatus";
+import { nextQuotationNumber } from "./services/quotationNumbering";
+import { assertValidQuotationTransition, isImmutableQuotationStatus, computeOptionTotalPaise, type QuotationStatusValue } from "./services/quotationStatus";
+import { sendQuotationMessage } from "./whatsapp/sendQuotationMessage";
 import { computeCustomerTimeline } from "./services/timelineService";
 import { previewCampaign, sendCampaign } from "./services/campaignService";
 import { buildDriverPerformance } from "./services/driverPerformance";
 import { buildVehiclePerformance } from "./services/vehiclePerformance";
+import { findDuplicateCandidates, mergeCustomers } from "./services/customerMergeService";
+import { buildCustomerFinancialSummary, buildPaymentReceipt } from "./services/customerFinancialService";
+import { addCurrentInvoiceSettlements, createAdjustmentNote, createInvoiceDraft, finalizeInvoice, previewInvoice, reviseInvoice, updateInvoiceDraft } from "./services/invoiceService";
+import { getInvoiceSettings, upsertInvoiceSettings } from "./services/invoiceSettingsService";
+import { buildCustomerDriverHistory, buildDriverFeedbackProfile } from "./services/driverFeedbackService";
+import { buildCustomerVehicleHistory, buildVehicleFeedbackProfile } from "./services/vehicleFeedbackService";
 import { DriverLeave, DriverAttendance } from "./models/index";
+import { Expense, Driver } from "./models/index";
+import bcrypt from "bcrypt";
+import { authenticateDriver, type DriverAuthRequest } from "./middleware/driverAuth";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -77,6 +93,34 @@ const FINANCIAL_FIELDS = [
   'totalAmount', 'paymentStatus', 'tollCharges', 'parkingCharges', 'petrolCharges',
   'dieselCharges', 'cngCharges', 'miscellaneousAmount', 'thirdPartyDriverCharges',
 ];
+
+const GOOGLE_REVIEW_CHANNELS = ['whatsapp', 'email', 'sms', 'phone', 'in_person', 'other'] as const;
+const REVIEW_ELIGIBLE_STATUSES = new Set(['completed', 'payment_pending', 'closed']);
+
+function safeGoogleReviewUrl(value: unknown) {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  try {
+    const url = new URL(value.trim());
+    const host = url.hostname.toLowerCase();
+    const googleOwnedHost = host === 'g.page' || host === 'goo.gl' || host.endsWith('.goo.gl')
+      || host === 'google.com' || host.endsWith('.google.com');
+    return ['http:', 'https:'].includes(url.protocol) && googleOwnedHost ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function googleReviewRequestMessage(customer: any, booking: any, tenant: any, reviewPageUrl: string) {
+  const business = tenant?.businessName || tenant?.name || 'FleetPro';
+  return [
+    `Namaste ${customer.name || 'Customer'} ji,`,
+    `Booking ${booking.bookingId} (${booking.pickupLocation} → ${booking.dropoffLocation || '-'}) ke liye dhanyavaad.`,
+    'Aap apna genuine experience Google par share kar sakte hain:',
+    reviewPageUrl,
+    'Review dena poori tarah optional hai. Aapke honest feedback se hume service improve karne mein madad milegi.',
+    `- ${business}`,
+  ].join('\n');
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // P0 SECURITY HELPER: admin users are allowed cross-tenant access (see
@@ -492,6 +536,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error in /api/auth/me:', error);
       res.status(500).json({ message: "Failed to fetch user data" });
+    }
+  });
+
+  // ===== Driver portal auth (additive, separate from staff auth above) =====
+  // See the IDriver.loginPin comment in server/models/index.ts for why this
+  // is a deliberately parallel, minimal session mechanism rather than a
+  // new User.role. Reuses the exact same brute-force protections already
+  // built for staff login (loginRateLimit/loginSpeedLimit/checkUserLockout/
+  // trackLoginAttempt) — a short numeric PIN is if anything MORE guessable
+  // than a staff password, so this protection matters at least as much here.
+  app.post("/api/driver-auth/login", loginRateLimit, loginSpeedLimit, checkUserLockout, async (req, res) => {
+    try {
+      const { phone, pin } = req.body || {};
+      const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+      const userAgent = req.get('User-Agent') || 'unknown';
+
+      if (!phone || !pin) {
+        return res.status(400).json({ message: "Phone and PIN are required" });
+      }
+      const normalized = normalizeIndianPhone(phone);
+      if (!normalized) {
+        return res.status(400).json({ message: "Enter a valid 10-digit Indian mobile number." });
+      }
+
+      // checkUserLockout above already read req.body.userId (not set here,
+      // since this isn't the staff login body shape) — track attempts
+      // under the normalized phone explicitly so the same 5-strikes lockout
+      // actually applies to repeated PIN guesses against one driver.
+      const recentFailedAttempts = getRecentFailedAttempts(normalized);
+      if (recentFailedAttempts >= 5) {
+        trackLoginAttempt(normalized, clientIP, false, userAgent);
+        return res.status(429).json({
+          message: "Too many failed attempts. Please wait 5 minutes.",
+          lockoutTime: 5 * 60,
+        });
+      }
+
+      // Phone is not guaranteed globally unique across tenants (nothing
+      // enforces that today), and a driver has no tenant context to supply
+      // at login — so every same-phone candidate is checked, and whichever
+      // one the PIN actually matches resolves the tenant automatically.
+      const last10 = normalized.replace(/^91/, '');
+      const candidates = await Driver.find({ phone: new RegExp(last10 + '$'), loginPin: { $exists: true, $ne: null } });
+
+      let matched: any = null;
+      for (const candidate of candidates) {
+        if (candidate.loginPin && await bcrypt.compare(String(pin), candidate.loginPin)) {
+          matched = candidate;
+          break;
+        }
+      }
+
+      if (!matched) {
+        trackLoginAttempt(normalized, clientIP, false, userAgent);
+        return res.status(401).json({ message: "Invalid phone number or PIN" });
+      }
+
+      trackLoginAttempt(normalized, clientIP, true, userAgent);
+
+      const sessionId = nanoid();
+      matched.sessionId = sessionId;
+      await matched.save();
+
+      // A driver session and a staff session are independent keys on the
+      // same cookie-backed session object (see authenticateDriver) — clearing
+      // userId here is just defensive hygiene, not required for correctness.
+      delete (req.session as any).userId;
+      (req.session as any).driverSessionId = sessionId;
+
+      req.session.save((err) => {
+        if (err) {
+          console.error('Error saving driver session:', err);
+          return res.status(500).json({ message: "Failed to save session" });
+        }
+        res.json({ driver: { id: matched._id, name: matched.name, phone: matched.phone } });
+      });
+    } catch (error: any) {
+      console.error('Driver login error:', error?.message || error);
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.post("/api/driver-auth/logout", authenticateDriver, async (req: DriverAuthRequest, res) => {
+    try {
+      if (req.driver) {
+        req.driver.sessionId = undefined;
+        await req.driver.save();
+      }
+      req.session.destroy((err) => {
+        if (err) console.error('Error destroying driver session:', err);
+        res.json({ message: "Logged out" });
+      });
+    } catch (error: any) {
+      console.error('Driver logout error:', error?.message || error);
+      res.status(500).json({ message: "Logout failed" });
+    }
+  });
+
+  app.get("/api/driver-portal/me", authenticateDriver, async (req: DriverAuthRequest, res) => {
+    res.json({ id: req.driver._id, name: req.driver.name, phone: req.driver.phone, status: req.driver.status });
+  });
+
+  // A driver's own assigned duties only — scoped by BOTH driverId and the
+  // driver's own tenantId (never client-supplied), so this can never leak
+  // another driver's or another tenant's bookings even though the driver
+  // session itself carries no separate tenant-selection step.
+  app.get("/api/driver-portal/my-duties", authenticateDriver, async (req: DriverAuthRequest, res) => {
+    try {
+      const bookings = await Booking.find({
+        tenantId: req.driver.tenantId,
+        driverId: req.driver._id,
+        status: { $nin: ['cancelled', 'no_show'] },
+      })
+        .select('bookingId customerName customerPhone pickupLocation dropoffLocation pickupDate pickupTime returnDate returnTime status totalAmount advanceReceived dutyAcceptedAt')
+        .sort({ pickupDate: -1 });
+      res.json(bookings);
+    } catch (error: any) {
+      console.error('Driver duties error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load duties" });
+    }
+  });
+
+  app.post("/api/driver-portal/bookings/:id/accept-duty", authenticateDriver, async (req: DriverAuthRequest, res) => {
+    try {
+      const booking: any = await Booking.findOne({ _id: req.params.id, tenantId: req.driver.tenantId, driverId: req.driver._id });
+      if (!booking) return res.status(404).json({ message: "Duty not found" });
+      if (!booking.dutyAcceptedAt) {
+        booking.dutyAcceptedAt = new Date();
+        await booking.save();
+      }
+      res.json({ dutyAcceptedAt: booking.dutyAcceptedAt });
+    } catch (error: any) {
+      console.error('Accept duty error:', error?.message || error);
+      res.status(500).json({ message: "Failed to accept duty" });
+    }
+  });
+
+  // Staff-side PIN management — a driver can never set/see their own PIN
+  // hash; only office staff with MANAGE_DRIVERS can set or reset one, the
+  // same permission that already gates every other driver-record edit.
+  // Setting a new PIN also force-logs-out any existing driver session
+  // (defense in depth: a lost/compromised PIN shouldn't leave an old
+  // session valid after it's reset).
+  app.post("/api/drivers/:id/set-login-pin", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+    try {
+      const { pin } = req.body || {};
+      if (!pin || !/^\d{4,6}$/.test(String(pin))) {
+        return res.status(400).json({ message: "PIN must be 4-6 digits." });
+      }
+      const driver: any = await Driver.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!driver) return res.status(404).json({ message: "Driver not found" });
+      driver.loginPin = await bcrypt.hash(String(pin), 12);
+      driver.loginPinSetAt = new Date();
+      driver.sessionId = undefined;
+      await driver.save();
+      res.json({ loginPinSetAt: driver.loginPinSetAt });
+    } catch (error: any) {
+      console.error('Set driver PIN error:', error?.message || error);
+      res.status(500).json({ message: "Failed to set PIN" });
     }
   });
 
@@ -1347,7 +1550,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
 
-  app.delete("/api/users/sub-users/:userId", authenticateUser, async (req: AuthRequest, res) => {
+  app.delete("/api/users/sub-users/:userId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       // Only allow admin and client users to deactivate sub-users
       if (req.user?.role !== 'admin' && req.user?.role !== 'client') {
@@ -1364,7 +1567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/users/sub-users/:userId/reactivate", authenticateUser, async (req: AuthRequest, res) => {
+  app.patch("/api/users/sub-users/:userId/reactivate", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       // Only allow admin and client users to reactivate sub-users
       if (req.user?.role !== 'admin' && req.user?.role !== 'client') {
@@ -1382,7 +1585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Revenue Report
-  app.get("/api/reports/revenue", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+  app.get("/api/reports/revenue", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
     try {
       const { startDate, endDate } = req.query;
       console.log('Revenue Report API Debug:', {
@@ -1411,6 +1614,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vendor settlement (docs/PIPELINE_BUG_REPORT.md #12) — read-only
+  // reporting only, built entirely on the existing plain string/number
+  // vendor fields on Booking (fulfilmentType/vendorName/vendorAgreedRate/
+  // vendorAdvancePaid — "Scoped-down stand-in for a full vendor master...
+  // not a ledger", see the IBooking comment). No payment-recording here;
+  // that would need a real ledger, a larger scope than a settlement view.
+  // Gated the same way as Revenue Report — this is financial-outflow
+  // visibility, the same category of oversight data.
+  app.get("/api/vendors/settlement", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
+    try {
+      const bookings = await Booking.find({
+        tenantId: req.tenantId,
+        fulfilmentType: 'vendor',
+        vendorName: { $exists: true, $ne: '' },
+      })
+        .select('bookingId vendorName vendorContactPhone vendorAgreedRate vendorAdvancePaid pickupDate pickupLocation dropoffLocation status')
+        .sort({ pickupDate: -1 });
+
+      const byVendor = new Map<string, {
+        vendorName: string; vendorContactPhone?: string;
+        totalAgreed: number; totalPaid: number; bookingCount: number;
+        bookings: any[];
+      }>();
+
+      for (const b of bookings as any[]) {
+        const key = b.vendorName;
+        if (!byVendor.has(key)) {
+          byVendor.set(key, { vendorName: key, vendorContactPhone: b.vendorContactPhone, totalAgreed: 0, totalPaid: 0, bookingCount: 0, bookings: [] });
+        }
+        const entry = byVendor.get(key)!;
+        entry.totalAgreed += b.vendorAgreedRate || 0;
+        entry.totalPaid += b.vendorAdvancePaid || 0;
+        entry.bookingCount += 1;
+        entry.bookings.push({
+          bookingId: b.bookingId, pickupDate: b.pickupDate, pickupLocation: b.pickupLocation, dropoffLocation: b.dropoffLocation,
+          status: b.status, vendorAgreedRate: b.vendorAgreedRate || 0, vendorAdvancePaid: b.vendorAdvancePaid || 0,
+          outstanding: Math.max(0, (b.vendorAgreedRate || 0) - (b.vendorAdvancePaid || 0)),
+        });
+        // Most recent contact phone wins if it varies across bookings.
+        if (b.vendorContactPhone) entry.vendorContactPhone = b.vendorContactPhone;
+      }
+
+      const vendors = Array.from(byVendor.values())
+        .map((v) => ({ ...v, outstanding: Math.max(0, v.totalAgreed - v.totalPaid) }))
+        .sort((a, b) => b.outstanding - a.outstanding);
+
+      res.json({ vendors, totalOutstanding: vendors.reduce((sum, v) => sum + v.outstanding, 0) });
+    } catch (error: any) {
+      console.error('Vendor settlement error:', error?.message || error);
+      res.status(500).json({ message: "Failed to compute vendor settlement" });
+    }
+  });
+
   // Vehicle Routes
   app.get("/api/vehicles", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
@@ -1418,6 +1674,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(vehicles);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch vehicles" });
+    }
+  });
+
+  app.get("/api/vehicles/:id/customer-feedback-profile", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid vehicle ID" });
+      const profile = await buildVehicleFeedbackProfile(req.tenantId!, req.params.id);
+      if (!profile) return res.status(404).json({ message: "Vehicle not found" });
+      res.json(profile);
+    } catch (error: any) {
+      console.error('Vehicle customer-feedback profile error:', error?.message || error);
+      res.status(500).json({ message: "Failed to build vehicle customer-feedback profile" });
     }
   });
 
@@ -1532,6 +1800,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(drivers);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch drivers" });
+    }
+  });
+
+  app.get("/api/drivers/:id/customer-feedback-profile", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid driver ID" });
+      const profile = await buildDriverFeedbackProfile(req.tenantId!, req.params.id);
+      if (!profile) return res.status(404).json({ message: "Driver not found" });
+      res.json(profile);
+    } catch (error: any) {
+      console.error('Driver customer-feedback profile error:', error?.message || error);
+      res.status(500).json({ message: "Failed to build driver customer-feedback profile" });
     }
   });
 
@@ -1693,6 +1973,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Upcoming bookings error:', error);
       res.status(500).json({ message: "Failed to load upcoming bookings" });
+    }
+  });
+
+  // Dashboard Overview's Today/Tomorrow/Future/All Upcoming tabs. Reuses the
+  // same tenant booking fetch and the same centralized upcoming-booking rule
+  // as /api/operations/upcoming-bookings above, but returns full booking
+  // documents (not the summarized shape) so the dashboard can reopen the
+  // existing Booking Details dialog without a second, divergent definition
+  // of "upcoming" anywhere in the codebase.
+  app.get("/api/dashboard/upcoming-bookings", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const bookings = await storage.getBookingsByTenant(req.tenantId!);
+      res.json(classifyUpcomingBookings(bookings, new Date()));
+    } catch (error) {
+      console.error('Dashboard upcoming bookings error:', error);
+      res.status(500).json({ message: "Failed to load upcoming bookings" });
+    }
+  });
+
+  // Dashboard Overview's Finance section — today's collection split by
+  // payment mode. Sourced entirely from the PaymentTransaction ledger
+  // (never a raw sum of booking fields — see the payment-accuracy
+  // guidance in docs/SECURITY_AND_DATA_RISK_AUDIT.md), reusing the exact
+  // same RECEIPT_TYPES definition paymentLedger.ts uses to decide what
+  // counts as money actually received, so this can never silently drift
+  // from the balance shown on a booking/invoice.
+  app.get("/api/dashboard/finance-summary", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(todayStart);
+      todayEnd.setDate(todayEnd.getDate() + 1);
+
+      const transactions = await PaymentTransaction.find({
+        tenantId: req.tenantId,
+        status: 'completed',
+        paymentType: { $in: Array.from(RECEIPT_TYPES) },
+        receivedAt: { $gte: todayStart, $lt: todayEnd },
+      }).lean();
+
+      const summary = { cash: 0, upi: 0, bank: 0, card: 0, other: 0, total: 0 };
+      for (const t of transactions) {
+        const amount = t.amount || 0;
+        if (t.paymentMode === 'cash') summary.cash += amount;
+        else if (t.paymentMode === 'upi') summary.upi += amount;
+        else if (t.paymentMode === 'bank_transfer') summary.bank += amount;
+        else if (t.paymentMode === 'card') summary.card += amount;
+        else summary.other += amount;
+        summary.total += amount;
+      }
+      res.json(summary);
+    } catch (error) {
+      console.error('Dashboard finance summary error:', error);
+      res.status(500).json({ message: "Failed to load finance summary" });
+    }
+  });
+
+  // Dashboard Overview's booking-source chart — all-time count of bookings
+  // per source, from the existing Booking.bookingSource field (already
+  // populated at booking-creation time, no schema change).
+  app.get("/api/dashboard/lead-sources", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const rows = await Booking.aggregate([
+        { $match: { tenantId: new mongoose.Types.ObjectId(req.tenantId) } },
+        { $group: { _id: { $ifNull: ["$bookingSource", "direct_customer"] }, count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]);
+      res.json(rows.map((r) => ({ source: r._id, count: r.count })));
+    } catch (error) {
+      console.error('Dashboard lead sources error:', error);
+      res.status(500).json({ message: "Failed to load lead sources" });
     }
   });
 
@@ -1916,6 +2267,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Booking wizard draft persistence — one slot per (tenant, user). Purely
+  // additive: the Add Booking form works exactly as before if a caller never
+  // touches these routes. Scoped to authenticateUser + requireTenant only
+  // (same access level as creating the booking itself; a draft is not yet a
+  // real booking so it doesn't need its own permission key).
+  app.get("/api/booking-drafts/mine", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const draft = await BookingDraft.findOne({ tenantId: req.tenantId, userId: req.userId });
+      res.json(draft || null);
+    } catch (error: any) {
+      console.error('Get booking draft error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load booking draft" });
+    }
+  });
+
+  app.put("/api/booking-drafts/mine", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { step, formData, leadId } = req.body || {};
+      const draft = await BookingDraft.findOneAndUpdate(
+        { tenantId: req.tenantId, userId: req.userId },
+        {
+          $set: {
+            step: typeof step === 'number' ? step : 1,
+            formData: formData || {},
+            ...(leadId !== undefined ? { leadId } : {}),
+            updatedAt: new Date(),
+          },
+          $setOnInsert: { tenantId: req.tenantId, userId: req.userId, createdAt: new Date() },
+        },
+        { upsert: true, new: true },
+      );
+      res.json(draft);
+    } catch (error: any) {
+      console.error('Save booking draft error:', error?.message || error);
+      res.status(500).json({ message: "Failed to save booking draft" });
+    }
+  });
+
+  app.delete("/api/booking-drafts/mine", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      await BookingDraft.deleteOne({ tenantId: req.tenantId, userId: req.userId });
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Delete booking draft error:', error?.message || error);
+      res.status(500).json({ message: "Failed to delete booking draft" });
+    }
+  });
+
   app.post("/api/bookings", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CREATE_BOOKING), async (req: AuthRequest, res) => {
     try {
       // Map frontend field names to MongoDB schema
@@ -1950,6 +2349,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // P0 FIX: no longer logging the full mapped booking payload — it
       // contains customer PII (name, phone, email) and financial amounts.
       const bookingData: any = mongoBookingSchema.parse(mappedData);
+
+      // Duplicate-request guard (pipeline audit finding: this route had no
+      // idempotency protection at all — a double form-submit, a browser
+      // back-then-resubmit, or a retried request after a dropped response
+      // created two distinct Booking documents, each with its own vehicle/
+      // driver hold and its own revenue count). Checked before any of the
+      // customer-linking/reward-redemption/payment side effects below run,
+      // so a retry is a true no-op rather than a partial re-do. Optional:
+      // callers that don't send a key (imports, migrations, older clients)
+      // keep today's behavior unchanged.
+      if (bookingData.idempotencyKey) {
+        const existingBooking = await Booking.findOne({
+          tenantId: req.tenantId,
+          idempotencyKey: bookingData.idempotencyKey,
+        });
+        if (existingBooking) {
+          return res.status(200).json(existingBooking);
+        }
+      }
 
       // Customer Database linking — resolved BEFORE the booking is
       // created (not after) so an "Apply Reward Points" redemption can be
@@ -1996,7 +2414,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         bookingData.rewardDiscountApplied = redemption.discountValue;
       }
 
-      let booking = await storage.createBooking(bookingData);
+      let booking;
+      try {
+        booking = await storage.createBooking(bookingData);
+      } catch (error: any) {
+        // Two truly simultaneous requests carrying the same idempotencyKey
+        // can both pass the pre-check above before either has saved — the
+        // unique partial index (tenantId+idempotencyKey) is the real
+        // guard, this just turns that race into the same "return the
+        // existing booking" response instead of a raw 500.
+        if (error?.code === 11000 && bookingData.idempotencyKey) {
+          const existingBooking = await Booking.findOne({
+            tenantId: req.tenantId,
+            idempotencyKey: bookingData.idempotencyKey,
+          });
+          if (existingBooking) return res.status(200).json(existingBooking);
+        }
+        throw error;
+      }
 
       if (resolvedCustomer) {
         try {
@@ -2094,7 +2529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // conflicts, instead of silently creating a double-booked driver —
       // this is the hard backend stop that exists even if the frontend
       // dropdown incorrectly let the conflicting driver be selected).
-      if (error?.code === 'VEHICLE_DOUBLE_BOOKING' || error?.code === 'DRIVER_TIME_CONFLICT') {
+      if (error?.code === 'VEHICLE_DOUBLE_BOOKING' || error?.code === 'DRIVER_TIME_CONFLICT' || error?.code === 'VEHICLE_TENTATIVELY_HELD') {
         const c = error.conflict;
         return res.status(409).json({
           success: false,
@@ -2137,6 +2572,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // through POST /api/bookings/:id/payments instead; that route
       // recomputes this field itself after inserting a transaction.
       delete bookingData.advanceReceived;
+      // idempotencyKey is a create-time-only dedupe token — never editable
+      // after the fact (an edit changing it would defeat the point).
+      delete bookingData.idempotencyKey;
 
       const existing = await storage.getBooking(id, scopeTenant(req));
       if (!existing) {
@@ -2244,9 +2682,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Trip Cost Summary (docs/TRIP_COSTING_DATA_MAPPING.md) — Customer Revenue
+  // from the booking's own charge fields (unchanged), Internal Trip Cost
+  // from approved, customer-non-chargeable Expense rows linked to this
+  // booking, Collection from the existing payment ledger. Gross
+  // Contribution is computed here, never stored, and gated behind a
+  // dedicated permission — this is internal margin data, not something
+  // every booking viewer (or a customer-facing surface) should see.
+  app.get("/api/bookings/:id/trip-cost-summary", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_TRIP_PROFITABILITY), async (req: AuthRequest, res) => {
+    try {
+      const booking = await storage.getBooking(req.params.id, scopeTenant(req));
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const expenses = await Expense.find({ tenantId: req.tenantId, bookingId: req.params.id })
+        .populate('driverId', 'name')
+        .sort({ date: -1 });
+
+      const approvedInternalExpenses = expenses.filter((e: any) => !e.customerChargeable && e.approvalStatus === 'approved');
+      const internalTripCost = approvedInternalExpenses.reduce((sum: number, e: any) => sum + (e.amount || 0), 0);
+      const customerRevenue = (booking as any).totalAmount || 0;
+      const collection = (booking as any).advanceReceived || 0;
+
+      res.json({
+        customerRevenue,
+        internalTripCost,
+        collection,
+        remainingBalance: Math.max(0, customerRevenue - collection),
+        grossContribution: customerRevenue - internalTripCost,
+        expenses,
+        pendingApprovalCount: expenses.filter((e: any) => e.approvalStatus === 'pending').length,
+      });
+    } catch (error: any) {
+      console.error('Trip cost summary error:', error?.message || error);
+      res.status(500).json({ message: "Failed to compute trip cost summary" });
+    }
+  });
+
   app.post("/api/bookings/:id/payments", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const { amount, paymentType, paymentMode, transactionReference, receivedBy, receivedAt, notes } = req.body || {};
+      const { amount, paymentType, paymentMode, transactionReference, receivedBy, receivedAt, notes, idempotencyKey } = req.body || {};
       if (!amount || amount <= 0) {
         return res.status(400).json({ message: "A positive amount is required." });
       }
@@ -2273,6 +2747,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         receivedAt: receivedAt ? new Date(receivedAt) : undefined,
         notes,
         createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+        // Client-generated, one per "open the Record Payment dialog"
+        // session (not per click) — lets a double-click or a retried
+        // request after a dropped response resolve to the SAME
+        // PaymentTransaction instead of creating a duplicate. Optional:
+        // callers that don't send one (e.g. the initial-advance write at
+        // booking creation) keep today's behavior unchanged.
+        idempotencyKey: typeof idempotencyKey === 'string' && idempotencyKey.trim() ? idempotencyKey.trim() : undefined,
       });
 
       res.json(result);
@@ -2327,18 +2808,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (search && typeof search === 'string' && search.trim()) {
         const normalized = normalizeIndianPhone(search) || search;
         const safeSearch = escapeRegex(search.trim().slice(0, 100));
+        const digitsOnly = normalized.replace(/\D/g, '');
         query.$or = [
           { name: { $regex: safeSearch, $options: 'i' } },
-          { primaryMobile: { $regex: normalized.replace(/\D/g, '') } },
-          { alternateMobile: { $regex: normalized.replace(/\D/g, '') } },
           { email: { $regex: safeSearch, $options: 'i' } },
+          { emailAliases: { $regex: safeSearch, $options: 'i' } },
+          { companyAliases: { $regex: safeSearch, $options: 'i' } },
+          // A text search with no digits at all (the overwhelming majority
+          // of name/email searches) used to fall through to
+          // normalizeIndianPhone(search) returning null -> normalized
+          // defaulting to the raw text -> stripping non-digits from THAT
+          // producing an empty string -> {$regex: ''} on the phone fields,
+          // which matches every document in Mongo. The net effect: any
+          // name search silently ignored its own filter and returned the
+          // entire (500-row-capped) customer list via this $or. Only add
+          // the phone clauses when there's an actual digit to match.
+          ...(digitsOnly ? [
+            { primaryMobile: { $regex: digitsOnly } },
+            { alternateMobile: { $regex: digitsOnly } },
+            { whatsappNumber: { $regex: digitsOnly } },
+            { phoneAliases: { $regex: digitsOnly } },
+          ] : []),
         ];
       }
       const customers = await Customer.find(query).sort({ lastBookingDate: -1, createdAt: -1 }).limit(500);
       res.json(customers);
     } catch (error: any) {
       console.error('List customers error:', error?.message || error);
-      res.status(500).json({ message: "Failed to fetch customers" });
+      res.status(error?.status || 500).json({ message: error?.status ? error.message : "Failed to fetch customers" });
     }
   });
 
@@ -2411,7 +2908,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Feedback — driver/vehicle/service ratings tied to a specific booking.
   app.get("/api/customers/:id/feedback", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const rows = await CustomerFeedback.find({ tenantId: req.tenantId, customerId: req.params.id }).sort({ createdAt: -1 });
+      const rows = await CustomerFeedback.find({ tenantId: req.tenantId, customerId: req.params.id })
+        .populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation')
+        .populate('driverId', 'name phone status')
+        .populate('vehicleId', 'make vehicleModel licensePlate')
+        .sort({ createdAt: -1 });
       res.json(rows);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch feedback" });
@@ -2420,29 +2921,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/customers/:id/feedback", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const { bookingId, type, driverRating, vehicleRating, serviceRating, comments } = req.body || {};
+      const {
+        bookingId, type, overallRating, driverRating, vehicleRating, serviceRating,
+        bookingProcessRating, officeCommunicationRating, tripSatisfactionRating, valueForMoneyRating,
+        vehicleCleanlinessRating, vehicleComfortRating, vehicleAcRating, vehicleConditionRating,
+        vehicleIssueReported, breakdownOccurred, vehicleIssueDescription,
+        driverPunctualityRating, driverBehaviourRating, driverSafetyRating, driverRouteKnowledgeRating,
+        driverCommunicationRating, driverAssistanceRating, driverPaymentHandlingRating,
+        wouldBookAgain, wouldRecommend, responsibleParty, comments,
+      } = req.body || {};
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
-      if (bookingId && !await Booking.exists({ _id: bookingId, tenantId: req.tenantId, customerId: customer._id })) {
-        return res.status(400).json({ message: "bookingId does not belong to this customer." });
+      const booking: any = bookingId
+        ? await Booking.findOne({ _id: bookingId, tenantId: req.tenantId, customerId: customer._id }).lean()
+        : null;
+      if (bookingId && !booking) return res.status(400).json({ message: "bookingId does not belong to this customer." });
+      if (type && !['feedback', 'appreciation'].includes(type)) return res.status(400).json({ message: "Invalid feedback type." });
+
+      const ratingFields = {
+        overallRating, driverRating, vehicleRating, serviceRating, bookingProcessRating,
+        officeCommunicationRating, tripSatisfactionRating, valueForMoneyRating,
+        vehicleCleanlinessRating, vehicleComfortRating, vehicleAcRating, vehicleConditionRating,
+        driverPunctualityRating,
+        driverBehaviourRating, driverSafetyRating, driverRouteKnowledgeRating, driverCommunicationRating,
+        driverAssistanceRating, driverPaymentHandlingRating,
+      };
+      for (const [field, value] of Object.entries(ratingFields)) {
+        if (value !== undefined && (!Number.isFinite(Number(value)) || Number(value) < 1 || Number(value) > 5)) {
+          return res.status(400).json({ message: `${field} must be between 1 and 5.` });
+        }
+      }
+      // Backward compatibility: the legacy form allowed one generic
+      // driverRating even on self-drive/unassigned bookings. Preserve
+      // those records, but require a real assigned Driver Master for the
+      // new detailed driver dimensions that feed Driver Profile analytics.
+      const hasDriverFeedback = [driverPunctualityRating, driverBehaviourRating, driverSafetyRating,
+        driverRouteKnowledgeRating, driverCommunicationRating, driverAssistanceRating, driverPaymentHandlingRating]
+        .some((value) => value !== undefined);
+      if (hasDriverFeedback && !booking?.driverId) return res.status(400).json({ message: "Select a booking with an assigned driver for driver feedback." });
+      const hasVehicleFeedback = [vehicleRating, vehicleCleanlinessRating, vehicleComfortRating, vehicleAcRating,
+        vehicleConditionRating, vehicleIssueReported, breakdownOccurred, vehicleIssueDescription]
+        .some((value) => value !== undefined && value !== false && value !== '');
+      if (hasVehicleFeedback && !booking?.vehicleId) return res.status(400).json({ message: "Select a booking with an assigned vehicle for vehicle feedback." });
+      if (responsibleParty === 'driver' && !booking?.driverId) return res.status(400).json({ message: "This booking has no assigned driver." });
+      if (responsibleParty === 'vehicle' && !booking?.vehicleId) return res.status(400).json({ message: "This booking has no assigned vehicle." });
+      if (responsibleParty && !['company', 'driver', 'vehicle', 'vendor', 'customer', 'unclear'].includes(responsibleParty)) {
+        return res.status(400).json({ message: "Invalid responsible party." });
+      }
+      if (vehicleIssueReported !== undefined && typeof vehicleIssueReported !== 'boolean') return res.status(400).json({ message: "vehicleIssueReported must be boolean." });
+      if (breakdownOccurred !== undefined && typeof breakdownOccurred !== 'boolean') return res.status(400).json({ message: "breakdownOccurred must be boolean." });
+      if (vehicleIssueDescription !== undefined && typeof vehicleIssueDescription !== 'string') return res.status(400).json({ message: "vehicleIssueDescription must be text." });
+      if (comments !== undefined && typeof comments !== 'string') return res.status(400).json({ message: "comments must be text." });
+      if (!Object.values(ratingFields).some((value) => value !== undefined) && !comments?.trim() && !vehicleIssueReported && !breakdownOccurred) {
+        return res.status(400).json({ message: "Add a rating or feedback comment." });
+      }
+      const feedbackType = type || 'feedback';
+      if (bookingId && await CustomerFeedback.exists({ tenantId: req.tenantId, customerId: customer._id, bookingId, type: feedbackType })) {
+        return res.status(409).json({ message: "Feedback for this booking already exists. The original record was preserved." });
       }
 
       const feedback = await CustomerFeedback.create({
         tenantId: req.tenantId, customerId: req.params.id, bookingId: bookingId || undefined,
-        type: type || 'feedback', driverRating, vehicleRating, serviceRating, comments,
+        driverId: booking?.driverId, vehicleId: booking?.vehicleId,
+        type: feedbackType, ...ratingFields, vehicleIssueReported, breakdownOccurred,
+        vehicleIssueDescription: vehicleIssueDescription?.trim(), wouldBookAgain, wouldRecommend,
+        responsibleParty, comments: comments?.trim(),
         createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
       });
-      res.json(feedback);
+      await feedback.populate(['bookingId', 'driverId', 'vehicleId']);
+      res.status(201).json(feedback);
     } catch (error: any) {
       console.error('Add feedback error:', error?.message || error);
       res.status(500).json({ message: "Failed to record feedback" });
     }
   });
 
+  app.get("/api/customers/:id/drivers", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid customer ID" });
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      res.json(await buildCustomerDriverHistory(req.tenantId!, req.params.id));
+    } catch (error: any) {
+      console.error('Customer driver history error:', error?.message || error);
+      res.status(500).json({ message: "Failed to build customer driver history" });
+    }
+  });
+
+  app.get("/api/customers/:id/vehicles", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid customer ID" });
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      res.json(await buildCustomerVehicleHistory(req.tenantId!, req.params.id));
+    } catch (error: any) {
+      console.error('Customer vehicle history error:', error?.message || error);
+      res.status(500).json({ message: "Failed to build customer vehicle history" });
+    }
+  });
+
   // Complaints and service recovery.
   app.get("/api/customers/:id/complaints", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const rows = await CustomerComplaint.find({ tenantId: req.tenantId, customerId: req.params.id }).sort({ createdAt: -1 });
+      const rows = await CustomerComplaint.find({ tenantId: req.tenantId, customerId: req.params.id })
+        .populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation')
+        .populate('driverId', 'name phone status')
+        .populate('vehicleId', 'make vehicleModel licensePlate')
+        .sort({ createdAt: -1 });
       res.json(rows);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch complaints" });
@@ -2451,25 +3036,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/customers/:id/complaints", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const { bookingId, category, severity, description, responsibleParty, assignedTo, resolutionDeadline } = req.body || {};
+      const { bookingId, category, severity, description, responsibleParty, responsibilityReason, assignedTo, resolutionDeadline } = req.body || {};
       if (!category || !description || !description.trim()) {
         return res.status(400).json({ message: "category and description are required." });
       }
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
-      if (bookingId && !await Booking.exists({ _id: bookingId, tenantId: req.tenantId, customerId: customer._id })) {
-        return res.status(400).json({ message: "bookingId does not belong to this customer." });
+      const booking: any = bookingId
+        ? await Booking.findOne({ _id: bookingId, tenantId: req.tenantId, customerId: customer._id }).lean()
+        : null;
+      if (bookingId && !booking) return res.status(400).json({ message: "bookingId does not belong to this customer." });
+      const classifiedParty = responsibleParty || 'unclear';
+      if (!['company', 'driver', 'vehicle', 'vendor', 'customer', 'unclear'].includes(classifiedParty)) {
+        return res.status(400).json({ message: "Invalid responsible party." });
       }
+      if (classifiedParty === 'driver' && !booking?.driverId) return res.status(400).json({ message: "This booking has no assigned driver." });
+      if (classifiedParty === 'vehicle' && !booking?.vehicleId) return res.status(400).json({ message: "This booking has no assigned vehicle." });
+      if (classifiedParty !== 'unclear' && !responsibilityReason?.trim()) {
+        return res.status(400).json({ message: "A responsibility reason is required before assigning fault." });
+      }
+      const actor = { userId: req.userId!, role: req.user?.role || 'client' };
 
       const complaint = await CustomerComplaint.create({
         tenantId: req.tenantId, customerId: req.params.id, bookingId: bookingId || undefined,
+        driverId: booking?.driverId, vehicleId: booking?.vehicleId,
         category, severity: severity || 'medium', description,
-        responsibleParty, assignedTo,
+        responsibleParty: classifiedParty, responsibilityReason: responsibilityReason?.trim(), assignedTo,
+        responsibilityVerifiedBy: classifiedParty !== 'unclear' ? actor : undefined,
+        responsibilityVerifiedAt: classifiedParty !== 'unclear' ? new Date() : undefined,
         resolutionDeadline: resolutionDeadline ? new Date(resolutionDeadline) : undefined,
         status: 'open',
-        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+        createdBy: actor,
       });
-      res.json(complaint);
+      await complaint.populate(['bookingId', 'driverId', 'vehicleId']);
+      res.status(201).json(complaint);
     } catch (error: any) {
       console.error('Add complaint error:', error?.message || error);
       res.status(500).json({ message: "Failed to record complaint" });
@@ -2486,7 +3086,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const complaint = await CustomerComplaint.findOne({ _id: req.params.complaintId, tenantId: req.tenantId, customerId: req.params.id });
       if (!complaint) return res.status(404).json({ message: "Complaint not found" });
 
-      const { status, assignedTo, resolutionDeadline, correctiveAction, compensationAmount, compensationPoints, resolution, satisfactionAfterResolution } = req.body || {};
+      const { status, assignedTo, resolutionDeadline, correctiveAction, compensationAmount, compensationPoints, resolution, satisfactionAfterResolution, responsibleParty, responsibilityReason } = req.body || {};
       const actor = { userId: req.userId!, role: req.user?.role || 'client' };
 
       if (status) complaint.status = status;
@@ -2494,6 +3094,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (resolutionDeadline) complaint.resolutionDeadline = new Date(resolutionDeadline);
       if (resolution !== undefined) complaint.resolution = resolution;
       if (satisfactionAfterResolution) complaint.satisfactionAfterResolution = satisfactionAfterResolution;
+      if (responsibleParty !== undefined) {
+        if (!['company', 'driver', 'vehicle', 'vendor', 'customer', 'unclear'].includes(responsibleParty)) {
+          return res.status(400).json({ message: "Invalid responsible party." });
+        }
+        if (responsibleParty === 'driver' && !complaint.driverId) return res.status(400).json({ message: "This complaint has no linked driver." });
+        if (responsibleParty === 'vehicle' && !complaint.vehicleId) return res.status(400).json({ message: "This complaint has no linked vehicle." });
+        if (responsibleParty !== 'unclear' && !(responsibilityReason || complaint.responsibilityReason)?.trim()) {
+          return res.status(400).json({ message: "A responsibility reason is required before assigning fault." });
+        }
+        complaint.responsibleParty = responsibleParty;
+        complaint.responsibilityReason = responsibleParty === 'unclear' ? undefined : (responsibilityReason || complaint.responsibilityReason)?.trim();
+        complaint.responsibilityVerifiedBy = responsibleParty === 'unclear' ? undefined : actor;
+        complaint.responsibilityVerifiedAt = responsibleParty === 'unclear' ? undefined : new Date();
+      } else if (responsibilityReason !== undefined) {
+        complaint.responsibilityReason = responsibilityReason.trim();
+      }
 
       if (correctiveAction && correctiveAction !== complaint.correctiveAction) {
         complaint.correctiveAction = correctiveAction;
@@ -2692,6 +3308,275 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Google review tracking is deliberately confirmation-based. Sending a
+  // request never marks a review as received; only the evidence-gated
+  // /received action below can do that.
+  app.get("/api/customers/:id/google-reviews", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid customer ID" });
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      const rows = await GoogleReviewTracking.find({ tenantId: req.tenantId, customerId: req.params.id })
+        .populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status')
+        .populate('requestMessageId', 'status provider providerMessageId sentAt')
+        .populate('rewardTransactionId', 'transactionType points balanceAfter reason createdAt')
+        .sort({ requestDate: -1, reviewDate: -1, createdAt: -1 });
+      res.json(rows);
+    } catch (error: any) {
+      console.error('List Google reviews error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch Google review tracking" });
+    }
+  });
+
+  app.post("/api/customers/:id/google-reviews/request", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      const { bookingId, channel, reviewPageUrl, requestId, confirmedSent } = req.body || {};
+      if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid customer ID" });
+      if (!mongoose.isValidObjectId(bookingId)) return res.status(400).json({ message: "A valid completed booking is required" });
+      if (!GOOGLE_REVIEW_CHANNELS.includes(channel)) return res.status(400).json({ message: "Invalid review request channel" });
+      if (typeof requestId !== 'string' || !/^[A-Za-z0-9_-]{8,100}$/.test(requestId)) {
+        return res.status(400).json({ message: "A valid requestId is required" });
+      }
+      const pageUrl = safeGoogleReviewUrl(reviewPageUrl);
+      if (!pageUrl) return res.status(400).json({ message: "A valid Google review page URL is required" });
+
+      const [customer, booking, tenant] = await Promise.all([
+        Customer.findOne({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } }),
+        Booking.findOne({ _id: bookingId, tenantId: req.tenantId, customerId: req.params.id }),
+        storage.getTenant(req.tenantId!),
+      ]);
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      if (!booking) return res.status(400).json({ message: "bookingId does not belong to this customer" });
+      if (!REVIEW_ELIGIBLE_STATUSES.has(booking.status)) {
+        return res.status(400).json({ message: "Google review requests are allowed only after trip completion" });
+      }
+
+      let tracking = await GoogleReviewTracking.findOne({ tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id });
+      if (tracking?.reviewReceived) return res.status(409).json({ message: "A received Google review is already confirmed for this booking" });
+      const previousAttempt = tracking?.requestHistory?.find((attempt: any) => attempt.requestId === requestId);
+      if (previousAttempt) {
+        await tracking!.populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status');
+        return res.json({ alreadyProcessed: true, review: tracking });
+      }
+
+      const actor = { userId: req.userId!, role: req.user?.role || 'client' };
+      let messageDoc: any;
+      let sentAt = new Date();
+      if (channel === 'whatsapp') {
+        if (customer.status === 'do_not_contact' || customer.consent?.whatsapp === false) {
+          return res.status(400).json({ message: "Customer has opted out of WhatsApp messages" });
+        }
+        const recipientPhone = normalizeIndianPhone(customer.whatsappNumber || customer.primaryMobile);
+        if (!recipientPhone) return res.status(400).json({ message: "Customer WhatsApp number is invalid" });
+        const idempotencyKey = `${req.tenantId}_${customer._id}_google_review_request_${requestId}`;
+        messageDoc = await WhatsAppMessage.findOne({ idempotencyKey, status: { $in: ['queued', 'sent'] } });
+        if (messageDoc?.status === 'queued') {
+          return res.status(409).json({ message: "This Google review request is already being processed" });
+        }
+        if (!messageDoc) {
+          messageDoc = await WhatsAppMessage.create({
+            tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id,
+            recipientType: 'customer', recipientPhone, messageType: 'customer_google_review_request',
+            content: googleReviewRequestMessage(customer, booking, tenant, pageUrl),
+            provider: whatsappProvider.kind, status: 'queued', attemptCount: 0, createdBy: actor, idempotencyKey,
+          });
+          const result = await whatsappProvider.sendText(req.tenantId!, recipientPhone, messageDoc.content);
+          messageDoc.attemptCount = 1;
+          messageDoc.status = result.status === 'sent' ? 'sent' : 'failed';
+          messageDoc.providerMessageId = result.providerMessageId || undefined;
+          messageDoc.error = result.error || undefined;
+          if (result.status === 'sent') messageDoc.sentAt = new Date();
+          await messageDoc.save();
+          if (result.status !== 'sent') {
+            return res.status(502).json({ message: result.error || "Google review request was not sent", messageDoc });
+          }
+        }
+        sentAt = messageDoc.sentAt || messageDoc.createdAt || sentAt;
+      } else if (confirmedSent !== true) {
+        return res.status(400).json({ message: "Confirm that the review request was actually sent through this channel" });
+      }
+
+      if (!tracking) {
+        tracking = new GoogleReviewTracking({ tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id });
+      }
+      tracking.reviewPageUrl = pageUrl;
+      tracking.reviewRequested = true;
+      tracking.requestDate = sentAt;
+      tracking.requestSentThrough = channel;
+      tracking.requestMessageId = messageDoc?._id;
+      tracking.followUpRequired = true;
+      tracking.lastUpdatedBy = actor;
+      tracking.requestHistory.push({ sentAt, channel, messageId: messageDoc?._id, requestId, sentBy: actor });
+      await tracking.save();
+
+      const openReviewTask = await CustomerFollowUp.exists({
+        tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id,
+        taskType: 'Google review follow-up', status: { $nin: ['resolved', 'closed', 'do_not_contact'] },
+      });
+      if (!openReviewTask) {
+        const dueDate = new Date(sentAt); dueDate.setDate(dueDate.getDate() + 3);
+        await CustomerFollowUp.create({
+          tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id,
+          taskType: 'Google review follow-up', dueDate, priority: 'low',
+          notes: `Review requested through ${String(channel).replace(/_/g, ' ')}`,
+          createdBy: actor,
+        });
+      }
+      await tracking.populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status');
+      res.status(201).json({ alreadyProcessed: false, review: tracking, message: messageDoc });
+    } catch (error: any) {
+      if (error?.code === 11000) return res.status(409).json({ message: "This review request is already being processed" });
+      console.error('Send Google review request error:', error?.message || error);
+      res.status(500).json({ message: "Failed to send Google review request" });
+    }
+  });
+
+  app.put("/api/customers/:id/google-reviews/:reviewId/received", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      const { confirmedReceived, reviewDate, reviewRating, reviewLink, reviewReference, responseStatus, notes } = req.body || {};
+      if (!mongoose.isValidObjectId(req.params.id) || !mongoose.isValidObjectId(req.params.reviewId)) {
+        return res.status(400).json({ message: "Invalid customer or review ID" });
+      }
+      if (confirmedReceived !== true) return res.status(400).json({ message: "Explicit review-received confirmation is required" });
+      const rating = Number(reviewRating);
+      if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ message: "Google review rating must be a whole number from 1 to 5" });
+      const link = reviewLink ? safeGoogleReviewUrl(reviewLink) : undefined;
+      if (reviewLink && !link) return res.status(400).json({ message: "Review link must be a valid HTTP or HTTPS URL" });
+      if (!link && (typeof reviewReference !== 'string' || reviewReference.trim().length < 3)) {
+        return res.status(400).json({ message: "Add the actual review link or a screenshot/reference before confirming receipt" });
+      }
+      if (responseStatus && !['not_required', 'pending', 'responded'].includes(responseStatus)) {
+        return res.status(400).json({ message: "Invalid review response status" });
+      }
+      const receivedAt = reviewDate ? new Date(reviewDate) : new Date();
+      if (Number.isNaN(receivedAt.getTime()) || receivedAt.getTime() > Date.now() + 300000) {
+        return res.status(400).json({ message: "Review date is invalid or in the future" });
+      }
+
+      const review = await GoogleReviewTracking.findOne({ _id: req.params.reviewId, tenantId: req.tenantId, customerId: req.params.id });
+      if (!review) return res.status(404).json({ message: "Google review tracking record not found" });
+      const actor = { userId: req.userId!, role: req.user?.role || 'client' };
+      if (review.reviewReceived) {
+        const reward = await creditVerifiedGoogleReviewReward(req.tenantId!, req.params.id, review._id.toString(), actor);
+        if (reward && review.rewardTransactionId?.toString() !== reward._id.toString()) {
+          review.rewardTransactionId = reward._id;
+          review.lastUpdatedBy = actor;
+          await review.save();
+        }
+        await review.populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status');
+        await review.populate('rewardTransactionId', 'transactionType points balanceAfter reason createdAt');
+        return res.json(review);
+      }
+
+      review.reviewReceived = true;
+      review.reviewDate = receivedAt;
+      review.reviewRating = rating;
+      review.reviewLink = link;
+      review.reviewReference = typeof reviewReference === 'string' ? reviewReference.trim() : undefined;
+      review.followUpRequired = false;
+      review.responseStatus = responseStatus || 'pending';
+      review.notes = typeof notes === 'string' ? notes.trim() : review.notes;
+      review.reviewConfirmedBy = actor;
+      review.reviewConfirmedAt = new Date();
+      review.lastUpdatedBy = actor;
+      if (review.responseStatus === 'responded') {
+        review.respondedAt = new Date();
+        review.respondedBy = actor;
+      }
+      await review.save();
+      const reward = await creditVerifiedGoogleReviewReward(req.tenantId!, req.params.id, review._id.toString(), actor);
+      if (reward) {
+        review.rewardTransactionId = reward._id;
+        await review.save();
+      }
+      await CustomerFollowUp.updateMany({
+        tenantId: req.tenantId, customerId: req.params.id, bookingId: review.bookingId,
+        taskType: 'Google review follow-up', status: { $nin: ['resolved', 'closed'] },
+      }, {
+        $set: { status: 'resolved', resolution: 'Google review receipt confirmed with evidence.', communicationResult: `Received ${rating}-star Google review.` },
+      });
+      await review.populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status');
+      await review.populate('rewardTransactionId', 'transactionType points balanceAfter reason createdAt');
+      res.json(review);
+    } catch (error: any) {
+      console.error('Confirm Google review receipt error:', error?.message || error);
+      res.status(500).json({ message: "Failed to confirm Google review receipt" });
+    }
+  });
+
+  app.put("/api/customers/:id/google-reviews/:reviewId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id) || !mongoose.isValidObjectId(req.params.reviewId)) {
+        return res.status(400).json({ message: "Invalid customer or review ID" });
+      }
+      const review = await GoogleReviewTracking.findOne({ _id: req.params.reviewId, tenantId: req.tenantId, customerId: req.params.id });
+      if (!review) return res.status(404).json({ message: "Google review tracking record not found" });
+      const { reviewPageUrl, reviewLink, reviewReference, reviewRating, reviewDate, followUpRequired, responseStatus, notes } = req.body || {};
+      if (reviewPageUrl !== undefined) {
+        const value = safeGoogleReviewUrl(reviewPageUrl);
+        if (!value) return res.status(400).json({ message: "Google review page URL is invalid" });
+        review.reviewPageUrl = value;
+      }
+      if (reviewLink !== undefined) {
+        const value = reviewLink ? safeGoogleReviewUrl(reviewLink) : undefined;
+        if (reviewLink && !value) return res.status(400).json({ message: "Review link is invalid" });
+        review.reviewLink = value;
+      }
+      if (reviewReference !== undefined) review.reviewReference = String(reviewReference).trim() || undefined;
+      if (reviewRating !== undefined) {
+        if (!review.reviewReceived) return res.status(400).json({ message: "Confirm the review receipt before adding its rating" });
+        const rating = Number(reviewRating);
+        if (!Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ message: "Google review rating must be a whole number from 1 to 5" });
+        review.reviewRating = rating;
+      }
+      if (reviewDate !== undefined) {
+        if (!review.reviewReceived) return res.status(400).json({ message: "Confirm the review receipt before changing its date" });
+        const value = new Date(reviewDate);
+        if (Number.isNaN(value.getTime()) || value.getTime() > Date.now() + 300000) return res.status(400).json({ message: "Review date is invalid or in the future" });
+        review.reviewDate = value;
+      }
+      if (followUpRequired !== undefined) {
+        if (typeof followUpRequired !== 'boolean') return res.status(400).json({ message: "followUpRequired must be boolean" });
+        review.followUpRequired = followUpRequired;
+      }
+      const actor = { userId: req.userId!, role: req.user?.role || 'client' };
+      if (responseStatus !== undefined) {
+        if (!['not_required', 'pending', 'responded'].includes(responseStatus)) return res.status(400).json({ message: "Invalid review response status" });
+        if (responseStatus !== 'not_required' && !review.reviewReceived) return res.status(400).json({ message: "A response status requires a confirmed received review" });
+        review.responseStatus = responseStatus;
+        if (responseStatus === 'responded' && !review.respondedAt) {
+          review.respondedAt = new Date();
+          review.respondedBy = actor;
+        } else if (responseStatus !== 'responded') {
+          review.respondedAt = undefined;
+          review.respondedBy = undefined;
+        }
+      }
+      if (notes !== undefined) review.notes = String(notes).trim() || undefined;
+      review.lastUpdatedBy = actor;
+      await review.save();
+
+      if (review.followUpRequired) {
+        const openTask = await CustomerFollowUp.exists({
+          tenantId: req.tenantId, customerId: req.params.id, bookingId: review.bookingId,
+          taskType: 'Google review follow-up', status: { $nin: ['resolved', 'closed', 'do_not_contact'] },
+        });
+        if (!openTask) {
+          const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + 3);
+          await CustomerFollowUp.create({
+            tenantId: req.tenantId, customerId: req.params.id, bookingId: review.bookingId,
+            taskType: 'Google review follow-up', dueDate, priority: 'low', notes: 'Added from Google Review tracking.', createdBy: actor,
+          });
+        }
+      }
+      await review.populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status');
+      res.json(review);
+    } catch (error: any) {
+      console.error('Update Google review tracking error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update Google review tracking" });
+    }
+  });
+
   // Quick lookup by phone while typing in the booking form — returns the
   // matching customer (if any) plus enough summary data for the "previous
   // bookings, tier, dues, warnings" panel from spec section 22, without
@@ -2704,7 +3589,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const customer = await Customer.findOne({
         tenantId: req.tenantId, isDeleted: { $ne: true },
-        $or: [{ primaryMobile: normalized }, { alternateMobile: normalized }, { whatsappNumber: normalized }],
+        $or: [{ primaryMobile: normalized }, { alternateMobile: normalized }, { whatsappNumber: normalized }, { phoneAliases: normalized }],
       });
       if (!customer) return res.json({ customer: null });
 
@@ -2747,6 +3632,1016 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/customers/:id/duplicate-candidates", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const result = await findDuplicateCandidates(req.tenantId!, req.params.id);
+      if (!result) return res.status(404).json({ message: "Customer not found" });
+      res.json(result);
+    } catch (error: any) {
+      console.error('Duplicate candidate search error:', error?.message || error);
+      res.status(500).json({ message: "Failed to find duplicate customers" });
+    }
+  });
+
+  app.post("/api/customers/merge", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!req.user || !['admin', 'client'].includes(req.user.role)) {
+        return res.status(403).json({ message: "Only an administrator or account owner can merge customers." });
+      }
+      const { sourceCustomerId, targetCustomerId, reason } = req.body || {};
+      const result = await mergeCustomers({
+        tenantId: req.tenantId!, sourceCustomerId, targetCustomerId, reason: String(reason || ''),
+        actor: { userId: req.userId!, role: req.user.role },
+      });
+      res.json(result);
+    } catch (error: any) {
+      console.error('Customer merge error:', error?.message || error);
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to merge customers" });
+    }
+  });
+
+  // Requirements are immutable snapshots. Staff add a new version when a
+  // customer's needs change so older booking agreements remain auditable.
+  app.get("/api/customers/:id/requirements", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      const rows = await CustomerRequirement.find({ tenantId: req.tenantId, customerId: req.params.id })
+        .populate('bookingId', 'bookingId pickupDate')
+        .sort({ createdAt: -1 });
+      res.json(rows);
+    } catch (error: any) {
+      console.error('Customer requirements error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch customer requirements" });
+    }
+  });
+
+  app.post("/api/customers/:id/requirements", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+
+      const allowed = [
+        'bookingId', 'tripRequirement', 'pickupRequirements', 'dropRequirements', 'route', 'multipleStops',
+        'numberOfPassengers', 'luggage', 'hotelDetails', 'trainFlightDetails', 'seniorCitizenRequirement',
+        'childRequirement', 'wheelchair', 'templeTiming', 'darshanTiming', 'vehicleCategory',
+        'driverPreference', 'languagePreference', 'acRequirement', 'paymentArrangement',
+        'tollParkingAgreement', 'includedServices', 'excludedServices', 'customerVisibleInstructions',
+        'driverInstructions', 'officeOnlyNotes', 'billingInstructions',
+      ];
+      const payload: Record<string, any> = {};
+      for (const key of allowed) if (req.body?.[key] !== undefined) payload[key] = req.body[key];
+      for (const key of ['multipleStops', 'includedServices', 'excludedServices']) {
+        if (payload[key] !== undefined && !Array.isArray(payload[key])) {
+          return res.status(400).json({ message: `${key} must be an array.` });
+        }
+        if (Array.isArray(payload[key])) payload[key] = payload[key].map((value: any) => String(value).trim()).filter(Boolean);
+      }
+      if (payload.numberOfPassengers !== undefined) {
+        payload.numberOfPassengers = Number(payload.numberOfPassengers);
+        if (!Number.isInteger(payload.numberOfPassengers) || payload.numberOfPassengers < 1) {
+          return res.status(400).json({ message: "numberOfPassengers must be a positive whole number." });
+        }
+      }
+      if (payload.bookingId && !await Booking.exists({
+        _id: payload.bookingId, tenantId: req.tenantId, customerId: req.params.id,
+      })) {
+        return res.status(400).json({ message: "bookingId does not belong to this customer." });
+      }
+      const hasRequirement = Object.entries(payload).some(([key, value]) => {
+        if (key === 'bookingId' || value === undefined || value === null) return false;
+        if (typeof value === 'string') return value.trim().length > 0;
+        if (typeof value === 'boolean') return value;
+        if (Array.isArray(value)) return value.length > 0;
+        return true;
+      });
+      if (!hasRequirement) return res.status(400).json({ message: "Add at least one requirement." });
+
+      const requirement = await CustomerRequirement.create({
+        tenantId: req.tenantId,
+        customerId: req.params.id,
+        ...payload,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      await requirement.populate('bookingId', 'bookingId pickupDate');
+      res.status(201).json(requirement);
+    } catch (error: any) {
+      console.error('Add customer requirement error:', error?.message || error);
+      res.status(500).json({ message: "Failed to add customer requirement" });
+    }
+  });
+
+  // ── Inquiry CRM (additive — see docs/INQUIRY_LEAD_EXISTING_AUDIT.md) ──
+  // A real pre-sales pipeline entity, distinct from Booking's early
+  // 'enquiry'/'quotation_sent' statuses, so office staff can log a phone
+  // call that may never become a trip without creating a real Booking
+  // (which requires a vehicleId today).
+
+  const INQUIRY_ALLOWED_FIELDS = [
+    'priority', 'source', 'sourceDetail', 'campaign', 'referrer', 'assignedExecutive', 'nextFollowUpAt',
+    'customerName', 'primaryMobile', 'whatsappNumber', 'alternateMobile', 'email', 'linkedCustomerId',
+    'tripType', 'pickupDate', 'pickupTime', 'returnDate', 'returnTime', 'flexibleDate',
+    'pickupLocation', 'dropLocation', 'viaLocations', 'placesToVisit',
+    'numberOfPassengers', 'seniorCitizens', 'children', 'infants', 'luggageCount',
+    'route', 'vehicleCategory', 'driverPreference', 'languagePreference', 'acRequirement',
+    'paymentArrangement', 'tollParkingAgreement', 'customerVisibleInstructions', 'driverInstructions',
+    'officeOnlyNotes', 'billingInstructions', 'vehicleRequirements', 'customVehicleRequests', 'notes',
+  ];
+
+  function buildInquiryPayload(body: any): Record<string, any> {
+    const payload: Record<string, any> = {};
+    for (const key of INQUIRY_ALLOWED_FIELDS) if (body?.[key] !== undefined) payload[key] = body[key];
+    return payload;
+  }
+
+  app.get("/api/inquiries", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_INQUIRIES), async (req: AuthRequest, res) => {
+    try {
+      const query: Record<string, any> = { tenantId: req.tenantId };
+      if (req.query.status) query.status = req.query.status;
+      if (req.query.priority) query.priority = req.query.priority;
+      if (req.query.assignedExecutive) query.assignedExecutive = req.query.assignedExecutive;
+      if (req.query.search) {
+        const term = String(req.query.search).trim();
+        const normalizedPhone = normalizeIndianPhone(term);
+        query.$or = [
+          { customerName: { $regex: term, $options: 'i' } },
+          { primaryMobile: { $regex: normalizedPhone || term, $options: 'i' } },
+          { inquiryNumber: { $regex: term, $options: 'i' } },
+        ];
+      }
+      const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+      const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
+      const [rows, total] = await Promise.all([
+        Inquiry.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit),
+        Inquiry.countDocuments(query),
+      ]);
+      res.json({ rows, total, limit, skip });
+    } catch (error: any) {
+      console.error('List inquiries error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load inquiries" });
+    }
+  });
+
+  app.get("/api/inquiries/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_INQUIRIES), async (req: AuthRequest, res) => {
+    try {
+      const inquiry = await Inquiry.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Inquiry not found" });
+      res.json(inquiry);
+    } catch (error: any) {
+      console.error('Get inquiry error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load inquiry" });
+    }
+  });
+
+  app.post("/api/inquiries", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CREATE_INQUIRY), async (req: AuthRequest, res) => {
+    try {
+      if (!req.body?.customerName?.trim()) return res.status(400).json({ message: "Customer name is required." });
+      if (!req.body?.primaryMobile?.trim()) return res.status(400).json({ message: "Primary mobile is required." });
+      const normalizedMobile = normalizeIndianPhone(req.body.primaryMobile);
+      if (!normalizedMobile) return res.status(400).json({ message: "Enter a valid 10-digit Indian mobile number." });
+
+      const payload = buildInquiryPayload(req.body);
+      payload.customerName = req.body.customerName.trim();
+      payload.primaryMobile = normalizedMobile;
+      if (!payload.source) payload.source = 'phone_call';
+
+      const inquiryNumber = await nextInquiryNumber(req.tenantId!);
+      const inquiry = await Inquiry.create({
+        tenantId: req.tenantId,
+        inquiryNumber,
+        status: 'new',
+        ...payload,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(inquiry);
+    } catch (error: any) {
+      console.error('Create inquiry error:', error?.message || error);
+      res.status(500).json({ message: "Failed to create inquiry" });
+    }
+  });
+
+  app.patch("/api/inquiries/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_INQUIRY), async (req: AuthRequest, res) => {
+    try {
+      const inquiry = await Inquiry.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Inquiry not found" });
+      if (isTerminalInquiryStatus(inquiry.status as InquiryStatusValue)) {
+        return res.status(400).json({ message: `Cannot edit an inquiry that is already "${inquiry.status}".` });
+      }
+
+      const payload = buildInquiryPayload(req.body);
+      if (payload.primaryMobile !== undefined) {
+        const normalized = normalizeIndianPhone(payload.primaryMobile);
+        if (!normalized) return res.status(400).json({ message: "Enter a valid 10-digit Indian mobile number." });
+        payload.primaryMobile = normalized;
+      }
+      for (const [key, value] of Object.entries(payload)) {
+        (inquiry as any)[key] = value;
+      }
+      inquiry.updatedAt = new Date();
+      await inquiry.save();
+      res.json(inquiry);
+    } catch (error: any) {
+      console.error('Update inquiry error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update inquiry" });
+    }
+  });
+
+  app.post("/api/inquiries/:id/qualify", authenticateUser, requireTenant, requirePermission(PERMISSIONS.QUALIFY_INQUIRY), async (req: AuthRequest, res) => {
+    try {
+      const inquiry = await Inquiry.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Inquiry not found" });
+
+      const missing = getMissingQualificationFields(inquiry as any);
+      if (missing.length > 0) {
+        return res.status(400).json({ message: "Missing required fields to qualify this inquiry.", missing });
+      }
+      try {
+        assertValidInquiryTransition(inquiry.status as InquiryStatusValue, 'qualified');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      inquiry.status = 'qualified';
+      inquiry.updatedAt = new Date();
+      await inquiry.save();
+      res.json(inquiry);
+    } catch (error: any) {
+      console.error('Qualify inquiry error:', error?.message || error);
+      res.status(500).json({ message: "Failed to qualify inquiry" });
+    }
+  });
+
+  // Converts a qualified Inquiry into a real Lead (one-to-one, enforced by
+  // Lead's unique inquiryId index) and marks the Inquiry converted. Wrapped
+  // in a transaction (with a standalone-MongoDB fallback, mirroring the
+  // exact pattern already used by storage-mongodb.ts's createBooking) so
+  // the two writes never partially succeed — an Inquiry is never left
+  // "converted_to_lead" without a real Lead behind it, and vice versa.
+  // The response now includes the created `lead` alongside the inquiry;
+  // existing callers that only read the top-level inquiry fields (Phase 1's
+  // UI) are unaffected by this additive response shape change.
+  app.post("/api/inquiries/:id/convert-to-lead", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CONVERT_INQUIRY_TO_LEAD), async (req: AuthRequest, res) => {
+    try {
+      const inquiry = await Inquiry.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Inquiry not found" });
+      if (inquiry.status === 'converted_to_lead') {
+        return res.status(400).json({ message: "This inquiry has already been converted to a lead.", code: 'ALREADY_CONVERTED' });
+      }
+      const existingLead = await Lead.findOne({ tenantId: req.tenantId, inquiryId: inquiry._id });
+      if (existingLead) {
+        return res.status(400).json({ message: "A lead already exists for this inquiry.", code: 'ALREADY_CONVERTED', lead: existingLead });
+      }
+      try {
+        assertValidInquiryTransition(inquiry.status as InquiryStatusValue, 'converted_to_lead');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+
+      const leadNumber = await nextLeadNumber(req.tenantId!);
+      const runConvert = async (session?: mongoose.ClientSession) => {
+        const [lead] = await Lead.create([{
+          tenantId: req.tenantId,
+          leadNumber,
+          inquiryId: inquiry._id,
+          status: 'new',
+          priority: inquiry.priority,
+          assignedExecutive: inquiry.assignedExecutive,
+          createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+        }], { session });
+        inquiry.status = 'converted_to_lead';
+        inquiry.convertedToLeadAt = new Date();
+        inquiry.updatedAt = new Date();
+        await inquiry.save({ session });
+        return lead;
+      };
+
+      let lead;
+      try {
+        const session = await mongoose.startSession();
+        try {
+          await session.withTransaction(async () => { lead = await runConvert(session); });
+        } finally {
+          await session.endSession();
+        }
+      } catch (error: any) {
+        if (typeof error?.message === 'string' && error.message.includes('Transaction numbers')) {
+          lead = await runConvert(undefined);
+        } else {
+          throw error;
+        }
+      }
+
+      res.json({ ...inquiry.toObject(), lead });
+    } catch (error: any) {
+      console.error('Convert inquiry to lead error:', error?.message || error);
+      res.status(500).json({ message: "Failed to convert inquiry to lead" });
+    }
+  });
+
+  app.post("/api/inquiries/:id/mark-lost", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MARK_INQUIRY_LOST), async (req: AuthRequest, res) => {
+    try {
+      if (!req.body?.lostReason?.trim()) return res.status(400).json({ message: "A lost reason is required." });
+      const inquiry = await Inquiry.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Inquiry not found" });
+      try {
+        assertValidInquiryTransition(inquiry.status as InquiryStatusValue, 'lost');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      inquiry.status = 'lost';
+      inquiry.lostReason = req.body.lostReason.trim();
+      if (req.body.lostNotes !== undefined) inquiry.lostNotes = req.body.lostNotes;
+      if (req.body.futureReconnectDate !== undefined) inquiry.futureReconnectDate = req.body.futureReconnectDate;
+      inquiry.updatedAt = new Date();
+      await inquiry.save();
+      res.json(inquiry);
+    } catch (error: any) {
+      console.error('Mark inquiry lost error:', error?.message || error);
+      res.status(500).json({ message: "Failed to mark inquiry as lost" });
+    }
+  });
+
+  app.post("/api/inquiries/:id/reopen", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_INQUIRY), async (req: AuthRequest, res) => {
+    try {
+      const inquiry = await Inquiry.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Inquiry not found" });
+      try {
+        assertValidInquiryTransition(inquiry.status as InquiryStatusValue, 'contacted');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      inquiry.status = 'contacted';
+      inquiry.updatedAt = new Date();
+      await inquiry.save();
+      res.json(inquiry);
+    } catch (error: any) {
+      console.error('Reopen inquiry error:', error?.message || error);
+      res.status(500).json({ message: "Failed to reopen inquiry" });
+    }
+  });
+
+  // ── Lead pipeline (additive) ──
+  // Every Lead references exactly one Inquiry (see the Lead model comment
+  // in models/index.ts for why requirement/contact fields are read from
+  // there rather than duplicated here).
+
+  app.get("/api/leads", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_LEADS), async (req: AuthRequest, res) => {
+    try {
+      const query: Record<string, any> = { tenantId: req.tenantId };
+      if (req.query.status) query.status = req.query.status;
+      if (req.query.assignedExecutive) query.assignedExecutive = req.query.assignedExecutive;
+      const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+      const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
+      const [rows, total] = await Promise.all([
+        Lead.find(query)
+          .populate('inquiryId')
+          .sort({ createdAt: -1 }).skip(skip).limit(limit),
+        Lead.countDocuments(query),
+      ]);
+      res.json({ rows, total, limit, skip });
+    } catch (error: any) {
+      console.error('List leads error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load leads" });
+    }
+  });
+
+  app.get("/api/leads/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_LEADS), async (req: AuthRequest, res) => {
+    try {
+      const lead = await Lead.findOne({ _id: req.params.id, tenantId: req.tenantId }).populate('inquiryId');
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      res.json(lead);
+    } catch (error: any) {
+      console.error('Get lead error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load lead" });
+    }
+  });
+
+  app.patch("/api/leads/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_LEAD), async (req: AuthRequest, res) => {
+    try {
+      const lead = await Lead.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+
+      if (req.body.status !== undefined) {
+        try {
+          assertValidLeadTransition(lead.status as LeadStatusValue, req.body.status);
+        } catch (e: any) {
+          return res.status(400).json({ message: e.message, code: e.code });
+        }
+        lead.status = req.body.status;
+      }
+      if (req.body.priority !== undefined) lead.priority = req.body.priority;
+      if (req.body.assignedExecutive !== undefined) lead.assignedExecutive = req.body.assignedExecutive;
+      lead.updatedAt = new Date();
+      await lead.save();
+      await lead.populate('inquiryId');
+      res.json(lead);
+    } catch (error: any) {
+      console.error('Update lead error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update lead" });
+    }
+  });
+
+  app.post("/api/leads/:id/mark-lost", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MARK_LEAD_LOST), async (req: AuthRequest, res) => {
+    try {
+      if (!req.body?.lostReason?.trim()) return res.status(400).json({ message: "A lost reason is required." });
+      const lead = await Lead.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      try {
+        assertValidLeadTransition(lead.status as LeadStatusValue, 'lost');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      lead.status = 'lost';
+      lead.lostReason = req.body.lostReason.trim();
+      if (req.body.lostNotes !== undefined) lead.lostNotes = req.body.lostNotes;
+      lead.updatedAt = new Date();
+      await lead.save();
+      res.json(lead);
+    } catch (error: any) {
+      console.error('Mark lead lost error:', error?.message || error);
+      res.status(500).json({ message: "Failed to mark lead as lost" });
+    }
+  });
+
+  // ── Quotations (additive) ──
+  // Options are validated and their totalPaise recomputed server-side from
+  // the same computeOptionTotalPaise() used everywhere else, so a client
+  // can never submit an inconsistent/manipulated total.
+
+  function sanitizeQuotationOptions(rawOptions: any): any[] {
+    if (!Array.isArray(rawOptions)) return [];
+    return rawOptions.map((opt: any, i: number) => {
+      const option = {
+        optionNumber: i + 1,
+        vehicleNameSnapshot: String(opt.vehicleNameSnapshot || '').trim(),
+        quantity: Number(opt.quantity) || 1,
+        pricingType: opt.pricingType || 'fixed',
+        baseRatePaise: opt.baseRatePaise !== undefined ? Number(opt.baseRatePaise) : undefined,
+        includedKm: opt.includedKm !== undefined ? Number(opt.includedKm) : undefined,
+        extraKmRatePaise: opt.extraKmRatePaise !== undefined ? Number(opt.extraKmRatePaise) : undefined,
+        includedHours: opt.includedHours !== undefined ? Number(opt.includedHours) : undefined,
+        extraHourRatePaise: opt.extraHourRatePaise !== undefined ? Number(opt.extraHourRatePaise) : undefined,
+        minimumKmPerDay: opt.minimumKmPerDay !== undefined ? Number(opt.minimumKmPerDay) : undefined,
+        driverAllowancePaise: opt.driverAllowancePaise !== undefined ? Number(opt.driverAllowancePaise) : undefined,
+        nightHaltPaise: opt.nightHaltPaise !== undefined ? Number(opt.nightHaltPaise) : undefined,
+        tollTreatment: opt.tollTreatment || 'excluded',
+        parkingTreatment: opt.parkingTreatment || 'excluded',
+        stateTaxTreatment: opt.stateTaxTreatment || 'excluded',
+        discountPaise: opt.discountPaise !== undefined ? Number(opt.discountPaise) : 0,
+        taxableAmountPaise: opt.taxableAmountPaise !== undefined ? Number(opt.taxableAmountPaise) : undefined,
+        gstPaise: opt.gstPaise !== undefined ? Number(opt.gstPaise) : 0,
+        notes: opt.notes,
+        totalPaise: 0,
+      };
+      option.totalPaise = computeOptionTotalPaise(option);
+      return option;
+    });
+  }
+
+  app.get("/api/leads/:leadId/quotations", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_QUOTATIONS), async (req: AuthRequest, res) => {
+    try {
+      const rows = await Quotation.find({ tenantId: req.tenantId, leadId: req.params.leadId }).sort({ version: -1, createdAt: -1 });
+      res.json(rows);
+    } catch (error: any) {
+      console.error('List quotations error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load quotations" });
+    }
+  });
+
+  app.post("/api/leads/:leadId/quotations", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CREATE_QUOTATION), async (req: AuthRequest, res) => {
+    try {
+      const lead = await Lead.findOne({ _id: req.params.leadId, tenantId: req.tenantId });
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+
+      const options = sanitizeQuotationOptions(req.body?.options);
+      if (options.length === 0) return res.status(400).json({ message: "At least one quotation option is required." });
+      if (options.some((o) => !o.vehicleNameSnapshot)) return res.status(400).json({ message: "Every option needs a vehicle name." });
+
+      const quotationNumber = await nextQuotationNumber(req.tenantId!);
+      const quotation = await Quotation.create({
+        tenantId: req.tenantId,
+        quotationNumber,
+        leadId: lead._id,
+        status: 'draft',
+        version: 1,
+        options,
+        validTill: req.body.validTill || undefined,
+        paymentTerms: req.body.paymentTerms,
+        termsAndConditions: req.body.termsAndConditions,
+        cancellationTerms: req.body.cancellationTerms,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+
+      // Best-effort Lead status sync (same pattern as the accept/send
+      // routes) — only advances a lead that's already at 'assigned' or
+      // 'requirement_completed'; a lead still sitting at 'new' is left
+      // alone rather than skipping the assign/gather-requirements steps
+      // for it. Quotation creation itself always succeeds either way.
+      if (!['converted_to_customer', 'converted_to_booking', 'lost', 'cancelled'].includes(lead.status)) {
+        try {
+          assertValidLeadTransition(lead.status as LeadStatusValue, 'quotation_draft');
+          lead.status = 'quotation_draft';
+          lead.updatedAt = new Date();
+          await lead.save();
+        } catch {
+          // Not a valid transition from wherever this lead currently is.
+        }
+      }
+
+      res.status(201).json(quotation);
+    } catch (error: any) {
+      console.error('Create quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to create quotation" });
+    }
+  });
+
+  app.get("/api/quotations/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_QUOTATIONS), async (req: AuthRequest, res) => {
+    try {
+      const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      res.json(quotation);
+    } catch (error: any) {
+      console.error('Get quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load quotation" });
+    }
+  });
+
+  app.patch("/api/quotations/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_QUOTATION_DRAFT), async (req: AuthRequest, res) => {
+    try {
+      const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      if (isImmutableQuotationStatus(quotation.status as QuotationStatusValue)) {
+        return res.status(400).json({ message: `Cannot edit a quotation that is already "${quotation.status}".` });
+      }
+      if (req.body.options !== undefined) {
+        const options = sanitizeQuotationOptions(req.body.options);
+        if (options.length === 0) return res.status(400).json({ message: "At least one quotation option is required." });
+        quotation.options = options;
+      }
+      if (req.body.validTill !== undefined) quotation.validTill = req.body.validTill;
+      if (req.body.paymentTerms !== undefined) quotation.paymentTerms = req.body.paymentTerms;
+      if (req.body.termsAndConditions !== undefined) quotation.termsAndConditions = req.body.termsAndConditions;
+      if (req.body.cancellationTerms !== undefined) quotation.cancellationTerms = req.body.cancellationTerms;
+      quotation.updatedAt = new Date();
+      await quotation.save();
+      res.json(quotation);
+    } catch (error: any) {
+      console.error('Update quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update quotation" });
+    }
+  });
+
+  // Generic status transition for the non-side-effecting moves (review,
+  // return-for-correction, viewed, customer_query, negotiation, reject,
+  // expire, supersede) — approve/send/revise/accept below have their own
+  // dedicated endpoints because each has a real side effect beyond the
+  // status field itself.
+  app.post("/api/quotations/:id/status", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_QUOTATION_DRAFT), async (req: AuthRequest, res) => {
+    try {
+      const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      const { status } = req.body;
+      if (!status) return res.status(400).json({ message: "A target status is required." });
+      try {
+        assertValidQuotationTransition(quotation.status as QuotationStatusValue, status);
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      quotation.status = status;
+      quotation.updatedAt = new Date();
+      await quotation.save();
+      res.json(quotation);
+    } catch (error: any) {
+      console.error('Quotation status change error:', error?.message || error);
+      res.status(500).json({ message: "Failed to change quotation status" });
+    }
+  });
+
+  app.post("/api/quotations/:id/approve", authenticateUser, requireTenant, requirePermission(PERMISSIONS.APPROVE_QUOTATION), async (req: AuthRequest, res) => {
+    try {
+      const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      try {
+        assertValidQuotationTransition(quotation.status as QuotationStatusValue, 'approved');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      quotation.status = 'approved';
+      quotation.updatedAt = new Date();
+      await quotation.save();
+      res.json(quotation);
+    } catch (error: any) {
+      console.error('Approve quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to approve quotation" });
+    }
+  });
+
+  // Sends the quotation via WhatsApp (text summary) and only flips status
+  // -> 'sent' if the send actually succeeded, so a failed send never
+  // silently leaves the quotation looking like it went out.
+  app.post("/api/quotations/:id/send-whatsapp", authenticateUser, requireTenant, requirePermission(PERMISSIONS.SEND_QUOTATION), async (req: AuthRequest, res) => {
+    try {
+      const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      if (quotation.status !== 'sent') {
+        try {
+          assertValidQuotationTransition(quotation.status as QuotationStatusValue, 'sent');
+        } catch (e: any) {
+          return res.status(400).json({ message: e.message, code: e.code });
+        }
+      }
+
+      const result = await sendQuotationMessage({
+        tenantId: req.tenantId!,
+        quotationId: quotation._id.toString(),
+        actor: { userId: req.userId!, role: req.user?.role || 'client' },
+        force: !!req.body?.force,
+      });
+      if (!result.ok) {
+        return res.status(result.code === 'ALREADY_SENT' ? 409 : 400).json(result);
+      }
+
+      if (quotation.status !== 'sent') {
+        quotation.status = 'sent';
+        quotation.sentAt = new Date();
+        quotation.updatedAt = new Date();
+        await quotation.save();
+
+        // Best-effort Lead status sync, same pattern as quotation-accept's
+        // customer_confirmed sync above: a lead already further along its
+        // own pipeline (e.g. negotiation, or already lost) is left alone —
+        // the quotation send itself must never fail because of lead state.
+        const lead = await Lead.findOne({ _id: quotation.leadId, tenantId: req.tenantId });
+        if (lead && !['converted_to_customer', 'converted_to_booking', 'lost', 'cancelled'].includes(lead.status)) {
+          try {
+            assertValidLeadTransition(lead.status as LeadStatusValue, 'quotation_sent');
+            lead.status = 'quotation_sent';
+            lead.updatedAt = new Date();
+            await lead.save();
+          } catch {
+            // Not a valid transition from wherever this lead currently is
+            // (e.g. still 'new', never moved through quotation_draft) —
+            // skip silently, matching the accept-route's own convention.
+          }
+        }
+      }
+      res.json({ quotation, messageDoc: result.messageDoc });
+    } catch (error: any) {
+      console.error('Send quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to send quotation" });
+    }
+  });
+
+  // Sends the ACTUAL Quotation PDF as a WhatsApp document (with the same
+  // Hinglish summary as its caption), closing the gap the text-only route
+  // above always documented as a deferred follow-up. PDF generation still
+  // happens client-side (the existing, already-tested html2pdf render used
+  // for "Download PDF") — no server-side PDF rendering is introduced; the
+  // client just uploads the resulting bytes here instead of only
+  // downloading them. Memory storage only (never touches disk) since the
+  // file is used once and discarded.
+  app.post(
+    "/api/quotations/:id/send-whatsapp-pdf",
+    authenticateUser, requireTenant, requirePermission(PERMISSIONS.SEND_QUOTATION),
+    multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 }, fileFilter: (req, file, cb) => {
+      if (file.mimetype === 'application/pdf') cb(null, true);
+      else cb(new Error('Only PDF files are accepted.'));
+    } }).single('pdf'),
+    async (req: AuthRequest, res) => {
+      try {
+        const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+        if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+        if (!req.file) return res.status(400).json({ message: "A PDF file is required (field name: pdf)." });
+        if (quotation.status !== 'sent') {
+          try {
+            assertValidQuotationTransition(quotation.status as QuotationStatusValue, 'sent');
+          } catch (e: any) {
+            return res.status(400).json({ message: e.message, code: e.code });
+          }
+        }
+
+        const result = await sendQuotationMessage({
+          tenantId: req.tenantId!,
+          quotationId: quotation._id.toString(),
+          actor: { userId: req.userId!, role: req.user?.role || 'client' },
+          force: !!req.body?.force,
+          pdf: { buffer: req.file.buffer, fileName: `Quotation_${quotation.quotationNumber || quotation._id}.pdf` },
+        });
+        if (!result.ok) {
+          return res.status(result.code === 'ALREADY_SENT' ? 409 : 400).json(result);
+        }
+
+        if (quotation.status !== 'sent') {
+          quotation.status = 'sent';
+          quotation.sentAt = new Date();
+          quotation.updatedAt = new Date();
+          await quotation.save();
+
+          // Same best-effort Lead status sync as the text-send route above.
+          const lead = await Lead.findOne({ _id: quotation.leadId, tenantId: req.tenantId });
+          if (lead && !['converted_to_customer', 'converted_to_booking', 'lost', 'cancelled'].includes(lead.status)) {
+            try {
+              assertValidLeadTransition(lead.status as LeadStatusValue, 'quotation_sent');
+              lead.status = 'quotation_sent';
+              lead.updatedAt = new Date();
+              await lead.save();
+            } catch {
+              // Not a valid transition from wherever this lead currently is.
+            }
+          }
+        }
+        res.json({ quotation, messageDoc: result.messageDoc });
+      } catch (error: any) {
+        console.error('Send quotation PDF error:', error?.message || error);
+        res.status(500).json({ message: error?.message?.includes('PDF') ? error.message : "Failed to send quotation PDF" });
+      }
+    },
+  );
+
+  // Creates a new draft version copying the current options (spec §19:
+  // "Sent quotation revision creates a new version"); the original is
+  // marked superseded and stays visible/immutable for history.
+  app.post("/api/quotations/:id/revise", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_QUOTATION_DRAFT), async (req: AuthRequest, res) => {
+    try {
+      const original = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!original) return res.status(404).json({ message: "Quotation not found" });
+      if (original.status === 'draft' || original.status === 'under_review') {
+        return res.status(400).json({ message: "A draft or under-review quotation can be edited directly instead of revised." });
+      }
+      if (original.status === 'converted') {
+        return res.status(400).json({ message: "Cannot revise a quotation that has already been converted to a booking." });
+      }
+
+      const quotationNumber = await nextQuotationNumber(req.tenantId!);
+      const revision = await Quotation.create({
+        tenantId: req.tenantId,
+        quotationNumber,
+        leadId: original.leadId,
+        status: 'draft',
+        version: (original.version || 1) + 1,
+        parentQuotationId: original._id,
+        options: original.options,
+        validTill: original.validTill,
+        paymentTerms: original.paymentTerms,
+        termsAndConditions: original.termsAndConditions,
+        cancellationTerms: original.cancellationTerms,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+
+      original.status = 'superseded';
+      original.updatedAt = new Date();
+      await original.save();
+
+      res.status(201).json(revision);
+    } catch (error: any) {
+      console.error('Revise quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to revise quotation" });
+    }
+  });
+
+  // Accepting a quotation also moves its Lead to customer_confirmed (spec
+  // lifecycle: "Quotation Accepted -> Customer Confirmed"), and becomes
+  // immutable from this point (spec §19).
+  app.post("/api/quotations/:id/accept", authenticateUser, requireTenant, requirePermission(PERMISSIONS.ACCEPT_QUOTATION), async (req: AuthRequest, res) => {
+    try {
+      const quotation = await Quotation.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!quotation) return res.status(404).json({ message: "Quotation not found" });
+      const acceptedOptionNumber = Number(req.body?.acceptedOptionNumber);
+      if (!acceptedOptionNumber || !quotation.options.some((o: any) => o.optionNumber === acceptedOptionNumber)) {
+        return res.status(400).json({ message: "acceptedOptionNumber must match one of this quotation's options." });
+      }
+      try {
+        assertValidQuotationTransition(quotation.status as QuotationStatusValue, 'accepted');
+      } catch (e: any) {
+        return res.status(400).json({ message: e.message, code: e.code });
+      }
+      quotation.status = 'accepted';
+      quotation.acceptedOptionNumber = acceptedOptionNumber;
+      quotation.acceptedAt = new Date();
+      quotation.updatedAt = new Date();
+      await quotation.save();
+
+      const lead = await Lead.findOne({ _id: quotation.leadId, tenantId: req.tenantId });
+      if (lead && !['converted_to_customer', 'converted_to_booking', 'lost', 'cancelled'].includes(lead.status)) {
+        try {
+          assertValidLeadTransition(lead.status as LeadStatusValue, 'customer_confirmed');
+          lead.status = 'customer_confirmed';
+          lead.updatedAt = new Date();
+          await lead.save();
+        } catch {
+          // Lead already past this point in its own pipeline — accepting
+          // the quotation itself still succeeds; the lead status is a
+          // best-effort convenience sync, not a hard dependency.
+        }
+      }
+
+      res.json(quotation);
+    } catch (error: any) {
+      console.error('Accept quotation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to accept quotation" });
+    }
+  });
+
+  // ── Lead follow-ups (additive) ──
+  // Separate from the existing after-sales CustomerFollowUp — see the
+  // LeadFollowUp model comment in models/index.ts for why.
+
+  app.get("/api/leads/:leadId/followups", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_FOLLOWUPS), async (req: AuthRequest, res) => {
+    try {
+      const rows = await LeadFollowUp.find({ tenantId: req.tenantId, leadId: req.params.leadId }).sort({ scheduledAt: -1 });
+      res.json(rows);
+    } catch (error: any) {
+      console.error('List lead follow-ups error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load follow-ups" });
+    }
+  });
+
+  app.post("/api/leads/:leadId/followups", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CREATE_FOLLOWUP), async (req: AuthRequest, res) => {
+    try {
+      const lead = await Lead.findOne({ _id: req.params.leadId, tenantId: req.tenantId });
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      if (!req.body?.type?.trim()) return res.status(400).json({ message: "Follow-up type is required." });
+      if (!req.body?.scheduledAt) return res.status(400).json({ message: "scheduledAt is required." });
+
+      const followUp = await LeadFollowUp.create({
+        tenantId: req.tenantId,
+        leadId: lead._id,
+        type: req.body.type.trim(),
+        scheduledAt: req.body.scheduledAt,
+        assignedTo: req.body.assignedTo,
+        priority: req.body.priority || 'medium',
+        purpose: req.body.purpose,
+        previousDiscussion: req.body.previousDiscussion,
+        outcome: 'pending',
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(followUp);
+    } catch (error: any) {
+      console.error('Create lead follow-up error:', error?.message || error);
+      res.status(500).json({ message: "Failed to create follow-up" });
+    }
+  });
+
+  // Tenant-wide follow-up list for a dashboard-style view: Due Today,
+  // Overdue, Upcoming, or High-Priority (spec §22). Only 'pending' rows
+  // are ever "due" — a completed row (any other outcome) never appears
+  // here regardless of its scheduledAt, since it isn't waiting on anyone.
+  app.get("/api/followups", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_FOLLOWUPS), async (req: AuthRequest, res) => {
+    try {
+      const query: Record<string, any> = { tenantId: req.tenantId, outcome: 'pending' };
+      const now = new Date();
+      const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1);
+
+      // Mutually exclusive by actual urgency, not just calendar date — a
+      // follow-up scheduled for 9am that's still pending at 2pm the same
+      // day is genuinely overdue, not "due later today" (same distinction
+      // liveOperations.ts already makes between startDue/startDelayed).
+      const due = (req.query.due as string) || 'all';
+      if (due === 'today') query.scheduledAt = { $gte: now, $lt: todayEnd };
+      else if (due === 'overdue') query.scheduledAt = { $lt: now };
+      else if (due === 'upcoming') query.scheduledAt = { $gte: todayEnd };
+      if (req.query.priority) query.priority = req.query.priority;
+
+      const rows = await LeadFollowUp.find(query)
+        .populate({ path: 'leadId', select: 'leadNumber status inquiryId', populate: { path: 'inquiryId', select: 'inquiryNumber customerName primaryMobile' } })
+        .sort({ scheduledAt: 1 })
+        .limit(200);
+      res.json(rows);
+    } catch (error: any) {
+      console.error('List follow-ups error:', error?.message || error);
+      res.status(500).json({ message: "Failed to load follow-ups" });
+    }
+  });
+
+  // Completing a follow-up can optionally chain a new one (nextFollowUpAt
+  // + type) — a real convenience for "finish this call, schedule the next
+  // one in the same action" rather than a required two-step flow.
+  app.post("/api/followups/:followupId/complete", authenticateUser, requireTenant, requirePermission(PERMISSIONS.COMPLETE_FOLLOWUP), async (req: AuthRequest, res) => {
+    try {
+      const followUp = await LeadFollowUp.findOne({ _id: req.params.followupId, tenantId: req.tenantId });
+      if (!followUp) return res.status(404).json({ message: "Follow-up not found" });
+      if (followUp.outcome !== 'pending') {
+        return res.status(400).json({ message: "This follow-up has already been completed." });
+      }
+      if (!req.body?.outcome || req.body.outcome === 'pending') {
+        return res.status(400).json({ message: "A real outcome is required to complete a follow-up." });
+      }
+
+      followUp.outcome = req.body.outcome;
+      if (req.body.customerResponse !== undefined) followUp.customerResponse = req.body.customerResponse;
+      if (req.body.internalNote !== undefined) followUp.internalNote = req.body.internalNote;
+      followUp.completedAt = new Date();
+      followUp.completedBy = req.userId!;
+
+      let nextFollowUp = null;
+      if (req.body.nextFollowUpAt) {
+        followUp.nextFollowUpAt = req.body.nextFollowUpAt;
+        nextFollowUp = await LeadFollowUp.create({
+          tenantId: req.tenantId,
+          leadId: followUp.leadId,
+          type: req.body.nextFollowUpType || followUp.type,
+          scheduledAt: req.body.nextFollowUpAt,
+          assignedTo: followUp.assignedTo,
+          priority: followUp.priority,
+          previousDiscussion: req.body.customerResponse || followUp.customerResponse,
+          outcome: 'pending',
+          createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+        });
+      }
+      await followUp.save();
+
+      res.json({ followUp, nextFollowUp });
+    } catch (error: any) {
+      console.error('Complete follow-up error:', error?.message || error);
+      res.status(500).json({ message: "Failed to complete follow-up" });
+    }
+  });
+
+  // One-click Lead -> Customer conversion (spec §23). Reuses
+  // findOrCreateCustomer() — the exact same dedupe-by-phone logic already
+  // used by booking creation — rather than a second, divergent
+  // duplicate-detection implementation. Neither the Inquiry nor the Lead
+  // is ever deleted; this only adds a link.
+  app.post("/api/leads/:id/convert-to-customer", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CONVERT_LEAD_TO_CUSTOMER), async (req: AuthRequest, res) => {
+    try {
+      const lead = await Lead.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      if (lead.linkedCustomerId) {
+        const existingCustomer = await Customer.findOne({ _id: lead.linkedCustomerId, tenantId: req.tenantId });
+        return res.status(400).json({ message: "This lead is already linked to a customer.", code: 'ALREADY_CONVERTED', customer: existingCustomer });
+      }
+
+      const inquiry = await Inquiry.findOne({ _id: lead.inquiryId, tenantId: req.tenantId });
+      if (!inquiry) return res.status(404).json({ message: "Linked inquiry not found" });
+
+      let result;
+      try {
+        result = await findOrCreateCustomer(
+          req.tenantId!,
+          { name: inquiry.customerName, phone: inquiry.primaryMobile, email: inquiry.email },
+          { userId: req.userId!, role: req.user?.role || 'client' },
+        );
+      } catch (e: any) {
+        if (e.code === 'INVALID_PHONE') return res.status(400).json({ message: e.message, code: e.code });
+        throw e;
+      }
+
+      lead.linkedCustomerId = result.customer._id;
+      lead.convertedToCustomerAt = new Date();
+      if (!inquiry.linkedCustomerId) inquiry.linkedCustomerId = result.customer._id;
+      try {
+        assertValidLeadTransition(lead.status as LeadStatusValue, 'converted_to_customer');
+        lead.status = 'converted_to_customer';
+      } catch {
+        // Lead's own pipeline state doesn't allow this move yet (e.g. still
+        // 'new') — the customer link itself still succeeds; see the same
+        // best-effort-sync note on the quotation accept route above.
+      }
+      lead.updatedAt = new Date();
+      await lead.save();
+      await inquiry.save();
+
+      res.json({ customer: result.customer, wasCreated: result.wasCreated, lead });
+    } catch (error: any) {
+      console.error('Convert lead to customer error:', error?.message || error);
+      res.status(500).json({ message: "Failed to convert lead to customer" });
+    }
+  });
+
+  // Completes the Lead -> Booking conversion (spec §24) after the actual
+  // Booking has already been created through the existing, unmodified
+  // POST /api/bookings endpoint (with its own full availability
+  // validation) — this route only records the link, it never creates or
+  // touches a Booking document itself, so there is exactly one place a
+  // real booking gets created in this whole codebase.
+  app.post("/api/leads/:leadId/link-booking", authenticateUser, requireTenant, requirePermission(PERMISSIONS.CONVERT_LEAD_TO_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      const lead = await Lead.findOne({ _id: req.params.leadId, tenantId: req.tenantId });
+      if (!lead) return res.status(404).json({ message: "Lead not found" });
+      if (!req.body?.bookingId) return res.status(400).json({ message: "bookingId is required." });
+
+      const booking = await Booking.findOne({ _id: req.body.bookingId, tenantId: req.tenantId });
+      if (!booking) return res.status(404).json({ message: "Booking not found for this tenant." });
+
+      lead.linkedBookingId = booking._id;
+      lead.convertedToBookingAt = new Date();
+      try {
+        assertValidLeadTransition(lead.status as LeadStatusValue, 'converted_to_booking');
+        lead.status = 'converted_to_booking';
+      } catch {
+        // Best-effort sync, same pattern as the quotation-accept and
+        // convert-to-customer routes above — the link itself still succeeds.
+      }
+      lead.updatedAt = new Date();
+      await lead.save();
+
+      res.json(lead);
+    } catch (error: any) {
+      console.error('Link lead to booking error:', error?.message || error);
+      res.status(500).json({ message: "Failed to link booking to lead" });
+    }
+  });
+
   // Customer 360: one consolidated financial ledger across every booking.
   // Payment rows remain immutable; this endpoint only assembles them for
   // the customer dashboard with their human booking number populated.
@@ -2765,6 +4660,221 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Customer payment ledger error:', error?.message || error);
       res.status(500).json({ message: "Failed to fetch customer payment ledger" });
+    }
+  });
+
+  app.get("/api/customers/:id/financial-summary", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const summary = await buildCustomerFinancialSummary(req.tenantId!, req.params.id);
+      if (!summary) return res.status(404).json({ message: "Customer not found" });
+      res.json(summary);
+    } catch (error: any) {
+      console.error('Customer financial summary error:', error?.message || error);
+      res.status(500).json({ message: "Failed to compute customer financial summary" });
+    }
+  });
+
+  app.get("/api/customers/:id/payments/:paymentId/receipt", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (!mongoose.isValidObjectId(req.params.id) || !mongoose.isValidObjectId(req.params.paymentId)) {
+        return res.status(400).json({ message: "Invalid customer or payment ID" });
+      }
+      const receipt = await buildPaymentReceipt(req.tenantId!, req.params.id, req.params.paymentId);
+      if (!receipt) return res.status(404).json({ message: "Payment receipt not found for this customer" });
+      res.json(receipt);
+    } catch (error: any) {
+      console.error('Payment receipt error:', error?.message || error);
+      res.status(500).json({ message: "Failed to create payment receipt" });
+    }
+  });
+
+  // Invoice Settings — tenant-specific company/tax/bank/numbering config
+  // used to render invoice PDFs and WhatsApp templates. GET always returns
+  // a full object (merged with defaults) even if the tenant never saved
+  // one; PATCH is the only thing that persists a row (upsert). Changing
+  // these only affects invoices generated AFTER the change — every
+  // existing finalized invoice already carries its own immutable
+  // businessSnapshot (see invoiceService.ts's loadContext).
+  app.get("/api/invoice-settings", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const settings = await getInvoiceSettings(req.tenantId!);
+      res.json(settings);
+    } catch (error: any) {
+      console.error('Get invoice settings error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch invoice settings" });
+    }
+  });
+
+  app.patch("/api/invoice-settings", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_INVOICE_SETTINGS), async (req: AuthRequest, res) => {
+    try {
+      const settings = await upsertInvoiceSettings(req.tenantId!, req.body || {}, { userId: req.userId!, role: req.user?.role || 'client' });
+      res.json(settings);
+    } catch (error: any) {
+      console.error('Update invoice settings error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update invoice settings" });
+    }
+  });
+
+  app.get("/api/customers/:id/billing-profiles", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      const profiles = await CustomerBillingProfile.find({ tenantId: req.tenantId, customerId: req.params.id, isActive: true })
+        .sort({ isDefault: -1, createdAt: 1 });
+      res.json(profiles);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch billing profiles" });
+    }
+  });
+
+  const billingProfileFields = [
+    'label', 'customerKind', 'billingName', 'companyName', 'gstNumber', 'panNumber', 'billingAddress',
+    'billingEmail', 'accountsContact', 'purchaseOrderNumber', 'paymentTerms', 'creditPeriodDays', 'tdsInformation',
+  ];
+
+  app.post("/api/customers/:id/billing-profiles", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!customer) return res.status(404).json({ message: "Customer not found" });
+      const payload: Record<string, any> = {};
+      for (const field of billingProfileFields) if (req.body?.[field] !== undefined) payload[field] = req.body[field];
+      if (!payload.label?.trim() || !payload.billingName?.trim()) return res.status(400).json({ message: "Profile label and billing name are required." });
+      if (payload.gstNumber) payload.gstNumber = String(payload.gstNumber).trim().toUpperCase();
+      if (payload.billingEmail) payload.billingEmail = String(payload.billingEmail).trim().toLowerCase();
+      const isFirst = await CustomerBillingProfile.countDocuments({ tenantId: req.tenantId, customerId: req.params.id, isActive: true }) === 0;
+      const isDefault = isFirst || req.body?.isDefault === true;
+      if (isDefault) await CustomerBillingProfile.updateMany({ tenantId: req.tenantId, customerId: req.params.id }, { $set: { isDefault: false } });
+      const profile = await CustomerBillingProfile.create({
+        tenantId: req.tenantId, customerId: req.params.id, ...payload, isDefault,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(profile);
+    } catch (error: any) {
+      console.error('Create billing profile error:', error?.message || error);
+      res.status(500).json({ message: "Failed to create billing profile" });
+    }
+  });
+
+  app.put("/api/customers/:id/billing-profiles/:profileId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const profile = await CustomerBillingProfile.findOne({
+        _id: req.params.profileId, tenantId: req.tenantId, customerId: req.params.id, isActive: true,
+      });
+      if (!profile) return res.status(404).json({ message: "Billing profile not found" });
+      for (const field of billingProfileFields) if (req.body?.[field] !== undefined) (profile as any)[field] = req.body[field];
+      if (!profile.label?.trim() || !profile.billingName?.trim()) return res.status(400).json({ message: "Profile label and billing name are required." });
+      if (profile.gstNumber) profile.gstNumber = profile.gstNumber.trim().toUpperCase();
+      if (profile.billingEmail) profile.billingEmail = profile.billingEmail.trim().toLowerCase();
+      if (req.body?.isDefault === true && !profile.isDefault) {
+        await CustomerBillingProfile.updateMany({ tenantId: req.tenantId, customerId: req.params.id }, { $set: { isDefault: false } });
+        profile.isDefault = true;
+      }
+      profile.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      profile.updatedAt = new Date();
+      await profile.save();
+      res.json(profile);
+    } catch (error: any) {
+      console.error('Update billing profile error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update billing profile" });
+    }
+  });
+
+  app.post("/api/customers/:id/billing-profiles/:profileId/set-default", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const profile = await CustomerBillingProfile.findOne({ _id: req.params.profileId, tenantId: req.tenantId, customerId: req.params.id, isActive: true });
+      if (!profile) return res.status(404).json({ message: "Billing profile not found" });
+      await CustomerBillingProfile.updateMany({ tenantId: req.tenantId, customerId: req.params.id }, { $set: { isDefault: false } });
+      profile.isDefault = true;
+      profile.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      profile.updatedAt = new Date();
+      await profile.save();
+      res.json(profile);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to set default billing profile" });
+    }
+  });
+
+  app.get("/api/customers/:id/invoices", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const invoices = await Invoice.find({ tenantId: req.tenantId, customerId: req.params.id })
+        .populate('bookingId', 'bookingId pickupDate').sort({ createdAt: -1 });
+      res.json(await addCurrentInvoiceSettlements(invoices));
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch invoices" });
+    }
+  });
+
+  app.post("/api/customers/:id/invoices/preview", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const preview = await previewInvoice({ tenantId: req.tenantId!, customerId: req.params.id, ...req.body });
+      res.json(preview);
+    } catch (error: any) {
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to preview invoice" });
+    }
+  });
+
+  app.post("/api/customers/:id/invoices", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const result = await createInvoiceDraft({
+        tenantId: req.tenantId!, customerId: req.params.id, ...req.body,
+        actor: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(result.alreadyExists ? 200 : 201).json(result);
+    } catch (error: any) {
+      console.error('Create invoice error:', error?.message || error);
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to create invoice" });
+    }
+  });
+
+  app.get("/api/invoices/:invoiceId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const invoice = await Invoice.findOne({ _id: req.params.invoiceId, tenantId: req.tenantId });
+      if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+      res.json((await addCurrentInvoiceSettlements([invoice]))[0]);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch invoice" });
+    }
+  });
+
+  app.put("/api/invoices/:invoiceId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const invoice = await updateInvoiceDraft(req.tenantId!, req.params.invoiceId, req.body, { userId: req.userId!, role: req.user?.role || 'client' });
+      res.json(invoice);
+    } catch (error: any) {
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to update invoice" });
+    }
+  });
+
+  app.post("/api/invoices/:invoiceId/finalize", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const invoice = await finalizeInvoice(req.tenantId!, req.params.invoiceId, { userId: req.userId!, role: req.user?.role || 'client' });
+      res.json(invoice);
+    } catch (error: any) {
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to finalize invoice" });
+    }
+  });
+
+  app.post("/api/invoices/:invoiceId/revise", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const invoice = await reviseInvoice(req.tenantId!, req.params.invoiceId, { userId: req.userId!, role: req.user?.role || 'client' });
+      res.status(201).json(invoice);
+    } catch (error: any) {
+      console.error('Revise invoice error:', error?.message || error);
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to revise invoice" });
+    }
+  });
+
+  app.post("/api/invoices/:invoiceId/adjustment-note", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
+    try {
+      const invoice = await createAdjustmentNote({
+        tenantId: req.tenantId!, invoiceId: req.params.invoiceId, noteType: req.body?.noteType,
+        amount: req.body?.amount, reason: req.body?.reason,
+        actor: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(invoice);
+    } catch (error: any) {
+      console.error('Create invoice adjustment note error:', error?.message || error);
+      res.status(error?.status || 500).json({ message: error?.message || "Failed to create adjustment note" });
     }
   });
 
@@ -2887,20 +4997,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/customers/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const update = { ...req.body };
-      // Cached/derived fields are never client-editable — same rule as
-      // booking.advanceReceived, for the same reason (a direct overwrite
-      // here would silently disagree with the real booking data next
-      // time anything recomputes it).
-      delete update.totalBookings; delete update.completedBookings; delete update.cancelledBookings;
-      delete update.totalSpending; delete update.customerStatus; delete update.tenantId;
-      delete update.firstBookingDate; delete update.lastBookingDate;
-      delete update.rewardPointsBalance; delete update.loyaltyTier;
+      const editableFields = [
+        'name', 'primaryMobile', 'alternateMobile', 'whatsappNumber', 'email', 'dateOfBirth', 'anniversary',
+        'address', 'city', 'state', 'pinCode', 'companyName', 'customerType', 'gstNumber', 'emergencyContact',
+        'preferredLanguage', 'photoUrl', 'billing', 'preferences',
+      ];
+      const update: Record<string, any> = {};
+      for (const key of editableFields) if (req.body?.[key] !== undefined) update[key] = req.body[key];
 
-      if (update.primaryMobile) {
-        const normalized = normalizeIndianPhone(update.primaryMobile);
-        if (!normalized) return res.status(400).json({ message: `Invalid phone number: "${update.primaryMobile}"` });
-        update.primaryMobile = normalized;
+      for (const key of ['primaryMobile', 'alternateMobile', 'whatsappNumber']) {
+        if (!update[key]) continue;
+        const normalized = normalizeIndianPhone(update[key]);
+        if (!normalized) return res.status(400).json({ message: `Invalid phone number: "${update[key]}"` });
+        update[key] = normalized;
+      }
+      if (update.email) update.email = String(update.email).trim().toLowerCase();
+      if (update.gstNumber) update.gstNumber = String(update.gstNumber).trim().toUpperCase();
+
+      const duplicateChecks: Record<string, any>[] = [];
+      for (const key of ['primaryMobile', 'alternateMobile', 'whatsappNumber']) {
+        if (!update[key]) continue;
+        duplicateChecks.push(
+          { primaryMobile: update[key] }, { alternateMobile: update[key] }, { whatsappNumber: update[key] }, { phoneAliases: update[key] },
+        );
+      }
+      if (update.email) duplicateChecks.push({ email: update.email }, { emailAliases: update.email });
+      if (update.gstNumber) duplicateChecks.push({ gstNumber: update.gstNumber }, { gstAliases: update.gstNumber });
+      if (duplicateChecks.length && await Customer.exists({
+        _id: { $ne: req.params.id }, tenantId: req.tenantId, isDeleted: { $ne: true }, $or: duplicateChecks,
+      })) {
+        return res.status(409).json({ message: "Another customer already uses this mobile, email, or GST number." });
       }
       update.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
       update.updatedAt = new Date();
@@ -2976,6 +5102,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!['segment', 'tag'].includes(targetType)) return res.status(400).json({ message: "targetType must be 'segment' or 'tag'" });
       if (!targetKey || !String(targetKey).trim()) return res.status(400).json({ message: "targetKey is required" });
       if (!messageTemplate || !messageTemplate.trim()) return res.status(400).json({ message: "messageTemplate is required" });
+      if (targetType === 'segment') await getSegmentFilter(req.tenantId!, String(targetKey));
 
       const campaign = await Campaign.create({
         tenantId: req.tenantId, name: name.trim(), description,
@@ -2989,7 +5116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(campaign);
     } catch (error: any) {
       console.error('Create campaign error:', error?.message || error);
-      res.status(500).json({ message: "Failed to create campaign" });
+      res.status(error?.status || 500).json({ message: error?.status ? error.message : "Failed to create campaign" });
     }
   });
 
@@ -3000,6 +5127,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (campaign.status !== 'draft') return res.status(400).json({ message: `Cannot edit a campaign that is already ${campaign.status}.` });
 
       const { name, description, offerType, offerValue, targetType, targetKey, messageTemplate, validFrom, validTo } = req.body || {};
+      const nextTargetType = targetType === undefined ? campaign.targetType : targetType;
+      const nextTargetKey = targetKey === undefined ? campaign.targetKey : targetKey;
+      if (!['segment', 'tag'].includes(nextTargetType)) return res.status(400).json({ message: "targetType must be 'segment' or 'tag'" });
+      if (!nextTargetKey || !String(nextTargetKey).trim()) return res.status(400).json({ message: "targetKey is required" });
+      if (nextTargetType === 'segment') await getSegmentFilter(req.tenantId!, String(nextTargetKey));
       if (name !== undefined) campaign.name = name;
       if (description !== undefined) campaign.description = description;
       if (offerType !== undefined) campaign.offerType = offerType;
@@ -3012,7 +5144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await campaign.save();
       res.json(campaign);
     } catch (error: any) {
-      res.status(500).json({ message: "Failed to update campaign" });
+      res.status(error?.status || 500).json({ message: error?.status ? error.message : "Failed to update campaign" });
     }
   });
 
@@ -3036,7 +5168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(preview);
     } catch (error: any) {
       console.error('Campaign preview error:', error?.message || error);
-      res.status(500).json({ message: "Failed to preview campaign" });
+      res.status(error?.status || 500).json({ message: error?.status ? error.message : "Failed to preview campaign" });
     }
   });
 
@@ -3605,7 +5737,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Monthly Driver Performance. ?month=YYYY-MM (defaults to current month).
   // Every figure is derived live from bookings — nothing is stored
   // separately, so it can never drift out of sync with the actual data.
-  app.get("/api/reports/driver-performance", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+  app.get("/api/reports/driver-performance", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
     try {
       const monthParam = req.query.month as string | undefined;
       const now = new Date();
@@ -3624,7 +5756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/reports/vehicle-performance", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+  app.get("/api/reports/vehicle-performance", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
     try {
       const monthParam = req.query.month as string | undefined;
       const now = new Date();
@@ -3634,12 +5766,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const monthStart = new Date(year, month - 1, 1);
       const monthEnd = new Date(year, month, 1);
 
-      const [bookings, expenses, vehicles] = await Promise.all([
+      const [bookings, expenses, vehicles, feedback, complaints] = await Promise.all([
         storage.getBookingsByTenant(req.tenantId!),
         storage.getExpensesByTenant(req.tenantId!),
         storage.getVehiclesByTenant(req.tenantId!),
+        CustomerFeedback.find({ tenantId: req.tenantId }).lean(),
+        CustomerComplaint.find({ tenantId: req.tenantId }).lean(),
       ]);
-      const summary = buildVehiclePerformance(bookings, expenses, vehicles, monthStart, monthEnd);
+      const summary = buildVehiclePerformance(bookings, expenses, vehicles, monthStart, monthEnd, feedback, complaints);
       res.json({ month: `${year}-${String(month).padStart(2, '0')}`, vehicles: summary });
     } catch (error: any) {
       console.error('Vehicle performance report error:', error?.message || error);
@@ -3854,13 +5988,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/expenses", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       // Basic validation
-      const { vehicleId, category, amount, date, description, attachmentUrl } = req.body;
-      
+      const { vehicleId, category, amount, date, description, attachmentUrl, bookingId, driverId, customerChargeable, reimbursable } = req.body;
+
       if (!vehicleId || !category || !amount || !date) {
         return res.status(400).json({ message: "Vehicle, category, amount, and date are required" });
       }
 
-      const expenseData = {
+      const expenseData: any = {
         tenantId: req.tenantId!,
         vehicleId,
         category,
@@ -3873,6 +6007,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: req.user?.role || 'client'
         }
       };
+      // Trip-linkage fields (docs/TRIP_COSTING_DATA_MAPPING.md) — optional,
+      // only set when the caller actually links this expense to a trip.
+      // approvalStatus/approvedBy/approvedAt are deliberately NOT accepted
+      // here — they can only be set by POST /api/expenses/:id/approve or
+      // /reject, so the approval audit trail is always server-derived, not
+      // client-supplied.
+      if (bookingId) expenseData.bookingId = bookingId;
+      if (driverId) expenseData.driverId = driverId;
+      if (customerChargeable !== undefined) expenseData.customerChargeable = !!customerChargeable;
+      if (reimbursable !== undefined) expenseData.reimbursable = !!reimbursable;
 
       const expense = await storage.createExpense(expenseData);
       res.status(201).json(expense);
@@ -3904,6 +6048,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updateData.date) {
         updateData.date = new Date(updateData.date);
       }
+      // Approval fields are server-derived only — see POST /api/expenses/:id/approve
+      // and /reject. A generic edit must never be able to spoof an approval.
+      delete updateData.approvalStatus;
+      delete updateData.approvedBy;
+      delete updateData.approvedAt;
 
       const expense = await storage.updateExpense(req.params.id, updateData, scopeTenant(req));
       if (!expense) {
@@ -3913,6 +6062,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Update expense error:', error);
       res.status(500).json({ message: "Failed to update expense" });
+    }
+  });
+
+  // Trip-costing approval workflow (docs/TRIP_COSTING_DATA_MAPPING.md) — a
+  // booking-linked expense only counts toward the Trip Cost Summary's
+  // Internal Trip Cost once approved, mirroring the driver-leave approve/
+  // reject pattern above (server-derived approvedBy/approvedAt, never
+  // client-supplied).
+  app.post("/api/expenses/:id/approve", authenticateUser, requireTenant, requirePermission(PERMISSIONS.APPROVE_EXPENSE), async (req: AuthRequest, res) => {
+    try {
+      const expense: any = await Expense.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!expense) return res.status(404).json({ message: "Expense not found" });
+      expense.approvalStatus = 'approved';
+      expense.approvedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      expense.approvedAt = new Date();
+      await expense.save();
+      res.json(expense);
+    } catch (error: any) {
+      console.error('Approve expense error:', error?.message || error);
+      res.status(500).json({ message: "Failed to approve expense" });
+    }
+  });
+
+  app.post("/api/expenses/:id/reject", authenticateUser, requireTenant, requirePermission(PERMISSIONS.APPROVE_EXPENSE), async (req: AuthRequest, res) => {
+    try {
+      const expense: any = await Expense.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!expense) return res.status(404).json({ message: "Expense not found" });
+      expense.approvalStatus = 'rejected';
+      expense.approvedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      expense.approvedAt = new Date();
+      await expense.save();
+      res.json(expense);
+    } catch (error: any) {
+      console.error('Reject expense error:', error?.message || error);
+      res.status(500).json({ message: "Failed to reject expense" });
     }
   });
 

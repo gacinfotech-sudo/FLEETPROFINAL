@@ -21,6 +21,11 @@ export class MockProvider implements WhatsAppProvider {
     return { providerMessageId: `mock_${Date.now()}`, status: 'sent' };
   }
 
+  async sendDocument(tenantId: string, phone: string, document: Buffer, opts: { fileName: string; mimetype: string; caption?: string }): Promise<SendResult> {
+    console.log(`[whatsapp:mock] tenant=${tenantId} -> ${phone}: <document ${opts.fileName}, ${document.length} bytes>${opts.caption ? ` caption="${opts.caption}"` : ''}`);
+    return { providerMessageId: `mock_${Date.now()}`, status: 'sent' };
+  }
+
   onIncoming(handler: (msg: IncomingMessage) => void): void {
     this.handlers.push(handler);
   }

@@ -170,6 +170,26 @@ export class BaileysProvider implements WhatsAppProvider {
     }
   }
 
+  async sendDocument(tenantId: string, phone: string, document: Buffer, opts: { fileName: string; mimetype: string; caption?: string }): Promise<SendResult> {
+    const session = this.sessions.get(tenantId);
+    if (!session || session.status !== 'connected' || !session.sock) {
+      return { providerMessageId: null, status: 'failed', error: 'WhatsApp session not connected for this tenant' };
+    }
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 10) {
+      return { providerMessageId: null, status: 'failed', error: 'Invalid phone number' };
+    }
+    const jid = `${digits}@s.whatsapp.net`;
+    try {
+      const result = await session.sock.sendMessage(jid, {
+        document, mimetype: opts.mimetype, fileName: opts.fileName, caption: opts.caption,
+      });
+      return { providerMessageId: result?.key?.id || null, status: 'sent' };
+    } catch (err: any) {
+      return { providerMessageId: null, status: 'failed', error: err?.message || 'send failed' };
+    }
+  }
+
   onIncoming(handler: (msg: IncomingMessage) => void): void {
     this.handlers.push(handler);
   }

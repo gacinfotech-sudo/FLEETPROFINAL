@@ -7,6 +7,7 @@ import { MessageCircle, Send, History, AlertTriangle, FileDown } from "lucide-re
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { whatsappErrorToast } from "@/lib/whatsapp-error";
 import DutySlip from "./duty-slip";
 
 type MessageType = "booking_confirmation" | "driver_duty";
@@ -112,7 +113,7 @@ export default function BookingCommunication({ booking }: Props) {
         setPreviewData(null);
         return;
       }
-      toast({ title: "Could not send message", description: err.message, variant: "destructive" });
+      toast(whatsappErrorToast(err.message));
     },
   });
 

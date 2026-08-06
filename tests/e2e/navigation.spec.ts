@@ -20,6 +20,7 @@ const SIDEBAR_PAGES: { label: string; path: string; expectedText: RegExp }[] = [
   { label: 'Driver Performance', path: '/dashboard/driver-performance', expectedText: /Driver Performance/i },
   { label: 'Booking History', path: '/dashboard/history', expectedText: /history|booking/i },
   { label: 'Revenue Report', path: '/dashboard/revenue', expectedText: /revenue/i },
+  { label: 'Vendor Settlement', path: '/dashboard/vendor-settlement', expectedText: /vendor settlement/i },
   { label: 'Manage Expenses', path: '/dashboard/expenses', expectedText: /expense/i },
   { label: 'WhatsApp', path: '/dashboard/whatsapp', expectedText: /WhatsApp/i },
   { label: 'Salary', path: '/dashboard/salary', expectedText: /Coming Soon/i },

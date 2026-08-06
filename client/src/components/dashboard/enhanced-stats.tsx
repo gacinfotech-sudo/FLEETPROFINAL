@@ -1,11 +1,39 @@
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, Calendar, Car, Users, AlertCircle } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 // import { Alert, AlertDescription } from "@/components/ui/alert";
+
+// Shared click/keyboard-activation handling for a KPI card that navigates
+// into an existing dashboard view. Kept local to this file since these
+// cards are the only clickable-div-style elements here — a real <button>
+// isn't used because the existing Card visual (padding, hover states)
+// would need restyling, so this affordance is added via role/tabIndex
+// instead, per the "no clickable div without keyboard support" requirement.
+function useCardNav(enabled: boolean, to: string) {
+  const [, setLocation] = useLocation();
+  if (!enabled) return { navProps: {}, navClassName: "" };
+  return {
+    navProps: {
+      role: "button" as const,
+      tabIndex: 0,
+      onClick: () => setLocation(to),
+      onKeyDown: (e: React.KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setLocation(to);
+        }
+      },
+    },
+    navClassName: "cursor-pointer",
+  };
+}
 
 export default function EnhancedStats() {
   const { user } = useAuth();
+  const { canViewRevenue } = usePermissions();
   const { data: stats, isLoading } = useQuery({
     queryKey: ["/api/dashboard/stats"],
   });
@@ -32,6 +60,16 @@ export default function EnhancedStats() {
 
   // Check if we have enough bookings for meaningful analytics
   const hasEnoughData = realStats.totalBookings >= 10;
+
+  // Each KPI card navigates into its existing corresponding dashboard view.
+  // Total Drivers only navigates for roles actually allowed into the
+  // "drivers" view (managers are restricted there — dashboard.tsx's own
+  // allowedSections filtering) so this never sends anyone into a route
+  // that immediately bounces them back.
+  const revenueNav = useCardNav(canViewRevenue(), "/dashboard/revenue");
+  const bookingsNav = useCardNav(true, "/dashboard/history");
+  const vehiclesNav = useCardNav(true, "/dashboard/fleet");
+  const driversNav = useCardNav(user?.role !== 'manager', "/dashboard/drivers");
 
   if (isLoading) {
     return (
@@ -68,7 +106,11 @@ export default function EnhancedStats() {
       {/* Stats Cards */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 ${user?.role === 'manager' ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4 lg:gap-6`}>
         {user?.role !== 'manager' && (
-          <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]">
+          <Card
+            className={`transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] ${revenueNav.navClassName}`}
+            {...revenueNav.navProps}
+            aria-label="Total Revenue — view Revenue Report"
+          >
             <CardContent className="p-4 lg:p-6">
               <div className="flex items-center">
                 <div className="w-10 h-10 lg:w-12 lg:h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -85,7 +127,11 @@ export default function EnhancedStats() {
           </Card>
         )}
 
-        <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]">
+        <Card
+          className={`transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] ${bookingsNav.navClassName}`}
+          {...bookingsNav.navProps}
+          aria-label="Total Bookings — view Booking History"
+        >
           <CardContent className="p-4 lg:p-6">
             <div className="flex items-center">
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -109,7 +155,11 @@ export default function EnhancedStats() {
           </CardContent>
         </Card>
 
-        <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]">
+        <Card
+          className={`transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] ${vehiclesNav.navClassName}`}
+          {...vehiclesNav.navProps}
+          aria-label="Total Vehicles — view Fleet"
+        >
           <CardContent className="p-4 lg:p-6">
             <div className="flex items-center">
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -131,7 +181,11 @@ export default function EnhancedStats() {
           </CardContent>
         </Card>
 
-        <Card className="transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]">
+        <Card
+          className={`transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] ${driversNav.navClassName}`}
+          {...driversNav.navProps}
+          aria-label="Total Drivers — view Manage Drivers"
+        >
           <CardContent className="p-4 lg:p-6">
             <div className="flex items-center">
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-orange-100 rounded-lg flex items-center justify-center">

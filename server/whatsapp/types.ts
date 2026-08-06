@@ -32,5 +32,9 @@ export interface WhatsAppProvider {
 
   sendText(tenantId: string, phone: string, text: string): Promise<SendResult>;
 
+  /** Sends a document (e.g. a quotation PDF) as its own WhatsApp message,
+   * with an optional caption. */
+  sendDocument(tenantId: string, phone: string, document: Buffer, opts: { fileName: string; mimetype: string; caption?: string }): Promise<SendResult>;
+
   onIncoming(handler: (msg: IncomingMessage) => void): void;
 }

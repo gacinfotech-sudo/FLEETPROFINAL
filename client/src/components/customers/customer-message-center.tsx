@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { whatsappErrorToast } from "@/lib/whatsapp-error";
 
 interface Props {
   customerId: string;
@@ -71,7 +72,7 @@ export default function CustomerMessageCenter({ customerId, bookings }: Props) {
       queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/messages`] });
       queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}/timeline`] });
     },
-    onError: (error: any) => toast({ title: "Message not sent", description: error.message, variant: "destructive" }),
+    onError: (error: any) => toast(whatsappErrorToast(error.message)),
   });
 
   return (

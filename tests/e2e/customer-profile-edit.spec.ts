@@ -11,6 +11,7 @@ test('Customer profile fields are editable via PUT and derived stats stay protec
   await login(page, 'qaclient', 'QaFixed456!');
   const csrfToken = await getCsrfToken(page);
   const phone = '92' + String(Date.now()).slice(-8);
+  const email = `apiedited-${Date.now()}@test.com`;
   const day = new Date();
   day.setDate(day.getDate() + 7500 + Math.floor(Math.random() * 400));
   const dayStr = day.toISOString().slice(0, 10);
@@ -36,12 +37,12 @@ test('Customer profile fields are editable via PUT and derived stats stay protec
   // API: profile fields editable, derived fields protected.
   const editRes = await page.request.put(`/api/customers/${customerId}`, {
     headers: { 'X-CSRF-Token': csrfToken },
-    data: { name: 'API Edited Name', email: 'apiedited@test.com', city: 'Indore', totalBookings: 9999, totalSpending: 999999 },
+    data: { name: 'API Edited Name', email, city: 'Indore', totalBookings: 9999, totalSpending: 999999 },
   });
   const edited = await editRes.json();
   expect(editRes.ok()).toBe(true);
   expect(edited.name).toBe('API Edited Name');
-  expect(edited.email).toBe('apiedited@test.com');
+  expect(edited.email).toBe(email);
   expect(edited.totalBookings).toBe(1); // real count, not the attempted 9999
   expect(edited.totalSpending).not.toBe(999999);
 

@@ -1,6 +1,7 @@
 import {
   Customer, Booking, PaymentTransaction, RewardTransaction,
-  CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp,
+  CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerMerge, Invoice,
+  GoogleReviewTracking, Inquiry, Lead,
 } from '../models/index';
 
 export interface TimelineEvent {
@@ -9,6 +10,11 @@ export interface TimelineEvent {
   description: string;
   bookingId?: string;
   employee?: string;
+  // Mongo _id (not a human-readable number, unlike bookingId above) — lets
+  // the Customer 360° timeline link directly to the originating Inquiry/
+  // Lead record instead of just describing it in text.
+  inquiryId?: string;
+  leadId?: string;
 }
 
 // Assembled on read from the real collections that already exist —
@@ -19,15 +25,22 @@ export interface TimelineEvent {
 // a second copy would just be another place these could drift out of
 // sync with the record that's actually authoritative.
 export async function computeCustomerTimeline(tenantId: string, customerId: string): Promise<TimelineEvent[]> {
-  const [customer, bookings, payments, rewards, tagEvents, feedback, complaints, followUps] = await Promise.all([
+  const [customer, bookings] = await Promise.all([
     Customer.findOne({ _id: customerId, tenantId }),
     Booking.find({ tenantId, customerId }),
-    PaymentTransaction.find({ tenantId, customerId }),
+  ]);
+  const bookingIds = bookings.map((booking: any) => booking._id);
+  const [payments, rewards, tagEvents, feedback, complaints, followUps, requirements, merges, invoices, googleReviews] = await Promise.all([
+    PaymentTransaction.find({ tenantId, bookingId: { $in: bookingIds } }),
     RewardTransaction.find({ tenantId, customerId }),
     CustomerTagEvent.find({ tenantId, customerId }),
     CustomerFeedback.find({ tenantId, customerId }),
     CustomerComplaint.find({ tenantId, customerId }),
     CustomerFollowUp.find({ tenantId, customerId }),
+    CustomerRequirement.find({ tenantId, customerId }),
+    CustomerMerge.find({ tenantId, status: 'completed', $or: [{ targetCustomerId: customerId }, { sourceCustomerId: customerId }] }),
+    Invoice.find({ tenantId, customerId }),
+    GoogleReviewTracking.find({ tenantId, customerId }),
   ]);
 
   const events: TimelineEvent[] = [];
@@ -102,6 +115,94 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
       bookingId: t.bookingId ? bookingIdMap.get(t.bookingId.toString()) : undefined,
       employee: t.createdBy?.userId,
     });
+  }
+
+  for (const requirement of requirements as any[]) {
+    events.push({
+      type: 'requirement', date: requirement.createdAt,
+      description: `Requirement added${requirement.route ? `: ${requirement.route}` : requirement.tripRequirement ? `: ${requirement.tripRequirement}` : ''}`,
+      bookingId: requirement.bookingId ? bookingIdMap.get(requirement.bookingId.toString()) : undefined,
+      employee: requirement.createdBy?.userId,
+    });
+  }
+
+  for (const merge of merges as any[]) {
+    events.push({
+      type: 'customer_merge', date: merge.completedAt,
+      description: merge.targetCustomerId.toString() === customerId
+        ? `Duplicate customer merged into this profile — ${merge.reason}`
+        : `Customer profile merged into canonical profile — ${merge.reason}`,
+      employee: merge.performedBy?.userId,
+    });
+  }
+
+  for (const invoice of invoices as any[]) {
+    // A draft created since numbering moved to finalization time has no
+    // invoiceNumber yet — show "Draft" rather than the literal string
+    // "undefined".
+    events.push({
+      type: 'invoice', date: invoice.finalizedAt || invoice.createdAt,
+      description: `${invoice.documentType.replace(/_/g, ' ')} ${invoice.invoiceNumber || 'Draft'} ${invoice.status}`,
+      bookingId: invoice.bookingId ? bookingIdMap.get(invoice.bookingId.toString()) : undefined,
+      employee: invoice.finalizedBy?.userId || invoice.createdBy?.userId,
+    });
+  }
+
+  for (const review of googleReviews as any[]) {
+    for (const request of review.requestHistory || []) {
+      events.push({
+        type: 'google_review_request', date: request.sentAt,
+        description: `Google review requested through ${String(request.channel).replace(/_/g, ' ')}`,
+        bookingId: review.bookingId ? bookingIdMap.get(review.bookingId.toString()) : undefined,
+        employee: request.sentBy?.userId,
+      });
+    }
+    if (review.reviewReceived && review.reviewDate) {
+      events.push({
+        type: 'google_review_received', date: review.reviewDate,
+        description: `Google review received: ${review.reviewRating || '-'}★${review.reviewReference ? ` — ${review.reviewReference}` : ''}`,
+        bookingId: review.bookingId ? bookingIdMap.get(review.bookingId.toString()) : undefined,
+        employee: review.reviewConfirmedBy?.userId,
+      });
+    }
+    if (review.responseStatus === 'responded' && review.respondedAt) {
+      events.push({
+        type: 'google_review_responded', date: review.respondedAt,
+        description: 'Google review response marked as completed',
+        bookingId: review.bookingId ? bookingIdMap.get(review.bookingId.toString()) : undefined,
+        employee: review.respondedBy?.userId,
+      });
+    }
+  }
+
+  // Inquiry -> Lead -> Customer conversion events (spec §41 "Add Customer
+  // Timeline event" when a lead converts). Read live from Inquiry/Lead,
+  // same "assembled on read, not a second stored copy" principle as the
+  // rest of this function.
+  const linkedInquiries = await Inquiry.find({ tenantId, linkedCustomerId: customerId });
+  for (const inq of linkedInquiries as any[]) {
+    events.push({
+      type: 'inquiry_linked', date: inq.createdAt,
+      description: `Inquiry ${inq.inquiryNumber || inq._id} logged (source: ${(inq.source || 'other').replace(/_/g, ' ')})`,
+      employee: inq.createdBy?.userId,
+      inquiryId: inq._id.toString(),
+    });
+    if (inq.convertedToLeadAt) {
+      const lead: any = await Lead.findOne({ tenantId, inquiryId: inq._id });
+      events.push({
+        type: 'inquiry_converted_to_lead', date: inq.convertedToLeadAt,
+        description: `Inquiry ${inq.inquiryNumber || inq._id} converted to lead ${lead?.leadNumber || ''}`.trim(),
+        inquiryId: inq._id.toString(),
+        leadId: lead?._id?.toString(),
+      });
+      if (lead?.convertedToCustomerAt) {
+        events.push({
+          type: 'lead_converted_to_customer', date: lead.convertedToCustomerAt,
+          description: `Lead ${lead.leadNumber} converted to this customer record`,
+          leadId: lead._id.toString(),
+        });
+      }
+    }
   }
 
   return events

@@ -60,6 +60,7 @@ export default function VehiclePerformancePage() {
                     <TableCell>Expenses</TableCell>
                     <TableCell>Net Profit</TableCell>
                     <TableCell>Profit / km</TableCell>
+                    <TableCell>Customer Feedback</TableCell>
                     <TableCell>Damage Incidents</TableCell>
                   </TableRow>
                 </TableHeader>
@@ -76,6 +77,13 @@ export default function VehiclePerformancePage() {
                         <Badge variant={v.netProfit >= 0 ? "default" : "destructive"}>{fmtMoney(v.netProfit)}</Badge>
                       </TableCell>
                       <TableCell>{v.profitPerKm === null ? "-" : `₹${v.profitPerKm}/km`}</TableCell>
+                      <TableCell>
+                        <div className="text-xs space-y-0.5">
+                          <p className="font-medium">Rating: {v.averageVehicleRating === null ? 'Not rated' : `${v.averageVehicleRating} / 5`}</p>
+                          <p className="text-gray-500">Clean {v.cleanlinessRating ?? '-'} · Comfort {v.comfortRating ?? '-'} · AC {v.acRating ?? '-'}</p>
+                          {v.verifiedVehicleIssueCount > 0 && <p className="text-red-600">{v.verifiedVehicleIssueCount} verified issue{v.verifiedVehicleIssueCount === 1 ? '' : 's'}</p>}
+                        </div>
+                      </TableCell>
                       <TableCell>{v.damageIncidentCount > 0 ? <Badge variant="destructive">{v.damageIncidentCount}</Badge> : 0}</TableCell>
                     </TableRow>
                   ))}

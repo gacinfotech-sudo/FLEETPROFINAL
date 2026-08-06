@@ -50,6 +50,9 @@ export default function PaymentSection({ booking }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showAddPayment, setShowAddPayment] = useState(false);
+  // Fresh per dialog-open, held for its lifetime — see the matching
+  // comment in customer-dashboard.tsx's recordPaymentMutation.
+  const [idempotencyKey, setIdempotencyKey] = useState("");
   const bookingId = booking._id || booking.id;
 
   const [form, setForm] = useState({
@@ -76,6 +79,7 @@ export default function PaymentSection({ booking }: Props) {
         transactionReference: form.transactionReference || undefined,
         receivedBy: form.receivedBy || undefined,
         notes: form.notes || undefined,
+        idempotencyKey,
       });
       return res.json();
     },
@@ -134,7 +138,7 @@ export default function PaymentSection({ booking }: Props) {
           <Badge variant={booking.paymentStatus === 'paid' ? 'default' : booking.paymentStatus === 'refunded' ? 'destructive' : 'secondary'} className="capitalize">
             {booking.paymentStatus || 'pending'}
           </Badge>
-          <Button size="sm" variant="outline" onClick={() => setShowAddPayment(true)}>
+          <Button size="sm" variant="outline" onClick={() => { setShowAddPayment(true); setIdempotencyKey(crypto.randomUUID()); }}>
             <Plus className="w-3.5 h-3.5 mr-1" />
             Add Payment
           </Button>

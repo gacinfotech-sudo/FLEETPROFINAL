@@ -6,6 +6,13 @@ import {
 
 interface Props {
   customerId: string;
+  // Navigates to the originating Inquiry/Lead record — only "inquiry_linked"/
+  // "inquiry_converted_to_lead" events carry inquiryId, only
+  // "inquiry_converted_to_lead"/"lead_converted_to_customer" carry leadId
+  // (server/services/timelineService.ts). Optional: a parent that doesn't
+  // wire these up just gets the old plain-text-only row.
+  onNavigateToInquiry?: (inquiryId: string) => void;
+  onNavigateToLead?: (leadId: string) => void;
 }
 
 const TYPE_ICON: Record<string, any> = {
@@ -19,6 +26,9 @@ const TYPE_ICON: Record<string, any> = {
   complaint: AlertTriangle,
   complaint_resolved: CheckCircle2,
   follow_up: ClipboardCheck,
+  google_review_request: Star,
+  google_review_received: CheckCircle2,
+  google_review_responded: CheckCircle2,
 };
 
 const TYPE_COLOR: Record<string, string> = {
@@ -32,12 +42,15 @@ const TYPE_COLOR: Record<string, string> = {
   complaint: "text-red-600 bg-red-50",
   complaint_resolved: "text-green-600 bg-green-50",
   follow_up: "text-cyan-600 bg-cyan-50",
+  google_review_request: "text-blue-600 bg-blue-50",
+  google_review_received: "text-amber-600 bg-amber-50",
+  google_review_responded: "text-green-600 bg-green-50",
 };
 
 // Assembled server-side on read from every collection this customer
 // touches (bookings, payments, rewards, tags, feedback, complaints,
 // follow-ups) — not a separately stored/maintained log.
-export default function CustomerTimeline({ customerId }: Props) {
+export default function CustomerTimeline({ customerId, onNavigateToInquiry, onNavigateToLead }: Props) {
   const { data: events, isLoading } = useQuery<any[]>({
     queryKey: [`/api/customers/${customerId}/timeline`],
   });
@@ -50,13 +63,24 @@ export default function CustomerTimeline({ customerId }: Props) {
       {events.map((e: any, i: number) => {
         const Icon = TYPE_ICON[e.type] || Calendar;
         const color = TYPE_COLOR[e.type] || "text-gray-600 bg-gray-50";
+        // Prefer the lead link when both are present (inquiry_converted_to_lead
+        // carries both — the lead is the more specific, "further along" record).
+        const navigateTo = e.leadId && onNavigateToLead
+          ? () => onNavigateToLead(e.leadId)
+          : e.inquiryId && onNavigateToInquiry
+          ? () => onNavigateToInquiry(e.inquiryId)
+          : null;
         return (
-          <div key={i} className="flex items-start gap-3 py-2 border-b last:border-0">
+          <div
+            key={i}
+            className={`flex items-start gap-3 py-2 border-b last:border-0 ${navigateTo ? "cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1" : ""}`}
+            onClick={navigateTo || undefined}
+          >
             <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${color}`}>
               <Icon className="w-3.5 h-3.5" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-gray-800">{e.description}</p>
+              <p className={`text-sm ${navigateTo ? "text-blue-700 hover:underline" : "text-gray-800"}`}>{e.description}</p>
               <p className="text-xs text-gray-400">
                 {new Date(e.date).toLocaleString('en-IN')}
                 {e.bookingId ? ` · ${e.bookingId}` : ""}

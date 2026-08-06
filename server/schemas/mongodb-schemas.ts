@@ -89,6 +89,17 @@ export const mongoDriverSchema = z.object({
 export const mongoBookingSchema = z.object({
   tenantId: z.string(),
   bookingId: z.string().optional(),
+  // Same "must be declared or Zod silently strips it" trap noted on
+  // createdBy just below — declared explicitly so the duplicate-booking
+  // idempotency check in server/routes.ts actually receives this field.
+  idempotencyKey: z.string().optional(),
+  // Was never declared here, so the default Zod object behavior (strip
+  // unrecognized keys) silently dropped it from every booking ever created
+  // through this schema — server/routes.ts has built this object correctly
+  // since before this session, but it never survived .parse(). Found while
+  // building the Availability Engine's own-draft self-exclusion check,
+  // which depends on it to identify "the user creating this booking."
+  createdBy: z.object({ userId: z.string(), role: z.string() }).optional(),
   customerName: z.string().min(1, 'Customer name is required'),
   customerPhone: z.string().min(1, 'Customer phone is required'),
   customerEmail: z.string().email().optional(),

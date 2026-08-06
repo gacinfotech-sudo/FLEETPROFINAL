@@ -97,11 +97,30 @@ export interface IDriver extends Document {
   panNumber?: string;
   dateOfJoining?: Date;
   createdAt: Date;
+  // Driver portal login (additive) — a deliberately separate, minimal auth
+  // surface from the staff User/role system, not a new User.role value.
+  // Reasoning: this codebase has 100+ routes gated only by
+  // `authenticateUser, requireTenant` with no further per-route permission
+  // check, all written assuming only admin/client/manager roles exist —
+  // adding a 'driver' role to User would silently pass those, a much
+  // larger and riskier surface than intended. A driver session can only
+  // ever authenticate against the small, explicit set of /api/driver-*
+  // routes built for it.
+  loginPin?: string; // bcrypt hash, never the raw PIN
+  loginPinSetAt?: Date;
+  sessionId?: string;
 }
 
 export interface IBooking extends Document {
   tenantId: mongoose.Types.ObjectId;
   bookingId: string;
+  // Client-generated, one per booking-form submission session (not
+  // persisted/reused across a genuinely new booking) — lets a double
+  // form-submit or a retried request after a dropped response resolve to
+  // the SAME booking instead of creating a duplicate. Optional so every
+  // booking created before this field existed, and every non-UI caller
+  // (imports, migrations, tests) that doesn't send one, is unaffected.
+  idempotencyKey?: string;
   // customerName/customerPhone stay exactly as they were — the booking-time
   // snapshot, preserved for audit/history even if the Customer record is
   // edited later. customerId links to the actual Customer Database record
@@ -114,6 +133,11 @@ export interface IBooking extends Document {
   customerEmail?: string;
   vehicleId: mongoose.Types.ObjectId;
   driverId?: mongoose.Types.ObjectId;
+  // Set once, by the assigned driver themselves via the driver portal
+  // (POST /api/driver-portal/bookings/:id/accept-duty) — trip start is
+  // unaffected by this either way (spec: don't block on it), it's
+  // visibility for ops, not a gate.
+  dutyAcceptedAt?: Date;
   pickupLocation: string;
   dropoffLocation?: string;
   pickupDate: Date;
@@ -269,6 +293,21 @@ export interface IExpense extends Document {
     role: string;
   };
   createdAt: Date;
+  // Additive trip-linkage fields (docs/TRIP_COSTING_DATA_MAPPING.md). All
+  // optional — an Expense with none of these set is exactly the original
+  // "general vehicle cost, no trip attached" record (maintenance/damage/
+  // tires/etc.), unchanged. Only expenses deliberately linked to a booking
+  // via bookingId feed the Trip Cost Summary.
+  bookingId?: mongoose.Types.ObjectId;
+  driverId?: mongoose.Types.ObjectId;
+  customerChargeable?: boolean;
+  reimbursable?: boolean;
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  approvedBy?: {
+    userId: string;
+    role: string;
+  };
+  approvedAt?: Date;
 }
 
 // Tenant Schema
@@ -384,19 +423,26 @@ const DriverSchema = new Schema<IDriver>({
   aadharNumber: { type: String },
   panNumber: { type: String },
   dateOfJoining: { type: Date },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  loginPin: { type: String },
+  loginPinSetAt: { type: Date },
+  sessionId: { type: String },
 });
+// Backs authenticateDriver's per-request session lookup.
+DriverSchema.index({ sessionId: 1 });
 
 // Booking Schema
 const BookingSchema = new Schema<IBooking>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
   bookingId: { type: String, required: true, unique: true },
+  idempotencyKey: { type: String },
   customerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
   customerName: { type: String, required: true },
   customerPhone: { type: String, required: true },
   customerEmail: { type: String },
   vehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle', required: true },
   driverId: { type: Schema.Types.ObjectId, ref: 'Driver' },
+  dutyAcceptedAt: { type: Date },
   pickupLocation: { type: String, required: true },
   dropoffLocation: { type: String },
   pickupDate: { type: Date, required: true },
@@ -632,13 +678,25 @@ const ExpenseSchema = new Schema<IExpense>({
     userId: { type: String, required: false },
     role: { type: String, required: false }
   },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  driverId: { type: Schema.Types.ObjectId, ref: 'Driver' },
+  customerChargeable: { type: Boolean, default: false },
+  reimbursable: { type: Boolean, default: false },
+  approvalStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'pending' },
+  approvedBy: {
+    userId: { type: String, required: false },
+    role: { type: String, required: false }
+  },
+  approvedAt: { type: Date },
 });
 
 export interface IWhatsAppMessage extends Document {
   tenantId: mongoose.Types.ObjectId;
   customerId?: mongoose.Types.ObjectId;
   bookingId?: mongoose.Types.ObjectId;
+  leadId?: mongoose.Types.ObjectId;
+  quotationId?: mongoose.Types.ObjectId;
   recipientType: 'customer' | 'driver';
   recipientPhone: string;
   messageType: string;
@@ -658,6 +716,8 @@ const WhatsAppMessageSchema = new Schema<IWhatsAppMessage>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
   customerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
   bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  leadId: { type: Schema.Types.ObjectId, ref: 'Lead' },
+  quotationId: { type: Schema.Types.ObjectId, ref: 'Quotation' },
   recipientType: { type: String, enum: ['customer', 'driver'], required: true },
   recipientPhone: { type: String, required: true },
   messageType: { type: String, required: true },
@@ -846,6 +906,7 @@ DriverAttendanceSchema.index({ tenantId: 1, driverId: 1, date: 1 }, { unique: tr
 // separate collections added in later phases, not bolted onto this one.
 export interface ICustomer extends Document {
   tenantId: mongoose.Types.ObjectId;
+  customerCode?: string;
   name: string;
   // Canonical normalizeIndianPhone() form ("919876543210") — the actual
   // de-duplication key. alternateMobile/whatsappNumber are stored in the
@@ -854,7 +915,9 @@ export interface ICustomer extends Document {
   primaryMobile: string;
   alternateMobile?: string;
   whatsappNumber?: string;
+  phoneAliases: string[];
   email?: string;
+  emailAliases: string[];
   dateOfBirth?: Date;
   anniversary?: Date;
   address?: string;
@@ -862,11 +925,30 @@ export interface ICustomer extends Document {
   state?: string;
   pinCode?: string;
   companyName?: string;
+  companyAliases: string[];
   customerType: 'individual' | 'family' | 'corporate' | 'travel_agent' | 'hotel_guest' | 'religious_traveller'
     | 'self_drive' | 'airport' | 'outstation' | 'vip' | 'credit' | 'other';
   gstNumber?: string;
+  gstAliases: string[];
   emergencyContact?: string;
   preferredLanguage?: string;
+  photoUrl?: string;
+  billing?: {
+    billingName?: string;
+    panNumber?: string;
+    billingAddress?: string;
+    billingEmail?: string;
+    accountsContact?: string;
+    purchaseOrderRequired?: boolean;
+    creditPeriodDays?: number;
+    creditLimit?: number;
+    invoiceRequired?: boolean;
+    gstInvoiceRequired?: boolean;
+    tdsInformation?: string;
+    preferredInvoiceFormat?: string;
+    bankPaymentInstructions?: string;
+    internalBillingNotes?: string;
+  };
   preferences?: {
     preferredVehicleCategory?: string;
     preferredVehicleId?: mongoose.Types.ObjectId;
@@ -884,6 +966,10 @@ export interface ICustomer extends Document {
     airportPreference?: boolean;
     noSmoking?: boolean;
     driverBehaviourPreference?: string;
+    hotelPreference?: string;
+    foodStopPreference?: string;
+    specialAssistance?: string;
+    generalRequirements?: string;
     specialInstructions?: string;
   };
   // Cached summary — recomputed server-side from real bookings whenever a
@@ -930,17 +1016,25 @@ export interface ICustomer extends Document {
   createdBy: { userId: string; role: string };
   updatedBy?: { userId: string; role: string };
   isDeleted?: boolean;
+  mergedIntoCustomerId?: mongoose.Types.ObjectId;
+  mergedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
 
 const CustomerSchema = new Schema<ICustomer>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  customerCode: {
+    type: String,
+    default: () => `CUS-${new mongoose.Types.ObjectId().toString().slice(-8).toUpperCase()}`,
+  },
   name: { type: String, required: true },
   primaryMobile: { type: String, required: true },
   alternateMobile: { type: String },
   whatsappNumber: { type: String },
+  phoneAliases: { type: [String], default: [] },
   email: { type: String },
+  emailAliases: { type: [String], default: [] },
   dateOfBirth: { type: Date },
   anniversary: { type: Date },
   address: { type: String },
@@ -948,6 +1042,7 @@ const CustomerSchema = new Schema<ICustomer>({
   state: { type: String },
   pinCode: { type: String },
   companyName: { type: String },
+  companyAliases: { type: [String], default: [] },
   customerType: {
     type: String,
     enum: ['individual', 'family', 'corporate', 'travel_agent', 'hotel_guest', 'religious_traveller',
@@ -955,8 +1050,26 @@ const CustomerSchema = new Schema<ICustomer>({
     default: 'individual',
   },
   gstNumber: { type: String },
+  gstAliases: { type: [String], default: [] },
   emergencyContact: { type: String },
   preferredLanguage: { type: String },
+  photoUrl: { type: String },
+  billing: {
+    billingName: { type: String },
+    panNumber: { type: String },
+    billingAddress: { type: String },
+    billingEmail: { type: String },
+    accountsContact: { type: String },
+    purchaseOrderRequired: { type: Boolean, default: false },
+    creditPeriodDays: { type: Number, min: 0 },
+    creditLimit: { type: Number, min: 0 },
+    invoiceRequired: { type: Boolean, default: false },
+    gstInvoiceRequired: { type: Boolean, default: false },
+    tdsInformation: { type: String },
+    preferredInvoiceFormat: { type: String },
+    bankPaymentInstructions: { type: String },
+    internalBillingNotes: { type: String },
+  },
   preferences: {
     preferredVehicleCategory: { type: String },
     preferredVehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle' },
@@ -974,6 +1087,10 @@ const CustomerSchema = new Schema<ICustomer>({
     airportPreference: { type: Boolean },
     noSmoking: { type: Boolean },
     driverBehaviourPreference: { type: String },
+    hotelPreference: { type: String },
+    foodStopPreference: { type: String },
+    specialAssistance: { type: String },
+    generalRequirements: { type: String },
     specialInstructions: { type: String },
   },
   totalBookings: { type: Number, default: 0 },
@@ -1006,10 +1123,18 @@ const CustomerSchema = new Schema<ICustomer>({
   createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
   updatedBy: { userId: { type: String }, role: { type: String } },
   isDeleted: { type: Boolean, default: false },
+  mergedIntoCustomerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
+  mergedAt: { type: Date },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
 CustomerSchema.index({ tenantId: 1, primaryMobile: 1 });
+CustomerSchema.index({ tenantId: 1, phoneAliases: 1 });
+CustomerSchema.index({ tenantId: 1, email: 1 });
+CustomerSchema.index({ tenantId: 1, emailAliases: 1 });
+CustomerSchema.index({ tenantId: 1, gstNumber: 1 });
+CustomerSchema.index({ tenantId: 1, gstAliases: 1 });
+CustomerSchema.index({ tenantId: 1, customerCode: 1 }, { unique: true, sparse: true });
 CustomerSchema.index({ tenantId: 1, customerStatus: 1 });
 CustomerSchema.pre('save', function (next) { this.updatedAt = new Date(); next(); });
 
@@ -1143,6 +1268,10 @@ UserSchema.index({ sessionId: 1 });
 VehicleSchema.index({ tenantId: 1, status: 1 });
 DriverSchema.index({ tenantId: 1, status: 1 });
 BookingSchema.index({ tenantId: 1, status: 1 });
+BookingSchema.index(
+  { tenantId: 1, idempotencyKey: 1 },
+  { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } }
+);
 // Backs findDriverConflicts / findVehicleConflicts (services/availability.ts)
 // — every driver- and vehicle-assignment mutation runs one of these
 // queries, so an unindexed scan here would get slower as booking volume
@@ -1151,6 +1280,8 @@ BookingSchema.index({ tenantId: 1, driverId: 1, status: 1, scheduledStartDateTim
 BookingSchema.index({ tenantId: 1, vehicleId: 1, status: 1, scheduledStartDateTime: 1, scheduledEndDateTime: 1 });
 ExpenseSchema.index({ tenantId: 1, date: 1 });
 ExpenseSchema.index({ tenantId: 1, vehicleId: 1 });
+// Backs the Trip Cost Summary's per-booking expense lookup.
+ExpenseSchema.index({ tenantId: 1, bookingId: 1 });
 
 // Export models
 export const Tenant = mongoose.model<ITenant>('Tenant', TenantSchema);
@@ -1190,10 +1321,34 @@ export interface ICustomerFeedback extends Document {
   tenantId: mongoose.Types.ObjectId;
   customerId: mongoose.Types.ObjectId;
   bookingId?: mongoose.Types.ObjectId;
+  driverId?: mongoose.Types.ObjectId;
+  vehicleId?: mongoose.Types.ObjectId;
   type: 'feedback' | 'appreciation';
+  overallRating?: number;
   driverRating?: number; // 1-5
   vehicleRating?: number;
   serviceRating?: number;
+  vehicleCleanlinessRating?: number;
+  vehicleComfortRating?: number;
+  vehicleAcRating?: number;
+  vehicleConditionRating?: number;
+  vehicleIssueReported?: boolean;
+  breakdownOccurred?: boolean;
+  vehicleIssueDescription?: string;
+  bookingProcessRating?: number;
+  officeCommunicationRating?: number;
+  tripSatisfactionRating?: number;
+  valueForMoneyRating?: number;
+  driverPunctualityRating?: number;
+  driverBehaviourRating?: number;
+  driverSafetyRating?: number;
+  driverRouteKnowledgeRating?: number;
+  driverCommunicationRating?: number;
+  driverAssistanceRating?: number;
+  driverPaymentHandlingRating?: number;
+  wouldBookAgain?: boolean;
+  wouldRecommend?: boolean;
+  responsibleParty?: 'company' | 'driver' | 'vehicle' | 'vendor' | 'customer' | 'unclear';
   comments?: string;
   createdBy: { userId: string; role: string };
   createdAt: Date;
@@ -1202,15 +1357,41 @@ const CustomerFeedbackSchema = new Schema<ICustomerFeedback>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
   customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
   bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  driverId: { type: Schema.Types.ObjectId, ref: 'Driver' },
+  vehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle' },
   type: { type: String, enum: ['feedback', 'appreciation'], default: 'feedback' },
+  overallRating: { type: Number, min: 1, max: 5 },
   driverRating: { type: Number, min: 1, max: 5 },
   vehicleRating: { type: Number, min: 1, max: 5 },
   serviceRating: { type: Number, min: 1, max: 5 },
+  vehicleCleanlinessRating: { type: Number, min: 1, max: 5 },
+  vehicleComfortRating: { type: Number, min: 1, max: 5 },
+  vehicleAcRating: { type: Number, min: 1, max: 5 },
+  vehicleConditionRating: { type: Number, min: 1, max: 5 },
+  vehicleIssueReported: { type: Boolean },
+  breakdownOccurred: { type: Boolean },
+  vehicleIssueDescription: { type: String },
+  bookingProcessRating: { type: Number, min: 1, max: 5 },
+  officeCommunicationRating: { type: Number, min: 1, max: 5 },
+  tripSatisfactionRating: { type: Number, min: 1, max: 5 },
+  valueForMoneyRating: { type: Number, min: 1, max: 5 },
+  driverPunctualityRating: { type: Number, min: 1, max: 5 },
+  driverBehaviourRating: { type: Number, min: 1, max: 5 },
+  driverSafetyRating: { type: Number, min: 1, max: 5 },
+  driverRouteKnowledgeRating: { type: Number, min: 1, max: 5 },
+  driverCommunicationRating: { type: Number, min: 1, max: 5 },
+  driverAssistanceRating: { type: Number, min: 1, max: 5 },
+  driverPaymentHandlingRating: { type: Number, min: 1, max: 5 },
+  wouldBookAgain: { type: Boolean },
+  wouldRecommend: { type: Boolean },
+  responsibleParty: { type: String, enum: ['company', 'driver', 'vehicle', 'vendor', 'customer', 'unclear'] },
   comments: { type: String },
   createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
   createdAt: { type: Date, default: Date.now },
 });
 CustomerFeedbackSchema.index({ tenantId: 1, customerId: 1 });
+CustomerFeedbackSchema.index({ tenantId: 1, driverId: 1, createdAt: -1 });
+CustomerFeedbackSchema.index({ tenantId: 1, vehicleId: 1, createdAt: -1 });
 export const CustomerFeedback = mongoose.model<ICustomerFeedback>('CustomerFeedback', CustomerFeedbackSchema);
 
 // Complaints and service recovery. Compensation (refund/reward points) is
@@ -1221,12 +1402,17 @@ export interface ICustomerComplaint extends Document {
   tenantId: mongoose.Types.ObjectId;
   customerId: mongoose.Types.ObjectId;
   bookingId?: mongoose.Types.ObjectId;
-  category: 'driver_late' | 'driver_behaviour' | 'rash_driving' | 'vehicle_problem' | 'vehicle_cleanliness'
+  driverId?: mongoose.Types.ObjectId;
+  vehicleId?: mongoose.Types.ObjectId;
+  category: 'driver_late' | 'driver_behaviour' | 'rash_driving' | 'vehicle_problem' | 'vehicle_cleanliness' | 'vehicle_breakdown'
     | 'ac_problem' | 'wrong_vehicle' | 'booking_issue' | 'payment_dispute' | 'office_communication'
     | 'vendor_issue' | 'self_drive_issue' | 'other';
   severity: 'low' | 'medium' | 'high' | 'critical';
   description: string;
-  responsibleParty?: 'company' | 'driver' | 'vendor' | 'customer' | 'unclear';
+  responsibleParty?: 'company' | 'driver' | 'vehicle' | 'vendor' | 'customer' | 'unclear';
+  responsibilityReason?: string;
+  responsibilityVerifiedBy?: { userId: string; role: string };
+  responsibilityVerifiedAt?: Date;
   assignedTo?: string;
   resolutionDeadline?: Date;
   status: 'open' | 'in_progress' | 'resolved' | 'closed';
@@ -1245,16 +1431,21 @@ const CustomerComplaintSchema = new Schema<ICustomerComplaint>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
   customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
   bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  driverId: { type: Schema.Types.ObjectId, ref: 'Driver' },
+  vehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle' },
   category: {
     type: String,
-    enum: ['driver_late', 'driver_behaviour', 'rash_driving', 'vehicle_problem', 'vehicle_cleanliness',
+    enum: ['driver_late', 'driver_behaviour', 'rash_driving', 'vehicle_problem', 'vehicle_cleanliness', 'vehicle_breakdown',
       'ac_problem', 'wrong_vehicle', 'booking_issue', 'payment_dispute', 'office_communication',
       'vendor_issue', 'self_drive_issue', 'other'],
     required: true,
   },
   severity: { type: String, enum: ['low', 'medium', 'high', 'critical'], default: 'medium' },
   description: { type: String, required: true },
-  responsibleParty: { type: String, enum: ['company', 'driver', 'vendor', 'customer', 'unclear'] },
+  responsibleParty: { type: String, enum: ['company', 'driver', 'vehicle', 'vendor', 'customer', 'unclear'] },
+  responsibilityReason: { type: String },
+  responsibilityVerifiedBy: { userId: { type: String }, role: { type: String } },
+  responsibilityVerifiedAt: { type: Date },
   assignedTo: { type: String },
   resolutionDeadline: { type: Date },
   status: { type: String, enum: ['open', 'in_progress', 'resolved', 'closed'], default: 'open' },
@@ -1270,6 +1461,8 @@ const CustomerComplaintSchema = new Schema<ICustomerComplaint>({
   createdAt: { type: Date, default: Date.now },
 });
 CustomerComplaintSchema.index({ tenantId: 1, customerId: 1, status: 1 });
+CustomerComplaintSchema.index({ tenantId: 1, driverId: 1, status: 1 });
+CustomerComplaintSchema.index({ tenantId: 1, vehicleId: 1, status: 1 });
 export const CustomerComplaint = mongoose.model<ICustomerComplaint>('CustomerComplaint', CustomerComplaintSchema);
 
 // After-sales follow-up tasks — auto-created on booking completion
@@ -1314,6 +1507,938 @@ const CustomerFollowUpSchema = new Schema<ICustomerFollowUp>({
 });
 CustomerFollowUpSchema.index({ tenantId: 1, status: 1, dueDate: 1 });
 export const CustomerFollowUp = mongoose.model<ICustomerFollowUp>('CustomerFollowUp', CustomerFollowUpSchema);
+
+// Google review tracking is an auditable linked record, not a loose flag
+// on Customer. A customer may be asked after more than one completed trip,
+// while every request/confirmation keeps its original Booking context.
+export interface IGoogleReviewTracking extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  customerId: mongoose.Types.ObjectId;
+  bookingId?: mongoose.Types.ObjectId;
+  reviewPageUrl?: string;
+  reviewRequested: boolean;
+  requestDate?: Date;
+  requestSentThrough?: 'whatsapp' | 'email' | 'sms' | 'phone' | 'in_person' | 'other';
+  requestMessageId?: mongoose.Types.ObjectId;
+  requestHistory: {
+    sentAt: Date;
+    channel: 'whatsapp' | 'email' | 'sms' | 'phone' | 'in_person' | 'other';
+    messageId?: mongoose.Types.ObjectId;
+    requestId?: string;
+    sentBy: { userId: string; role: string };
+  }[];
+  reviewReceived: boolean;
+  reviewDate?: Date;
+  reviewRating?: number;
+  reviewLink?: string;
+  reviewReference?: string;
+  rewardTransactionId?: mongoose.Types.ObjectId;
+  followUpRequired: boolean;
+  responseStatus: 'not_required' | 'pending' | 'responded';
+  respondedAt?: Date;
+  respondedBy?: { userId: string; role: string };
+  notes?: string;
+  reviewConfirmedBy?: { userId: string; role: string };
+  reviewConfirmedAt?: Date;
+  lastUpdatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const GoogleReviewTrackingSchema = new Schema<IGoogleReviewTracking>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  reviewPageUrl: { type: String },
+  reviewRequested: { type: Boolean, default: false },
+  requestDate: { type: Date },
+  requestSentThrough: { type: String, enum: ['whatsapp', 'email', 'sms', 'phone', 'in_person', 'other'] },
+  requestMessageId: { type: Schema.Types.ObjectId, ref: 'WhatsAppMessage' },
+  requestHistory: [{
+    sentAt: { type: Date, required: true },
+    channel: { type: String, enum: ['whatsapp', 'email', 'sms', 'phone', 'in_person', 'other'], required: true },
+    messageId: { type: Schema.Types.ObjectId, ref: 'WhatsAppMessage' },
+    requestId: { type: String },
+    sentBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  }],
+  reviewReceived: { type: Boolean, default: false },
+  reviewDate: { type: Date },
+  reviewRating: { type: Number, min: 1, max: 5 },
+  reviewLink: { type: String },
+  reviewReference: { type: String },
+  rewardTransactionId: { type: Schema.Types.ObjectId, ref: 'RewardTransaction' },
+  followUpRequired: { type: Boolean, default: false },
+  responseStatus: { type: String, enum: ['not_required', 'pending', 'responded'], default: 'not_required' },
+  respondedAt: { type: Date },
+  respondedBy: { userId: { type: String }, role: { type: String } },
+  notes: { type: String },
+  reviewConfirmedBy: { userId: { type: String }, role: { type: String } },
+  reviewConfirmedAt: { type: Date },
+  lastUpdatedBy: { userId: { type: String }, role: { type: String } },
+}, { timestamps: true });
+GoogleReviewTrackingSchema.index({ tenantId: 1, customerId: 1, requestDate: -1 });
+GoogleReviewTrackingSchema.index(
+  { tenantId: 1, customerId: 1, bookingId: 1 },
+  { unique: true, partialFilterExpression: { bookingId: { $type: 'objectId' } } },
+);
+GoogleReviewTrackingSchema.index({ tenantId: 1, reviewReceived: 1, followUpRequired: 1 });
+export const GoogleReviewTracking = mongoose.model<IGoogleReviewTracking>('GoogleReviewTracking', GoogleReviewTrackingSchema);
+
+// Append-only requirement snapshots. A new trip or changed request creates
+// a new row instead of mutating an earlier booking's agreed requirements.
+export interface ICustomerRequirement extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  customerId: mongoose.Types.ObjectId;
+  bookingId?: mongoose.Types.ObjectId;
+  tripRequirement?: string;
+  pickupRequirements?: string;
+  dropRequirements?: string;
+  route?: string;
+  multipleStops: string[];
+  numberOfPassengers?: number;
+  luggage?: string;
+  hotelDetails?: string;
+  trainFlightDetails?: string;
+  seniorCitizenRequirement?: boolean;
+  childRequirement?: boolean;
+  wheelchair?: boolean;
+  templeTiming?: string;
+  darshanTiming?: string;
+  vehicleCategory?: string;
+  driverPreference?: string;
+  languagePreference?: string;
+  acRequirement?: boolean;
+  paymentArrangement?: string;
+  tollParkingAgreement?: string;
+  includedServices: string[];
+  excludedServices: string[];
+  customerVisibleInstructions?: string;
+  driverInstructions?: string;
+  officeOnlyNotes?: string;
+  billingInstructions?: string;
+  createdBy: { userId: string; role: string };
+  createdAt: Date;
+}
+
+const CustomerRequirementSchema = new Schema<ICustomerRequirement>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  tripRequirement: { type: String },
+  pickupRequirements: { type: String },
+  dropRequirements: { type: String },
+  route: { type: String },
+  multipleStops: { type: [String], default: [] },
+  numberOfPassengers: { type: Number, min: 1 },
+  luggage: { type: String },
+  hotelDetails: { type: String },
+  trainFlightDetails: { type: String },
+  seniorCitizenRequirement: { type: Boolean, default: false },
+  childRequirement: { type: Boolean, default: false },
+  wheelchair: { type: Boolean, default: false },
+  templeTiming: { type: String },
+  darshanTiming: { type: String },
+  vehicleCategory: { type: String },
+  driverPreference: { type: String },
+  languagePreference: { type: String },
+  acRequirement: { type: Boolean, default: false },
+  paymentArrangement: { type: String },
+  tollParkingAgreement: { type: String },
+  includedServices: { type: [String], default: [] },
+  excludedServices: { type: [String], default: [] },
+  customerVisibleInstructions: { type: String },
+  driverInstructions: { type: String },
+  officeOnlyNotes: { type: String },
+  billingInstructions: { type: String },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  createdAt: { type: Date, default: Date.now },
+});
+CustomerRequirementSchema.index({ tenantId: 1, customerId: 1, createdAt: -1 });
+CustomerRequirementSchema.index({ tenantId: 1, bookingId: 1 });
+export const CustomerRequirement = mongoose.model<ICustomerRequirement>('CustomerRequirement', CustomerRequirementSchema);
+
+// Inquiry — a real Customer/Sales pipeline entity distinct from Booking's
+// early 'enquiry'/'quotation_sent' statuses (see docs/INQUIRY_LEAD_STATUS_MAPPING.md).
+// Exists specifically so a phone call that may never become a trip doesn't
+// force premature creation of a real Booking (which requires a vehicleId).
+// Reuses CustomerRequirement's field vocabulary for requirement-capture
+// fields (see docs/INQUIRY_BOOKING_FIELD_INVENTORY.md) rather than
+// inventing a parallel shape.
+export type InquiryStatus =
+  | 'new' | 'unverified' | 'contact_attempted' | 'contacted'
+  | 'requirement_pending' | 'requirement_completed' | 'qualified'
+  | 'converted_to_lead' | 'future_follow_up' | 'duplicate' | 'invalid'
+  | 'lost' | 'cancelled';
+
+const INQUIRY_SOURCE_VALUES = [
+  'direct_customer', 'walk_in', 'phone_call', 'whatsapp', 'website', 'google_business_profile',
+  'google_ads', 'facebook', 'instagram', 'hotel', 'corporate_client', 'travel_agent', 'vendor_partner',
+  'referral', 'online_travel_platform', 'repeat_customer', 'other',
+] as const;
+
+const INQUIRY_TRIP_TYPE_VALUES = [
+  'local', 'airport_transfer', 'railway_transfer', 'one_way', 'round_trip', 'outstation',
+  'multi_city', 'religious_tour', 'corporate_duty', 'wedding_event', 'group_tour',
+  'self_drive', 'monthly_contract', 'employee_transport', 'custom',
+] as const;
+
+interface IInquiryVehicleRequirement {
+  vehicleCategoryId?: mongoose.Types.ObjectId;
+  requestedNameSnapshot: string;
+  quantity: number;
+  seatingCapacity?: number;
+  luggageCapacity?: number;
+  preferredModel?: string;
+  serviceType: 'with_driver' | 'self_drive';
+  alternativeAllowed: boolean;
+  notes?: string;
+}
+
+interface IInquiryCustomVehicleRequest {
+  customVehicleName: string;
+  brand?: string;
+  model?: string;
+  vehicleType?: string;
+  seatingCapacity?: number;
+  luggageCapacity?: number;
+  acNonAc?: string;
+  transmission?: string;
+  fuelType?: string;
+  luxuryLevel?: string;
+  quantity: number;
+  customerDescription?: string;
+  expectedBudget?: number;
+  alternativeAllowed: boolean;
+  notes?: string;
+}
+
+export interface IInquiry extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  inquiryNumber: string;
+  status: InquiryStatus;
+  priority: 'low' | 'medium' | 'high';
+
+  // Source attribution — deliberately separate from Booking.bookingSource
+  // (spec: "Original Inquiry Source" must never be conflated with later
+  // "Lead Conversion Source" / "Booking Source" / "Fulfilment Source").
+  source: typeof INQUIRY_SOURCE_VALUES[number];
+  sourceDetail?: string;
+  campaign?: string;
+  referrer?: string;
+
+  assignedExecutive?: string;
+  nextFollowUpAt?: Date;
+
+  // Contact capture — an Inquiry may exist with no linked Customer at all.
+  customerName: string;
+  primaryMobile: string;
+  whatsappNumber?: string;
+  alternateMobile?: string;
+  email?: string;
+  linkedCustomerId?: mongoose.Types.ObjectId;
+
+  tripType?: typeof INQUIRY_TRIP_TYPE_VALUES[number];
+  pickupDate?: Date;
+  pickupTime?: string;
+  returnDate?: Date;
+  returnTime?: string;
+  flexibleDate?: boolean;
+
+  pickupLocation?: string;
+  dropLocation?: string;
+  viaLocations?: string;
+  placesToVisit?: string;
+
+  numberOfPassengers?: number;
+  seniorCitizens?: number;
+  children?: number;
+  infants?: number;
+  luggageCount?: number;
+
+  // Requirement-capture fields — same vocabulary as CustomerRequirement.
+  route?: string;
+  vehicleCategory?: string;
+  driverPreference?: string;
+  languagePreference?: string;
+  acRequirement?: string;
+  paymentArrangement?: string;
+  tollParkingAgreement?: string;
+  customerVisibleInstructions?: string;
+  driverInstructions?: string;
+  officeOnlyNotes?: string;
+  billingInstructions?: string;
+
+  vehicleRequirements?: IInquiryVehicleRequirement[];
+  customVehicleRequests?: IInquiryCustomVehicleRequest[];
+
+  notes?: string;
+
+  convertedToLeadAt?: Date;
+  linkedBookingId?: mongoose.Types.ObjectId;
+
+  lostReason?: string;
+  lostNotes?: string;
+  futureReconnectDate?: Date;
+
+  createdBy: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const InquiryVehicleRequirementSchema = new Schema<IInquiryVehicleRequirement>({
+  vehicleCategoryId: { type: Schema.Types.ObjectId },
+  requestedNameSnapshot: { type: String, required: true },
+  quantity: { type: Number, required: true, default: 1 },
+  seatingCapacity: { type: Number },
+  luggageCapacity: { type: Number },
+  preferredModel: { type: String },
+  serviceType: { type: String, enum: ['with_driver', 'self_drive'], default: 'with_driver' },
+  alternativeAllowed: { type: Boolean, default: true },
+  notes: { type: String },
+}, { _id: true });
+
+const InquiryCustomVehicleRequestSchema = new Schema<IInquiryCustomVehicleRequest>({
+  customVehicleName: { type: String, required: true },
+  brand: { type: String },
+  model: { type: String },
+  vehicleType: { type: String },
+  seatingCapacity: { type: Number },
+  luggageCapacity: { type: Number },
+  acNonAc: { type: String },
+  transmission: { type: String },
+  fuelType: { type: String },
+  luxuryLevel: { type: String },
+  quantity: { type: Number, required: true, default: 1 },
+  customerDescription: { type: String },
+  expectedBudget: { type: Number },
+  alternativeAllowed: { type: Boolean, default: true },
+  notes: { type: String },
+}, { _id: true });
+
+const InquirySchema = new Schema<IInquiry>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  inquiryNumber: { type: String },
+  status: {
+    type: String,
+    enum: ['new', 'unverified', 'contact_attempted', 'contacted', 'requirement_pending',
+      'requirement_completed', 'qualified', 'converted_to_lead', 'future_follow_up',
+      'duplicate', 'invalid', 'lost', 'cancelled'],
+    default: 'new',
+  },
+  priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
+
+  source: { type: String, enum: INQUIRY_SOURCE_VALUES, default: 'phone_call' },
+  sourceDetail: { type: String },
+  campaign: { type: String },
+  referrer: { type: String },
+
+  assignedExecutive: { type: String },
+  nextFollowUpAt: { type: Date },
+
+  customerName: { type: String, required: true },
+  primaryMobile: { type: String, required: true },
+  whatsappNumber: { type: String },
+  alternateMobile: { type: String },
+  email: { type: String },
+  linkedCustomerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
+
+  tripType: { type: String, enum: INQUIRY_TRIP_TYPE_VALUES },
+  pickupDate: { type: Date },
+  pickupTime: { type: String },
+  returnDate: { type: Date },
+  returnTime: { type: String },
+  flexibleDate: { type: Boolean, default: false },
+
+  pickupLocation: { type: String },
+  dropLocation: { type: String },
+  viaLocations: { type: String },
+  placesToVisit: { type: String },
+
+  numberOfPassengers: { type: Number },
+  seniorCitizens: { type: Number },
+  children: { type: Number },
+  infants: { type: Number },
+  luggageCount: { type: Number },
+
+  route: { type: String },
+  vehicleCategory: { type: String },
+  driverPreference: { type: String },
+  languagePreference: { type: String },
+  acRequirement: { type: String },
+  paymentArrangement: { type: String },
+  tollParkingAgreement: { type: String },
+  customerVisibleInstructions: { type: String },
+  driverInstructions: { type: String },
+  officeOnlyNotes: { type: String },
+  billingInstructions: { type: String },
+
+  vehicleRequirements: { type: [InquiryVehicleRequirementSchema], default: [] },
+  customVehicleRequests: { type: [InquiryCustomVehicleRequestSchema], default: [] },
+
+  notes: { type: String },
+
+  convertedToLeadAt: { type: Date },
+  linkedBookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+
+  lostReason: { type: String },
+  lostNotes: { type: String },
+  futureReconnectDate: { type: Date },
+
+  createdBy: {
+    userId: { type: String, required: true },
+    role: { type: String, required: true },
+  },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+InquirySchema.index({ tenantId: 1, status: 1, createdAt: -1 });
+InquirySchema.index({ tenantId: 1, primaryMobile: 1 });
+InquirySchema.index({ tenantId: 1, nextFollowUpAt: 1 });
+InquirySchema.index(
+  { tenantId: 1, inquiryNumber: 1 },
+  { unique: true, partialFilterExpression: { inquiryNumber: { $type: 'string' } } },
+);
+export const Inquiry = mongoose.model<IInquiry>('Inquiry', InquirySchema);
+
+// Lead — a thin sales-pipeline-state wrapper around exactly one qualified
+// Inquiry (one-to-one, enforced by a unique index on inquiryId). Deliberately
+// does NOT duplicate the Inquiry's contact/requirement fields (customer
+// name, route, passengers, vehicle requirements, etc.) — those stay owned
+// by the Inquiry record and are read via inquiryId so editing the
+// requirement later (spec §28 "earlier steps remain editable") never
+// creates two divergent copies of the same fact. Lead adds only what's
+// genuinely new: pipeline status, executive assignment, and (later
+// phases) quotation/customer/booking linkage.
+export type LeadStatus =
+  | 'new' | 'assigned' | 'requirement_completed' | 'quotation_draft'
+  | 'quotation_under_review' | 'quotation_sent' | 'follow_up_due'
+  | 'negotiation' | 'customer_confirmed' | 'converted_to_customer'
+  | 'converted_to_booking' | 'future_requirement' | 'lost' | 'cancelled';
+
+export interface ILead extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  leadNumber: string;
+  inquiryId: mongoose.Types.ObjectId;
+  status: LeadStatus;
+  priority: 'low' | 'medium' | 'high';
+  assignedExecutive?: string;
+
+  linkedCustomerId?: mongoose.Types.ObjectId;
+  convertedToCustomerAt?: Date;
+  linkedBookingId?: mongoose.Types.ObjectId;
+  convertedToBookingAt?: Date;
+
+  lostReason?: string;
+  lostNotes?: string;
+
+  createdBy: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const LeadSchema = new Schema<ILead>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  leadNumber: { type: String },
+  inquiryId: { type: Schema.Types.ObjectId, ref: 'Inquiry', required: true },
+  status: {
+    type: String,
+    enum: ['new', 'assigned', 'requirement_completed', 'quotation_draft', 'quotation_under_review',
+      'quotation_sent', 'follow_up_due', 'negotiation', 'customer_confirmed', 'converted_to_customer',
+      'converted_to_booking', 'future_requirement', 'lost', 'cancelled'],
+    default: 'new',
+  },
+  priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
+  assignedExecutive: { type: String },
+
+  linkedCustomerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
+  convertedToCustomerAt: { type: Date },
+  linkedBookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  convertedToBookingAt: { type: Date },
+
+  lostReason: { type: String },
+  lostNotes: { type: String },
+
+  createdBy: {
+    userId: { type: String, required: true },
+    role: { type: String, required: true },
+  },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+LeadSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
+LeadSchema.index({ tenantId: 1, inquiryId: 1 }, { unique: true });
+LeadSchema.index(
+  { tenantId: 1, leadNumber: 1 },
+  { unique: true, partialFilterExpression: { leadNumber: { $type: 'string' } } },
+);
+export const Lead = mongoose.model<ILead>('Lead', LeadSchema);
+
+// Quotation — one or more priced vehicle/package options prepared against a
+// Lead. Money is stored as integer paise throughout (spec §18) to avoid the
+// float-drift class of bug already flagged for the older Booking/Payment
+// money fields elsewhere in this codebase (see docs/SECURITY_AND_DATA_RISK_AUDIT.md).
+// Options are embedded (not a separate collection) — same pattern already
+// used for Booking.extensionHistory/rescheduleHistory — since they only
+// ever exist in the context of their parent Quotation.
+export type QuotationStatus =
+  | 'draft' | 'under_review' | 'approved' | 'sent' | 'viewed' | 'customer_query'
+  | 'negotiation' | 'accepted' | 'rejected' | 'expired' | 'superseded' | 'converted';
+
+interface IQuotationOption {
+  optionNumber: number;
+  vehicleNameSnapshot: string;
+  quantity: number;
+  pricingType: 'fixed' | 'per_km' | 'per_day' | 'per_hour' | 'monthly' | 'custom';
+  baseRatePaise?: number;
+  includedKm?: number;
+  extraKmRatePaise?: number;
+  includedHours?: number;
+  extraHourRatePaise?: number;
+  minimumKmPerDay?: number;
+  driverAllowancePaise?: number;
+  nightHaltPaise?: number;
+  tollTreatment?: 'included' | 'excluded' | 'actual';
+  parkingTreatment?: 'included' | 'excluded' | 'actual';
+  stateTaxTreatment?: 'included' | 'excluded' | 'actual';
+  discountPaise?: number;
+  taxableAmountPaise?: number;
+  gstPaise?: number;
+  totalPaise: number;
+  notes?: string;
+}
+
+export interface IQuotation extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  quotationNumber?: string;
+  leadId: mongoose.Types.ObjectId;
+  status: QuotationStatus;
+  version: number;
+  parentQuotationId?: mongoose.Types.ObjectId;
+  options: IQuotationOption[];
+  acceptedOptionNumber?: number;
+  validTill?: Date;
+  paymentTerms?: string;
+  termsAndConditions?: string;
+  cancellationTerms?: string;
+  createdBy: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+  sentAt?: Date;
+  acceptedAt?: Date;
+}
+
+const QuotationOptionSchema = new Schema<IQuotationOption>({
+  optionNumber: { type: Number, required: true },
+  vehicleNameSnapshot: { type: String, required: true },
+  quantity: { type: Number, required: true, default: 1 },
+  pricingType: { type: String, enum: ['fixed', 'per_km', 'per_day', 'per_hour', 'monthly', 'custom'], default: 'fixed' },
+  baseRatePaise: { type: Number },
+  includedKm: { type: Number },
+  extraKmRatePaise: { type: Number },
+  includedHours: { type: Number },
+  extraHourRatePaise: { type: Number },
+  minimumKmPerDay: { type: Number },
+  driverAllowancePaise: { type: Number },
+  nightHaltPaise: { type: Number },
+  tollTreatment: { type: String, enum: ['included', 'excluded', 'actual'], default: 'excluded' },
+  parkingTreatment: { type: String, enum: ['included', 'excluded', 'actual'], default: 'excluded' },
+  stateTaxTreatment: { type: String, enum: ['included', 'excluded', 'actual'], default: 'excluded' },
+  discountPaise: { type: Number, default: 0 },
+  taxableAmountPaise: { type: Number },
+  gstPaise: { type: Number, default: 0 },
+  totalPaise: { type: Number, required: true },
+  notes: { type: String },
+}, { _id: false });
+
+const QuotationSchema = new Schema<IQuotation>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  quotationNumber: { type: String },
+  leadId: { type: Schema.Types.ObjectId, ref: 'Lead', required: true },
+  status: {
+    type: String,
+    enum: ['draft', 'under_review', 'approved', 'sent', 'viewed', 'customer_query', 'negotiation',
+      'accepted', 'rejected', 'expired', 'superseded', 'converted'],
+    default: 'draft',
+  },
+  version: { type: Number, default: 1 },
+  parentQuotationId: { type: Schema.Types.ObjectId, ref: 'Quotation' },
+  options: { type: [QuotationOptionSchema], default: [] },
+  acceptedOptionNumber: { type: Number },
+  validTill: { type: Date },
+  paymentTerms: { type: String },
+  termsAndConditions: { type: String },
+  cancellationTerms: { type: String },
+  createdBy: {
+    userId: { type: String, required: true },
+    role: { type: String, required: true },
+  },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  sentAt: { type: Date },
+  acceptedAt: { type: Date },
+});
+QuotationSchema.index({ tenantId: 1, leadId: 1, createdAt: -1 });
+QuotationSchema.index(
+  { tenantId: 1, quotationNumber: 1 },
+  { unique: true, partialFilterExpression: { quotationNumber: { $type: 'string' } } },
+);
+export const Quotation = mongoose.model<IQuotation>('Quotation', QuotationSchema);
+
+// LeadFollowUp — structured sales-pipeline follow-up tasks against a Lead
+// (spec §22). Deliberately a SEPARATE model from the existing
+// CustomerFollowUp (models/index.ts, "After-sales follow-up tasks —
+// auto-created on booking completion") — that one is post-trip customer
+// care; this one is pre-sales lead nurturing. Conflating the two would
+// mix "call this lead about their quotation" with "check if the
+// completed trip went well" in one list, which is exactly the kind of
+// mixed-purpose list the spec's Inquiry/Lead/Customer/Booking
+// terminology section warns against.
+export type LeadFollowUpOutcome =
+  | 'pending' | 'connected' | 'no_answer' | 'callback_requested' | 'quotation_requested'
+  | 'negotiation' | 'confirmed' | 'not_interested' | 'postponed' | 'lost';
+
+export interface ILeadFollowUp extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  leadId: mongoose.Types.ObjectId;
+  type: string;
+  scheduledAt: Date;
+  assignedTo?: string;
+  priority: 'low' | 'medium' | 'high';
+  purpose?: string;
+  previousDiscussion?: string;
+  customerResponse?: string;
+  internalNote?: string;
+  outcome: LeadFollowUpOutcome;
+  nextFollowUpAt?: Date;
+  completedAt?: Date;
+  completedBy?: string;
+  createdBy: { userId: string; role: string };
+  createdAt: Date;
+}
+
+const LeadFollowUpSchema = new Schema<ILeadFollowUp>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  leadId: { type: Schema.Types.ObjectId, ref: 'Lead', required: true },
+  type: { type: String, required: true },
+  scheduledAt: { type: Date, required: true },
+  assignedTo: { type: String },
+  priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
+  purpose: { type: String },
+  previousDiscussion: { type: String },
+  customerResponse: { type: String },
+  internalNote: { type: String },
+  outcome: {
+    type: String,
+    enum: ['pending', 'connected', 'no_answer', 'callback_requested', 'quotation_requested',
+      'negotiation', 'confirmed', 'not_interested', 'postponed', 'lost'],
+    default: 'pending',
+  },
+  nextFollowUpAt: { type: Date },
+  completedAt: { type: Date },
+  completedBy: { type: String },
+  createdBy: {
+    userId: { type: String, required: true },
+    role: { type: String, required: true },
+  },
+  createdAt: { type: Date, default: Date.now },
+});
+LeadFollowUpSchema.index({ tenantId: 1, leadId: 1, scheduledAt: -1 });
+LeadFollowUpSchema.index({ tenantId: 1, outcome: 1, scheduledAt: 1 });
+export const LeadFollowUp = mongoose.model<ILeadFollowUp>('LeadFollowUp', LeadFollowUpSchema);
+
+export interface ICustomerMerge extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  sourceCustomerId: mongoose.Types.ObjectId;
+  targetCustomerId: mongoose.Types.ObjectId;
+  reason: string;
+  status: 'in_progress' | 'completed' | 'failed';
+  movedCounts: Record<string, number>;
+  retainedSourceCampaignRecipients: number;
+  error?: string;
+  performedBy: { userId: string; role: string };
+  startedAt: Date;
+  completedAt?: Date;
+}
+
+const CustomerMergeSchema = new Schema<ICustomerMerge>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  sourceCustomerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  targetCustomerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  reason: { type: String, required: true },
+  status: { type: String, enum: ['in_progress', 'completed', 'failed'], default: 'in_progress' },
+  movedCounts: { type: Schema.Types.Mixed, default: {} },
+  retainedSourceCampaignRecipients: { type: Number, default: 0 },
+  error: { type: String },
+  performedBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  startedAt: { type: Date, default: Date.now },
+  completedAt: { type: Date },
+});
+CustomerMergeSchema.index({ tenantId: 1, sourceCustomerId: 1 }, { unique: true });
+CustomerMergeSchema.index({ tenantId: 1, targetCustomerId: 1, completedAt: -1 });
+export const CustomerMerge = mongoose.model<ICustomerMerge>('CustomerMerge', CustomerMergeSchema);
+
+export interface ICustomerBillingProfile extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  customerId: mongoose.Types.ObjectId;
+  label: string;
+  customerKind: 'individual' | 'company';
+  billingName: string;
+  companyName?: string;
+  gstNumber?: string;
+  panNumber?: string;
+  billingAddress?: string;
+  billingEmail?: string;
+  accountsContact?: string;
+  purchaseOrderNumber?: string;
+  paymentTerms?: string;
+  creditPeriodDays?: number;
+  tdsInformation?: string;
+  isDefault: boolean;
+  isActive: boolean;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const CustomerBillingProfileSchema = new Schema<ICustomerBillingProfile>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  label: { type: String, required: true },
+  customerKind: { type: String, enum: ['individual', 'company'], default: 'individual' },
+  billingName: { type: String, required: true },
+  companyName: { type: String },
+  gstNumber: { type: String },
+  panNumber: { type: String },
+  billingAddress: { type: String },
+  billingEmail: { type: String },
+  accountsContact: { type: String },
+  purchaseOrderNumber: { type: String },
+  paymentTerms: { type: String },
+  creditPeriodDays: { type: Number, min: 0 },
+  tdsInformation: { type: String },
+  isDefault: { type: Boolean, default: false },
+  isActive: { type: Boolean, default: true },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+CustomerBillingProfileSchema.index({ tenantId: 1, customerId: 1, isActive: 1 });
+export const CustomerBillingProfile = mongoose.model<ICustomerBillingProfile>('CustomerBillingProfile', CustomerBillingProfileSchema);
+
+export interface IInvoice extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  customerId: mongoose.Types.ObjectId;
+  bookingId?: mongoose.Types.ObjectId;
+  billingProfileId?: mongoose.Types.ObjectId;
+  // Undefined for a fresh draft — real numbering only happens at
+  // finalization (see finalizeInvoice in invoiceService.ts), so a draft
+  // that never gets finalized never burns a sequence number. Revisions
+  // keep their existing immediate-suffix behavior (${parent}-R{n}),
+  // unchanged from before this field became optional.
+  invoiceNumber?: string;
+  sourceKey?: string;
+  documentType: 'tax_invoice' | 'non_gst_invoice' | 'proforma_invoice' | 'payment_receipt' | 'credit_note' | 'debit_note' | 'customer_statement';
+  status: 'draft' | 'finalized' | 'void';
+  revisionNumber: number;
+  parentInvoiceId?: mongoose.Types.ObjectId;
+  relatedInvoiceId?: mongoose.Types.ObjectId;
+  invoiceDate: Date;
+  customerSnapshot: Record<string, any>;
+  billingSnapshot: Record<string, any>;
+  businessSnapshot: Record<string, any>;
+  bookingSnapshot?: Record<string, any>;
+  serviceDescription: string;
+  gstRate: number;
+  discount: number;
+  tollParkingTreatment: 'included' | 'separate_non_taxable';
+  taxableAmount: number;
+  gstAmount: number;
+  tollAmount: number;
+  parkingAmount: number;
+  adjustmentAmount: number;
+  totalAmount: number;
+  amountReceived: number;
+  balanceDue: number;
+  paymentTerms?: string;
+  bankDetails?: string;
+  upiId?: string;
+  termsAndConditions?: string;
+  adjustmentReason?: string;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  finalizedBy?: { userId: string; role: string };
+  finalizedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const InvoiceSchema = new Schema<IInvoice>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking' },
+  billingProfileId: { type: Schema.Types.ObjectId, ref: 'CustomerBillingProfile' },
+  invoiceNumber: { type: String },
+  sourceKey: { type: String },
+  documentType: {
+    type: String,
+    enum: ['tax_invoice', 'non_gst_invoice', 'proforma_invoice', 'payment_receipt', 'credit_note', 'debit_note', 'customer_statement'],
+    required: true,
+  },
+  status: { type: String, enum: ['draft', 'finalized', 'void'], default: 'draft' },
+  revisionNumber: { type: Number, default: 1, min: 1 },
+  parentInvoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
+  relatedInvoiceId: { type: Schema.Types.ObjectId, ref: 'Invoice' },
+  invoiceDate: { type: Date, required: true, default: Date.now },
+  customerSnapshot: { type: Schema.Types.Mixed, required: true },
+  billingSnapshot: { type: Schema.Types.Mixed, required: true },
+  businessSnapshot: { type: Schema.Types.Mixed, required: true },
+  bookingSnapshot: { type: Schema.Types.Mixed },
+  serviceDescription: { type: String, required: true },
+  gstRate: { type: Number, default: 0, min: 0, max: 100 },
+  discount: { type: Number, default: 0, min: 0 },
+  tollParkingTreatment: { type: String, enum: ['included', 'separate_non_taxable'], default: 'included' },
+  taxableAmount: { type: Number, required: true, min: 0 },
+  gstAmount: { type: Number, required: true, min: 0 },
+  tollAmount: { type: Number, default: 0, min: 0 },
+  parkingAmount: { type: Number, default: 0, min: 0 },
+  adjustmentAmount: { type: Number, default: 0, min: 0 },
+  totalAmount: { type: Number, required: true, min: 0 },
+  amountReceived: { type: Number, required: true, min: 0 },
+  balanceDue: { type: Number, required: true, min: 0 },
+  paymentTerms: { type: String },
+  bankDetails: { type: String },
+  upiId: { type: String },
+  termsAndConditions: { type: String },
+  adjustmentReason: { type: String },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  finalizedBy: { userId: { type: String }, role: { type: String } },
+  finalizedAt: { type: Date },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+// A plain `sparse: true` does NOT work here: for a COMPOUND index, Mongo
+// only skips a document from a sparse index if it's missing ALL of the
+// indexed fields — since tenantId is always present, every draft (even
+// with invoiceNumber absent) still gets indexed with an effective null
+// key, so a second draft collides with the first "null" entry. A partial
+// index with an explicit filter is the correct fix: only documents that
+// actually HAVE a real invoiceNumber are indexed at all, so any number of
+// unfinalized drafts can coexist.
+InvoiceSchema.index(
+  { tenantId: 1, invoiceNumber: 1 },
+  { unique: true, partialFilterExpression: { invoiceNumber: { $type: 'string' } } },
+);
+InvoiceSchema.index({ tenantId: 1, sourceKey: 1 }, { unique: true, sparse: true });
+InvoiceSchema.index({ tenantId: 1, customerId: 1, createdAt: -1 });
+InvoiceSchema.index({ tenantId: 1, bookingId: 1, status: 1 });
+export const Invoice = mongoose.model<IInvoice>('Invoice', InvoiceSchema);
+
+// Generic atomic per-tenant sequence generator — `findOneAndUpdate` with
+// `$inc` is a single atomic Mongo operation, so concurrent invoice
+// creation can never hand out the same number twice (unlike
+// `count() + 1`, which races under concurrent inserts). Used for
+// financial-year-aware invoice numbering below.
+export interface ICounter extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  name: string;
+  value: number;
+}
+const CounterSchema = new Schema<ICounter>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  name: { type: String, required: true },
+  value: { type: Number, default: 0 },
+});
+CounterSchema.index({ tenantId: 1, name: 1 }, { unique: true });
+export const Counter = mongoose.model<ICounter>('Counter', CounterSchema);
+
+// Tenant-specific invoice configuration — company/tax/bank details used to
+// render the PDF header/footer and WhatsApp templates, plus the numbering
+// scheme. Deliberately a SEPARATE document from User.businessDetails
+// (which already exists and stays exactly as-is, still used as a
+// fallback in invoiceService.ts's businessSnapshot) rather than folded
+// into it, since invoice prefixes/bank details/T&C are invoice-specific
+// configuration, not a generic company profile. Changing these settings
+// only affects invoices generated AFTER the change — every existing
+// finalized invoice already carries its own immutable businessSnapshot.
+export interface IInvoiceSettings extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  legalCompanyName?: string;
+  brandName?: string;
+  logoUrl?: string;
+  gstNumber?: string;
+  panNumber?: string;
+  registeredAddress?: string;
+  branchAddress?: string;
+  mobile?: string;
+  email?: string;
+  website?: string;
+  taxInvoicePrefix: string;
+  nonGstInvoicePrefix: string;
+  proformaPrefix: string;
+  creditNotePrefix: string;
+  debitNotePrefix: string;
+  receiptPrefix: string;
+  statementPrefix: string;
+  financialYearStartMonth: number; // 1-12, default 4 (April, Indian FY)
+  defaultGstRate: number;
+  defaultPaymentTerms?: string;
+  defaultTermsAndConditions?: string;
+  authorizedSignatoryName?: string;
+  signatureUrl?: string;
+  bankAccountName?: string;
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankIfsc?: string;
+  bankBranch?: string;
+  upiId?: string;
+  paymentQrUrl?: string;
+  invoiceFooterMessage?: string;
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+const InvoiceSettingsSchema = new Schema<IInvoiceSettings>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true, unique: true },
+  legalCompanyName: { type: String },
+  brandName: { type: String },
+  logoUrl: { type: String },
+  gstNumber: { type: String },
+  panNumber: { type: String },
+  registeredAddress: { type: String },
+  branchAddress: { type: String },
+  mobile: { type: String },
+  email: { type: String },
+  website: { type: String },
+  taxInvoicePrefix: { type: String, default: 'INV' },
+  nonGstInvoicePrefix: { type: String, default: 'INV' },
+  proformaPrefix: { type: String, default: 'PI' },
+  creditNotePrefix: { type: String, default: 'CN' },
+  debitNotePrefix: { type: String, default: 'DN' },
+  receiptPrefix: { type: String, default: 'RCT' },
+  statementPrefix: { type: String, default: 'STMT' },
+  financialYearStartMonth: { type: Number, default: 4, min: 1, max: 12 },
+  defaultGstRate: { type: Number, default: 18, min: 0, max: 100 },
+  defaultPaymentTerms: { type: String },
+  defaultTermsAndConditions: { type: String },
+  authorizedSignatoryName: { type: String },
+  signatureUrl: { type: String },
+  bankAccountName: { type: String },
+  bankName: { type: String },
+  bankAccountNumber: { type: String },
+  bankIfsc: { type: String },
+  bankBranch: { type: String },
+  upiId: { type: String },
+  paymentQrUrl: { type: String },
+  invoiceFooterMessage: { type: String },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+InvoiceSettingsSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const InvoiceSettings = mongoose.model<IInvoiceSettings>('InvoiceSettings', InvoiceSettingsSchema);
 
 // Consent history — append-only, same split as tags: Customer.consent is
 // the fast-read current state, this is the audit trail of every grant/
@@ -1432,6 +2557,34 @@ const CampaignRecipientSchema = new Schema<ICampaignRecipient>({
 });
 CampaignRecipientSchema.index({ campaignId: 1, customerId: 1 }, { unique: true });
 export const CampaignRecipient = mongoose.model<ICampaignRecipient>('CampaignRecipient', CampaignRecipientSchema);
+
+// One in-progress "Add Booking" wizard draft per (tenant, user) — auto-saved
+// as the user moves through the existing EnhancedBookingForm steps so a
+// refresh or accidental navigation-away doesn't lose their progress. A
+// single slot per user (not a list) is a deliberate scope decision: the
+// spec asks not to lose in-progress work, not to build a drafts-management
+// UI, and a single "resume your unfinished booking?" prompt covers that.
+export interface IBookingDraft extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  userId: string;
+  step: number;
+  formData: any;
+  leadId?: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const BookingDraftSchema = new Schema<IBookingDraft>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  userId: { type: String, required: true },
+  step: { type: Number, default: 1 },
+  formData: { type: Schema.Types.Mixed, default: {} },
+  leadId: { type: Schema.Types.ObjectId, ref: 'Lead' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+BookingDraftSchema.index({ tenantId: 1, userId: 1 }, { unique: true });
+export const BookingDraft = mongoose.model<IBookingDraft>('BookingDraft', BookingDraftSchema);
 
 export const User = mongoose.model<IUser>('User', UserSchema);
 export const Vehicle = mongoose.model<IVehicle>('Vehicle', VehicleSchema);

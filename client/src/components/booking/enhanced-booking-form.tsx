@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -12,10 +12,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, Check, Phone, Mail, IndianRupee, Download } from "lucide-react";
+import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, Check, Phone, Mail, IndianRupee, Download, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import html2pdf from 'html2pdf.js';
 import BookingConfirmationPDF from "./booking-confirmation-pdf";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -88,10 +89,17 @@ type BookingFormData = z.infer<typeof bookingSchema>;
 const EXTERNAL_SOURCE_TYPES = new Set(["hotel", "corporate_client", "travel_agent", "vendor_partner", "referral", "online_travel_platform"]);
 
 interface EnhancedBookingFormProps {
-  onSuccess: () => void;
+  onSuccess: (booking?: any) => void;
+  // Pre-fills the form (e.g. from a Lead/Inquiry/accepted Quotation being
+  // converted into a booking, spec §24 "Do not re-enter the same
+  // information manually") without skipping any validation, availability
+  // check, or the vehicle/driver picker itself — the user still completes
+  // and submits through this exact same form and the existing
+  // POST /api/bookings endpoint, unchanged.
+  initialValues?: Partial<BookingFormData>;
 }
 
-export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormProps) {
+export default function EnhancedBookingForm({ onSuccess, initialValues }: EnhancedBookingFormProps) {
   const [step, setStep] = useState(1);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
   const [selectedPricingType, setSelectedPricingType] = useState<"day" | "km" | "">("");
@@ -99,6 +107,19 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [routeType, setRouteType] = useState<"custom" | "local" | "not_decided">("custom");
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
+  // Progressive disclosure for Review & Confirm (spec: "daily-use fields
+  // first, expandable detailed sections") — fuel deductions and misc.
+  // expenses are normally settled at trip-end, not at booking time, so
+  // they start collapsed. Purely a display toggle: no field, validation,
+  // or submit-payload change.
+  const [showMoreCharges, setShowMoreCharges] = useState(false);
+  // One key per booking-creation attempt (this mount, or since the last
+  // "Create New Booking" reset) — reused across a retried submit of the
+  // SAME booking (e.g. clicking Confirm again after a dropped response),
+  // regenerated whenever the form is deliberately reset to start a
+  // genuinely new booking. See server/routes.ts's POST /api/bookings
+  // duplicate-request guard.
+  const bookingIdempotencyKeyRef = useRef<string>(crypto.randomUUID());
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -151,7 +172,85 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
     },
   });
 
+  // Applies a Lead-conversion prefill exactly once, on mount, without
+  // touching anything the user has already typed if this effect somehow
+  // re-ran (it shouldn't, since initialValues is only ever set once by
+  // the caller for a fresh "Convert to Booking" navigation).
+  useEffect(() => {
+    if (initialValues) {
+      form.reset({ ...form.getValues(), ...initialValues });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const watchedValues = form.watch();
+
+  // Booking wizard draft persistence (auto-save + resume). Deliberately
+  // scoped OFF for a Lead-conversion prefill session (initialValues present)
+  // — that flow already has its own source of truth (the Lead) and was
+  // built/tested as a self-contained path in the previous phase; layering
+  // draft-resume on top would only add risk to an already-verified flow for
+  // a case (someone abandoning a Lead-conversion mid-way) the spec's actual
+  // ask — "don't lose organic Add Booking progress" — doesn't cover.
+  const draftEnabled = !initialValues;
+  const [draftChecked, setDraftChecked] = useState(!draftEnabled);
+  const [pendingDraft, setPendingDraft] = useState<{ step: number; formData: any } | null>(null);
+  const draftSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards against a race where the mount-time "is there an existing
+  // draft?" GET resolves only after the user has already started typing
+  // (slow network, or this session's own debounced autosave already fired)
+  // — without this, a fast typist could get interrupted by a "resume?"
+  // prompt for what is actually their own just-created progress.
+  const hasInteractedRef = useRef(false);
+
+  useEffect(() => {
+    if (form.formState.isDirty) hasInteractedRef.current = true;
+  }, [form.formState.isDirty]);
+
+  useEffect(() => {
+    if (!draftEnabled) return;
+    (async () => {
+      try {
+        const res = await apiRequest("GET", "/api/booking-drafts/mine");
+        const draft = await res.json();
+        if (!hasInteractedRef.current && draft && (draft.step > 1 || draft.formData?.customerName || draft.formData?.pickupLocation)) {
+          setPendingDraft({ step: draft.step || 1, formData: draft.formData || {} });
+        }
+      } catch {
+        // No draft, or the fetch failed — proceed with a fresh form either way.
+      } finally {
+        setDraftChecked(true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const resumeDraft = () => {
+    if (!pendingDraft) return;
+    form.reset({ ...form.getValues(), ...pendingDraft.formData });
+    setStep(pendingDraft.step);
+    setPendingDraft(null);
+  };
+
+  const discardDraft = () => {
+    setPendingDraft(null);
+    apiRequest("DELETE", "/api/booking-drafts/mine").catch(() => {});
+  };
+
+  // Debounced auto-save: only once the initial "resume?" decision is
+  // settled (so we never overwrite a just-fetched draft with the form's
+  // still-default values), only once the user has actually typed something,
+  // and never after a booking has already been confirmed in this session.
+  useEffect(() => {
+    if (!draftEnabled || !draftChecked || pendingDraft || bookingConfirmed) return;
+    if (!form.formState.isDirty) return;
+    if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
+    draftSaveTimer.current = setTimeout(() => {
+      apiRequest("PUT", "/api/booking-drafts/mine", { step, formData: watchedValues }).catch(() => {});
+    }, 1200);
+    return () => { if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedValues, step, draftChecked, pendingDraft, bookingConfirmed]);
 
   // Fetch available vehicles
   const { data: availableVehicles } = useQuery({
@@ -253,14 +352,18 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
         useThirdPartyDriver: false,
         thirdPartyDriverName: "",
         thirdPartyDriverCharges: 0,
+        idempotencyKey: bookingIdempotencyKeyRef.current,
       };
-      
+
       const response = await apiRequest("POST", "/api/bookings", bookingData);
       return response.json();
     },
     onSuccess: async (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      if (draftEnabled) {
+        apiRequest("DELETE", "/api/booking-drafts/mine").catch(() => {});
+      }
       setCreatedBooking(result);
       setBookingConfirmed(true);
       toast({
@@ -943,6 +1046,7 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
                                 
                                 {/* By Day Option */}
                                 <button
+                                  type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleVehicleAndPricingSelection(vehicleId, "day");
@@ -968,6 +1072,7 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
 
                                 {/* By Kilometer Option */}
                                 <button
+                                  type="button"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (vehicle.pricePerKm && vehicle.pricePerKm > 0) {
@@ -1472,13 +1577,14 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
                       variant="outline"
                       onClick={() => {
                         form.reset();
+                        bookingIdempotencyKeyRef.current = crypto.randomUUID();
                         setStep(1);
                         setSelectedVehicleId("");
                         setSelectedPricingType("");
+                        onSuccess(createdBooking);
                         setCreatedBooking(null);
                         setBookingConfirmed(false);
                         setRouteType("custom");
-                        onSuccess();
                       }}
                       className="px-6 py-3"
                       size="lg"
@@ -1715,116 +1821,151 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
                           />
                         </div>
                         
-                        {/* Fuel Charges Section */}
-                        <div className="space-y-4 p-4 bg-red-50 rounded-lg">
-                          <h4 className="font-semibold text-red-800 flex items-center">
-                            <span className="mr-2">⛽</span>
-                            Fuel Charges (To be deducted from final amount)
-                          </h4>
-                          <div className="grid grid-cols-3 gap-4">
-                            <FormField
-                              control={form.control}
-                              name="petrolCharges"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium text-red-700">Petrol (₹)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number" 
-                                      placeholder="0"
-                                      value={field.value || 0}
-                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                      className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
+                        {/* Fuel deductions + misc. expenses are normally
+                            settled at trip-end, not at booking time — kept
+                            out of the daily-use path by default, per spec's
+                            progressive-disclosure ask. Auto-opens (and stays
+                            open) if a resumed draft already has any of these
+                            set, so existing data is never hidden. */}
+                        {(() => {
+                          const hasExtraCharges = !!(
+                            (watchedValues.petrolCharges && watchedValues.petrolCharges > 0) ||
+                            (watchedValues.dieselCharges && watchedValues.dieselCharges > 0) ||
+                            (watchedValues.cngCharges && watchedValues.cngCharges > 0) ||
+                            (watchedValues.miscellaneousAmount && watchedValues.miscellaneousAmount > 0)
+                          );
+                          const moreChargesOpen = showMoreCharges || hasExtraCharges;
+                          return (
+                            <Collapsible>
+                              <CollapsibleTrigger
+                                type="button"
+                                onClick={() => setShowMoreCharges(!moreChargesOpen)}
+                                className="border border-dashed border-gray-300 bg-gray-50/50"
+                              >
+                                <span className="text-sm font-medium text-gray-700">
+                                  More charges (fuel deductions, misc. expenses)
+                                </span>
+                                {moreChargesOpen ? (
+                                  <ChevronDown className="w-4 h-4 text-gray-500" />
+                                ) : (
+                                  <ChevronRight className="w-4 h-4 text-gray-500" />
+                                )}
+                              </CollapsibleTrigger>
+                              <CollapsibleContent isOpen={moreChargesOpen} className="space-y-4 pt-2">
+                                {/* Fuel Charges Section */}
+                                <div className="space-y-4 p-4 bg-red-50 rounded-lg">
+                                  <h4 className="font-semibold text-red-800 flex items-center">
+                                    <span className="mr-2">⛽</span>
+                                    Fuel Charges (To be deducted from final amount)
+                                  </h4>
+                                  <div className="grid grid-cols-3 gap-4">
+                                    <FormField
+                                      control={form.control}
+                                      name="petrolCharges"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-sm font-medium text-red-700">Petrol (₹)</FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              type="number"
+                                              placeholder="0"
+                                              value={field.value || 0}
+                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
                                     />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="dieselCharges"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium text-red-700">Diesel (₹)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number" 
-                                      placeholder="0"
-                                      value={field.value || 0}
-                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                      className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
+                                    <FormField
+                                      control={form.control}
+                                      name="dieselCharges"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-sm font-medium text-red-700">Diesel (₹)</FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              type="number"
+                                              placeholder="0"
+                                              value={field.value || 0}
+                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
                                     />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="cngCharges"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium text-red-700">CNG (₹)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number" 
-                                      placeholder="0"
-                                      value={field.value || 0}
-                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                      className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
+                                    <FormField
+                                      control={form.control}
+                                      name="cngCharges"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-sm font-medium text-red-700">CNG (₹)</FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              type="number"
+                                              placeholder="0"
+                                              value={field.value || 0}
+                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
                                     />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-                        
-                        {/* Miscellaneous Expenses Section */}
-                        <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-                          <h4 className="font-semibold text-gray-800">Miscellaneous Expenses</h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <FormField
-                              control={form.control}
-                              name="miscellaneousAmount"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium">Amount (₹)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      type="number" 
-                                      placeholder="0"
-                                      value={field.value || 0}
-                                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                      className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
+                                  </div>
+                                </div>
+
+                                {/* Miscellaneous Expenses Section */}
+                                <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+                                  <h4 className="font-semibold text-gray-800">Miscellaneous Expenses</h4>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <FormField
+                                      control={form.control}
+                                      name="miscellaneousAmount"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-sm font-medium">Amount (₹)</FormLabel>
+                                          <FormControl>
+                                            <Input
+                                              type="number"
+                                              placeholder="0"
+                                              value={field.value || 0}
+                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
                                     />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={form.control}
-                              name="miscellaneousDescription"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-sm font-medium">Description</FormLabel>
-                                  <FormControl>
-                                    <Textarea
-                                      placeholder="e.g., cleaning charges, late return fee, damage cost"
-                                      {...field}
-                                      className="h-20 text-sm border border-gray-300 focus:border-orange-500 rounded resize-none"
+                                    <FormField
+                                      control={form.control}
+                                      name="miscellaneousDescription"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel className="text-sm font-medium">Description</FormLabel>
+                                          <FormControl>
+                                            <Textarea
+                                              placeholder="e.g., cleaning charges, late return fee, damage cost"
+                                              {...field}
+                                              className="h-20 text-sm border border-gray-300 focus:border-orange-500 rounded resize-none"
+                                            />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
                                     />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-                        
+                                  </div>
+                                </div>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          );
+                        })()}
+
                         {/* Summary of all charges */}
                         <div className="space-y-2 text-sm">
                           {/* Base amount display */}
@@ -2153,6 +2294,30 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
         </form>
       </Form>
 
+      {/* Resume unfinished booking draft */}
+      <Dialog open={!!pendingDraft} onOpenChange={(open) => { if (!open) discardDraft(); }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Resume your unfinished booking?</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <p className="text-sm text-gray-600 mb-6">
+              You have a booking in progress from earlier
+              {pendingDraft?.formData?.customerName ? ` for ${pendingDraft.formData.customerName}` : ""}.
+              Would you like to continue where you left off, or start a new booking?
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button onClick={resumeDraft} className="bg-blue-500 hover:bg-blue-600 text-white">
+                Resume Booking
+              </Button>
+              <Button variant="outline" onClick={discardDraft}>
+                Start Fresh
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* WhatsApp Share Modal */}
       <Dialog open={showConfirmationModal} onOpenChange={setShowConfirmationModal}>
         <DialogContent className="sm:max-w-[425px]">
@@ -2190,13 +2355,14 @@ export default function EnhancedBookingForm({ onSuccess }: EnhancedBookingFormPr
                 variant="outline"
                 onClick={() => {
                   form.reset();
+                  bookingIdempotencyKeyRef.current = crypto.randomUUID();
                   setStep(1);
                   setSelectedVehicleId("");
                   setSelectedPricingType("");
+                  onSuccess(createdBooking);
                   setCreatedBooking(null);
                   setShowConfirmationModal(false);
                   setRouteType("custom");
-                  onSuccess();
                 }}
                 className="w-full"
               >

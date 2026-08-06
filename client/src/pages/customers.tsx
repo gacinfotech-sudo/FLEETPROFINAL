@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Search, Users, X } from "lucide-react";
 import CustomerDashboard from "@/components/customers/customer-dashboard";
+import QuickInquiryForm from "@/components/inquiries/quick-inquiry-form";
 
 function fmtMoney(n?: number) {
   return `₹${(n || 0).toLocaleString("en-IN")}`;
@@ -24,13 +25,27 @@ const STATUS_BADGE: Record<string, { label: string; className: string }> = {
 
 interface CustomersPageProps {
   onEditBooking?: (booking: any) => void;
+  onNewBooking?: (prefill: any) => void;
+  // Set by the Sidebar's Global Customer Search (via dashboard.tsx's
+  // pendingCustomerId) when the user picked a specific customer before
+  // navigating here — opens that customer's 360 dialog immediately instead
+  // of landing on the plain list.
+  initialCustomerId?: string | null;
+  // Forwarded to CustomerDashboard's timeline — see its own prop comment.
+  onNavigateToInquiry?: (inquiryId: string) => void;
+  onNavigateToLead?: (leadId: string) => void;
 }
 
-export default function CustomersPage({ onEditBooking }: CustomersPageProps) {
+export default function CustomersPage({ onEditBooking, onNewBooking, initialCustomerId, onNavigateToInquiry, onNavigateToLead }: CustomersPageProps) {
   const [search, setSearch] = useState("");
   const [activeSegment, setActiveSegment] = useState<{ key: string; label: string } | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [viewingCustomerId, setViewingCustomerId] = useState<string | null>(null);
+  const [showQuickInquiry, setShowQuickInquiry] = useState(false);
+
+  useEffect(() => {
+    if (initialCustomerId) setViewingCustomerId(initialCustomerId);
+  }, [initialCustomerId]);
 
   const { data: segments } = useQuery<any[]>({ queryKey: ["/api/customers/segments"] });
   const { data: tagCounts } = useQuery<any[]>({ queryKey: ["/api/customers/tags"] });
@@ -50,6 +65,12 @@ export default function CustomersPage({ onEditBooking }: CustomersPageProps) {
 
   const customers = data || [];
   const nonEmptySegments = (segments || []).filter((s) => s.key === 'all' || s.count > 0);
+  // The "unknown NUMBER → Quick Inquiry" flow (spec) is specifically about
+  // a phone search coming up empty — a plain name search with zero results
+  // isn't the same scenario (there's no number to seed the inquiry with),
+  // so it keeps the original neutral empty state instead of offering a CTA
+  // that would open a form with nothing useful pre-filled.
+  const searchLooksLikePhone = /\d{10,}/.test(search.replace(/\D/g, ""));
 
   return (
     <div className="space-y-6">
@@ -128,8 +149,18 @@ export default function CustomersPage({ onEditBooking }: CustomersPageProps) {
           ) : customers.length === 0 ? (
             <div className="text-center text-gray-500 py-12">
               <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p>No customers found</p>
-              <p className="text-sm">Customers are created automatically from bookings.</p>
+              {searchLooksLikePhone ? (
+                <>
+                  <p className="font-medium text-gray-700">No Existing Customer Found</p>
+                  <p className="text-sm mb-4">No customer matches "{search.trim()}".</p>
+                  <Button onClick={() => setShowQuickInquiry(true)}>Create Quick Inquiry</Button>
+                </>
+              ) : (
+                <>
+                  <p>No customers found</p>
+                  <p className="text-sm">Customers are created automatically from bookings.</p>
+                </>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -179,8 +210,31 @@ export default function CustomersPage({ onEditBooking }: CustomersPageProps) {
                 setViewingCustomerId(null);
                 onEditBooking?.(booking);
               }}
+              onNewBooking={(prefill) => {
+                setViewingCustomerId(null);
+                onNewBooking?.(prefill);
+              }}
+              onNavigateToInquiry={(inquiryId) => {
+                setViewingCustomerId(null);
+                onNavigateToInquiry?.(inquiryId);
+              }}
+              onNavigateToLead={(leadId) => {
+                setViewingCustomerId(null);
+                onNavigateToLead?.(leadId);
+              }}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showQuickInquiry} onOpenChange={setShowQuickInquiry}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>New Inquiry</DialogTitle></DialogHeader>
+          <QuickInquiryForm
+            initialMobile={searchLooksLikePhone ? search : undefined}
+            onSuccess={() => setShowQuickInquiry(false)}
+            onCancel={() => setShowQuickInquiry(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>
