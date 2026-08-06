@@ -369,4 +369,36 @@ test.describe('Referral capture + configurable reward event rules', () => {
     const referrerAfter = await (await page.request.get(`/api/customers/${referrer._id}`)).json();
     expect(referrerAfter.rewardPointsBalance).toBe(balanceBefore + 0.5);
   });
+
+  test('UI: Customer 360 Referral Program panel shows the code, stats, and a pending referral without misattributing the referrer\'s own name', async ({ page }) => {
+    await login(page, 'qaclient', 'QaFixed456!');
+    const csrf = await getCsrfToken(page);
+    const marker = String(Date.now());
+    const mobile = freshMobile();
+
+    const { customer: referrer } = await createCustomerViaBooking(page, csrf, `Panel Referrer ${marker}`, mobile);
+    const codeRes = await page.request.post(`/api/customers/${referrer._id}/referral-code`, { headers: { 'X-CSRF-Token': csrf } });
+    const { referralCode } = await codeRes.json();
+
+    const captureRes = await page.request.post('/api/referrals', {
+      headers: { 'X-CSRF-Token': csrf },
+      data: { referrerCustomerId: referrer._id, referredMobile: freshMobile(), source: 'existing_customer_search' },
+    });
+    expect(captureRes.status()).toBe(201);
+
+    await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+    await page.getByPlaceholder('Search name, mobile, or email').fill(mobile);
+    await page.getByText(`Panel Referrer ${marker}`, { exact: true }).click();
+
+    const dialog = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });
+    await expect(dialog.getByText('Referral Program')).toBeVisible();
+    await expect(dialog.getByText(referralCode)).toBeVisible();
+    await expect(dialog.getByText('Total Referrals')).toBeVisible();
+    // The referred side has no linked Customer yet (only a phone number
+    // was given at capture) — must read as a neutral placeholder, never
+    // as the referrer's own name (the exact display bug found and fixed
+    // while building this panel).
+    await expect(dialog.getByText('Referred contact (pending)')).toBeVisible();
+    await expect(dialog.getByText(`Panel Referrer ${marker}`, { exact: true })).toHaveCount(1);
+  });
 });

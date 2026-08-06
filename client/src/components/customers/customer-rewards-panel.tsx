@@ -33,8 +33,8 @@ export default function CustomerRewardsPanel({ customerId, rewards }: Props) {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const value = Number(points);
-      if (!Number.isInteger(value) || value === 0) throw new Error("Enter non-zero whole points");
+      const value = Math.round(Number(points) * 100) / 100;
+      if (!Number.isFinite(value) || value === 0) throw new Error("Enter a non-zero number of points");
       if (!reason.trim()) throw new Error("Reason is required");
       return (await apiRequest("POST", `/api/customers/${customerId}/rewards/adjust`, {
         points: value,

@@ -15,6 +15,7 @@ import CustomerService from "./customer-service";
 import CustomerTimeline from "./customer-timeline";
 import CustomerConsent from "./customer-consent";
 import CustomerRewardsPanel from "./customer-rewards-panel";
+import CustomerReferralPanel from "./customer-referral-panel";
 import CustomerMessageCenter from "./customer-message-center";
 import CustomerRequirements from "./customer-requirements";
 import CustomerDuplicateReview from "./customer-duplicate-review";
@@ -767,6 +768,8 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
       <CustomerGoogleReviews customerId={customerId} bookings={rows} />
 
       <CustomerRewardsPanel customerId={customerId} rewards={rewards} />
+
+      <CustomerReferralPanel customerId={customerId} />
 
       <div id="customer-whatsapp" className="scroll-mt-4">
         <CustomerMessageCenter customerId={customerId} bookings={rows} />
