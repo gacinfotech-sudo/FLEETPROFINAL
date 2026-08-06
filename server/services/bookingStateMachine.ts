@@ -205,11 +205,28 @@ export async function transitionBooking(
   // validated transition (a real Start Trip / Complete Trip action).
   if (toStatus === 'trip_started' && !(booking as any).actualStartDateTime) {
     (booking as any).actualStartDateTime = new Date();
-    if (options.startOdometer !== undefined) (booking as any).startOdometer = options.startOdometer;
+    if (options.startOdometer !== undefined) {
+      if (!Number.isFinite(options.startOdometer) || options.startOdometer < 0) {
+        throw new InvalidTransitionError('Start odometer must be a non-negative number.');
+      }
+      (booking as any).startOdometer = options.startOdometer;
+    }
   }
   if (toStatus === 'completed' && !(booking as any).actualEndDateTime) {
     (booking as any).actualEndDateTime = new Date();
-    if (options.endOdometer !== undefined) (booking as any).endOdometer = options.endOdometer;
+    if (options.endOdometer !== undefined) {
+      if (!Number.isFinite(options.endOdometer) || options.endOdometer < 0) {
+        throw new InvalidTransitionError('End odometer must be a non-negative number.');
+      }
+      const startOdometer = Number((booking as any).startOdometer);
+      if (Number.isFinite(startOdometer) && options.endOdometer < startOdometer) {
+        throw new InvalidTransitionError('End odometer cannot be lower than start odometer.');
+      }
+      (booking as any).endOdometer = options.endOdometer;
+      if (Number.isFinite(startOdometer)) {
+        (booking as any).totalKilometers = options.endOdometer - startOdometer;
+      }
+    }
   }
 
   await booking.save();

@@ -12,12 +12,13 @@ test('Positive-feedback and unresolved-complaint segments are real, and the time
   const csrfToken = await getCsrfToken(page);
   const phone = '93' + String(Date.now()).slice(-8);
   const day = new Date();
-  day.setDate(day.getDate() + 4500 + Math.floor(Math.random() * 400));
+  day.setDate(day.getDate() + 42000 + Math.floor(Math.random() * 400));
   const dayStr = day.toISOString().slice(0, 10);
 
   const vehiclesRes = await page.request.get(`/api/vehicles/available?pickupDate=${dayStr}&returnDate=${dayStr}`);
   const vehicles = await vehiclesRes.json();
   const vehicleId = vehicles[0]?._id || vehicles[0]?.id;
+  expect(vehicleId, 'Timeline test requires an available vehicle').toBeTruthy();
 
   const bookingRes = await page.request.post('/api/bookings', {
     headers: { 'X-CSRF-Token': csrfToken },
@@ -30,6 +31,7 @@ test('Positive-feedback and unresolved-complaint segments are real, and the time
     },
   });
   const booking = await bookingRes.json();
+  expect(bookingRes.ok(), JSON.stringify(booking)).toBe(true);
   const lookup = await (await page.request.get(`/api/customers/lookup?phone=${phone}`)).json();
   const customerId = lookup.customer._id;
 
@@ -43,10 +45,11 @@ test('Positive-feedback and unresolved-complaint segments are real, and the time
   });
 
   // Positive feedback (avg >= 4).
-  await page.request.post(`/api/customers/${customerId}/feedback`, {
+  const feedbackResponse = await page.request.post(`/api/customers/${customerId}/feedback`, {
     headers: { 'X-CSRF-Token': csrfToken },
     data: { bookingId: booking._id, driverRating: 5, vehicleRating: 5, serviceRating: 4 },
   });
+  expect(feedbackResponse.status(), JSON.stringify(await feedbackResponse.json())).toBe(201);
 
   // Unresolved complaint.
   await page.request.post(`/api/customers/${customerId}/complaints`, {

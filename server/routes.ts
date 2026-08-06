@@ -90,6 +90,9 @@ import { DriverLeave, DriverAttendance } from "./models/index";
 import { Expense, Driver } from "./models/index";
 import bcrypt from "bcrypt";
 import { authenticateDriver, type DriverAuthRequest } from "./middleware/driverAuth";
+import { registerGpsConnectionRoutes } from "./gps/routes/connections";
+import { registerGpsDeviceRoutes } from "./gps/routes/devices";
+import { registerGpsAssignmentRoutes } from "./gps/routes/assignments";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -278,6 +281,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/csrf-token", (req: any, res) => {
     res.json({ csrfToken: req.session.csrfToken });
   });
+
+  // Additive GPS namespace. Existing FleetPro routes and workflows remain
+  // authoritative and unchanged.
+  registerGpsConnectionRoutes(app);
+  registerGpsDeviceRoutes(app);
+  registerGpsAssignmentRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
@@ -3069,6 +3078,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!category || !description || !description.trim()) {
         return res.status(400).json({ message: "category and description are required." });
       }
+      const validComplaintCategories = ['driver_late', 'driver_behaviour', 'rash_driving', 'vehicle_problem', 'vehicle_cleanliness',
+        'vehicle_breakdown', 'ac_problem', 'wrong_vehicle', 'booking_issue', 'payment_dispute', 'office_communication',
+        'vendor_issue', 'self_drive_issue', 'other'];
+      if (!validComplaintCategories.includes(category)) {
+        return res.status(400).json({ message: "Invalid complaint category." });
+      }
+      if (severity !== undefined && !['low', 'medium', 'high', 'critical'].includes(severity)) {
+        return res.status(400).json({ message: "Invalid complaint severity." });
+      }
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
       const booking: any = bookingId
@@ -5638,6 +5656,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Customer-linked side effects must be identical whether completion is
+  // requested through the generic status action or the dedicated Complete
+  // Trip action. Keeping them here prevents one UI path from silently
+  // skipping rewards, tier updates, or after-sales tasks.
+  async function applyCustomerStatusEffects(booking: any, bookingRecordId: string, status: string, req: AuthRequest) {
+    if (!booking.customerId) return;
+    const customerId = booking.customerId.toString();
+    const actor = { userId: req.userId!, role: req.user?.role || 'client' };
+    try {
+      const result = await recomputeCustomerStats(customerId);
+      if (['completed', 'closed'].includes(status)) {
+        await creditBookingReward(req.tenantId!, customerId, bookingRecordId, booking.totalAmount, actor, result?.completedBookings);
+      }
+      if (status === 'completed') {
+        const alreadyCreated = await CustomerFollowUp.exists({ tenantId: req.tenantId, bookingId: bookingRecordId });
+        if (!alreadyCreated) {
+          const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+          const inAWeek = new Date(); inAWeek.setDate(inAWeek.getDate() + 7);
+          await CustomerFollowUp.insertMany([
+            { tenantId: req.tenantId, customerId, bookingId: bookingRecordId, taskType: 'Confirm safe trip completion', dueDate: new Date(), priority: 'high', createdBy: actor },
+            { tenantId: req.tenantId, customerId, bookingId: bookingRecordId, taskType: 'Ask for driver feedback', dueDate: tomorrow, priority: 'medium', createdBy: actor },
+            { tenantId: req.tenantId, customerId, bookingId: bookingRecordId, taskType: 'Offer repeat booking benefit', dueDate: inAWeek, priority: 'low', createdBy: actor },
+          ]);
+        }
+      }
+      if (['cancelled', 'no_show'].includes(status)) {
+        await reverseBookingReward(req.tenantId!, customerId, bookingRecordId, actor);
+      }
+      if (result) {
+        const tier = await computeLoyaltyTier(req.tenantId!, result);
+        if (result.loyaltyTier !== tier.name) {
+          result.loyaltyTier = tier.name;
+          await result.save();
+        }
+      }
+    } catch (err: any) {
+      console.error('Customer stats/reward recompute failed after status change:', err?.message || err);
+    }
+  }
+
   // The single sanctioned way to change a booking's status. Every status
   // mutation (cancel, complete, assign, dispatch, ...) goes through this
   // so the state machine's transition rules are always enforced.
@@ -5672,45 +5730,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Awaited (not fire-and-forget) because reward crediting needs the
       // freshly-recomputed completedBookings count to detect the repeat-
       // booking-bonus threshold correctly.
-      if ((booking as any).customerId) {
-        const customerId = (booking as any).customerId.toString();
-        const actor = { userId: req.userId!, role: req.user?.role || 'client' };
-        try {
-          const result = await recomputeCustomerStats(customerId);
-          if (['completed', 'closed'].includes(status)) {
-            await creditBookingReward(req.tenantId!, customerId, id, booking.totalAmount, actor, result?.completedBookings);
-          }
-          if (status === 'completed') {
-            // Default after-sales task set for every completed trip — a
-            // real, working starting point per spec section 15, not
-            // configurable per-tenant yet (see Remaining Issues). Guarded
-            // against duplicate creation in case this transition fires
-            // more than once for the same booking (e.g. a retried request).
-            const alreadyCreated = await CustomerFollowUp.exists({ tenantId: req.tenantId, bookingId: id });
-            if (!alreadyCreated) {
-              const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
-              const inAWeek = new Date(); inAWeek.setDate(inAWeek.getDate() + 7);
-              await CustomerFollowUp.insertMany([
-                { tenantId: req.tenantId, customerId, bookingId: id, taskType: 'Confirm safe trip completion', dueDate: new Date(), priority: 'high', createdBy: actor },
-                { tenantId: req.tenantId, customerId, bookingId: id, taskType: 'Ask for driver feedback', dueDate: tomorrow, priority: 'medium', createdBy: actor },
-                { tenantId: req.tenantId, customerId, bookingId: id, taskType: 'Offer repeat booking benefit', dueDate: inAWeek, priority: 'low', createdBy: actor },
-              ]);
-            }
-          }
-          if (['cancelled', 'no_show'].includes(status)) {
-            await reverseBookingReward(req.tenantId!, customerId, id, actor);
-          }
-          if (result) {
-            const tier = await computeLoyaltyTier(req.tenantId!, result);
-            if (result.loyaltyTier !== tier.name) {
-              result.loyaltyTier = tier.name;
-              await result.save();
-            }
-          }
-        } catch (err: any) {
-          console.error('Customer stats/reward recompute failed after status change:', err?.message || err);
-        }
-      }
+      await applyCustomerStatusEffects(booking, id, status, req);
 
       // Keep any Vendor Duty's lifecycle in sync with its booking — a
       // completed/closed booking's duty is done; a cancelled/no-show
@@ -5793,6 +5813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { endOdometer }
       );
       if (!booking) return res.status(404).json({ message: "Booking not found" });
+      await applyCustomerStatusEffects(booking, req.params.id, 'completed', req);
       res.json(booking);
     } catch (error: any) {
       if (error instanceof InvalidTransitionError) {
