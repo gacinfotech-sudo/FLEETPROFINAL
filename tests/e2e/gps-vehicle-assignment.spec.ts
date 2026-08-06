@@ -22,6 +22,13 @@ test('vehicle GPS assignment enforces one-to-one active mapping and preserves ef
     expect(vehicles.length).toBeGreaterThanOrEqual(2);
     const [vehicleOne, vehicleTwo] = vehicles;
 
+    // Idempotent across repeated runs against a persistent dev DB — the
+    // overlap check considers ended history too (by design, preserving
+    // "who had this vehicle when" forever), so a prior run's own records
+    // for these same two real tenant vehicles would otherwise permanently
+    // block this run's relative "yesterday to now" date window.
+    await VehicleGpsAssignment.deleteMany({ vehicleId: { $in: [vehicleOne._id, vehicleTwo._id] } });
+
     const connectionResponse = await page.request.post('/api/gps/connections', {
       headers,
       data: {
