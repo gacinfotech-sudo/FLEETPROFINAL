@@ -1793,16 +1793,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/vehicles/available", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const { pickupDate, returnDate } = req.query;
-      
+      const { pickupDate, returnDate, pickupTime, returnTime } = req.query;
+
       if (!pickupDate || !returnDate) {
         return res.status(400).json({ message: "Pickup and return dates are required" });
       }
-      
+
       const vehicles = await storage.getAvailableVehicles(
         req.tenantId!,
         pickupDate as string,
-        returnDate as string
+        returnDate as string,
+        pickupTime as string | undefined,
+        returnTime as string | undefined
       );
       res.json(vehicles);
     } catch (error) {
@@ -2371,6 +2373,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // P0 FIX: no longer logging the full mapped booking payload — it
       // contains customer PII (name, phone, email) and financial amounts.
       const bookingData: any = mongoBookingSchema.parse(mappedData);
+
+      // Flexible fulfilment: vehicleId is no longer schema-required (a
+      // booking may be confirmed with the physical resource still
+      // unresolved — see docs/BOOKING_RESOURCE_DEAD_END_AUDIT.md), but
+      // SOME explicit resolution is still required so an old/unmodified
+      // client (which never sends resourceAssignmentPending) keeps
+      // getting today's exact "vehicleId required" behavior unchanged.
+      // Vendor-vehicle linkage is deliberately NOT accepted here — it
+      // goes through the existing, already-tested
+      // POST /api/bookings/:id/assign-vendor as an immediate follow-up
+      // call from the wizard, reusing its real overlap/duty checks
+      // rather than duplicating them on this path too.
+      if (!bookingData.vehicleId && !req.body.resourceAssignmentPending) {
+        return res.status(400).json({
+          message: "A vehicle is required, or set resourceAssignmentPending to confirm the booking with resource sourcing still pending.",
+          code: "VEHICLE_OR_ASSIGNMENT_PENDING_REQUIRED",
+        });
+      }
+      if (!bookingData.resourceFulfilmentStatus) {
+        bookingData.resourceFulfilmentStatus = bookingData.vehicleId ? 'own_fleet_assigned' : 'not_started';
+      }
 
       // Duplicate-request guard (pipeline audit finding: this route had no
       // idempotency protection at all — a double form-submit, a browser
@@ -6190,6 +6213,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       booking.fulfilmentVendorId = linkedVendor ? linkedVendor._id : undefined;
       booking.vendorDriverId = vendorDriverId || undefined;
       booking.vendorVehicleId = vendorVehicleId || undefined;
+      // Summary status for dashboards/filters/Trip Start gate — see
+      // docs/RESOURCE_FULFILMENT_MATRIX.md. Matches spec §9 step 10
+      // ("Mark status vendor_confirmation_pending") whether this call is
+      // the wizard's immediate follow-up to a vehicle-less creation, or a
+      // later assignment on a booking that already had a company vehicle.
+      booking.resourceFulfilmentStatus = linkedVendor ? 'vendor_confirmation_pending' : booking.resourceFulfilmentStatus;
 
       await booking.save();
 

@@ -178,7 +178,15 @@ export async function transitionBooking(
     );
   }
 
-  if (REQUIRES_ASSIGNMENT.includes(toStatus) && (!booking.vehicleId || !booking.driverId) && booking.bookingType !== 'self_drive') {
+  // Resolved either by a company vehicle+driver, OR by a vendor
+  // vehicle+driver (flexible-fulfilment initiative — a booking may be
+  // confirmed vendor-only from the start; see
+  // docs/STAGE_VALIDATION_MATRIX.md). Strictness at Trip Start is
+  // unchanged — some real resolution is still required either way,
+  // this only widens WHICH fields can satisfy it.
+  const hasOwnAssignment = !!(booking.vehicleId && booking.driverId);
+  const hasVendorAssignment = !!((booking as any).vendorVehicleId && (booking as any).vendorDriverId);
+  if (REQUIRES_ASSIGNMENT.includes(toStatus) && !hasOwnAssignment && !hasVendorAssignment && booking.bookingType !== 'self_drive') {
     if (!options.override) {
       throw new InvalidTransitionError(
         `Booking ${booking.bookingId} is missing vehicle/driver assignment. A manager must override with a recorded reason to proceed to '${toStatus}'.`

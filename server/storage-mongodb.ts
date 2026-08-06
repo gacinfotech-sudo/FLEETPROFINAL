@@ -43,7 +43,7 @@ export interface IStorage {
   getVehicle(id: string, tenantId?: string): Promise<IVehicle | undefined>;
   updateVehicle(id: string, data: any, tenantId?: string): Promise<IVehicle | undefined>;
   deleteVehicle(id: string, tenantId?: string): Promise<void>;
-  getAvailableVehicles(tenantId: string, pickupDate: string, returnDate: string): Promise<IVehicle[]>;
+  getAvailableVehicles(tenantId: string, pickupDate: string, returnDate: string, pickupTime?: string, returnTime?: string): Promise<IVehicle[]>;
 
   // Driver methods
   createDriver(driver: any): Promise<IDriver>;
@@ -447,28 +447,27 @@ export class MongoDBStorage implements IStorage {
     }
   }
 
-  async getAvailableVehicles(tenantId: string, pickupDate: string, returnDate: string): Promise<IVehicle[]> {
+  // P0 FIX (flexible-fulfilment initiative, docs/FLEXIBLE_PIPELINE_CURRENT_AUDIT.md
+  // §2): this used to compare bare pickupDate/returnDate (midnight-only)
+  // and only excluded status:'confirmed' bookings — a real, if narrow,
+  // contributor to the "no vehicles available" dead-end, since a vehicle
+  // free for the actual requested time window could still be reported
+  // unavailable by a same-day-but-non-overlapping booking, or (opposite
+  // direction) show as available despite an active non-'confirmed' hold.
+  // Now delegates to findVehicleConflicts — the same full-datetime,
+  // full-occupying-status conflict check already used by booking creation
+  // and the Availability Engine — instead of a separate, divergent query.
+  async getAvailableVehicles(tenantId: string, pickupDate: string, returnDate: string, pickupTime?: string, returnTime?: string): Promise<IVehicle[]> {
     try {
-      const pickup = new Date(pickupDate);
-      const returnD = new Date(returnDate);
+      const start = combineDateTime(pickupDate, pickupTime);
+      const end = combineDateTime(returnDate, returnTime);
 
-      // Find vehicles that are not booked during the requested period
-      const bookedVehicleIds = await Booking.distinct('vehicleId', {
-        tenantId,
-        status: { $in: ['confirmed'] },
-        $or: [
-          {
-            pickupDate: { $lte: returnD },
-            returnDate: { $gte: pickup }
-          }
-        ]
-      });
-
-      return await Vehicle.find({
-        tenantId,
-        status: 'available',
-        _id: { $nin: bookedVehicleIds }
-      }).sort({ createdAt: -1 });
+      const candidates = await Vehicle.find({ tenantId, status: 'available' }).sort({ createdAt: -1 });
+      const availability = await Promise.all(candidates.map(async (v) => {
+        const conflicts = await findVehicleConflicts(tenantId, v.id, start, end);
+        return conflicts.length === 0;
+      }));
+      return candidates.filter((_v, i) => availability[i]);
     } catch (error) {
       console.error('Error getting available vehicles:', error);
       throw error;

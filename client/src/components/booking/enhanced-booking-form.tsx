@@ -280,12 +280,21 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedValues, step, draftChecked, pendingDraft, bookingConfirmed]);
 
-  // Fetch available vehicles
+  // Fetch available vehicles.
+  // P0 FIX (flexible-fulfilment initiative): this used to omit
+  // pickupTime/returnTime entirely, same bug already fixed for driver
+  // availability just below — see docs/FLEXIBLE_PIPELINE_CURRENT_AUDIT.md §2.
   const { data: availableVehicles } = useQuery({
-    queryKey: ["/api/vehicles/available", watchedValues.pickupDate, watchedValues.returnDate],
+    queryKey: ["/api/vehicles/available", watchedValues.pickupDate, watchedValues.pickupTime, watchedValues.returnDate, watchedValues.returnTime],
     queryFn: async () => {
       if (!watchedValues.pickupDate || !watchedValues.returnDate) return [];
-      const response = await fetch(`/api/vehicles/available?pickupDate=${watchedValues.pickupDate}&returnDate=${watchedValues.returnDate}`);
+      const params = new URLSearchParams({
+        pickupDate: watchedValues.pickupDate,
+        returnDate: watchedValues.returnDate,
+      });
+      if (watchedValues.pickupTime) params.set('pickupTime', watchedValues.pickupTime);
+      if (watchedValues.returnTime) params.set('returnTime', watchedValues.returnTime);
+      const response = await fetch(`/api/vehicles/available?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch vehicles');
       return response.json();
     },
