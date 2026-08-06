@@ -16,6 +16,7 @@ import EnhancedInvoiceGenerator from "../components/invoice/enhanced-invoice-gen
 import UserManagement from "../components/user-management";
 import BusinessProfile from "../components/business-profile";
 import InvoiceSettingsPanel from "../components/invoice/invoice-settings-panel";
+import RewardReferralSettingsPanel from "../components/settings/reward-referral-settings-panel";
 import OnboardingWizard from "../components/onboarding/onboarding-wizard";
 import ManageExpenses from "./manage-expenses";
 import LiveBookings, { type Bucket as LiveOpsBucket } from "./live-bookings";
@@ -2058,6 +2059,11 @@ export default function Dashboard() {
 
             {/* Invoice Settings Section */}
             <InvoiceSettingsPanel userRole={user?.role || ''} />
+
+            {/* Rewards and Referrals Settings Section */}
+            <div className="mb-6">
+              <RewardReferralSettingsPanel userRole={user?.role || ''} />
+            </div>
 
             {/* Security Section */}
             <Card>

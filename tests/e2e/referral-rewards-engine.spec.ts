@@ -401,4 +401,32 @@ test.describe('Referral capture + configurable reward event rules', () => {
     await expect(dialog.getByText('Referred contact (pending)')).toBeVisible();
     await expect(dialog.getByText(`Panel Referrer ${marker}`, { exact: true })).toHaveCount(1);
   });
+
+  test('UI: Rewards and Referrals Settings panel on Profile saves an event rule and it reloads with the new value', async ({ page }) => {
+    await login(page, 'qaclient', 'QaFixed456!');
+    const csrf = await getCsrfToken(page);
+
+    await page.goto('/dashboard/profile');
+    await page.waitForLoadState('networkidle');
+    await page.locator('text=Referral & Review Events').scrollIntoViewIfNeeded();
+
+    // Stable ids (rrs-ev-<eventKey>-points / -save), not text-based div
+    // filters — this codebase has repeatedly hit ambiguous-match issues
+    // with hasText filters matching oversized ancestor divs.
+    const pointsInput = page.locator('[id="rrs-ev-review.verified-points"]');
+    await pointsInput.fill('1.5');
+    await page.locator('[id="rrs-ev-review.verified-save"]').click();
+    await expect(page.getByText('Verified Review Submitted saved')).toBeVisible({ timeout: 5000 });
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await page.locator('text=Referral & Review Events').scrollIntoViewIfNeeded();
+    await expect(page.locator('[id="rrs-ev-review.verified-points"]')).toHaveValue('1.5');
+
+    // Restore the default so this test stays safely re-runnable and
+    // doesn't leak a changed rule into other tests sharing this tenant.
+    await page.request.put('/api/reward-event-rules/review.verified', {
+      headers: { 'X-CSRF-Token': csrf }, data: { points: 0.5 },
+    });
+  });
 });
