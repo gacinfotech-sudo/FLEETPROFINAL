@@ -25,6 +25,7 @@ import CampaignsPage from "./campaigns";
 import InquiriesPage from "./inquiries";
 import LeadsPage from "./leads";
 import FollowUpsPage from "./followups";
+import VendorsPage from "./vendors";
 import UpcomingBookings from "./upcoming-bookings";
 import PaymentDues from "./payment-dues";
 import DriverLeavePage from "./driver-leave";
@@ -35,6 +36,7 @@ import WhatsAppPanel from "./whatsapp-panel";
 import DailyOperationsPopup from "../components/dashboard/daily-operations-popup";
 import BookingCommunication from "../components/booking/booking-communication";
 import ExtendBookingDialog from "../components/booking/extend-booking-dialog";
+import AssignVendorDialog from "../components/booking/assign-vendor-dialog";
 import PaymentSection from "../components/booking/payment-section";
 import TripCostSummary from "../components/booking/trip-cost-summary";
 import SetDriverPinDialog from "../components/drivers/set-driver-pin-dialog";
@@ -53,7 +55,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Menu, LogOut, Star, Car, Users, UserCheck, Phone, Mail, MessageCircle, Banknote, Plus, User, FileText, Trash2 } from "lucide-react";
 
-type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups";
+type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors";
 
 // apiRequest() throws Error("<status>: <raw response text>") on a non-2xx
 // response (queryClient.ts:throwIfResNotOk) — without this, a rejected
@@ -153,7 +155,7 @@ export default function Dashboard() {
   // Sync URL with current view on mount with role-based access control
   useEffect(() => {
     const section = params.section as ViewType;
-    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "upcoming-bookings", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "after-sales", "campaigns", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile"];
+    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "upcoming-bookings", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "after-sales", "campaigns", "vendors", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile"];
     
     // Add "users" section only for admin and client roles
     if (user?.role === 'admin' || user?.role === 'client') {
@@ -162,7 +164,7 @@ export default function Dashboard() {
     
     // Remove restricted sections for manager roles
     if (user?.role === 'manager') {
-      const restrictedSections = ["revenue", "vendor-settlement", "drivers", "driver-leave", "driver-performance", "vehicle-performance", "driver-attendance", "after-sales", "campaigns"];
+      const restrictedSections = ["revenue", "vendor-settlement", "drivers", "driver-leave", "driver-performance", "vehicle-performance", "driver-attendance", "after-sales", "campaigns", "vendors"];
       restrictedSections.forEach(section => {
         const index = allowedSections.indexOf(section);
         if (index > -1) {
@@ -1505,6 +1507,9 @@ export default function Dashboard() {
       case "followups":
         return <FollowUpsPage />;
 
+      case "vendors":
+        return <VendorsPage />;
+
       case "history":
         return (
           <div>
@@ -2718,7 +2723,8 @@ export default function Dashboard() {
                   not a permission-gated placeholder, genuinely absent. */}
               <TripCostSummary booking={viewingBooking} />
 
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <AssignVendorDialog booking={viewingBooking} />
                 <ExtendBookingDialog booking={viewingBooking} />
               </div>
 

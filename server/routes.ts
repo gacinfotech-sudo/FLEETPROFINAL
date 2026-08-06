@@ -72,6 +72,12 @@ import { assertValidQuotationTransition, isImmutableQuotationStatus, computeOpti
 import { sendQuotationMessage } from "./whatsapp/sendQuotationMessage";
 import { computeCustomerTimeline } from "./services/timelineService";
 import { previewCampaign, sendCampaign } from "./services/campaignService";
+import { Vendor, VendorDriver, VendorVehicle } from "./models/index";
+import { createVendor } from "./services/vendorService";
+import { createVendorDriver, findVendorDriverByMobile, checkVendorDriverAvailability } from "./services/vendorDriverService";
+import { createVendorVehicle, findVendorVehicleByRegistration, checkVendorVehicleAvailability, normalizeRegistrationNumber } from "./services/vendorVehicleService";
+import { VendorDuty } from "./models/index";
+import { upsertVendorDuty, cancelVendorDutyForBooking, completeVendorDutyForBooking } from "./services/vendorDutyService";
 import { buildDriverPerformance } from "./services/driverPerformance";
 import { buildVehiclePerformance } from "./services/vehiclePerformance";
 import { findDuplicateCandidates, mergeCustomers } from "./services/customerMergeService";
@@ -2334,6 +2340,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerEmail: req.body.customerEmail || undefined,
         // Handle driverId - convert empty string to undefined for MongoDB ObjectId
         driverId: req.body.driverId && req.body.driverId.trim() !== '' ? req.body.driverId : undefined,
+        // Same empty-string-to-undefined handling for the optional Source
+        // Vendor link — the booking form always submits this field (default
+        // "" when nothing is selected), and Mongoose's ObjectId cast throws
+        // on an empty string rather than treating it as unset.
+        sourceVendorId: req.body.sourceVendorId && req.body.sourceVendorId.trim() !== '' ? req.body.sourceVendorId : undefined,
         // Handle totalKilometers for per-km pricing
         totalKilometers: req.body.totalKilometers || undefined,
         // Default values for optional fields
@@ -2367,6 +2378,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (existingBooking) {
           return res.status(200).json(existingBooking);
         }
+      }
+
+      // Optional Source Vendor link — when the booking source is a known
+      // vendor/agent, the caller may point at a real Vendor Master record
+      // instead of (or alongside) the free-text sourceName. Validated as
+      // active/belonging-to-tenant; sourceName/sourceContact are derived
+      // from it here only when the caller left them blank, so a manually
+      // typed override always wins.
+      if (bookingData.sourceVendorId) {
+        const sourceVendor = await Vendor.findOne({ _id: bookingData.sourceVendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+        if (!sourceVendor) {
+          return res.status(400).json({ message: "Source vendor not found" });
+        }
+        if (sourceVendor.status !== 'active') {
+          return res.status(400).json({ message: `Source vendor "${sourceVendor.companyName}" is ${sourceVendor.status.replace(/_/g, ' ')}, not active.` });
+        }
+        if (!bookingData.sourceName) bookingData.sourceName = sourceVendor.companyName;
+        if (!bookingData.sourceContact) bookingData.sourceContact = sourceVendor.primaryMobile;
       }
 
       // Customer Database linking — resolved BEFORE the booking is
@@ -5195,6 +5224,355 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ---------------------------------------------------------------------
+  // Vendor 360° — Vendor Master (Phase 1). Drivers/Vehicles/Duty/Ledger/
+  // Settlement are separate follow-up patches; this covers the root
+  // Vendor record every later phase links against via vendorId.
+  // ---------------------------------------------------------------------
+  app.get("/api/vendors", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const { status, search } = req.query as { status?: string; search?: string };
+      const query: any = { tenantId: req.tenantId, isDeleted: { $ne: true } };
+      if (status) query.status = status;
+      if (search) {
+        const normalized = normalizeIndianPhone(search) || '';
+        query.$or = [
+          { companyName: { $regex: search, $options: 'i' } },
+          { contactPerson: { $regex: search, $options: 'i' } },
+          { vendorCode: { $regex: search, $options: 'i' } },
+          ...(normalized ? [{ normalizedMobile: normalized }] : []),
+        ];
+      }
+      const vendors = await Vendor.find(query).sort({ createdAt: -1 });
+      res.json(vendors);
+    } catch (error: any) {
+      console.error('List vendors error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch vendors" });
+    }
+  });
+
+  app.get("/api/vendors/:vendorId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      res.json(vendor);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch vendor" });
+    }
+  });
+
+  app.post("/api/vendors", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_CREATE), async (req: AuthRequest, res) => {
+    try {
+      const { companyName, contactPerson, primaryMobile } = req.body || {};
+      if (!companyName || !companyName.trim()) return res.status(400).json({ message: "Company name is required" });
+      if (!contactPerson || !contactPerson.trim()) return res.status(400).json({ message: "Contact person is required" });
+      if (!primaryMobile) return res.status(400).json({ message: "Primary mobile is required" });
+
+      const vendor = await createVendor({
+        tenantId: req.tenantId!,
+        companyName, contactPerson, primaryMobile,
+        alternateMobile: req.body.alternateMobile,
+        whatsappNumber: req.body.whatsappNumber,
+        email: req.body.email,
+        address: req.body.address,
+        vendorTypes: req.body.vendorTypes,
+        roles: req.body.roles,
+        serviceAreas: req.body.serviceAreas,
+        businessDetails: req.body.businessDetails,
+        bankDetails: req.body.bankDetails,
+        defaultCommercialTerms: req.body.defaultCommercialTerms,
+        internalNotes: req.body.internalNotes,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(vendor);
+    } catch (error: any) {
+      console.error('Create vendor error:', error?.message || error);
+      res.status(400).json({ message: error?.message || "Failed to create vendor" });
+    }
+  });
+
+  // Explicit allowlist merge — never `vendor = req.body`. Nested objects
+  // (businessDetails/bankDetails/address/defaultCommercialTerms) are
+  // shallow-merged onto the existing subdocument so a partial payload
+  // can't blow away fields the caller didn't intend to touch.
+  app.patch("/api/vendors/:vendorId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_EDIT), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      const payload = req.body || {};
+
+      if (payload.companyName !== undefined) vendor.companyName = payload.companyName;
+      if (payload.contactPerson !== undefined) vendor.contactPerson = payload.contactPerson;
+      if (payload.primaryMobile !== undefined) {
+        const normalized = normalizeIndianPhone(payload.primaryMobile);
+        if (!normalized) return res.status(400).json({ message: `Invalid mobile number: "${payload.primaryMobile}"` });
+        vendor.primaryMobile = normalized;
+        vendor.normalizedMobile = normalized;
+      }
+      if (payload.alternateMobile !== undefined) vendor.alternateMobile = payload.alternateMobile;
+      if (payload.whatsappNumber !== undefined) vendor.whatsappNumber = payload.whatsappNumber;
+      if (payload.email !== undefined) vendor.email = payload.email;
+      if (payload.address !== undefined) vendor.address = { ...(vendor.address || {}), ...payload.address };
+      if (payload.vendorTypes !== undefined) vendor.vendorTypes = payload.vendorTypes;
+      if (payload.roles !== undefined) vendor.roles = payload.roles;
+      if (payload.serviceAreas !== undefined) vendor.serviceAreas = payload.serviceAreas;
+      if (payload.businessDetails !== undefined) vendor.businessDetails = { ...(vendor.businessDetails || {}), ...payload.businessDetails };
+      if (payload.bankDetails !== undefined) vendor.bankDetails = { ...(vendor.bankDetails || {}), ...payload.bankDetails };
+      if (payload.defaultCommercialTerms !== undefined) vendor.defaultCommercialTerms = { ...(vendor.defaultCommercialTerms || {}), ...payload.defaultCommercialTerms };
+      if (payload.internalNotes !== undefined) vendor.internalNotes = payload.internalNotes;
+      if (payload.rating !== undefined) vendor.rating = payload.rating;
+      // Immutable / server-derived — never client-settable via PATCH.
+      // (vendorCode, tenantId, status changes go through /block /activate.)
+
+      vendor.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      vendor.version = (vendor.version || 1) + 1;
+      await vendor.save();
+      res.json(vendor);
+    } catch (error: any) {
+      console.error('Update vendor error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update vendor" });
+    }
+  });
+
+  app.post("/api/vendors/:vendorId/block", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_BLOCK), async (req: AuthRequest, res) => {
+    try {
+      const { reason } = req.body || {};
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      vendor.status = 'temporarily_blocked';
+      vendor.suspensionReason = reason;
+      vendor.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      await vendor.save();
+      res.json(vendor);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to block vendor" });
+    }
+  });
+
+  app.post("/api/vendors/:vendorId/activate", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_BLOCK), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      vendor.status = 'active';
+      vendor.suspensionReason = undefined;
+      vendor.blacklistReason = undefined;
+      vendor.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      await vendor.save();
+      res.json(vendor);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to activate vendor" });
+    }
+  });
+
+  // Vendor Drivers — scoped to (tenantId, vendorId). Duplicate protection
+  // is by normalized mobile WITHIN the vendor only (see vendorDriverService).
+  app.get("/api/vendors/:vendorId/drivers", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      const drivers = await VendorDriver.find({ tenantId: req.tenantId, vendorId: vendor._id, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
+      res.json(drivers);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch vendor drivers" });
+    }
+  });
+
+  // "Search within this vendor for an existing driver by mobile before
+  // creating a new one" — the exact lookup the booking-assignment flow
+  // (spec §5) needs before showing "Add this driver to Vendor CRM".
+  app.get("/api/vendors/:vendorId/drivers/lookup", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const { mobile } = req.query as { mobile?: string };
+      if (!mobile) return res.status(400).json({ message: "mobile is required" });
+      const driver = await findVendorDriverByMobile(req.tenantId!, req.params.vendorId, mobile);
+      res.json({ found: !!driver, driver });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to look up vendor driver" });
+    }
+  });
+
+  app.get("/api/vendors/:vendorId/drivers/:driverId/availability", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const result = await checkVendorDriverAvailability(req.tenantId!, req.params.vendorId, req.params.driverId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to check driver availability" });
+    }
+  });
+
+  app.post("/api/vendors/:vendorId/drivers", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_DRIVER_CREATE), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      const { name, primaryMobile } = req.body || {};
+      if (!name || !name.trim()) return res.status(400).json({ message: "Driver name is required" });
+      if (!primaryMobile) return res.status(400).json({ message: "Primary mobile is required" });
+
+      const driver = await createVendorDriver({
+        tenantId: req.tenantId!, vendorId: req.params.vendorId,
+        name, primaryMobile,
+        alternateMobile: req.body.alternateMobile, whatsappNumber: req.body.whatsappNumber,
+        licenseNumber: req.body.licenseNumber,
+        licenseExpiry: req.body.licenseExpiry ? new Date(req.body.licenseExpiry) : undefined,
+        address: req.body.address, emergencyContact: req.body.emergencyContact,
+        serviceAreas: req.body.serviceAreas,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(driver);
+    } catch (error: any) {
+      console.error('Create vendor driver error:', error?.message || error);
+      res.status(400).json({ message: error?.message || "Failed to create vendor driver" });
+    }
+  });
+
+  app.patch("/api/vendors/:vendorId/drivers/:driverId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_DRIVER_EDIT), async (req: AuthRequest, res) => {
+    try {
+      const driver = await VendorDriver.findOne({ _id: req.params.driverId, tenantId: req.tenantId, vendorId: req.params.vendorId, isDeleted: { $ne: true } });
+      if (!driver) return res.status(404).json({ message: "Vendor driver not found" });
+      const payload = req.body || {};
+
+      if (payload.name !== undefined) driver.name = payload.name;
+      if (payload.primaryMobile !== undefined) {
+        const normalized = normalizeIndianPhone(payload.primaryMobile);
+        if (!normalized) return res.status(400).json({ message: `Invalid mobile number: "${payload.primaryMobile}"` });
+        driver.primaryMobile = normalized;
+        driver.normalizedMobile = normalized;
+      }
+      if (payload.alternateMobile !== undefined) driver.alternateMobile = payload.alternateMobile;
+      if (payload.whatsappNumber !== undefined) driver.whatsappNumber = payload.whatsappNumber;
+      if (payload.licenseNumber !== undefined) driver.licenseNumber = payload.licenseNumber;
+      if (payload.licenseExpiry !== undefined) driver.licenseExpiry = payload.licenseExpiry ? new Date(payload.licenseExpiry) : undefined;
+      if (payload.address !== undefined) driver.address = payload.address;
+      if (payload.emergencyContact !== undefined) driver.emergencyContact = payload.emergencyContact;
+      if (payload.serviceAreas !== undefined) driver.serviceAreas = payload.serviceAreas;
+      if (payload.status !== undefined) driver.status = payload.status;
+      if (payload.rating !== undefined) driver.rating = payload.rating;
+
+      driver.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      await driver.save();
+      res.json(driver);
+    } catch (error: any) {
+      console.error('Update vendor driver error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update vendor driver" });
+    }
+  });
+
+  // Vendor Vehicles — scoped to (tenantId, vendorId). Duplicate protection
+  // is by normalized registration number WITHIN the vendor only.
+  app.get("/api/vendors/:vendorId/vehicles", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      const vehicles = await VendorVehicle.find({ tenantId: req.tenantId, vendorId: vendor._id, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
+      res.json(vehicles);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch vendor vehicles" });
+    }
+  });
+
+  app.get("/api/vendors/:vendorId/vehicles/lookup", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const { registrationNumber } = req.query as { registrationNumber?: string };
+      if (!registrationNumber) return res.status(400).json({ message: "registrationNumber is required" });
+      const vehicle = await findVendorVehicleByRegistration(req.tenantId!, req.params.vendorId, registrationNumber);
+      res.json({ found: !!vehicle, vehicle });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to look up vendor vehicle" });
+    }
+  });
+
+  app.get("/api/vendors/:vendorId/vehicles/:vehicleId/availability", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const result = await checkVendorVehicleAvailability(req.tenantId!, req.params.vendorId, req.params.vehicleId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to check vehicle availability" });
+    }
+  });
+
+  app.post("/api/vendors/:vendorId/vehicles", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VEHICLE_CREATE), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      const { registrationNumber, vehicleModel, category } = req.body || {};
+      if (!registrationNumber) return res.status(400).json({ message: "Registration number is required" });
+      if (!vehicleModel) return res.status(400).json({ message: "Vehicle model is required" });
+      if (!category) return res.status(400).json({ message: "Vehicle category is required" });
+
+      const vehicle = await createVendorVehicle({
+        tenantId: req.tenantId!, vendorId: req.params.vendorId,
+        registrationNumber, vehicleModel, category,
+        make: req.body.make, variant: req.body.variant,
+        seatingCapacity: req.body.seatingCapacity, fuelType: req.body.fuelType, colour: req.body.colour,
+        ownerName: req.body.ownerName,
+        insuranceExpiry: req.body.insuranceExpiry ? new Date(req.body.insuranceExpiry) : undefined,
+        permitExpiry: req.body.permitExpiry ? new Date(req.body.permitExpiry) : undefined,
+        fitnessExpiry: req.body.fitnessExpiry ? new Date(req.body.fitnessExpiry) : undefined,
+        pucExpiry: req.body.pucExpiry ? new Date(req.body.pucExpiry) : undefined,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      res.status(201).json(vehicle);
+    } catch (error: any) {
+      console.error('Create vendor vehicle error:', error?.message || error);
+      res.status(400).json({ message: error?.message || "Failed to create vendor vehicle" });
+    }
+  });
+
+  app.patch("/api/vendors/:vendorId/vehicles/:vehicleId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VEHICLE_EDIT), async (req: AuthRequest, res) => {
+    try {
+      const vehicle = await VendorVehicle.findOne({ _id: req.params.vehicleId, tenantId: req.tenantId, vendorId: req.params.vendorId, isDeleted: { $ne: true } });
+      if (!vehicle) return res.status(404).json({ message: "Vendor vehicle not found" });
+      const payload = req.body || {};
+
+      if (payload.registrationNumber !== undefined) {
+        vehicle.registrationNumber = payload.registrationNumber;
+        vehicle.normalizedRegistrationNumber = normalizeRegistrationNumber(payload.registrationNumber);
+      }
+      if (payload.make !== undefined) vehicle.make = payload.make;
+      if (payload.vehicleModel !== undefined) vehicle.vehicleModel = payload.vehicleModel;
+      if (payload.variant !== undefined) vehicle.variant = payload.variant;
+      if (payload.category !== undefined) vehicle.category = payload.category;
+      if (payload.seatingCapacity !== undefined) vehicle.seatingCapacity = payload.seatingCapacity;
+      if (payload.fuelType !== undefined) vehicle.fuelType = payload.fuelType;
+      if (payload.colour !== undefined) vehicle.colour = payload.colour;
+      if (payload.ownerName !== undefined) vehicle.ownerName = payload.ownerName;
+      if (payload.insuranceExpiry !== undefined) vehicle.insuranceExpiry = payload.insuranceExpiry ? new Date(payload.insuranceExpiry) : undefined;
+      if (payload.permitExpiry !== undefined) vehicle.permitExpiry = payload.permitExpiry ? new Date(payload.permitExpiry) : undefined;
+      if (payload.fitnessExpiry !== undefined) vehicle.fitnessExpiry = payload.fitnessExpiry ? new Date(payload.fitnessExpiry) : undefined;
+      if (payload.pucExpiry !== undefined) vehicle.pucExpiry = payload.pucExpiry ? new Date(payload.pucExpiry) : undefined;
+      if (payload.status !== undefined) vehicle.status = payload.status;
+      if (payload.notes !== undefined) vehicle.notes = payload.notes;
+      if (payload.rating !== undefined) vehicle.rating = payload.rating;
+
+      vehicle.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      await vehicle.save();
+      res.json(vehicle);
+    } catch (error: any) {
+      console.error('Update vendor vehicle error:', error?.message || error);
+      res.status(500).json({ message: "Failed to update vendor vehicle" });
+    }
+  });
+
+  // Vendor Duties — created/updated by assign-vendor, listed here for the
+  // Vendor 360 detail view's Duties tab. Read-only; there is no direct
+  // create/edit route since a duty only ever comes from a real booking
+  // assignment or that booking's own status changes.
+  app.get("/api/vendors/:vendorId/duties", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      const duties = await VendorDuty.find({ tenantId: req.tenantId, fulfilmentVendorId: vendor._id })
+        .populate('bookingId', 'bookingId customerName pickupLocation dropoffLocation status totalAmount')
+        .populate('vendorDriverId', 'name driverCode')
+        .populate('vendorVehicleId', 'registrationNumber vehicleCode')
+        .sort({ createdAt: -1 });
+      res.json(duties);
+    } catch (error: any) {
+      console.error('List vendor duties error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch vendor duties" });
+    }
+  });
+
   // Manual credit/debit — e.g. service-recovery compensation, referral
   // bonus not tied to a booking. Scoped to admins/owners since it directly
   // creates value with no booking behind it, same reasoning as payment
@@ -5331,6 +5709,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         } catch (err: any) {
           console.error('Customer stats/reward recompute failed after status change:', err?.message || err);
+        }
+      }
+
+      // Keep any Vendor Duty's lifecycle in sync with its booking — a
+      // completed/closed booking's duty is done; a cancelled/no-show
+      // booking's duty never happened. (Driver/vehicle `status` is
+      // deliberately left alone here — see the long comment in
+      // assign-vendor for why it's not auto-managed off duty state.)
+      if (['completed', 'closed'].includes(status) || ['cancelled', 'no_show'].includes(status)) {
+        try {
+          const actor = { userId: req.userId!, role: req.user?.role || 'client' };
+          if (['completed', 'closed'].includes(status)) {
+            await completeVendorDutyForBooking(req.tenantId!, id, actor);
+          } else {
+            await cancelVendorDutyForBooking(req.tenantId!, id, actor);
+          }
+        } catch (err: any) {
+          console.error('Vendor duty status sync failed after booking status change:', err?.message || err);
         }
       }
 
@@ -5490,25 +5886,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Assign fulfilment to a vendor. Scoped-down stand-in for a full vendor
-  // master/ledger — stores vendor + vendor driver/vehicle directly on the
-  // booking so "assign to vendor" is a real, working action now, rather
-  // than a half-built vendor accounting system with nothing behind it.
+  // Assign fulfilment to a vendor. Two modes, both writing the same
+  // free-text display fields (vendorName/vendorDriverName/
+  // vendorVehicleDetails) so every existing reader of them — duty slip,
+  // live/upcoming bookings, dashboards — keeps working unchanged either
+  // way:
+  //   1. Legacy free-text: vendorName required, exactly as before.
+  //   2. Real Vendor 360° link: fulfilmentVendorId (+ optional
+  //      vendorDriverId/vendorVehicleId) — validated active/available,
+  //      free-text fields derived from the linked records unless the
+  //      caller explicitly overrides them.
   app.post("/api/bookings/:id/assign-vendor", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const { vendorName, vendorContactPhone, vendorDriverName, vendorDriverPhone, vendorVehicleDetails, vendorAgreedRate, vendorAdvancePaid } = req.body || {};
-      if (!vendorName || !vendorName.trim()) {
-        return res.status(400).json({ message: "vendorName is required" });
-      }
-      if (vendorDriverPhone && !normalizeIndianPhone(vendorDriverPhone)) {
-        return res.status(400).json({ message: `Invalid vendor driver phone number: "${vendorDriverPhone}"` });
-      }
+      const { fulfilmentVendorId, vendorDriverId, vendorVehicleId } = req.body || {};
+      let { vendorName, vendorContactPhone, vendorDriverName, vendorDriverPhone, vendorVehicleDetails, vendorAgreedRate, vendorAdvancePaid } = req.body || {};
 
       const booking: any = await Booking.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
       if (['cancelled', 'no_show', 'completed', 'closed'].includes(booking.status)) {
         return res.status(400).json({ message: `Cannot assign a vendor to a booking that is ${booking.status}.` });
       }
+      // Real overlap checking needs the booking's actual scheduled window —
+      // loaded here (not after) so it can be passed into the driver/vehicle
+      // availability checks below, and so this same booking never conflicts
+      // with itself.
+      const window = { start: booking.scheduledStartDateTime, end: booking.scheduledEndDateTime, excludeBookingId: String(booking._id) };
+
+      let linkedVendor: any = null;
+      if (fulfilmentVendorId) {
+        linkedVendor = await Vendor.findOne({ _id: fulfilmentVendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+        if (!linkedVendor) return res.status(400).json({ message: "Vendor not found" });
+        if (linkedVendor.status !== 'active') {
+          return res.status(400).json({ message: `Vendor "${linkedVendor.companyName}" is ${linkedVendor.status.replace(/_/g, ' ')}, not active.` });
+        }
+        if (!vendorName) vendorName = linkedVendor.companyName;
+        if (!vendorContactPhone) vendorContactPhone = linkedVendor.primaryMobile;
+
+        if (vendorDriverId) {
+          const driver = await VendorDriver.findOne({ _id: vendorDriverId, tenantId: req.tenantId, vendorId: linkedVendor._id, isDeleted: { $ne: true } });
+          if (!driver) return res.status(400).json({ message: "Vendor driver not found under this vendor" });
+          const availability = await checkVendorDriverAvailability(req.tenantId!, String(linkedVendor._id), vendorDriverId, window);
+          if (!availability.available) {
+            return res.status(409).json({ message: `Vendor driver unavailable: ${availability.reason}`, code: 'VENDOR_DRIVER_TIME_CONFLICT' });
+          }
+          if (!vendorDriverName) vendorDriverName = driver.name;
+          if (!vendorDriverPhone) vendorDriverPhone = driver.primaryMobile;
+        }
+
+        if (vendorVehicleId) {
+          const vehicle = await VendorVehicle.findOne({ _id: vendorVehicleId, tenantId: req.tenantId, vendorId: linkedVendor._id, isDeleted: { $ne: true } });
+          if (!vehicle) return res.status(400).json({ message: "Vendor vehicle not found under this vendor" });
+          const availability = await checkVendorVehicleAvailability(req.tenantId!, String(linkedVendor._id), vendorVehicleId, window);
+          if (!availability.available) {
+            return res.status(409).json({ message: `Vendor vehicle unavailable: ${availability.reason}`, code: 'VENDOR_VEHICLE_TIME_CONFLICT' });
+          }
+          if (!vendorVehicleDetails) vendorVehicleDetails = `${vehicle.make ? vehicle.make + ' ' : ''}${vehicle.vehicleModel} (${vehicle.registrationNumber})`;
+        }
+      }
+
+      if (!vendorName || !vendorName.trim()) {
+        return res.status(400).json({ message: "vendorName is required (or select a Vendor)" });
+      }
+      if (vendorDriverPhone && !normalizeIndianPhone(vendorDriverPhone)) {
+        return res.status(400).json({ message: `Invalid vendor driver phone number: "${vendorDriverPhone}"` });
+      }
+
+      const actor = { userId: req.userId!, role: req.user?.role || 'client' };
 
       booking.fulfilmentType = 'vendor';
       booking.vendorName = vendorName.trim();
@@ -5518,8 +5961,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (vendorVehicleDetails !== undefined) booking.vendorVehicleDetails = vendorVehicleDetails;
       if (vendorAgreedRate !== undefined) booking.vendorAgreedRate = vendorAgreedRate;
       if (vendorAdvancePaid !== undefined) booking.vendorAdvancePaid = vendorAdvancePaid;
+      booking.fulfilmentVendorId = linkedVendor ? linkedVendor._id : undefined;
+      booking.vendorDriverId = vendorDriverId || undefined;
+      booking.vendorVehicleId = vendorVehicleId || undefined;
 
       await booking.save();
+
+      // Vendor Duty — the record that this assignment is a real, time-
+      // windowed commitment. Only created for a real Vendor Master link;
+      // the legacy free-text-only mode has no vendor/driver/vehicle record
+      // to create a duty against. Reassigning away from a linked vendor
+      // (or back to free-text) cancels the prior duty so it stops
+      // occupying its driver/vehicle in future conflict checks.
+      //
+      // Deliberately NOT flipping VendorDriver/VendorVehicle.status to
+      // "assigned" here: status is a coarse, non-time-scoped flag, and a
+      // driver can legitimately hold several non-overlapping duties across
+      // different days. Auto-setting "assigned" on every duty would make
+      // checkVendorDriverAvailability's status check block every FUTURE
+      // assignment for that driver too, not just genuinely overlapping
+      // ones — the real conflict signal is the time-window duty check
+      // above, which already handles this correctly on its own.
+      try {
+        if (linkedVendor) {
+          await upsertVendorDuty({
+            tenantId: req.tenantId!, bookingId: String(booking._id), fulfilmentVendorId: String(linkedVendor._id),
+            vendorDriverId: vendorDriverId || undefined, vendorVehicleId: vendorVehicleId || undefined,
+            scheduledStartDateTime: booking.scheduledStartDateTime, scheduledEndDateTime: booking.scheduledEndDateTime,
+            vendorAgreedRate: booking.vendorAgreedRate, vendorAdvancePaid: booking.vendorAdvancePaid, actor,
+          });
+        } else {
+          await cancelVendorDutyForBooking(req.tenantId!, String(booking._id), actor);
+        }
+      } catch (dutyError: any) {
+        // The booking-level assignment already saved successfully — a duty
+        // bookkeeping failure shouldn't roll that back or fail the request,
+        // just get logged loudly so it can be reconciled.
+        console.error('Vendor duty sync failed after successful assignment:', dutyError?.message || dutyError);
+      }
+
       res.json(booking);
     } catch (error: any) {
       console.error('Assign vendor error:', error?.message || error);

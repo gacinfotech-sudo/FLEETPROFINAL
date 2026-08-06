@@ -189,9 +189,16 @@ export interface IBooking extends Document {
   sourceCommissionAmount?: number;
   sourceReferenceNumber?: string;
   sourceNotes?: string;
+  // Optional link to a real Vendor Master record (Vendor 360°). The
+  // free-text sourceName/sourceContact above remain the display fields
+  // either way — set from the linked vendor when this is present.
+  sourceVendorId?: mongoose.Types.ObjectId;
   // Fulfilment: who is actually providing the vehicle/driver for this
-  // booking. Scoped-down stand-in for a full vendor master — good enough
-  // to make "assign to vendor" a real, working action; not a ledger.
+  // booking. fulfilmentVendorId/vendorDriverId/vendorVehicleId are
+  // optional links to real Vendor 360° records (set via
+  // POST /api/bookings/:id/assign-vendor); the free-text fields below
+  // stay populated either way (derived from the linked records when
+  // present) so every existing reader of them keeps working unchanged.
   fulfilmentType?: 'own' | 'vendor';
   vendorName?: string;
   vendorContactPhone?: string;
@@ -200,6 +207,9 @@ export interface IBooking extends Document {
   vendorVehicleDetails?: string;
   vendorAgreedRate?: number;
   vendorAdvancePaid?: number;
+  fulfilmentVendorId?: mongoose.Types.ObjectId;
+  vendorDriverId?: mongoose.Types.ObjectId;
+  vendorVehicleId?: mongoose.Types.ObjectId;
   bookingType: 'self_drive' | 'with_driver' | 'one_way' | 'round_trip' | 'local' | 'airport';
   pricingType?: 'day' | 'km';
   totalKilometers?: number;
@@ -484,6 +494,7 @@ const BookingSchema = new Schema<IBooking>({
   sourceCommissionAmount: { type: Number },
   sourceReferenceNumber: { type: String },
   sourceNotes: { type: String },
+  sourceVendorId: { type: Schema.Types.ObjectId, ref: 'Vendor' },
   fulfilmentType: { type: String, enum: ['own', 'vendor'], default: 'own' },
   vendorName: { type: String },
   vendorContactPhone: { type: String },
@@ -492,6 +503,9 @@ const BookingSchema = new Schema<IBooking>({
   vendorVehicleDetails: { type: String },
   vendorAgreedRate: { type: Number },
   vendorAdvancePaid: { type: Number },
+  fulfilmentVendorId: { type: Schema.Types.ObjectId, ref: 'Vendor' },
+  vendorDriverId: { type: Schema.Types.ObjectId, ref: 'VendorDriver' },
+  vendorVehicleId: { type: Schema.Types.ObjectId, ref: 'VendorVehicle' },
   bookingType: {
     type: String, 
     enum: ['self_drive', 'with_driver', 'one_way', 'round_trip', 'local', 'airport'], 
@@ -2585,6 +2599,350 @@ const BookingDraftSchema = new Schema<IBookingDraft>({
 });
 BookingDraftSchema.index({ tenantId: 1, userId: 1 }, { unique: true });
 export const BookingDraft = mongoose.model<IBookingDraft>('BookingDraft', BookingDraftSchema);
+
+// ---------------------------------------------------------------------
+// Vendor 360°
+// ---------------------------------------------------------------------
+// Reuses the existing `Counter` model (defined above, alongside invoice
+// numbering) as its atomic per-tenant sequence generator rather than
+// declaring a second identical one.
+
+export type VendorType =
+  | 'taxi_vendor' | 'fleet_owner' | 'travel_agent' | 'booking_agent' | 'tour_operator'
+  | 'vehicle_owner' | 'driver_cum_owner' | 'corporate_transport_vendor' | 'hotel_partner'
+  | 'religious_tour_partner' | 'self_drive_vendor' | 'attached_vehicle_partner'
+  | 'online_booking_partner' | 'other';
+export type VendorRole = 'booking_source' | 'vehicle_provider' | 'driver_provider' | 'complete_duty_provider' | 'commission_partner';
+export type VendorStatus = 'draft' | 'verification_pending' | 'active' | 'temporarily_blocked' | 'suspended' | 'inactive' | 'blacklisted' | 'agreement_expired';
+export type VendorPaymentCycle = 'per_trip' | 'weekly' | 'fortnightly' | 'monthly' | 'on_demand';
+export type CommissionType = 'fixed' | 'percentage' | 'per_booking' | 'per_km' | 'monthly' | 'none' | 'custom';
+
+// Vendor Master — the root record everything else in Vendor 360° (drivers,
+// vehicles, duties, ledger, settlements) hangs off of via vendorId. Money
+// fields here follow this codebase's existing convention (plain rupee
+// Numbers, same as Booking.totalAmount/advanceReceived) rather than the
+// paise-integer convention sometimes used elsewhere, to avoid mixing two
+// units across a single booking->vendor cost calculation.
+export interface IVendor extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  vendorCode: string;
+  companyName: string;
+  contactPerson: string;
+  primaryMobile: string;
+  normalizedMobile: string;
+  alternateMobile?: string;
+  whatsappNumber?: string;
+  email?: string;
+  address?: { line1?: string; line2?: string; city?: string; state?: string; pinCode?: string };
+  vendorTypes: VendorType[];
+  roles: VendorRole[];
+  serviceAreas: string[];
+  businessDetails?: {
+    gstNumber?: string; pan?: string; registrationNumber?: string;
+    agreementNumber?: string; agreementStartDate?: Date; agreementEndDate?: Date;
+    creditLimit?: number; creditPeriodDays?: number; paymentCycle?: VendorPaymentCycle;
+    taxTreatment?: string; tdsApplicable?: boolean;
+  };
+  bankDetails?: {
+    accountHolderName?: string; bankName?: string; accountNumberEncrypted?: string;
+    ifsc?: string; branch?: string; upiId?: string; paymentInstructions?: string;
+  };
+  defaultCommercialTerms?: { commissionType?: CommissionType; commissionValue?: number; rateAgreementNotes?: string };
+  status: VendorStatus;
+  rating?: number;
+  blacklistReason?: string;
+  suspensionReason?: string;
+  internalNotes?: string;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+  isDeleted: boolean;
+  version: number;
+}
+const VendorSchema = new Schema<IVendor>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  vendorCode: { type: String, required: true },
+  companyName: { type: String, required: true },
+  contactPerson: { type: String, required: true },
+  primaryMobile: { type: String, required: true },
+  normalizedMobile: { type: String, required: true },
+  alternateMobile: { type: String },
+  whatsappNumber: { type: String },
+  email: { type: String },
+  address: {
+    line1: { type: String }, line2: { type: String }, city: { type: String },
+    state: { type: String }, pinCode: { type: String },
+  },
+  vendorTypes: [{ type: String }],
+  roles: [{ type: String }],
+  serviceAreas: [{ type: String }],
+  businessDetails: {
+    gstNumber: { type: String }, pan: { type: String }, registrationNumber: { type: String },
+    agreementNumber: { type: String }, agreementStartDate: { type: Date }, agreementEndDate: { type: Date },
+    creditLimit: { type: Number }, creditPeriodDays: { type: Number }, paymentCycle: { type: String },
+    taxTreatment: { type: String }, tdsApplicable: { type: Boolean },
+  },
+  bankDetails: {
+    accountHolderName: { type: String }, bankName: { type: String }, accountNumberEncrypted: { type: String },
+    ifsc: { type: String }, branch: { type: String }, upiId: { type: String }, paymentInstructions: { type: String },
+  },
+  defaultCommercialTerms: {
+    commissionType: { type: String }, commissionValue: { type: Number }, rateAgreementNotes: { type: String },
+  },
+  status: {
+    type: String,
+    enum: ['draft', 'verification_pending', 'active', 'temporarily_blocked', 'suspended', 'inactive', 'blacklisted', 'agreement_expired'],
+    default: 'active',
+  },
+  rating: { type: Number },
+  blacklistReason: { type: String },
+  suspensionReason: { type: String },
+  internalNotes: { type: String },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  isDeleted: { type: Boolean, default: false },
+  version: { type: Number, default: 1 },
+});
+VendorSchema.index({ tenantId: 1, vendorCode: 1 }, { unique: true });
+VendorSchema.index({ tenantId: 1, normalizedMobile: 1 });
+VendorSchema.index({ tenantId: 1, status: 1 });
+VendorSchema.pre('save', function (next) {
+  (this as any).updatedAt = new Date();
+  next();
+});
+export const Vendor = mongoose.model<IVendor>('Vendor', VendorSchema);
+
+export type VendorDriverStatus = 'available' | 'tentatively_held' | 'assigned' | 'on_duty' | 'on_leave' | 'suspended' | 'inactive' | 'document_expired';
+
+// A driver belonging to a Vendor (not a company driver — see `Driver`
+// above). Scoped to (tenantId, vendorId); duplicate detection is by
+// normalized mobile WITHIN the same vendor only — the same person
+// legitimately drives for two different vendors in this domain.
+export interface IVendorDriver extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  vendorId: mongoose.Types.ObjectId;
+  driverCode: string;
+  name: string;
+  primaryMobile: string;
+  normalizedMobile: string;
+  alternateMobile?: string;
+  whatsappNumber?: string;
+  licenseNumber?: string;
+  licenseExpiry?: Date;
+  policeVerificationStatus?: string;
+  address?: string;
+  emergencyContact?: string;
+  photoUrl?: string;
+  status: VendorDriverStatus;
+  assignedVehicleId?: mongoose.Types.ObjectId;
+  serviceAreas: string[];
+  rating?: number;
+  complaintCount: number;
+  completedDutyCount: number;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+  isDeleted: boolean;
+}
+const VendorDriverSchema = new Schema<IVendorDriver>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  driverCode: { type: String, required: true },
+  name: { type: String, required: true },
+  primaryMobile: { type: String, required: true },
+  normalizedMobile: { type: String, required: true },
+  alternateMobile: { type: String },
+  whatsappNumber: { type: String },
+  licenseNumber: { type: String },
+  licenseExpiry: { type: Date },
+  policeVerificationStatus: { type: String },
+  address: { type: String },
+  emergencyContact: { type: String },
+  photoUrl: { type: String },
+  status: {
+    type: String,
+    enum: ['available', 'tentatively_held', 'assigned', 'on_duty', 'on_leave', 'suspended', 'inactive', 'document_expired'],
+    default: 'available',
+  },
+  assignedVehicleId: { type: Schema.Types.ObjectId, ref: 'VendorVehicle' },
+  serviceAreas: [{ type: String }],
+  rating: { type: Number },
+  complaintCount: { type: Number, default: 0 },
+  completedDutyCount: { type: Number, default: 0 },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  isDeleted: { type: Boolean, default: false },
+});
+VendorDriverSchema.index({ tenantId: 1, vendorId: 1, driverCode: 1 }, { unique: true });
+// Real duplicate protection (spec §5) — the same mobile can't be created
+// twice under the same vendor; not just an advisory lookup. Scoped to
+// non-deleted rows so a soft-deleted driver doesn't block a legitimate
+// re-add.
+VendorDriverSchema.index(
+  { tenantId: 1, vendorId: 1, normalizedMobile: 1 },
+  { unique: true, partialFilterExpression: { isDeleted: false } },
+);
+VendorDriverSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const VendorDriver = mongoose.model<IVendorDriver>('VendorDriver', VendorDriverSchema);
+
+export type VendorVehicleStatus = 'available' | 'tentatively_held' | 'assigned' | 'on_trip' | 'maintenance' | 'breakdown' | 'document_expired' | 'inactive';
+
+// A vehicle belonging to a Vendor (not a company vehicle — see `Vehicle`
+// above). Registration numbers are normalized (case/space/hyphen
+// insensitive) before the duplicate check so "MP09 AB 1234", "MP09AB1234"
+// and "mp-09-ab-1234" all resolve to the same vendor vehicle.
+export interface IVendorVehicle extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  vendorId: mongoose.Types.ObjectId;
+  vehicleCode: string;
+  registrationNumber: string;
+  normalizedRegistrationNumber: string;
+  make?: string;
+  vehicleModel: string;
+  variant?: string;
+  category: string;
+  seatingCapacity?: number;
+  fuelType?: string;
+  colour?: string;
+  ownerName?: string;
+  assignedDriverId?: mongoose.Types.ObjectId;
+  rcNumber?: string;
+  rcExpiry?: Date;
+  insuranceExpiry?: Date;
+  permitExpiry?: Date;
+  fitnessExpiry?: Date;
+  pucExpiry?: Date;
+  taxExpiry?: Date;
+  fastagDetails?: string;
+  gpsDetails?: string;
+  currentOdometer?: number;
+  status: VendorVehicleStatus;
+  completedDutyCount: number;
+  totalRevenue: number;
+  totalVendorCost: number;
+  rating?: number;
+  complaintCount: number;
+  notes?: string;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+  isDeleted: boolean;
+}
+const VendorVehicleSchema = new Schema<IVendorVehicle>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  vehicleCode: { type: String, required: true },
+  registrationNumber: { type: String, required: true },
+  normalizedRegistrationNumber: { type: String, required: true },
+  make: { type: String },
+  vehicleModel: { type: String, required: true },
+  variant: { type: String },
+  category: { type: String, required: true },
+  seatingCapacity: { type: Number },
+  fuelType: { type: String },
+  colour: { type: String },
+  ownerName: { type: String },
+  assignedDriverId: { type: Schema.Types.ObjectId, ref: 'VendorDriver' },
+  rcNumber: { type: String },
+  rcExpiry: { type: Date },
+  insuranceExpiry: { type: Date },
+  permitExpiry: { type: Date },
+  fitnessExpiry: { type: Date },
+  pucExpiry: { type: Date },
+  taxExpiry: { type: Date },
+  fastagDetails: { type: String },
+  gpsDetails: { type: String },
+  currentOdometer: { type: Number },
+  status: {
+    type: String,
+    enum: ['available', 'tentatively_held', 'assigned', 'on_trip', 'maintenance', 'breakdown', 'document_expired', 'inactive'],
+    default: 'available',
+  },
+  completedDutyCount: { type: Number, default: 0 },
+  totalRevenue: { type: Number, default: 0 },
+  totalVendorCost: { type: Number, default: 0 },
+  rating: { type: Number },
+  complaintCount: { type: Number, default: 0 },
+  notes: { type: String },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  isDeleted: { type: Boolean, default: false },
+});
+VendorVehicleSchema.index({ tenantId: 1, vendorId: 1, vehicleCode: 1 }, { unique: true });
+// Real duplicate protection (spec §6) — same reasoning as VendorDriver's
+// normalizedMobile index above.
+VendorVehicleSchema.index(
+  { tenantId: 1, vendorId: 1, normalizedRegistrationNumber: 1 },
+  { unique: true, partialFilterExpression: { isDeleted: false } },
+);
+VendorVehicleSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const VendorVehicle = mongoose.model<IVendorVehicle>('VendorVehicle', VendorVehicleSchema);
+
+// The record that a booking's vendor assignment became a real duty with a
+// time window — created/updated by POST /api/bookings/:id/assign-vendor,
+// one active duty per booking (upserted by bookingId). scheduledStart/
+// EndDateTime is a snapshot taken at assignment time for display/audit
+// (duty slip) purposes; the actual overlap-check path in
+// vendorDriverService/vendorVehicleService reads the LIVE booking's
+// scheduledStartDateTime/scheduledEndDateTime instead of this snapshot,
+// so a later reschedule/extend of the booking can't leave a stale
+// duty window silently defeating conflict detection.
+export type VendorDutyStatus = 'active' | 'completed' | 'cancelled';
+export interface IVendorDuty extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  dutyNumber: string;
+  bookingId: mongoose.Types.ObjectId;
+  fulfilmentVendorId: mongoose.Types.ObjectId;
+  vendorDriverId?: mongoose.Types.ObjectId;
+  vendorVehicleId?: mongoose.Types.ObjectId;
+  scheduledStartDateTime: Date;
+  scheduledEndDateTime: Date;
+  vendorAgreedRate?: number;
+  vendorAdvancePaid?: number;
+  status: VendorDutyStatus;
+  createdBy: { userId: string; role: string };
+  updatedBy?: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+const VendorDutySchema = new Schema<IVendorDuty>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  dutyNumber: { type: String, required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
+  fulfilmentVendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  vendorDriverId: { type: Schema.Types.ObjectId, ref: 'VendorDriver' },
+  vendorVehicleId: { type: Schema.Types.ObjectId, ref: 'VendorVehicle' },
+  scheduledStartDateTime: { type: Date, required: true },
+  scheduledEndDateTime: { type: Date, required: true },
+  vendorAgreedRate: { type: Number },
+  vendorAdvancePaid: { type: Number },
+  status: { type: String, enum: ['active', 'completed', 'cancelled'], default: 'active' },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String }, role: { type: String } },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+VendorDutySchema.index({ tenantId: 1, dutyNumber: 1 }, { unique: true });
+// One active duty per booking — assign-vendor upserts against this rather
+// than ever inserting a second live duty for the same booking.
+VendorDutySchema.index(
+  { tenantId: 1, bookingId: 1 },
+  { unique: true, partialFilterExpression: { status: 'active' } },
+);
+VendorDutySchema.index({ tenantId: 1, vendorDriverId: 1, status: 1 });
+VendorDutySchema.index({ tenantId: 1, vendorVehicleId: 1, status: 1 });
+VendorDutySchema.index({ tenantId: 1, fulfilmentVendorId: 1, status: 1 });
+VendorDutySchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const VendorDuty = mongoose.model<IVendorDuty>('VendorDuty', VendorDutySchema);
 
 export const User = mongoose.model<IUser>('User', UserSchema);
 export const Vehicle = mongoose.model<IVehicle>('Vehicle', VehicleSchema);

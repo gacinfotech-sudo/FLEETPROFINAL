@@ -35,6 +35,10 @@ const bookingSchema = z.object({
   // rest of this multi-step form already uses for step validation).
   sourceName: z.string().optional(),
   sourceContact: z.string().optional(),
+  // Optional link to a real Vendor Master record — when set, sourceName/
+  // sourceContact above are auto-filled from it but stay editable/
+  // overridable, and remain the actual display fields either way.
+  sourceVendorId: z.string().optional(),
   sourceReferenceNumber: z.string().optional(),
   sourceCommissionType: z.enum(["flat", "percentage"]).optional(),
   sourceCommissionAmount: z.number().min(0).optional(),
@@ -135,6 +139,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       bookingSource: "direct_customer",
       sourceName: "",
       sourceContact: "",
+      sourceVendorId: "",
       sourceReferenceNumber: "",
       sourceCommissionType: undefined,
       sourceCommissionAmount: undefined,
@@ -317,6 +322,18 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   });
   const redemptionValuePerPoint = rewardRule?.redemptionValuePerPoint ?? 1;
   const minPointsToRedeem = rewardRule?.minPointsToRedeem ?? 100;
+
+  // Active vendors — only fetched when the Booking Source panel is
+  // actually showing, for the optional "link to Vendor Master" select.
+  const { data: activeVendors } = useQuery<any[]>({
+    queryKey: ["/api/vendors", "active"],
+    queryFn: async () => {
+      const res = await fetch("/api/vendors?status=active", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: EXTERNAL_SOURCE_TYPES.has(watchedValues.bookingSource),
+  });
 
   // Fetch business profile for logo
   const { data: businessProfile } = useQuery({
@@ -1359,6 +1376,40 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                           </FormItem>
                         )}
                       />
+                      {activeVendors && activeVendors.length > 0 && (
+                        <FormField
+                          control={form.control}
+                          name="sourceVendorId"
+                          render={({ field }) => (
+                            <FormItem className="md:col-span-2">
+                              <FormLabel className="text-sm font-medium text-gray-700">Link to Vendor Master (Optional)</FormLabel>
+                              <Select
+                                onValueChange={(value) => {
+                                  field.onChange(value);
+                                  const vendor = activeVendors.find((v: any) => v._id === value);
+                                  if (vendor) {
+                                    if (!form.getValues("sourceName")) form.setValue("sourceName", vendor.companyName);
+                                    if (!form.getValues("sourceContact")) form.setValue("sourceContact", vendor.primaryMobile?.replace(/^91/, ""));
+                                  }
+                                }}
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger className="h-11 border-2 border-gray-200 rounded-lg">
+                                    <SelectValue placeholder="Not linked to a vendor record" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {activeVendors.map((v: any) => (
+                                    <SelectItem key={v._id} value={v._id}>{v.companyName} ({v.vendorCode})</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
                       <FormField
                         control={form.control}
                         name="sourceReferenceNumber"

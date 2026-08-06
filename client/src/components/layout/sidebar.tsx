@@ -35,6 +35,7 @@ const navItems = [
   { id: "customers", label: "Customers", icon: Contact },
   { id: "after-sales", label: "After-Sales", icon: HeartHandshake, restrictedForManagers: true },
   { id: "campaigns", label: "Campaigns", icon: Megaphone, restrictedForManagers: true },
+  { id: "vendors", label: "Vendors", icon: Building2, restrictedForManagers: true },
   { id: "revenue", label: "Revenue Report", icon: TrendingUp, restrictedForManagers: true },
   { id: "vendor-settlement", label: "Vendor Settlement", icon: Building2, restrictedForManagers: true },
   { id: "expenses", label: "Manage Expenses", icon: ReceiptIcon },

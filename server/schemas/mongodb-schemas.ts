@@ -151,6 +151,10 @@ export const mongoBookingSchema = z.object({
   sourceCommissionAmount: z.number().min(0).optional(),
   sourceReferenceNumber: z.string().optional(),
   sourceNotes: z.string().optional(),
+  // Optional link to a real Vendor Master record when the booking source
+  // is a known vendor/agent — coexists with the free-text sourceName
+  // above (which stays the display value either way; see routes.ts).
+  sourceVendorId: z.string().optional(),
   fulfilmentType: z.enum(['own', 'vendor']).default('own'),
   vendorName: z.string().optional(),
   vendorContactPhone: z.string().optional(),
@@ -159,6 +163,14 @@ export const mongoBookingSchema = z.object({
   vendorVehicleDetails: z.string().optional(),
   vendorAgreedRate: z.number().min(0).optional(),
   vendorAdvancePaid: z.number().min(0).optional(),
+  // Optional links to real Vendor 360° records — set via
+  // POST /api/bookings/:id/assign-vendor. The vendorName/vendorDriverName/
+  // vendorVehicleDetails free-text fields above stay populated (derived
+  // from these when set) so every existing display surface (duty slip,
+  // live/upcoming bookings, dashboards) keeps working unchanged.
+  fulfilmentVendorId: z.string().optional(),
+  vendorDriverId: z.string().optional(),
+  vendorVehicleId: z.string().optional(),
   // Third-party driver fields
   useThirdPartyDriver: z.boolean().default(false),
   thirdPartyDriverName: z.string().optional(),
