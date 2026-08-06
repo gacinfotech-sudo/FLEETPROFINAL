@@ -40,6 +40,8 @@ import AssignVendorDialog from "../components/booking/assign-vendor-dialog";
 import PaymentSection from "../components/booking/payment-section";
 import TripCostSummary from "../components/booking/trip-cost-summary";
 import SetDriverPinDialog from "../components/drivers/set-driver-pin-dialog";
+import PipelineStepper from "../components/pipeline/pipeline-stepper";
+import { bookingPipelineInfo } from "../lib/pipelineStages";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -2546,6 +2548,13 @@ export default function Dashboard() {
           </DialogHeader>
           {viewingBooking && (
             <div className="space-y-6">
+              {/* Read-only — this dialog's own contextual actions
+                  (AssignVendorDialog/ExtendBookingDialog/PaymentSection/
+                  TripCostSummary/BookingCommunication below) already cover
+                  every status-changing action for a Booking; the stepper
+                  exists to show where this record sits without duplicating
+                  those, not to add a second action surface. */}
+              <PipelineStepper info={bookingPipelineInfo(viewingBooking)} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-700">Booking ID</Label>

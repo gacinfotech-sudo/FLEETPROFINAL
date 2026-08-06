@@ -15,6 +15,9 @@ import { Separator } from "@/components/ui/separator";
 import QuotationPanel from "@/components/leads/quotation-panel";
 import FollowUpPanel from "@/components/leads/followup-panel";
 import CustomerDashboard from "@/components/customers/customer-dashboard";
+import PipelineStepper from "@/components/pipeline/pipeline-stepper";
+import ContextualActionBar from "@/components/pipeline/contextual-action-bar";
+import { leadPipelineInfo } from "@/lib/pipelineStages";
 
 const LEAD_STATUS_OPTIONS = [
   "new", "assigned", "requirement_completed", "quotation_draft", "quotation_under_review",
@@ -304,6 +307,16 @@ export default function LeadsPage({ onConvertToBooking, initialLeadId }: LeadsPa
             const inquiry = viewingLead.inquiryId || {};
             return (
               <div className="space-y-3 text-sm">
+                <PipelineStepper
+                  info={leadPipelineInfo(viewingLead)}
+                  nextAction={
+                    !viewingLead.linkedCustomerId
+                      ? { label: "Convert to Customer", onClick: () => convertToCustomerMutation.mutate(viewingLead._id), disabled: convertToCustomerMutation.isPending }
+                      : !viewingLead.linkedBookingId
+                      ? { label: "Convert to Booking", onClick: () => handleConvertToBooking(viewingLead), disabled: convertingToBooking }
+                      : undefined
+                  }
+                />
                 <div className="grid grid-cols-2 gap-3">
                   <div><span className="text-gray-500">Customer</span><div className="font-medium">{inquiry.customerName}</div></div>
                   <div><span className="text-gray-500">Mobile</span><div className="font-medium">{inquiry.primaryMobile}</div></div>
@@ -332,34 +345,42 @@ export default function LeadsPage({ onConvertToBooking, initialLeadId }: LeadsPa
                   </div>
                 )}
 
-                <div className="flex justify-end gap-2">
-                  {viewingLead.linkedCustomerId ? (
-                    <Button size="sm" variant="outline" onClick={() => setViewingCustomerId(viewingLead.linkedCustomerId)}>
-                      Open Customer 360°
-                    </Button>
-                  ) : (
-                    <Button
-                      size="sm"
-                      disabled={convertToCustomerMutation.isPending}
-                      onClick={() => convertToCustomerMutation.mutate(viewingLead._id)}
-                    >
-                      Convert to Customer
-                    </Button>
-                  )}
-                  {viewingLead.linkedBookingId ? (
-                    <Badge variant="default" className="self-center">Booking Created</Badge>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant={viewingLead.linkedCustomerId ? "default" : "outline"}
-                      disabled={convertingToBooking}
-                      title={viewingLead.linkedCustomerId ? "Requires an accepted quotation" : "Convert to Customer first"}
-                      onClick={() => handleConvertToBooking(viewingLead)}
-                    >
-                      Convert to Booking
-                    </Button>
-                  )}
+                <div className="flex items-center justify-end gap-2">
+                  {viewingLead.linkedBookingId && <Badge variant="default">Booking Created</Badge>}
                 </div>
+                <ContextualActionBar
+                  actions={[
+                    {
+                      key: "open-customer",
+                      label: "Open Customer 360°",
+                      onClick: () => setViewingCustomerId(viewingLead.linkedCustomerId),
+                      hidden: !viewingLead.linkedCustomerId,
+                    },
+                    {
+                      key: "convert-to-customer",
+                      label: "Convert to Customer",
+                      variant: "default",
+                      onClick: () => convertToCustomerMutation.mutate(viewingLead._id),
+                      pending: convertToCustomerMutation.isPending,
+                      hidden: !!viewingLead.linkedCustomerId,
+                    },
+                    {
+                      key: "convert-to-booking",
+                      label: "Convert to Booking",
+                      variant: viewingLead.linkedCustomerId ? "default" : "outline",
+                      onClick: () => handleConvertToBooking(viewingLead),
+                      disabled: convertingToBooking,
+                      hidden: !!viewingLead.linkedBookingId,
+                    },
+                    {
+                      key: "mark-lost",
+                      label: "Mark Lost",
+                      variant: "destructive",
+                      onClick: () => setShowLostDialog(viewingLead),
+                      hidden: ["lost", "cancelled", "converted_to_booking"].includes(viewingLead.status),
+                    },
+                  ]}
+                />
 
                 <Separator />
                 <QuotationPanel leadId={viewingLead._id} inquiry={inquiry} />

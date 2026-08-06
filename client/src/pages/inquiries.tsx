@@ -13,6 +13,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import QuickInquiryForm from "@/components/inquiries/quick-inquiry-form";
 import DetailedRequirementForm from "@/components/inquiries/detailed-requirement-form";
+import PipelineStepper from "@/components/pipeline/pipeline-stepper";
+import ContextualActionBar from "@/components/pipeline/contextual-action-bar";
+import { inquiryPipelineInfo } from "@/lib/pipelineStages";
 
 const STATUS_BADGE: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   new: "secondary", unverified: "secondary", contact_attempted: "secondary", contacted: "secondary",
@@ -243,6 +246,16 @@ export default function InquiriesPage({ initialInquiryId }: InquiriesPageProps =
           <DialogHeader><DialogTitle>{viewingInquiry?.inquiryNumber}</DialogTitle></DialogHeader>
           {viewingInquiry && (
             <div className="space-y-3 text-sm">
+              <PipelineStepper
+                info={inquiryPipelineInfo(viewingInquiry)}
+                nextAction={
+                  viewingInquiry.status === "qualified"
+                    ? { label: "Convert to Lead", onClick: () => convertMutation.mutate(viewingInquiry._id), disabled: convertMutation.isPending }
+                    : viewingInquiry.status !== "converted_to_lead" && !["lost", "cancelled", "duplicate", "invalid"].includes(viewingInquiry.status)
+                    ? { label: "Qualify", onClick: () => qualifyMutation.mutate(viewingInquiry._id), disabled: qualifyMutation.isPending }
+                    : undefined
+                }
+              />
               <div className="grid grid-cols-2 gap-3">
                 <div><span className="text-gray-500">Customer</span><div className="font-medium">{viewingInquiry.customerName}</div></div>
                 <div><span className="text-gray-500">Mobile</span><div className="font-medium">{viewingInquiry.primaryMobile}</div></div>
@@ -289,13 +302,38 @@ export default function InquiriesPage({ initialInquiryId }: InquiriesPageProps =
                 </div>
               )}
 
-              {!["converted_to_lead", "lost", "cancelled", "duplicate", "invalid"].includes(viewingInquiry.status) && (
-                <div className="flex justify-end pt-2">
-                  <Button size="sm" variant="outline" onClick={() => { setShowDetailedForm(viewingInquiry); setViewingInquiry(null); }}>
-                    Add Full Requirement Details
-                  </Button>
-                </div>
-              )}
+              <ContextualActionBar
+                actions={[
+                  {
+                    key: "qualify",
+                    label: "Qualify",
+                    onClick: () => qualifyMutation.mutate(viewingInquiry._id),
+                    pending: qualifyMutation.isPending,
+                    hidden: viewingInquiry.status === "qualified" || viewingInquiry.status === "converted_to_lead" || ["lost", "cancelled", "duplicate", "invalid"].includes(viewingInquiry.status),
+                  },
+                  {
+                    key: "convert-to-lead",
+                    label: "Convert to Lead",
+                    variant: "default",
+                    onClick: () => convertMutation.mutate(viewingInquiry._id),
+                    pending: convertMutation.isPending,
+                    hidden: viewingInquiry.status !== "qualified",
+                  },
+                  {
+                    key: "add-requirements",
+                    label: "Add Full Requirement Details",
+                    onClick: () => { setShowDetailedForm(viewingInquiry); setViewingInquiry(null); },
+                    hidden: ["converted_to_lead", "lost", "cancelled", "duplicate", "invalid"].includes(viewingInquiry.status),
+                  },
+                  {
+                    key: "mark-lost",
+                    label: "Mark Lost",
+                    variant: "destructive",
+                    onClick: () => setShowLostDialog(viewingInquiry),
+                    hidden: ["lost", "converted_to_lead", "cancelled", "duplicate", "invalid"].includes(viewingInquiry.status),
+                  },
+                ]}
+              />
             </div>
           )}
         </DialogContent>
