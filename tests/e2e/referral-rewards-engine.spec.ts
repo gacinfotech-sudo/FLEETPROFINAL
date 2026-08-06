@@ -1,5 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
+import mongoose from 'mongoose';
 import { login } from './helpers';
+import { Referral, RewardTransaction, Customer } from '../../server/models/index';
 
 async function getCsrfToken(page: Page): Promise<string> {
   const res = await page.request.get('/api/csrf-token');
@@ -469,5 +471,56 @@ test.describe('Referral capture + configurable reward event rules', () => {
 
     await page.getByText('Active Referrers').click();
     await expect(page.getByText('All Referrals')).toBeVisible({ timeout: 5000 });
+  });
+
+  // Tenant isolation (spec §33: "Tenant A must never access Tenant B...
+  // referral codes, point balances, referral customers, reports,
+  // transactions"). Same pattern already established in
+  // gps-vehicle-assignment.spec.ts: create a record directly with a
+  // fresh, unrelated tenantId (simulating a real second tenant), then
+  // confirm the logged-in tenant's own API surface never returns it.
+  test('API: another tenant\'s referrals, reward transactions, and dashboard totals are never visible', async ({ page }) => {
+    test.setTimeout(30_000);
+    if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI is required for tenant isolation verification.');
+    await mongoose.connect(process.env.MONGODB_URI);
+    try {
+      const otherTenantId = new mongoose.Types.ObjectId();
+      const otherCustomer = await Customer.create({
+        tenantId: otherTenantId, name: 'Other Tenant Customer', primaryMobile: '9' + String(Date.now()).slice(-9),
+        createdBy: { userId: 'system', role: 'admin' },
+      });
+      const otherReferral = await Referral.create({
+        tenantId: otherTenantId, referrerCustomerId: otherCustomer._id,
+        referrerDisplaySnapshot: { name: otherCustomer.name, mobile: otherCustomer.primaryMobile },
+        source: 'existing_customer_search', status: 'captured',
+        statusHistory: [{ status: 'captured', at: new Date() }],
+        createdBy: { userId: 'system', role: 'admin' },
+      });
+      const otherTransaction = await RewardTransaction.create({
+        tenantId: otherTenantId, customerId: otherCustomer._id,
+        transactionType: 'manual_credit', points: 999999, balanceAfter: 999999,
+        reason: 'Cross-tenant isolation probe — must never be visible to qaclient',
+        createdBy: { userId: 'system', role: 'admin' },
+      });
+
+      await login(page, 'qaclient', 'QaFixed456!');
+
+      const referrals = await (await page.request.get('/api/referrals')).json();
+      expect(referrals.find((r: any) => r._id === otherReferral._id.toString())).toBeUndefined();
+
+      const transactions = await (await page.request.get('/api/reward-transactions')).json();
+      expect(transactions.find((t: any) => t._id === otherTransaction._id.toString())).toBeUndefined();
+
+      // The other tenant's 999,999-point transaction would be impossible
+      // to miss in the aggregated total if tenant scoping leaked anywhere
+      // in buildRewardsReferralDashboard's Mongo aggregation pipelines.
+      const dashboard = await (await page.request.get('/api/rewards-referral-dashboard')).json();
+      expect(dashboard.totalPointsIssued).toBeLessThan(900000);
+
+      const referrerLookup = await (await page.request.get(`/api/referrals/resolve-referrer?customerId=${otherCustomer._id}`)).json();
+      expect(referrerLookup.referrer).toBeNull();
+    } finally {
+      await mongoose.disconnect();
+    }
   });
 });
