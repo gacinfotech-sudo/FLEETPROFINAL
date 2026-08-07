@@ -43,6 +43,10 @@ import mongoose from "mongoose";
 import { Server as SocketIOServer } from "socket.io";
 import { setTelephonyEventEmitter, type TelephonyEvent } from "./telephony/index";
 import { startGpsPollingScheduler, stopGpsPollingScheduler } from "./gps/ingestion/pollingScheduler";
+// TASK-ROOT-SUPPORT-03 (Root Control Plane) additive middleware — attaches
+// a correlation ID to every request (not just /api/root/**) before any
+// route/error path runs. See docs/root-control-plane/ROOT-INTEGRATION-report.md.
+import { correlationIdMiddleware } from "./root/middleware/correlationId";
 
 const app = express();
 // Trust only the known number of reverse-proxy hops. `true` trusts arbitrary
@@ -67,6 +71,7 @@ app.use(express.json({
   verify: (req: any, _res, buf) => { req.rawBody = buf; },
 }));
 app.use(express.urlencoded({ extended: false }));
+app.use(correlationIdMiddleware);
 
 app.use((req, res, next) => {
   const start = Date.now();

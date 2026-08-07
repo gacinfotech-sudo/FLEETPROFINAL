@@ -5,6 +5,27 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/hooks/use-auth";
 import GlobalCustomerSearch from "@/components/customers/global-customer-search";
+import { ShieldCheck } from "lucide-react";
+
+// Root Control Plane (Wave 1) — platform Super Admin console. These are
+// genuine top-level routes (client/src/App.tsx), not `onViewChange` SPA
+// sections like everything above, so they navigate with a real <a href>
+// rather than the section-switch callback. Gated on role==='admin' as a
+// client-side visibility stopgap only (matches App.tsx's ProtectedRoute
+// requiredRole="admin" stopgap) — the actual authorization boundary is
+// server-side, on every /api/root/** route, via platformRole.
+const ROOT_NAV_ITEMS = [
+  { href: "/root/dashboard", label: "Root Dashboard" },
+  { href: "/root/tenants", label: "Tenant Database" },
+  { href: "/root/customers", label: "Global Customers" },
+  { href: "/root/sales", label: "Sales Pipeline" },
+  { href: "/root/product-config", label: "Product Configuration" },
+  { href: "/root/support-tickets", label: "Support Center" },
+  { href: "/root/error-center", label: "Error Center" },
+  { href: "/root/diagnostics", label: "Support Diagnostics" },
+  { href: "/root/security", label: "Security" },
+  { href: "/root/audit-log", label: "Audit Log" },
+];
 
 interface SidebarProps {
   currentView: string;
@@ -228,6 +249,28 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle, o
             })}
           </div>
         </nav>
+
+        {/* Root Control Plane (Wave 1) — see ROOT_NAV_ITEMS comment above
+            for why this section uses real <a href> navigation instead of
+            onViewChange. Client-side visibility only; real gating is
+            server-side. */}
+        {user?.role === 'admin' && (
+          <div className="px-3 lg:px-4 py-2 border-t border-gray-200 space-y-1 lg:space-y-2 max-h-48 overflow-y-auto">
+            <div className="flex items-center px-1 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <ShieldCheck className="mr-2 shrink-0" size={14} />
+              Root / Platform
+            </div>
+            {ROOT_NAV_ITEMS.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="block rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors truncate"
+              >
+                {item.label}
+              </a>
+            ))}
+          </div>
+        )}
 
         {/* Logout Button */}
         <div className="p-3 lg:p-4 border-t border-gray-200">

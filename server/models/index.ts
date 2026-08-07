@@ -7,6 +7,11 @@ import {
   TRAVEL_DATE_STATUSES, TRIP_TYPES,
   isPickupDateRequired, isTentativeRangeRequired,
 } from '../booking/domain';
+// TASK-ROOT-DOMAIN-01 — additive platform-staff field on the existing User
+// model (Root Control Plane). Applied here at integration per that task's
+// report's proposed patch. See server/root/types.ts for the full contract
+// doc comment on why this is a separate, never-mixed axis from `role`.
+import { PLATFORM_ROLES, type PlatformRole } from '../root/types';
 
 // Interfaces for TypeScript
 export interface ITenant extends Document {
@@ -24,6 +29,24 @@ export interface ITenant extends Document {
     managers: number;
   };
   createdAt: Date;
+  // TASK-ROOT-DASHBOARD-02 (Root Control Plane) — additive/optional, applied
+  // at integration per that task's report's proposed patch. All existing
+  // tenants render these as "not set" until explicitly backfilled; Root's
+  // routes already read them defensively.
+  tenantCode?: string;
+  trialStartsAt?: Date;
+  trialEndsAt?: Date;
+  usageCounters?: {
+    bookingsThisMonth: number;
+    lastActivityAt?: Date;
+  };
+  healthRiskFlag?: 'none' | 'watch' | 'at_risk';
+  internalNotes?: {
+    note: string;
+    authorId: string;
+    authorName?: string;
+    createdAt: Date;
+  }[];
 }
 
 export interface IUser extends Document {
@@ -31,6 +54,11 @@ export interface IUser extends Document {
   name?: string;
   password: string;
   role: 'admin' | 'client' | 'manager';
+  // TASK-ROOT-DOMAIN-01 (Root Control Plane) — additive, optional. NEVER
+  // compared against `role` above; see server/root/types.ts's
+  // UserPlatformFields doc comment. Absent/undefined = not platform staff,
+  // the safe default (no cross-tenant access).
+  platformRole?: PlatformRole;
   tenantId?: mongoose.Types.ObjectId;
   sessionId?: string;
   // P1 FIX: this field is used throughout storage-mongodb.ts /
@@ -465,7 +493,20 @@ const TenantSchema = new Schema<ITenant>({
     drivers: { type: Number, default: 3 },  // Starter plan default
     managers: { type: Number, default: 1 }  // Starter plan default
   },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  // TASK-ROOT-DASHBOARD-02 (Root Control Plane) — additive/optional, no
+  // migration required. See ITenant's doc comment above.
+  tenantCode: { type: String, unique: true, sparse: true },
+  trialStartsAt: { type: Date },
+  trialEndsAt: { type: Date },
+  usageCounters: {
+    bookingsThisMonth: { type: Number, default: 0 },
+    lastActivityAt: { type: Date },
+  },
+  healthRiskFlag: { type: String, enum: ['none', 'watch', 'at_risk'] },
+  internalNotes: [{
+    note: String, authorId: String, authorName: String, createdAt: { type: Date, default: Date.now },
+  }],
 });
 
 // User Schema
@@ -474,6 +515,10 @@ const UserSchema = new Schema<IUser>({
   name: { type: String },
   password: { type: String, required: true },
   role: { type: String, enum: ['admin', 'client', 'manager'], default: 'client' },
+  // TASK-ROOT-DOMAIN-01 (Root Control Plane) — additive, optional, no
+  // default/required. Populated only via scripts/migrate-admin-to-platform-role.ts
+  // or explicit platform-staff provisioning.
+  platformRole: { type: String, enum: PLATFORM_ROLES },
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant' },
   sessionId: { type: String },
   deviceInfo: {

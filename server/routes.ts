@@ -122,6 +122,20 @@ import { registerVehicleFuelRoutes } from "./vehicle/expenses/routes";
 import { registerVehicleFastagRoutes } from "./vehicle/fastag/routes";
 import { registerVehicleIncidentRoutes } from "./vehicle/incidents/routes";
 import { registerVehicleInspectionRoutes } from "./vehicle/inspections/routes";
+// Root Control Plane (Wave 1) additive imports — new /api/root/** namespace
+// only, no existing route/import in this file was touched. See
+// docs/root-control-plane/ROOT-INTEGRATION-report.md for the full mount list.
+import { isPlatformRole } from "./root/types";
+import { registerRootDashboardRoutes } from "./root/routes/dashboard";
+import { registerRootTenantRoutes } from "./root/routes/tenants";
+import { registerRootCustomerRoutes } from "./root/routes/customers";
+import { securityRouter } from "./root/routes/security";
+import { auditRouter } from "./root/routes/audit";
+import { registerSupportRoutes } from "./root/routes/support";
+import { registerErrorRoutes } from "./root/routes/errors";
+import { registerSalesRoutes } from "./root/routes/sales";
+import { registerConfigRoutes } from "./root/routes/config";
+import { registerFeatureFlagRoutes } from "./root/routes/features";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -176,12 +190,19 @@ export function getSessionMiddleware(): ReturnType<typeof session> | undefined {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // P0 SECURITY HELPER: admin users are allowed cross-tenant access (see
-  // requireTenant middleware); everyone else must be scoped to their own
-  // tenant on every single-record read/update/delete to prevent IDOR
-  // (one tenant reading/modifying another tenant's data by guessing an id).
+  // P0 SECURITY HELPER: platform staff (a VALID, recognized platformRole)
+  // are allowed cross-tenant access (see requireTenant middleware);
+  // everyone else must be scoped to their own tenant on every single-record
+  // read/update/delete to prevent IDOR (one tenant reading/modifying
+  // another tenant's data by guessing an id). Replaces the old
+  // `role === "admin"` bypass — see TASK-ROOT-SECURITY-05's report for the
+  // full before/after behavior analysis. Validated via isPlatformRole(),
+  // not a bare truthy check (integration review fix) — mirrors
+  // requireTenant's own hardening in server/middleware/auth.ts; see that
+  // file's comment for why this must fail closed independent of what
+  // currently writes this field.
   const scopeTenant = (req: AuthRequest): string | undefined =>
-    req.user?.role === "admin" ? undefined : req.tenantId;
+    isPlatformRole(req.user?.platformRole) ? undefined : req.tenantId;
 
   const escapeRegex = (value: string): string =>
     value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -357,6 +378,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerVehicleFastagRoutes(app);
   registerVehicleIncidentRoutes(app);
   registerVehicleInspectionRoutes(app);
+
+  // Root Control Plane (Wave 1) additive registration — new /api/root/**
+  // namespace only. See docs/root-control-plane/ROOT-INTEGRATION-report.md.
+  registerRootDashboardRoutes(app);
+  registerRootTenantRoutes(app);
+  registerRootCustomerRoutes(app);
+  app.use('/api/root', authenticateUser, securityRouter);
+  app.use('/api/root', authenticateUser, auditRouter);
+  registerSupportRoutes(app);
+  registerErrorRoutes(app);
+  registerSalesRoutes(app);
+  registerConfigRoutes(app);
+  registerFeatureFlagRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
