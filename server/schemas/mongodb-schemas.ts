@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { optionalString } from './validation-helpers';
 
 // MongoDB Tenant Schema
 export const mongoTenantSchema = z.object({
@@ -81,16 +82,43 @@ export const mongoDriverSchema = z.object({
   tenantId: z.string(),
   name: z.string().min(1, 'Name is required'),
   phone: z.string().min(1, 'Phone is required'),
-  email: z.string().email().optional(),
-  licenseNumber: z.string().min(1).optional(),
-  experience: z.number().int().min(0).optional(),
-  rating: z.number().min(1).max(5).optional(),
+  // TASK-DRIVER-ADD-400-FIX: both of these are product-optional fields but
+  // previously ran their format check (`.email()` / `.min(1)`) against a
+  // literal `""` sent by a blank form field, since `.optional()` alone
+  // does not exempt "provided but blank" — only "absent". optionalString
+  // normalizes blank/whitespace-only to `undefined` first so the format
+  // check only ever runs against a genuinely-provided value. See
+  // ./validation-helpers.ts for the full contract.
+  email: optionalString(z.string().email('Please enter a valid email address.')),
+  // Kept intentionally light: this only rejects obviously-malformed input
+  // (too short / disallowed characters), not a specific national license
+  // format — driver license formats vary too widely across
+  // states/countries for this product to hard-code one.
+  licenseNumber: optionalString(
+    z.string()
+      .min(4, 'Driving Licence Number must be at least 4 characters.')
+      .regex(/^[A-Za-z0-9][A-Za-z0-9 \-\/]*$/, 'Driving Licence Number format is invalid.')
+  ),
+  // experience/rating: the current UI never sends "" for these (its
+  // onChange handlers already convert a blank input to `undefined` before
+  // the request is built), but optionalString is applied defensively so
+  // any other caller (mobile app, API integration, future UI) that DOES
+  // send "" for these gets the same "blank -> not provided" contract
+  // instead of a type-mismatch 400 — optionalString's preprocess works
+  // for any inner schema, not just strings.
+  experience: optionalString(z.number().int().min(0)),
+  rating: optionalString(z.number().min(1).max(5)),
+  // status has a real default and the UI's Select never offers a blank
+  // option, so this is left as-is — not part of the reported bug.
   status: z.enum(['available', 'on_duty', 'inactive']).default('available'),
   languages: z.array(z.string()).default([]),
   // Additional fields
   permanentAddress: z.string().optional(),
   currentAddress: z.string().optional(),
-  maritalStatus: z.enum(['single', 'married', 'divorced', 'widowed']).optional(),
+  // Same defensive reasoning as experience/rating above: the UI never
+  // submits "" for an enum select today, but a blank string sent by any
+  // other caller should mean "not provided", not an invalid-enum 400.
+  maritalStatus: optionalString(z.enum(['single', 'married', 'divorced', 'widowed'])),
   aadharNumber: z.string().optional(),
   panNumber: z.string().optional(),
   dateOfJoining: z.string().optional()

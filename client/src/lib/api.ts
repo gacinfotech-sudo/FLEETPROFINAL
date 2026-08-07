@@ -31,6 +31,34 @@ export function getCachedCsrfToken(): string | null {
 
 export const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+// TASK-DRIVER-ADD-400-FIX: apiRequest previously threw a bare Error whose
+// message was `${status}: ${rawResponseText}` — for a JSON error body,
+// that's the entire raw payload (e.g. a Zod issues array) stuffed into
+// `.message` and shown verbatim in a toast. ApiError parses the body once
+// here, exposes `status`/`body`/`fields` for callers that want to render
+// field-specific errors, and falls back to `body.message` (or the raw
+// text if the body isn't JSON) for `.message` so existing callers that
+// only read `error.message` get a clean string instead of a JSON blob.
+export class ApiError extends Error {
+  status: number;
+  body: any;
+  fields?: Record<string, string>;
+
+  constructor(status: number, rawText: string) {
+    let body: any = null;
+    try {
+      body = JSON.parse(rawText);
+    } catch {
+      // Not a JSON body — fall back to the raw text below.
+    }
+    super((body && typeof body.message === "string" && body.message) || rawText || `Request failed with status ${status}`);
+    this.name = "ApiError";
+    this.status = status;
+    this.body = body;
+    this.fields = body && typeof body.fields === "object" ? body.fields : undefined;
+  }
+}
+
 export async function apiRequest(
   method: string,
   url: string,
@@ -79,8 +107,8 @@ export async function apiRequest(
 
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    throw new ApiError(res.status, text);
   }
-  
+
   return res;
 }
