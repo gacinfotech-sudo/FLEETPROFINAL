@@ -1505,6 +1505,12 @@ BookingSchema.index(
 // grows exactly where it matters most (assignment time).
 BookingSchema.index({ tenantId: 1, driverId: 1, status: 1, scheduledStartDateTime: 1, scheduledEndDateTime: 1 });
 BookingSchema.index({ tenantId: 1, vehicleId: 1, status: 1, scheduledStartDateTime: 1, scheduledEndDateTime: 1 });
+// Backs driverDeviceCorrelation.ts's findDriverCandidates (GPS/meter trip
+// reconciliation, TASK-GPS-MAPPING-03/TASK-GPS-TRIP-BILLING-06) — that query
+// filters on actual (not scheduled) start/end, which the index above does
+// not cover; without this, every reconciliation call scans the vehicle's
+// full booking history.
+BookingSchema.index({ tenantId: 1, vehicleId: 1, actualStartDateTime: 1, actualEndDateTime: 1 });
 ExpenseSchema.index({ tenantId: 1, date: 1 });
 ExpenseSchema.index({ tenantId: 1, vehicleId: 1 });
 // Backs the Trip Cost Summary's per-booking expense lookup.

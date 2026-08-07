@@ -47,12 +47,15 @@ export interface DriverNotOnRecord {
 }
 
 /**
- * More than one booking overlaps the same vehicle + window with a driver
- * attached. Per booking-state-machine invariants this "shouldn't normally
- * happen" (see availability.ts's OCCUPYING_STATUSES overlap guard on
- * scheduled times), but actual-time overlaps are not guarded the same way,
- * so this task must still handle it if it occurs (data correction, manual
- * DB edit, a status/actual-time edit that bypassed the guard, etc).
+ * More than one booking overlaps the same vehicle + window with *different*
+ * drivers attached. Per booking-state-machine invariants this "shouldn't
+ * normally happen" (see availability.ts's OCCUPYING_STATUSES overlap guard
+ * on scheduled times), but actual-time overlaps are not guarded the same
+ * way, so this task must still handle it if it occurs (data correction,
+ * manual DB edit, a status/actual-time edit that bypassed the guard, etc).
+ * An overlap where every candidate shares the same driverId (e.g. a normal
+ * handover running a few minutes late) is resolved as `found`, not
+ * `ambiguous` — see `resolveDriverOnRecord`.
  *
  * Resolution: flagged as ambiguous, NOT resolved to a single "best guess"
  * driver. See the file-level comment above `resolveDriverOnRecord` for why.
@@ -146,30 +149,51 @@ async function findDriverCandidates(
  * overlapping bookings (see findDriverCandidates).
  *
  * Overlapping-booking edge case: resolved as **flag-as-ambiguous**, not
- * first/most-recent. Rationale (documented per the task spec's requirement
+ * first/most-recent — but only when the overlapping bookings disagree on
+ * *who was driving*. Rationale (documented per the task spec's requirement
  * to state and justify the choice): this join feeds GPS/meter distance
  * reconciliation for billing (TASK-GPS-TRIP-BILLING-06). Silently picking
- * "first" or "most-recent" would attribute GPS-derived distance/mismatch
- * data to a specific driver even when the underlying data is genuinely
- * inconsistent (two overlapping active bookings on the same vehicle should
- * never happen per the availability engine's invariants) — a wrong silent
- * guess here could misattribute cost or a mismatch flag to the wrong
- * driver in an audit trail. Surfacing it as an explicit ambiguous state
- * with all candidates listed makes the data-quality problem visible to
- * the caller/reviewer instead of hiding it behind a plausible-looking
- * single answer.
+ * "first" or "most-recent" across two *different* drivers would attribute
+ * GPS-derived distance/mismatch data to a specific driver even when the
+ * underlying data is genuinely inconsistent (two overlapping active
+ * bookings for different drivers on the same vehicle should never happen
+ * per the availability engine's invariants) — a wrong silent guess here
+ * could misattribute cost or a mismatch flag to the wrong driver in an
+ * audit trail. Surfacing it as an explicit ambiguous state with all
+ * candidates listed makes that data-quality problem visible instead of
+ * hiding it behind a plausible-looking single answer.
+ *
+ * A same-driver overlap (e.g. the previous trip's actualEndDateTime running
+ * a few minutes past the next trip's actualStartDateTime during a normal
+ * handover) is not that data-quality problem — there is only one driver on
+ * record, so it is resolved as **found**, not ambiguous. The reported
+ * booking is the candidate with the latest actualStartDateTime at or before
+ * windowStart (i.e. the most recently started trip covering the requested
+ * window — the "current" one during a handover, not the tail end of the
+ * previous trip whose paperwork simply hasn't closed yet), falling back to
+ * the earliest candidate if none started at or before windowStart.
  */
-function resolveDriverOnRecord(candidates: DriverWindowCandidate[]): DriverCorrelationResult {
+function resolveDriverOnRecord(
+  candidates: DriverWindowCandidate[],
+  windowStart: Date,
+): DriverCorrelationResult {
   if (candidates.length === 0) return { status: 'none' };
-  if (candidates.length === 1) {
-    const c = candidates[0];
+  const distinctDriverIds = new Set(candidates.map((c) => c.driverId));
+  if (candidates.length === 1 || distinctDriverIds.size === 1) {
+    // candidates is sorted ascending by actualStartDateTime (see
+    // findDriverCandidates), so the last entry at-or-before windowStart is
+    // the one with the latest start that still covers it.
+    const atOrBeforeWindowStart = candidates.filter((c) => c.actualStartDateTime <= windowStart);
+    const primary = atOrBeforeWindowStart.length > 0
+      ? atOrBeforeWindowStart[atOrBeforeWindowStart.length - 1]
+      : candidates[0];
     return {
       status: 'found',
-      driverId: c.driverId,
-      bookingId: c.bookingId,
-      bookingNumber: c.bookingNumber,
-      actualStartDateTime: c.actualStartDateTime,
-      actualEndDateTime: c.actualEndDateTime,
+      driverId: primary.driverId,
+      bookingId: primary.bookingId,
+      bookingNumber: primary.bookingNumber,
+      actualStartDateTime: primary.actualStartDateTime,
+      actualEndDateTime: primary.actualEndDateTime,
     };
   }
   return { status: 'ambiguous', candidates };
@@ -245,7 +269,7 @@ export async function correlateDriverAndDevice(
     vehicleId,
     windowStart,
     windowEnd,
-    driver: resolveDriverOnRecord(candidates),
+    driver: resolveDriverOnRecord(candidates, windowStart),
     device,
   };
 }
