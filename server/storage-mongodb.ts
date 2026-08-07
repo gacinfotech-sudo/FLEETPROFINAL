@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import mongoose from 'mongoose';
 import { Tenant, User, Vehicle, Driver, Booking, Expense, ITenant, IUser, IVehicle, IDriver, IBooking, IExpense } from './models';
 import { findVehicleConflicts, findDriverConflicts, findTentativeDraftConflicts, combineDateTime } from './services/availability';
+import { generateUniqueBookingCode } from './services/bookingCodeService';
 // TASK-02 (telephony/RBAC isolation) additive import — CallSession/
 // TelephonyIdentity were originally owned by server/telephony/models/*
 // (a separate collection outside the shared server/models/index.ts, which
@@ -624,6 +625,13 @@ export class MongoDBStorage implements IStorage {
       // nanoid suffix avoids collisions when two bookings are created in
       // the same millisecond under load (Date.now() alone is not unique).
       bookingData.bookingId = `BK${Date.now()}${nanoid(4).toUpperCase()}`;
+    }
+    if (!bookingData.bookingCode) {
+      // TASK-BOOKING-CODE-02: short public code, additive alongside
+      // bookingId. Never replaces it or _id.
+      bookingData.bookingCode = await generateUniqueBookingCode(
+        async (code) => (await Booking.exists({ bookingCode: code })) !== null
+      );
     }
 
     // Convert string IDs to ObjectIds if provided

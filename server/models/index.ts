@@ -114,6 +114,10 @@ export interface IDriver extends Document {
 export interface IBooking extends Document {
   tenantId: mongoose.Types.ObjectId;
   bookingId: string;
+  // Short, human-friendly public code (TASK-BOOKING-CODE-02) — additive,
+  // alongside bookingId/_id, never a replacement for either. Optional so
+  // existing bookings created before this field existed remain valid.
+  bookingCode?: string;
   // Client-generated, one per booking-form submission session (not
   // persisted/reused across a genuinely new booking) — lets a double
   // form-submit or a retried request after a dropped response resolve to
@@ -467,6 +471,9 @@ DriverSchema.index({ sessionId: 1 });
 const BookingSchema = new Schema<IBooking>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
   bookingId: { type: String, required: true, unique: true },
+  // TASK-BOOKING-CODE-02: short public code, additive alongside bookingId.
+  // sparse so existing/legacy bookings without one don't violate uniqueness.
+  bookingCode: { type: String, unique: true, sparse: true },
   idempotencyKey: { type: String },
   customerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
   customerName: { type: String, required: true },
