@@ -2679,10 +2679,26 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                 <div className="relative">
                                   <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
                                   <Input
-                                    type="number"
+                                    type="text"
+                                    inputMode="decimal"
                                     placeholder="Enter final amount"
                                     value={field.value ?? ""}
-                                    onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      // type="number" has a well-documented React
+                                      // controlled-value reconciliation quirk: React
+                                      // sometimes fails to actually clear/update the
+                                      // DOM on re-render because the browser's own
+                                      // number-input value normalization makes React
+                                      // think nothing changed — this is the root
+                                      // cause of the leading-zero/stuck-value bug
+                                      // confirmed by live testing (see this task's
+                                      // report). text + inputMode="decimal" gives the
+                                      // same numeric keyboard on mobile without that
+                                      // quirk; digits/one-decimal-point only.
+                                      if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return;
+                                      field.onChange(raw === "" ? undefined : parseFloat(raw));
+                                    }}
                                     className="h-12 pl-10 text-lg font-medium border-2 border-orange-300 focus:border-orange-500 rounded-lg"
                                   />
                                 </div>
