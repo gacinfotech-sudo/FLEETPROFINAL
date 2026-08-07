@@ -119,6 +119,7 @@ import { registerVehicleFuelRoutes } from "./vehicle/expenses/routes";
 import { registerVehicleFastagRoutes } from "./vehicle/fastag/routes";
 import { registerVehicleIncidentRoutes } from "./vehicle/incidents/routes";
 import { registerVehicleInspectionRoutes } from "./vehicle/inspections/routes";
+import { resolveOwnFleetEligibility } from "./vehicle/core/ownFleetEligibility";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -2720,7 +2721,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // conflicts, instead of silently creating a double-booked driver —
       // this is the hard backend stop that exists even if the frontend
       // dropdown incorrectly let the conflicting driver be selected).
-      if (error?.code === 'VEHICLE_DOUBLE_BOOKING' || error?.code === 'DRIVER_TIME_CONFLICT' || error?.code === 'VEHICLE_TENTATIVELY_HELD') {
+      // TASK-VEHICLE-SAFETY-ELIGIBILITY: same 409 convention as the
+      // conflict codes above — VEHICLE_SAFETY_HOLD is thrown by
+      // storage.createBooking's live eligibility recheck, never something
+      // the frontend can bypass by not calling the picker.
+      if (error?.code === 'VEHICLE_DOUBLE_BOOKING' || error?.code === 'DRIVER_TIME_CONFLICT' || error?.code === 'VEHICLE_TENTATIVELY_HELD' || error?.code === 'VEHICLE_SAFETY_HOLD') {
         const c = error.conflict;
         return res.status(409).json({
           success: false,
@@ -2731,6 +2736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             startDateTime: c.pickupDate,
             endDateTime: c.returnDate,
           } : undefined,
+          openCriticalDefects: error.openCriticalDefects,
         });
       }
       console.error('Booking creation error:', error?.message || error);
@@ -2819,6 +2825,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (availability.bookingConflicts.length) conflicts.driverBookings = availability.bookingConflicts;
           if (availability.leaveConflicts.length) conflicts.driverLeave = availability.leaveConflicts;
         }
+
+        // TASK-VEHICLE-SAFETY-ELIGIBILITY: stale-allocation recheck. Only
+        // fires when THIS request is actually assigning/reassigning the
+        // own-fleet vehicle (`vehicleChanged`) — re-evaluates SAFETY_HOLD
+        // live, at the moment of this save, never trusting whatever was
+        // true when the edit form/Add Booking wizard was opened. A vehicle
+        // that became SAFETY_HOLD in between (e.g. another staff member
+        // just logged a critical Daily Inspection defect) is caught here
+        // even though it looked fine when the form loaded. Deliberately
+        // NOT folded into the `conflicts`/`override` block above and NOT
+        // overridable the way a scheduling conflict is: a double-booking
+        // can be a legitimate, rare admin override; an unresolved critical
+        // safety defect cannot — the only way past this is to resolve the
+        // defect or pick a different vehicle/allocation path.
+        if (vehicleChanged && effectiveVehicleId) {
+          const eligibility = await resolveOwnFleetEligibility(req.tenantId!, refId(effectiveVehicleId));
+          if (eligibility.safetyHold) {
+            return res.status(409).json({
+              success: false,
+              code: "VEHICLE_SAFETY_HOLD",
+              message: "This vehicle is on Safety Hold due to an unresolved critical Daily Inspection defect and cannot be assigned to this booking. Resolve the defect or choose a different vehicle / allocation path (Allocation Pending, Vendor, Outsource).",
+              openCriticalDefects: eligibility.openCriticalDefects,
+            });
+          }
+        }
+
         if (Object.keys(conflicts).length) {
           if (!req.body.override) {
             return res.status(409).json({ message: "Driver or vehicle is unavailable for this schedule.", code: "AVAILABILITY_CONFLICT", conflicts });
