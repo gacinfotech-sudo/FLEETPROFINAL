@@ -123,6 +123,24 @@ unmerged worktree) — proves graceful degradation, but **full visual verificati
 populated data was not done**, since that requires both worktrees' changes running
 together, which is Integrator-owned scope once both are merged.
 
+## Fourth fix: document expiry tiers + missing-type summary
+
+`driver-onboarding-interface` @ `b92ae8e`. Two changes to `driver-documents-panel.tsx`/
+`driver-domain-constants.ts` (§13-15):
+- `expiryStatusText()` gives precise, tiered day-count text ("Expires in 7 days (in 4
+  days)", "Expired 3 days ago") instead of a bare date; widened the "expiring soon"
+  detection window from 30 to 90 days to match the spec's three reminder tiers.
+- The panel now shows which of the 14 known document types have never been uploaded at
+  all, as a plain summary line — distinct from "expired" (§15's "do not confuse MISSING
+  with EXPIRED"): a document that doesn't exist has no `expiryDate` and never reaches
+  `documentComplianceStatus()`/`expiryStatusText()`, both of which only ever describe a
+  document that exists.
+
+**Verified:** `npm run check` clean. Re-ran `driver-ui-onboarding-360.spec.ts` live — all 3
+pass (one run hit an unrelated transient page-load timeout, not reproducible on retry and
+confirmed unrelated to this change since it failed before ever reaching document-panel
+code).
+
 ## What this pass did NOT do — remaining scope
 
 None of the following were implemented. Each is a real, separate piece of work, not a
@@ -140,8 +158,6 @@ quick follow-on:
   the same file.
 - **First-Time Driver / Fresher flag** (§11): not present.
 - **Experience summary (declared/verified/unverified)** (§12): not built.
-- **Document expiry threshold reminders** (90/30/7 days, distinct from "missing") (§15):
-  not verified either way — `driver-documents-panel.tsx` was not inspected in this pass.
 - **Google Drive/Sheet optional fields in the UI** (§16): not verified.
 - **Dashboard/list completeness indicator + filters** (§21-23): not built.
 - **Migration/backward-compatibility verification for legacy Drivers** (§25): not
@@ -155,13 +171,14 @@ quick follow-on:
 
 ## Final state
 
-**Not `DRIVER_ZERO_BLOCK_ONBOARDING_VERIFIED`.** Three real, verified pieces landed:
+**Not `DRIVER_ZERO_BLOCK_ONBOARDING_VERIFIED`.** Four real, verified pieces landed:
 `PARTIAL — CONTACT_THRESHOLD_BLOCK_FIXED_AND_VERIFIED, COMPLETENESS_ENGINE_BUILT_AND_VERIFIED,
 DRIVER_360_REMINDER_CARD_BUILT_AND_VERIFIED (rendering only, not yet visually confirmed with
-real populated data end-to-end)`. The remaining scope above is substantial and should be
-treated as separate follow-on work, ideally by whichever session(s) already own the
-adjacent files (the employment-history panel is already being actively extended by another
-session; documents/Drive fields belong to `driver-google-documents`).
+real populated data end-to-end), DOCUMENT_EXPIRY_TIERS_AND_MISSING_SUMMARY_BUILT_AND_VERIFIED`.
+The remaining scope above is substantial and should be treated as separate follow-on work,
+ideally by whichever session(s) already own the adjacent files (the employment-history
+panel is already being actively extended by another session; Google Drive connection UI
+belongs to `driver-google-documents`).
 
 ## Commits
 
@@ -174,12 +191,14 @@ session; documents/Drive fields belong to `driver-google-documents`).
   (contact-threshold client mirror)
 - `driver-onboarding-interface` @ `b6e3558` — `client/src/components/drivers/
   driver-completeness-card.tsx`, `driver-360.tsx` (reminder card)
+- `driver-onboarding-interface` @ `b92ae8e` — `client/src/components/drivers/
+  driver-documents-panel.tsx`, `driver-domain-constants.ts` (expiry tiers + missing-type summary)
 
 ## Rollback
 
-`git revert 935402d 1308839` on `driver/domain-02-lifecycle` and `git revert 0ae5430 b6e3558`
-on `driver/onboarding-ui-04` — all isolated, additive-only commits with no other committed
-work depending on them.
+`git revert 935402d 1308839` on `driver/domain-02-lifecycle` and
+`git revert 0ae5430 b6e3558 b92ae8e` on `driver/onboarding-ui-04` — all isolated,
+additive-only commits with no other committed work depending on them.
 
 ## Shared wiring required (Integrator)
 
