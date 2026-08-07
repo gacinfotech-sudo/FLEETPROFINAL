@@ -1,4 +1,12 @@
 import mongoose, { Schema, Document } from 'mongoose';
+// TASK-BOOKING-DOMAIN-02: date-certainty enums + conditional-required
+// predicates. vehicleId/resourceFulfilmentStatus are NOT part of this —
+// that shipped separately (see the IBooking comments below). See
+// server/booking/domain/ for the full design rationale.
+import {
+  TRAVEL_DATE_STATUSES, TRIP_TYPES,
+  isPickupDateRequired, isTentativeRangeRequired,
+} from '../booking/domain';
 
 // Interfaces for TypeScript
 export interface ITenant extends Document {
@@ -145,10 +153,47 @@ export interface IBooking extends Document {
   dutyAcceptedAt?: Date;
   pickupLocation: string;
   dropoffLocation?: string;
-  pickupDate: Date;
+  // Optional as of TASK-BOOKING-DOMAIN-02: required only when
+  // travelDateStatus is 'confirmed' (the default — see
+  // requiredRules.isPickupDateRequired and legacy.ts's
+  // resolveTravelDateStatus for why an ABSENT travelDateStatus on a
+  // pre-existing document must still mean 'confirmed', never
+  // 'not_decided').
+  pickupDate?: Date;
   returnDate?: Date;
   pickupTime?: string;
   returnTime?: string;
+  // Date-certainty axis (TASK-BOOKING-DOMAIN-02) — orthogonal to
+  // resourceFulfilmentStatus below (vehicle-certainty, already shipped).
+  // MUST default to 'confirmed': every document that predates this field
+  // was created back when pickupDate was unconditionally required, so
+  // its absence always means a real date was supplied, never
+  // uncertainty. See server/booking/domain/legacy.ts.
+  travelDateStatus?: 'confirmed' | 'range' | 'not_decided';
+  // Required (via requiredRules.isTentativeRangeRequired) only when
+  // travelDateStatus === 'range' — a customer-given window ("sometime in
+  // the first two weeks of next month") rather than a single confirmed date.
+  tentativeStartDate?: Date;
+  tentativeEndDate?: Date;
+  // When to next follow up on an undecided/tentative booking — genuinely
+  // new, no prior concept existed. No legacy-default meaning (see
+  // legacy.ts's resolveFollowUpAt): absence just means "no follow-up set".
+  followUpAt?: Date;
+  // Server-derived "last touched" signal — NOT accepted from client
+  // payloads (see bookingCertaintySchema.ts's comment on why). Falls back
+  // to updatedAt, then createdAt, for any document that predates it; see
+  // legacy.ts's resolveLastActivityAt. Not backfilled.
+  lastActivityAt?: Date;
+  // Booking had no updatedAt field at all before this task (verified:
+  // grep for `booking.updatedAt`/`Booking...updatedAt` across
+  // server/routes.ts, server/services/*.ts, server/storage-mongodb.ts
+  // returns nothing) — added here as a plain, pre('save')-maintained
+  // field (matching the existing CustomerSchema/ReferralSchema/etc.
+  // convention already used elsewhere in this file) rather than turning
+  // on Mongoose's `timestamps: true` schema option, which would also
+  // start managing createdAt and risk conflicting with its existing
+  // `default: Date.now` behavior.
+  updatedAt?: Date;
   // Auto-computed (pre-save hook) from pickupDate+pickupTime and
   // returnDate+returnTime — pickupDate/returnDate alone are ALWAYS
   // midnight, with the real clock time living only in the separate
@@ -179,6 +224,21 @@ export interface IBooking extends Document {
     reason?: string;
     changedBy: { userId: string; role: string };
     changedAt: Date;
+  }[];
+  // Backdated authorized corrections (TASK-BOOKING-DOMAIN-02) — distinct
+  // from rescheduleHistory above (which records a FORWARD schedule change
+  // made through the normal reschedule flow). This is staff correcting
+  // the record of something already entered, on any field, always with a
+  // reason — see server/booking/domain/revisionHistory.ts, the only code
+  // path that can construct an entry (it throws without a non-empty
+  // reason). Never populated directly from a raw booking edit payload.
+  revisionHistory?: {
+    fieldsChanged: string[];
+    previousValues: Record<string, unknown>;
+    newValues: Record<string, unknown>;
+    reason: string;
+    authorizedBy: { userId: string; role: string };
+    correctedAt: Date;
   }[];
   // Booking Source: where the booking came from. Deliberately separate
   // from fulfilmentType below (who's providing the vehicle) — a booking
@@ -233,6 +293,14 @@ export interface IBooking extends Document {
     'vendor_confirmation_pending' | 'vendor_confirmed' | 'outsourcing_requested' | 'vendor_quotes_pending' |
     'resource_sourcing_pending' | 'resource_secured' | 'resource_rejected' | 'resource_failed';
   bookingType: 'self_drive' | 'with_driver' | 'one_way' | 'round_trip' | 'local' | 'airport';
+  // Trip shape (TASK-BOOKING-DOMAIN-02) — kept strictly distinct from
+  // bookingType above (who drives). Was declared and required on the
+  // client Zod schema and submitted on every create request, but silently
+  // stripped by the server Zod schema and never declared here — see
+  // server/booking/domain/tripType.ts and
+  // server/services/invoiceService.ts, which already reads this field
+  // expecting it to exist.
+  tripType?: 'one_way' | 'round_trip' | 'local' | 'airport';
   pricingType?: 'day' | 'km';
   totalKilometers?: number;
   status: 'enquiry' | 'quotation_sent' | 'tentative' | 'on_hold' | 'confirmed' | 'vehicle_assigned' |
@@ -477,10 +545,31 @@ const BookingSchema = new Schema<IBooking>({
   dutyAcceptedAt: { type: Date },
   pickupLocation: { type: String, required: true },
   dropoffLocation: { type: String },
-  pickupDate: { type: Date, required: true },
+  pickupDate: {
+    type: Date,
+    // Conditionally required (TASK-BOOKING-DOMAIN-02) — required exactly
+    // when travelDateStatus is 'confirmed' (the default). See
+    // requiredRules.isPickupDateRequired.
+    required: function (this: any) { return isPickupDateRequired(this); },
+  },
   returnDate: { type: Date },
   pickupTime: { type: String },
   returnTime: { type: String },
+  // Date-certainty axis (TASK-BOOKING-DOMAIN-02). default: 'confirmed' is
+  // the single most important line in this whole patch — see
+  // server/booking/domain/legacy.ts's resolveTravelDateStatus comment.
+  travelDateStatus: { type: String, enum: TRAVEL_DATE_STATUSES, default: 'confirmed' },
+  tentativeStartDate: {
+    type: Date,
+    required: function (this: any) { return isTentativeRangeRequired(this); },
+  },
+  tentativeEndDate: {
+    type: Date,
+    required: function (this: any) { return isTentativeRangeRequired(this); },
+  },
+  followUpAt: { type: Date },
+  lastActivityAt: { type: Date },
+  updatedAt: { type: Date },
   scheduledStartDateTime: { type: Date },
   scheduledEndDateTime: { type: Date },
   actualStartDateTime: { type: Date },
@@ -502,6 +591,22 @@ const BookingSchema = new Schema<IBooking>({
       role: { type: String }
     },
     changedAt: { type: Date, default: Date.now }
+  }],
+  // Backdated authorized corrections (TASK-BOOKING-DOMAIN-02) — see the
+  // IBooking interface comment above and
+  // server/booking/domain/revisionHistory.ts. `reason` is `required: true`
+  // at the schema layer too (not just at the builder-function layer) so a
+  // direct/scripted write attempting to skip it fails loudly.
+  revisionHistory: [{
+    fieldsChanged: [{ type: String }],
+    previousValues: { type: Schema.Types.Mixed },
+    newValues: { type: Schema.Types.Mixed },
+    reason: { type: String, required: true },
+    authorizedBy: {
+      userId: { type: String },
+      role: { type: String }
+    },
+    correctedAt: { type: Date, default: Date.now }
   }],
   bookingSource: {
     type: String,
@@ -535,10 +640,16 @@ const BookingSchema = new Schema<IBooking>({
       'vendor_confirmed', 'outsourcing_requested', 'vendor_quotes_pending', 'resource_sourcing_pending',
       'resource_secured', 'resource_rejected', 'resource_failed'],
   },
+  // Trip shape (TASK-BOOKING-DOMAIN-02) — see the IBooking interface
+  // comment above for why this was previously dead code.
+  tripType: {
+    type: String,
+    enum: TRIP_TYPES,
+  },
   bookingType: {
-    type: String, 
-    enum: ['self_drive', 'with_driver', 'one_way', 'round_trip', 'local', 'airport'], 
-    required: true 
+    type: String,
+    enum: ['self_drive', 'with_driver', 'one_way', 'round_trip', 'local', 'airport'],
+    required: true
   },
   pricingType: {
     type: String,
@@ -670,6 +781,15 @@ BookingSchema.pre('save', function (next) {
   if (this.isModified('returnDate') || this.isModified('returnTime') || this.isModified('pickupDate') || this.isModified('pickupTime') || this.isNew) {
     this.scheduledEndDateTime = combineDateAndTime(this.returnDate || this.pickupDate, this.returnTime || this.pickupTime) || this.scheduledStartDateTime;
   }
+  // TASK-BOOKING-DOMAIN-02: Booking had no updatedAt at all before this —
+  // maintained here the same way CustomerSchema/ReferralSchema/etc.
+  // already do elsewhere in this file. lastActivityAt mirrors it for
+  // every document saved from this point forward; a document that
+  // predates this hook and is never re-saved keeps falling back through
+  // legacy.ts's resolveLastActivityAt (updatedAt, then createdAt) — no
+  // backfill happens here.
+  (this as any).updatedAt = new Date();
+  (this as any).lastActivityAt = (this as any).updatedAt;
   next();
 });
 
@@ -699,6 +819,27 @@ BookingSchema.pre('findOneAndUpdate', async function (next) {
   } else {
     update.scheduledStartDateTime = scheduledStartDateTime;
     update.scheduledEndDateTime = scheduledEndDateTime;
+  }
+  this.setUpdate(update);
+  next();
+});
+
+// TASK-BOOKING-DOMAIN-02: same updatedAt/lastActivityAt maintenance as the
+// pre('save') hook above, for the findOneAndUpdate path (PUT
+// /api/bookings/:id goes through storage.updateBooking(), which — like
+// the scheduledStartDateTime sync above — does NOT run pre('save') hooks.
+// Runs on every update unconditionally (not just schedule-touching ones)
+// since "was this booking touched at all" is the actual signal
+// lastActivityAt exists to carry.
+BookingSchema.pre('findOneAndUpdate', function (next) {
+  const update: any = this.getUpdate();
+  const now = new Date();
+  if (update.$set) {
+    update.$set.updatedAt = now;
+    update.$set.lastActivityAt = now;
+  } else {
+    update.updatedAt = now;
+    update.lastActivityAt = now;
   }
   this.setUpdate(update);
   next();

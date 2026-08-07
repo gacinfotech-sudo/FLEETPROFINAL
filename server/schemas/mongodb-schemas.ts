@@ -112,11 +112,34 @@ export const mongoBookingSchema = z.object({
   driverId: z.string().optional(),
   pickupLocation: z.string().min(1, 'Pickup location is required'),
   dropoffLocation: z.string().optional(),
-  pickupDate: z.string(),
+  // TASK-BOOKING-DOMAIN-02: relaxed from unconditionally-required to
+  // structurally optional here — the actual conditional-requirement rule
+  // (required unless travelDateStatus is 'range'/'not_decided') is
+  // enforced by mongoBookingSchemaWithCertainty in
+  // server/booking/domain/bookingCertaintySchema.ts, which POST
+  // /api/bookings uses in place of this bare schema (see the routes.ts
+  // patch). This schema's own `.partial()` use in the PUT
+  // /api/bookings/:id edit route is exactly why the relaxation happens
+  // here directly rather than only in a `.superRefine()`-wrapped variant
+  // — ZodEffects (what `.superRefine()` produces) has no `.partial()`
+  // method.
+  pickupDate: z.string().optional(),
   returnDate: z.string().optional(),
   pickupTime: z.string().optional(),
   returnTime: z.string().optional(),
+  // Date-certainty axis (TASK-BOOKING-DOMAIN-02) — see
+  // server/booking/domain/types.ts. Absent means 'confirmed' (see
+  // legacy.ts's resolveTravelDateStatus). do not change this default.
+  travelDateStatus: z.enum(['confirmed', 'range', 'not_decided']).optional(),
+  tentativeStartDate: z.string().optional(),
+  tentativeEndDate: z.string().optional(),
+  followUpAt: z.string().optional(),
   bookingType: z.enum(['self_drive', 'with_driver', 'one_way', 'round_trip', 'local', 'airport']),
+  // Trip shape (TASK-BOOKING-DOMAIN-02) — kept distinct from bookingType
+  // above. Was declared on the client schema and submitted on every
+  // create request but silently stripped here (this exact gap is audit
+  // finding #3) — see server/booking/domain/tripType.ts.
+  tripType: z.enum(['one_way', 'round_trip', 'local', 'airport']).optional(),
   pricingType: z.enum(['day', 'km']).optional(),
   totalKilometers: z.number().min(0).optional(),
   status: z.enum(['enquiry', 'quotation_sent', 'tentative', 'on_hold', 'confirmed', 'vehicle_assigned',
