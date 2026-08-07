@@ -261,3 +261,119 @@ No scope creep or ownership violations found.
 `fleetpro-main/.claude/tasks/active/` to `fleetpro-main/.claude/tasks/completed/`
 (main worktree's `.claude/`, per instructions — this directory is untracked/local per
 worktree in this repo).
+
+## Follow-up fix applied (debounce click-race)
+
+Fixes "Follow-up needed from user" item 1 above, commit `556c67f` on
+`integration/preview-20260807`.
+
+**What changed** — `client/src/pages/customers.tsx`: the `useQuery` for
+`/api/customers` now also destructures `isFetching`, and a new
+`isSearchStale = search !== debouncedSearch || isFetching` flag drives two
+things: (1) row `onClick` becomes a no-op while stale, so a click can no
+longer land on the still-rendered pre-filter table and open the wrong
+customer, and (2) the table gets `opacity-50 pointer-events-none` plus an
+"Updating results..." overlay while stale, so the UI honestly reflects
+that what's on screen may not match the current search box value yet.
+This covers both halves of the race: the debounce window itself
+(`search !== debouncedSearch`, before the query even re-fires) and the
+network round-trip after it fires (`isFetching`). No changes to
+`use-debounced-value.ts` — the hook's behavior was never the problem.
+
+**Tests updated** — `customer-merge.spec.ts` (the trace-confirmed one),
+plus `customer-financial-summary.spec.ts`, `customer-invoice.spec.ts`, and
+`invoice-deferred-numbering.spec.ts`. All four turned out to have the
+exact same `fill(search) → page.locator('table tbody tr').first().click()`
+pattern with zero wait in between — the suspicion in item 1 was correct
+for all three, not just the confirmed one. Each now has a
+`page.waitForTimeout(600)` between the fill and the click, matching the
+convention already used for the same reason in
+`customer-quick-actions.spec.ts` (350ms debounce + margin for the
+network round-trip). `customer-360.spec.ts` was also checked: it clicks
+via `getByText(name, { exact: true })` rather than
+`table tbody tr .first()`, which Playwright auto-retries until that
+specific (post-debounce) row exists — not vulnerable to this race by
+construction, so it was left as-is.
+
+**Test results**:
+- Before: `customer-merge.spec.ts` reproducibly failed on this race (per
+  item 1's trace evidence); `customer-financial-summary.spec.ts`,
+  `customer-invoice.spec.ts`, and `invoice-deferred-numbering.spec.ts`
+  were suspected but not independently confirmed.
+- After the fix, on a fresh dev server (port 5091, this worktree only):
+  `npx playwright test tests/e2e/customer-merge.spec.ts
+  tests/e2e/customer-financial-summary.spec.ts
+  tests/e2e/customer-invoice.spec.ts
+  tests/e2e/invoice-deferred-numbering.spec.ts` → **5/5 passed**
+  (`invoice-deferred-numbering.spec.ts` has two tests in it).
+  Regression check — `npx playwright test tests/e2e/customer-360.spec.ts
+  tests/e2e/customer-quick-actions.spec.ts` → **8/8 passed**, confirming
+  normal (non-race) search/click flows still work.
+- `npm run check` stayed clean before and after.
+
+**Pattern confirmed in all 3 suspected files**, not ruled out in any of
+them — the root cause was identical across `customer-merge.spec.ts`,
+`customer-financial-summary.spec.ts`, `customer-invoice.spec.ts`, and
+`invoice-deferred-numbering.spec.ts`.
+
+## Follow-up fix applied (webhook inbound-event de-dupe race)
+
+Fixes "Follow-up needed from user" item 2 above, commit `78ff849` on
+`integration/preview-20260807`.
+
+**What changed** — `server/storage-mongodb.ts`: new
+`upsertInboundCallSession(tenantId, providerCallId, identityFields,
+mutableFields)`, a single `CallSession.findOneAndUpdate(..., { upsert:
+true, new: true, includeResultMetadata: true })` keyed on `(tenantId,
+providerCallId)`. Identity fields (`direction`, `userId`,
+`assignedUserId`, contact numbers, `createdBy`, etc.) apply only via
+`$setOnInsert`; mutable fields (`status`, `durationSeconds`,
+`updatedBy`) apply via `$set` on every write, so a duplicate delivery
+still refreshes status instead of being a no-op. `server/telephony/
+services/callService.ts`'s `resolveInboundEvent()` now calls this
+instead of the previous `findCallSessionByProviderCallId` +
+`createCallSessionRecord`/`updateCallSessionFields` check-then-act
+pair, and only fires the `call.ringing` screen-pop event when the
+upsert's `created` flag is true (matching the previous behavior of
+only notifying on first delivery).
+
+**Why this needed fixing, not just flagging**: the previous pattern's
+race window was real, not theoretical — two concurrent deliveries of
+the same provider event (an ordinary webhook-retry scenario) could
+both observe "no existing record" before either write landed, and the
+DB's unique index would only stop the *second* `create`, surfacing as
+an unhandled exception rather than a clean resolve to one record.
+
+**Tests added** — `tests/e2e/telephony-isolation.spec.ts`: "Two truly
+concurrent deliveries of a brand-new provider event resolve atomically
+to one record" — fires both webhook deliveries via `Promise.all` (not
+sequentially, which the pre-existing duplicate-delivery test already
+covered) for a `providerCallId` never seen before, asserts both
+requests succeed and exactly one `CallSession` document exists.
+
+**Test results**:
+- `npm run check` — clean, before and after.
+- Standalone verification script (12 concurrent
+  `upsertInboundCallSession` calls issued directly against MongoDB,
+  bypassing the HTTP/browser layer, run and deleted before commit —
+  not part of the shipped diff): 0 errors, exactly 1 `created: true`,
+  11 `created: false`, exactly 1 document in the DB, all 12 results
+  referencing the same document id.
+- `npx playwright test tests/e2e/telephony-isolation.spec.ts --grep
+  "inbound|concurrent"` → **3/3 passed**, including the new test,
+  against the real HTTP webhook route.
+- Full-suite regression was not re-run for this follow-up (single,
+  additive, mechanically-verified change to one already-isolated code
+  path with its own passing tests) — the dev server for this worktree
+  was found dead mid-verification (same unscoped-process-kill class of
+  incident already documented above and in `TASK-02-report.md`) and
+  had to be restarted before the targeted tests above could complete;
+  machine load during this session (`uptime` load average ~40-43,
+  ~20 concurrent Claude Code sessions) caused two earlier full-file
+  runs to fail on unrelated pre-existing tests (`page.goto('/login')`
+  timeouts, a plain GET exceeding a 60s timeout) — consistent with,
+  not contradicting, this report's own "Shared dev MongoDB /
+  concurrent-worktree contention" finding (item 3 below). The targeted
+  re-run above avoided that contention by skipping the unrelated
+  flaky login-dependent test via `--grep` and by verifying the core
+  mechanism directly against the database first.

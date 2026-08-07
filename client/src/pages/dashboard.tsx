@@ -524,6 +524,27 @@ export default function Dashboard() {
     queryKey: ["/api/bookings"],
   });
 
+  // viewingBooking/editingBooking are snapshots taken at click-time, not derived from
+  // the `bookings` query — so when a payment is recorded (or any other mutation
+  // invalidates /api/bookings), the refetched list has the correct new
+  // totalAmount/advanceReceived/paymentStatus, but the open dialog kept showing the
+  // stale snapshot, most visibly as an incorrect "Remaining Due" in PaymentSection.
+  // Re-sync both to the latest matching record whenever the list refetches.
+  useEffect(() => {
+    if (!bookings.length) return;
+    setViewingBooking((prev: any) => {
+      if (!prev) return prev;
+      const fresh = bookings.find((b: any) => (b._id || b.id) === (prev._id || prev.id));
+      return fresh || prev;
+    });
+    setEditingBooking((prev: any) => {
+      if (!prev) return prev;
+      const fresh = bookings.find((b: any) => (b._id || b.id) === (prev._id || prev.id));
+      return fresh || prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings]);
+
   const { data: users = [] } = useQuery<any[]>({
     queryKey: ["/api/users/sub-users"],
     enabled: user?.role === 'client' || user?.role === 'admin',
@@ -1608,8 +1629,9 @@ export default function Dashboard() {
                     {(bookings as any[])
                       .filter((booking: any) => {
                         // Search filter
-                        const matchesSearch = searchTerm === "" || 
+                        const matchesSearch = searchTerm === "" ||
                           booking.bookingId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (booking.bookingCode && booking.bookingCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
                           booking.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           booking.customerPhone.includes(searchTerm);
                         
@@ -1638,6 +1660,9 @@ export default function Dashboard() {
                       <TableRow key={booking._id || booking.id}>
                         <TableCell>
                           <div className="font-medium">{booking.bookingId}</div>
+                          {booking.bookingCode && (
+                            <div className="text-xs text-gray-500 font-mono">{booking.bookingCode}</div>
+                          )}
                           <div className="text-sm text-gray-500">
                             {new Date(booking.createdAt).toLocaleDateString()}
                           </div>
@@ -2577,6 +2602,12 @@ export default function Dashboard() {
                   <Label className="text-sm font-medium text-gray-700">Booking ID</Label>
                   <p className="text-sm text-gray-900">{viewingBooking.bookingId}</p>
                 </div>
+                {viewingBooking.bookingCode && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Booking Code</Label>
+                    <p className="text-sm text-gray-900 font-mono tracking-wide">{viewingBooking.bookingCode}</p>
+                  </div>
+                )}
                 <div>
                   <Label className="text-sm font-medium text-gray-700">Status</Label>
                   <Badge variant={viewingBooking.status === "confirmed" ? "default" : viewingBooking.status === "completed" ? "secondary" : "destructive"}>

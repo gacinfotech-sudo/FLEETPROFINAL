@@ -105,10 +105,10 @@ import { authenticateDriver, type DriverAuthRequest } from "./middleware/driverA
 import { registerGpsConnectionRoutes } from "./gps/routes/connections";
 import { registerGpsDeviceRoutes } from "./gps/routes/devices";
 import { registerGpsAssignmentRoutes } from "./gps/routes/assignments";
-import { registerBookingQueuesRoutes } from "./booking/queues";
 // TASK-02 (telephony/RBAC isolation) additive import — new namespace only,
 // no existing route/import in this file was touched.
 import { registerTelephonyRoutes } from "./telephony/index";
+import { registerBookingQueuesRoutes } from "./booking/queues";
 // Integrator addition: these six modules landed in trunk with real,
 // tested route handlers but were never wired in here — confirmed live
 // (curl returned 200/SPA-fallback, not 401) before this fix. Purely
@@ -338,11 +338,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerGpsConnectionRoutes(app);
   registerGpsDeviceRoutes(app);
   registerGpsAssignmentRoutes(app);
-  registerBookingQueuesRoutes(app);
   // TASK-02 (telephony/RBAC isolation) additive registration — new
   // /api/telephony/* namespace only, appended after the existing GPS
   // registrations without reordering or editing any existing line.
   registerTelephonyRoutes(app);
+  registerBookingQueuesRoutes(app);
   // Integrator addition: wire up Driver domain/documents/handover and GPS
   // billing/webhook — real handlers, already merged into this tree, never
   // previously mounted (confirmed unreachable via live curl before this fix).
