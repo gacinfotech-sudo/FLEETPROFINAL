@@ -9,6 +9,7 @@ import LandingPage from "./pages/landing";
 import LoginPage from "./pages/login";
 import AdminPanel from "./pages/admin-panel";
 import Dashboard from "./pages/dashboard";
+import Vehicle360Page from "./pages/vehicle-360";
 import ForcedPasswordResetPage from "./pages/forced-password-reset";
 import NotFound from "@/pages/not-found";
 import ProtectedRoute from "@/components/auth/protected-route";
@@ -73,6 +74,13 @@ function AuthenticatedApp() {
         </ProtectedRoute>
       </Route>
       
+      {/* Vehicle 360 (TASK-VEHICLE-360-UI-06) */}
+      <Route path="/vehicles/:vehicleId">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <Vehicle360Page />
+        </ProtectedRoute>
+      </Route>
+
       {/* Fallback route for any unknown paths - redirects to appropriate dashboard */}
       <Route>
         {loading ? (
