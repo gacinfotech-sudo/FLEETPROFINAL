@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import mongoose from 'mongoose';
 import { Tenant, User, Vehicle, Driver, Booking, Expense, VehicleBookingLock, ITenant, IUser, IVehicle, IDriver, IBooking, IExpense } from './models';
 import { findVehicleConflicts, findDriverConflicts, findTentativeDraftConflicts, combineDateTime } from './services/availability';
+import { resolveOwnFleetEligibility } from './vehicle/core/ownFleetEligibility';
 
 export interface IStorage {
   // Auth methods
@@ -500,7 +501,18 @@ export class MongoDBStorage implements IStorage {
       const candidates = await Vehicle.find({ tenantId, status: 'available' }).sort({ createdAt: -1 });
       const availability = await Promise.all(candidates.map(async (v) => {
         const conflicts = await findVehicleConflicts(tenantId, v.id, start, end);
-        return conflicts.length === 0;
+        if (conflicts.length > 0) return false;
+        // TASK-VEHICLE-SAFETY-ELIGIBILITY: exclude SAFETY_HOLD vehicles from
+        // the own-fleet picker's candidate list, matching the exact pattern
+        // this list already uses for every other ineligible state
+        // (maintenance/on-trip via the `status: 'available'` filter above,
+        // already-assigned via the overlap check just above) — plain
+        // exclusion, not a disabled-with-reason entry (that pattern is only
+        // used for drivers elsewhere in this app). Every candidate here is
+        // already known-`status: 'available'`, so `knownOperationalStatus`
+        // is passed for a fully real (not neutral-placeholder) evaluation.
+        const eligibility = await resolveOwnFleetEligibility(tenantId, v.id, { knownOperationalStatus: 'AVAILABLE' });
+        return eligibility.eligible;
       }));
       return candidates.filter((_v, i) => availability[i]);
     } catch (error) {
@@ -700,6 +712,32 @@ export class MongoDBStorage implements IStorage {
           );
           err.code = 'DRIVER_TIME_CONFLICT';
           err.conflict = c;
+          throw err;
+        }
+      }
+
+      // TASK-VEHICLE-SAFETY-ELIGIBILITY: real server-side enforcement, not
+      // just UI filtering — a SAFETY_HOLD own-fleet vehicle (unresolved
+      // CRITICAL Daily Inspection defect) can never be assigned to a new
+      // booking, even via a direct API call that bypasses the picker
+      // entirely. Evaluated live, inside this same create path/transaction
+      // — this is what makes it a real "final confirmation" recheck rather
+      // than trusting whatever was true when an Add Booking form was
+      // opened: a vehicle that became SAFETY_HOLD in between is caught
+      // here regardless. Only runs when an own-fleet vehicleId is actually
+      // being assigned — a booking captured via any other resource path
+      // (Allocation Pending / Vendor Vehicle / Outsource / Tentative /
+      // Quote Only, i.e. no vehicleId) is completely unaffected.
+      if (bookingData.vehicleId) {
+        const eligibility = await resolveOwnFleetEligibility(
+          bookingData.tenantId.toString(), bookingData.vehicleId.toString(), { session }
+        );
+        if (eligibility.safetyHold) {
+          const err: any = new Error(
+            'This vehicle is on Safety Hold due to an unresolved critical Daily Inspection defect and cannot be assigned to a new booking. Resolve the defect or choose a different vehicle / allocation path (Allocation Pending, Vendor, Outsource).'
+          );
+          err.code = 'VEHICLE_SAFETY_HOLD';
+          err.openCriticalDefects = eligibility.openCriticalDefects;
           throw err;
         }
       }
