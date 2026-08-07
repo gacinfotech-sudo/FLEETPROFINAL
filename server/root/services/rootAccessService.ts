@@ -196,9 +196,43 @@ async function defaultAuditSink(
     // behavior (Node's dynamic `import()`) is identical either way.
     const auditLogModulePath = '../models/auditLog';
     const auditModule: any = await import(auditLogModulePath).catch(() => null);
-    const PlatformAuditLog = auditModule?.PlatformAuditLog;
-    if (PlatformAuditLog?.create) {
-      await PlatformAuditLog.create(event);
+    // Integration review fix: two problems, both found live via a real
+    // GET /api/root/audit check returning empty after a real Customer 360
+    // view.
+    //
+    // (1) Wrong export name: the real model (server/root/models/auditLog.ts,
+    // merged from TASK-ROOT-SECURITY-05) exports `PlatformAuditEventModel`,
+    // not `PlatformAuditLog` — the name this lazy-bind guessed at before
+    // that task landed.
+    //
+    // (2) Field-shape mismatch: this file's `PlatformAuditEvent` (the
+    // contract every Wave-1 route — customers.ts, config.ts, features.ts,
+    // sales.ts — already codes against) uses `actorUserId` /
+    // `resourceType` / `resourceId` / `metadata`. The DB schema
+    // (auditLog.ts's own, separately-designed `PlatformAuditEvent`) uses
+    // `userId` (required — every plain `.create(event)` call was throwing
+    // and getting swallowed by the catch below) / `targetEntity` / no
+    // metadata field at all. Passing `event` straight through silently
+    // dropped every audit write across the whole Root Control Plane.
+    // Mapped explicitly here rather than reconciling the two shapes
+    // repo-wide, since every existing caller already depends on the
+    // canonical shape and none of them should need to change.
+    const PlatformAuditEventModel = auditModule?.PlatformAuditEventModel;
+    if (PlatformAuditEventModel?.create) {
+      const resourceLabel = event.resourceType
+        ? `${event.resourceType}:${event.resourceId ?? ''}`
+        : undefined;
+      await PlatformAuditEventModel.create({
+        userId: event.actorUserId,
+        actorPlatformRole: event.actorPlatformRole,
+        action: event.action,
+        targetTenantId: event.targetTenantId,
+        targetEntity: resourceLabel,
+        oldValue: event.oldValue,
+        newValue: event.metadata ? { ...event.newValue, _metadata: event.metadata } : event.newValue,
+        reason: event.reason,
+        createdAt: event.createdAt,
+      });
       return;
     }
   } catch (error) {

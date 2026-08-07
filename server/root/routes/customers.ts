@@ -22,9 +22,22 @@ import type { Express, NextFunction, Response } from 'express';
 import mongoose from 'mongoose';
 import { authenticateUser, type AuthRequest } from '../../middleware/auth';
 import { localRootAccessService } from '../services/localRootAccessService';
+import { rootAccessService } from '../services/rootAccessService';
 import { Customer, Booking } from '../../models/index';
 import { maskPhone, maskEmail } from '../services/piiMaskingService';
 import type { PlatformRole } from '../types';
+
+// Audit writes below deliberately go through the canonical rootAccessService
+// (server/root/services/rootAccessService.ts), not localRootAccessService —
+// localRootAccessService.recordAuditEvent is a Wave-1-dev-only placeholder
+// that only console.logs (see its file header), so routing PII-read audit
+// events through it would silently produce no durable audit trail despite
+// this file's own comment saying every such read "must be audited". Route
+// guarding (requireRole below) and getCustomerAcrossTenants still
+// deliberately use the local placeholder pending the Wave 2 contract
+// reconciliation already documented on localRootAccessService.ts — only the
+// audit sink needed to change here, since PlatformAuditEvent's shape is
+// compatible between both (targetType/targetId -> resourceType/resourceId).
 
 const ALL_PLATFORM_ROLES: PlatformRole[] = [
   'PLATFORM_ROOT', 'PLATFORM_SUPER_ADMIN', 'PLATFORM_SUPPORT_ADMIN',
@@ -68,7 +81,7 @@ export function registerRootCustomerRoutes(app: Express): void {
 
     // Cross-tenant PII read — must be audited (RootAccessService.recordAuditEvent
     // contract note: "every Root read/write of sensitive data MUST call this").
-    await localRootAccessService.recordAuditEvent({
+    await rootAccessService.recordAuditEvent({
       actorUserId: req.user?.userId ?? 'unknown',
       actorPlatformRole: (req.user as any)?.platformRole,
       action: 'root.customers.search',
@@ -93,12 +106,12 @@ export function registerRootCustomerRoutes(app: Express): void {
       .select('bookingId bookingCode status pickupLocation dropoffLocation pickupDate totalAmount tenantId')
       .lean();
 
-    await localRootAccessService.recordAuditEvent({
+    await rootAccessService.recordAuditEvent({
       actorUserId: req.user?.userId ?? 'unknown',
       actorPlatformRole: (req.user as any)?.platformRole,
       action: 'root.customer360.view',
-      targetType: 'Customer',
-      targetId: id,
+      resourceType: 'Customer',
+      resourceId: id,
     });
 
     res.json({
