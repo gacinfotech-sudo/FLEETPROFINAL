@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Search, Users, X } from "lucide-react";
 import CustomerDashboard from "@/components/customers/customer-dashboard";
 import QuickInquiryForm from "@/components/inquiries/quick-inquiry-form";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 function fmtMoney(n?: number) {
   return `₹${(n || 0).toLocaleString("en-IN")}`;
@@ -38,6 +39,7 @@ interface CustomersPageProps {
 
 export default function CustomersPage({ onEditBooking, onNewBooking, initialCustomerId, onNavigateToInquiry, onNavigateToLead }: CustomersPageProps) {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 350);
   const [activeSegment, setActiveSegment] = useState<{ key: string; label: string } | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [viewingCustomerId, setViewingCustomerId] = useState<string | null>(null);
@@ -51,10 +53,10 @@ export default function CustomersPage({ onEditBooking, onNewBooking, initialCust
   const { data: tagCounts } = useQuery<any[]>({ queryKey: ["/api/customers/tags"] });
 
   const { data, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/customers", search, activeSegment?.key, activeTag],
+    queryKey: ["/api/customers", debouncedSearch, activeSegment?.key, activeTag],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (search) params.set("search", search);
+      if (debouncedSearch) params.set("search", debouncedSearch);
       if (activeSegment) params.set("segment", activeSegment.key);
       if (activeTag) params.set("tag", activeTag);
       const res = await fetch(`/api/customers?${params.toString()}`, { credentials: "include" });

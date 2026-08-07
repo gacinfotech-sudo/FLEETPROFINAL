@@ -1961,8 +1961,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Booking Routes
   app.get("/api/bookings", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
+      if (req.query.limit || req.query.skip) {
+        const limit = Math.min(500, Math.max(1, parseInt(req.query.limit as string) || 100));
+        const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
+        const { rows, total } = await storage.getBookingsByTenantPaginated(req.tenantId!, { limit, skip });
+        return res.json({ rows, total, limit, skip });
+      }
       const bookings = await storage.getBookingsByTenant(req.tenantId!);
-
 
 
       res.json(bookings);
@@ -2945,7 +2950,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ] : []),
         ];
       }
-      const customers = await Customer.find(query).sort({ lastBookingDate: -1, createdAt: -1 }).limit(500);
+      const limit = Math.min(500, Math.max(1, parseInt(req.query.limit as string) || 500));
+      const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
+      const { rows: customers } = await storage.getCustomersListPaginated(query, { limit, skip });
       res.json(customers);
     } catch (error: any) {
       console.error('List customers error:', error?.message || error);

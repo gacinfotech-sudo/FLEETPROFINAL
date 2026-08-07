@@ -66,17 +66,13 @@ test.describe('performance: search debounce utility', () => {
   });
 });
 
-// Live reproduction of the bug this fix addresses, against the real
-// running app (not a mock) — see TASK-03-report.md's "Before/after
-// measurements" table for the exact numbers from this run. Left as a
-// characterization test (asserts TODAY's real, measured behavior) rather
-// than the desired end-state, because the one-line fix
-// (client/src/pages/customers.tsx wiring in useDebouncedValue — see this
-// task's report for the exact diff) lands in a file owned by another
-// task. Once that diff is applied, `requestCount` below will drop to 1
-// and this assertion should be tightened accordingly.
-test.describe('performance: customer search — live reproduction (documents current behavior)', () => {
-  test('typing a search term fires one GET /api/customers request per keystroke', async ({ page }) => {
+// Live reproduction against the real running app (not a mock) — see
+// TASK-03-report.md's "Before/after measurements" table for the original
+// (pre-fix) numbers. The Integrator has since wired useDebouncedValue into
+// client/src/pages/customers.tsx (see integration-preview branch), so this
+// now asserts the fixed end-state instead of the original bug.
+test.describe('performance: customer search — live reproduction (fixed)', () => {
+  test('typing a search term collapses to a single debounced GET /api/customers request', async ({ page }) => {
     const requests: string[] = [];
     page.on('request', (req) => {
       if (req.method() === 'GET' && /\/api\/customers\?.*search=/.test(req.url())) {
@@ -94,8 +90,9 @@ test.describe('performance: customer search — live reproduction (documents cur
     await page.getByPlaceholder('Search name, mobile, or email').pressSequentially(term, { delay: 80 });
     await page.waitForTimeout(1000);
 
-    // Today: no debounce, so this is (up to) one request per keystroke.
-    // Documents the bug; not a "this is fine" assertion.
-    expect(requests.length).toBeGreaterThanOrEqual(Math.floor(term.length * 0.5));
+    // Fixed: debounced at 350ms, so the whole burst (80ms/keystroke) collapses
+    // to exactly one network request carrying the final value.
+    expect(requests.length).toBe(1);
+    expect(requests[0]).toContain(encodeURIComponent(term));
   });
 });

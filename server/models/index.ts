@@ -1198,6 +1198,11 @@ CustomerSchema.index(
   { tenantId: 1, referralCode: 1 },
   { unique: true, partialFilterExpression: { referralCode: { $type: 'string' } } }
 );
+// TASK-03 (performance QA) — backs GET /api/customers' default
+// find({tenantId, isDeleted}).sort({lastBookingDate:-1, createdAt:-1}) so
+// Mongo can satisfy the sort from the index instead of a blocking
+// in-memory SORT stage. See .claude/tasks/reports/TASK-03-report.md.
+CustomerSchema.index({ tenantId: 1, isDeleted: 1, lastBookingDate: -1, createdAt: -1 });
 CustomerSchema.pre('save', function (next) { this.updatedAt = new Date(); next(); });
 
 // Reward rules — tenant-configurable, not hard-coded (spec explicitly
@@ -1505,6 +1510,12 @@ BookingSchema.index(
 // grows exactly where it matters most (assignment time).
 BookingSchema.index({ tenantId: 1, driverId: 1, status: 1, scheduledStartDateTime: 1, scheduledEndDateTime: 1 });
 BookingSchema.index({ tenantId: 1, vehicleId: 1, status: 1, scheduledStartDateTime: 1, scheduledEndDateTime: 1 });
+// TASK-03 (performance QA) — backs getBookingsByTenant/getBookingsByTenantPaginated's
+// sort, and getUpcomingBookings' {tenantId,status,pickupDate} filter+sort (previously
+// only {tenantId,status} was indexed, forcing an in-memory sort on pickupDate). See
+// .claude/tasks/reports/TASK-03-report.md.
+BookingSchema.index({ tenantId: 1, createdAt: -1 });
+BookingSchema.index({ tenantId: 1, status: 1, pickupDate: 1 });
 ExpenseSchema.index({ tenantId: 1, date: 1 });
 ExpenseSchema.index({ tenantId: 1, vehicleId: 1 });
 // Backs the Trip Cost Summary's per-booking expense lookup.
