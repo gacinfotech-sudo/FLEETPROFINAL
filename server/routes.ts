@@ -39,6 +39,7 @@ import {
   mongoDriverSchema,
   mongoBookingSchema
 } from "./schemas/mongodb-schemas";
+import { zodErrorToFieldErrors } from "./schemas/validation-helpers";
 // TASK-BOOKING-DOMAIN-02: date-certainty validation (pickupDate
 // conditional on travelDateStatus, tripType). vehicleId/
 // resourceFulfilmentStatus are untouched — that shipped separately. See
@@ -1942,8 +1943,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(driver);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid driver data", errors: error.errors });
+        // TASK-DRIVER-ADD-400-FIX: previously returned the raw Zod
+        // `error.errors` array as the response body — the "giant JSON
+        // toast" bug. Log the full issue list server-side only (useful
+        // for debugging, not sensitive) and give the client a shape it
+        // can render as field-specific messages instead.
+        console.error('Driver create validation failed:', error.issues.map(i => ({ path: i.path.join('.'), code: i.code })));
+        return res.status(400).json({
+          message: "Please check the highlighted fields.",
+          fields: zodErrorToFieldErrors(error),
+        });
       }
+      console.error('Error creating driver:', error);
       res.status(500).json({ message: "Failed to create driver" });
     }
   });
@@ -1953,13 +1964,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = req.params.id;
       const driverData = mongoDriverSchema.partial().parse(req.body);
       const driver = await storage.updateDriver(id, driverData, scopeTenant(req));
-      
+
       if (!driver) {
         return res.status(404).json({ message: "Driver not found" });
       }
-      
+
       res.json(driver);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        // TASK-DRIVER-ADD-400-FIX: this previously fell through to the
+        // generic catch-all below and returned a 500 "Failed to update
+        // driver" for a validation error — indistinguishable from a real
+        // server failure, and gave no field-level information at all.
+        console.error('Driver update validation failed:', error.issues.map(i => ({ path: i.path.join('.'), code: i.code })));
+        return res.status(400).json({
+          message: "Please check the highlighted fields.",
+          fields: zodErrorToFieldErrors(error),
+        });
+      }
+      console.error('Error updating driver:', error);
       res.status(500).json({ message: "Failed to update driver" });
     }
   });
