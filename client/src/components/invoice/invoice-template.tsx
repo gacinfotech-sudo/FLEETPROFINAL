@@ -2,6 +2,7 @@ import React from 'react';
 
 interface InvoiceData {
   bookingId: string;
+  bookingCode?: string;
   customerName: string;
   customerPhone: string;
   customerEmail?: string;
@@ -72,6 +73,9 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ data, classNam
               <div><strong>Email:</strong> {data.customerEmail}</div>
             )}
             <div><strong>Booking ID:</strong> {data.bookingId}</div>
+            {data.bookingCode && (
+              <div><strong>Booking Code:</strong> {data.bookingCode}</div>
+            )}
           </div>
         </div>
 
