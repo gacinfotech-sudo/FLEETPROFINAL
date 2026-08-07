@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/use-auth";
 import { usePermissions } from "../hooks/use-permissions";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import Sidebar from "../components/layout/sidebar";
 import EnhancedStats from "../components/dashboard/enhanced-stats";
 import EnhancedBookingForm from "../components/booking/enhanced-booking-form";
@@ -35,6 +35,7 @@ import DriverLeavePage from "./driver-leave";
 import DriverAttendancePage from "./driver-attendance";
 import DriverPerformancePage from "./driver-performance";
 import VehiclePerformancePage from "./vehicle-performance";
+import GpsSettingsPage from "./gps-settings";
 import WhatsAppPanel from "./whatsapp-panel";
 import DailyOperationsPopup from "../components/dashboard/daily-operations-popup";
 import BookingCommunication from "../components/booking/booking-communication";
@@ -60,7 +61,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Menu, LogOut, Star, Car, Users, UserCheck, Phone, Mail, MessageCircle, Banknote, Plus, User, FileText, Trash2 } from "lucide-react";
 
-type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "booking-queues" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors" | "rewards-referrals";
+type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "booking-queues" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors" | "rewards-referrals" | "gps-tracking";
 
 // apiRequest() throws Error("<status>: <raw response text>") on a non-2xx
 // response (queryClient.ts:throwIfResNotOk) — without this, a rejected
@@ -160,7 +161,7 @@ export default function Dashboard() {
   // Sync URL with current view on mount with role-based access control
   useEffect(() => {
     const section = params.section as ViewType;
-    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "upcoming-bookings", "booking-queues", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "after-sales", "campaigns", "rewards-referrals", "vendors", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile"];
+    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "upcoming-bookings", "booking-queues", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "after-sales", "campaigns", "rewards-referrals", "vendors", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile", "gps-tracking"];
     
     // Add "users" section only for admin and client roles
     if (user?.role === 'admin' || user?.role === 'client') {
@@ -1194,6 +1195,9 @@ export default function Dashboard() {
                           <Button size="sm" variant="secondary" className="flex-1" onClick={() => handleViewVehicle(vehicle)}>
                             View Profile
                           </Button>
+                          <Link href={`/vehicles/${vehicle._id || vehicle.id}`} className="flex-1">
+                            <Button size="sm" variant="outline" className="w-full">View 360</Button>
+                          </Link>
                           {canManageFleet() && <>
                             <Button size="sm" variant="outline" className="flex-1" onClick={() => handleEditVehicle(vehicle)}>
                               Edit
@@ -1268,6 +1272,9 @@ export default function Dashboard() {
                                 >
                                   View Profile
                                 </Button>
+                                <Link href={`/vehicles/${vehicle._id || vehicle.id}`}>
+                                  <Button variant="ghost" size="sm">View 360</Button>
+                                </Link>
                                 {canManageFleet() && <>
                                   <Button 
                                     variant="ghost" 
@@ -2237,6 +2244,9 @@ export default function Dashboard() {
 
       case "vehicle-performance":
         return <VehiclePerformancePage />;
+
+      case "gps-tracking":
+        return <GpsSettingsPage />;
 
       case "whatsapp":
         return <WhatsAppPanel />;

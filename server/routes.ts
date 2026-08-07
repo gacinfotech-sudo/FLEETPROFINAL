@@ -108,23 +108,20 @@ import { registerGpsAssignmentRoutes } from "./gps/routes/assignments";
 // TASK-02 (telephony/RBAC isolation) additive import — new namespace only,
 // no existing route/import in this file was touched.
 import { registerTelephonyRoutes } from "./telephony/index";
-import { registerBookingQueuesRoutes } from "./booking/queues";
-// Integrator addition: these six modules landed in trunk with real,
-// tested route handlers but were never wired in here — confirmed live
-// (curl returned 200/SPA-fallback, not 401) before this fix. Purely
-// additive registration, same pattern as the GPS/telephony/booking-queues
-// namespaces above.
-import { registerDriverDomainRoutes } from "./driver/domain/routes";
-import { registerGoogleDriveConnectionRoutes } from "./driver/documents/routes/connectionRoutes";
-import { registerDriverDocumentRoutes } from "./driver/documents/routes/documentRoutes";
-import { registerVehicleHandoverRoutes, acceptHandoverHandler, getPendingHandoversForDriverPortal } from "./driver/handover/index";
-import { registerGpsBillingRoutes } from "./gps/billing/routes";
+import { registerGpsVehicleStateRoutes } from "./gps/routes/vehicleState";
 import { registerGpsWebhookRoutes } from "./gps/ingestion/webhookRoute";
+import { registerGpsBillingRoutes } from "./gps/billing/routes";
+import { registerBookingQueuesRoutes } from "./booking/queues";
+import { registerDriverDomainRoutes } from "./driver/domain/routes";
+import { registerDriverDocumentModule } from "./driver/documents/index";
+import { registerVehicleHandoverRoutes } from "./driver/handover/index";
+import { acceptHandoverHandler, getPendingHandoversForDriverPortal } from "./driver/handover/driverPortalRoutes";
 import { registerVehicleDocumentRoutes } from "./vehicle/documents/routes";
 import { registerVehicleMaintenanceRoutes } from "./vehicle/maintenance/routes";
 import { registerVehicleFuelRoutes } from "./vehicle/expenses/routes";
 import { registerVehicleFastagRoutes } from "./vehicle/fastag/routes";
 import { registerVehicleIncidentRoutes } from "./vehicle/incidents/routes";
+import { registerVehicleInspectionRoutes } from "./vehicle/inspections/routes";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -347,21 +344,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // /api/telephony/* namespace only, appended after the existing GPS
   // registrations without reordering or editing any existing line.
   registerTelephonyRoutes(app);
-  registerBookingQueuesRoutes(app);
-  // Integrator addition: wire up Driver domain/documents/handover and GPS
-  // billing/webhook — real handlers, already merged into this tree, never
-  // previously mounted (confirmed unreachable via live curl before this fix).
-  registerDriverDomainRoutes(app);
-  registerGoogleDriveConnectionRoutes(app);
-  registerDriverDocumentRoutes(app);
-  registerVehicleHandoverRoutes(app);
-  registerGpsBillingRoutes(app);
+  registerGpsVehicleStateRoutes(app);
   registerGpsWebhookRoutes(app);
+  registerGpsBillingRoutes(app);
+  registerBookingQueuesRoutes(app);
+  registerDriverDomainRoutes(app);
+  registerDriverDocumentModule(app);
+  registerVehicleHandoverRoutes(app);
   registerVehicleDocumentRoutes(app);
   registerVehicleMaintenanceRoutes(app);
   registerVehicleFuelRoutes(app);
   registerVehicleFastagRoutes(app);
   registerVehicleIncidentRoutes(app);
+  registerVehicleInspectionRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
@@ -1679,6 +1674,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Permissions a manager can be granted through this endpoint — the
+  // original 4 defaults plus the Vehicle 360 batch's vehicle.* set (Final
+  // Vehicle 360 Integrator, "Open follow-ups" #3: these were added to
+  // PERMISSIONS/requirePermission but had no way to actually be assigned to
+  // a manager after creation). Deliberately not the full ~80-entry
+  // PERMISSIONS object — expanding this to every module's permissions is
+  // out of scope here.
+  const MANAGER_ASSIGNABLE_PERMISSIONS = new Set<string>([
+    PERMISSIONS.CREATE_BOOKING,
+    PERMISSIONS.VIEW_BOOKINGS,
+    PERMISSIONS.EDIT_BOOKING,
+    PERMISSIONS.GENERATE_INVOICE,
+    PERMISSIONS.VEHICLE_COMPLIANCE_VIEW,
+    PERMISSIONS.VEHICLE_COMPLIANCE_MANAGE,
+    PERMISSIONS.VEHICLE_MAINTENANCE_VIEW,
+    PERMISSIONS.VEHICLE_MAINTENANCE_MANAGE,
+    PERMISSIONS.VEHICLE_EXPENSE_VIEW,
+    PERMISSIONS.VEHICLE_EXPENSE_MANAGE,
+    PERMISSIONS.VEHICLE_FASTAG_VIEW,
+    PERMISSIONS.VEHICLE_FASTAG_MANAGE,
+    PERMISSIONS.VEHICLE_INCIDENTS_VIEW,
+    PERMISSIONS.VEHICLE_INCIDENTS_MANAGE,
+  ]);
+
+  app.patch("/api/users/sub-users/:userId/permissions", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin' && req.user?.role !== 'client') {
+        return res.status(403).json({ message: "Access denied. Only admins and clients can edit manager permissions." });
+      }
+
+      const requested = req.body.permissions;
+      if (!Array.isArray(requested) || !requested.every((p) => typeof p === 'string')) {
+        return res.status(400).json({ message: "permissions must be an array of strings." });
+      }
+      const invalid = requested.filter((p) => !MANAGER_ASSIGNABLE_PERMISSIONS.has(p));
+      if (invalid.length > 0) {
+        return res.status(400).json({ message: `Unknown or non-assignable permission(s): ${invalid.join(', ')}` });
+      }
+
+      const updated = await storage.updateSubUserPermissions(req.params.userId, requested, scopeTenant(req));
+      const { password, ...userResponse } = updated.toObject();
+      res.json(userResponse);
+    } catch (error) {
+      console.error("Error updating sub-user permissions:", error);
+      res.status(500).json({ message: "Failed to update sub-user permissions" });
+    }
+  });
+
   // Revenue Report
   app.get("/api/reports/revenue", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
     try {
@@ -1994,7 +2037,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const results = await Promise.all(allDrivers.map(async (d: any) => {
         const driverObj = typeof d.toObject === 'function' ? d.toObject() : d;
 
-        if (d.status === 'inactive' || d.status === 'suspended') {
+        const lifecycleStage = driverObj.lifecycleStage ?? 'active';
+        if (d.status === 'inactive' || lifecycleStage === 'suspended') {
           if (!wantUnavailable) return null;
           return { ...driverObj, available: false, unavailabilityReason: d.status === 'inactive' ? 'Inactive' : 'Suspended' };
         }

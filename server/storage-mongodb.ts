@@ -49,6 +49,7 @@ export interface IStorage {
   createSubUser(userData: any, createdBy: string): Promise<IUser>;
   getSubUsersByTenant(tenantId: string): Promise<IUser[]>;
   deactivateSubUser(userId: string, deactivatedBy: string, tenantId?: string): Promise<void>;
+  updateSubUserPermissions(userId: string, permissions: string[], tenantId?: string): Promise<IUser>;
   reactivateSubUser(userId: string, reactivatedBy: string, tenantId?: string): Promise<void>;
   checkUserPermission(userId: string, permission: string): Promise<boolean>;
   fixBookingAuditTrail(): Promise<number>;
@@ -1228,6 +1229,28 @@ export class MongoDBStorage implements IStorage {
       console.log(`Sub-user ${userId} deactivated by ${deactivatedBy}`);
     } catch (error) {
       console.error('Error deactivating sub-user:', error);
+      throw error;
+    }
+  }
+
+  // Tenant-scoped for the same reason as deactivateSubUser above — a
+  // manager belongs to exactly one tenant and must only be editable by that
+  // tenant's admin/client.
+  async updateSubUserPermissions(userId: string, permissions: string[], tenantId?: string): Promise<IUser> {
+    try {
+      const query: any = { userId: userId.toLowerCase(), role: 'manager' };
+      if (tenantId) query.tenantId = tenantId;
+      const result = await User.findOneAndUpdate(
+        query,
+        { permissions },
+        { new: true },
+      );
+      if (!result) {
+        throw new Error('Sub-user not found in this tenant');
+      }
+      return result;
+    } catch (error) {
+      console.error('Error updating sub-user permissions:', error);
       throw error;
     }
   }

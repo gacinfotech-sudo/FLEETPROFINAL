@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks, Building2, ChevronDown, ChevronRight, Gift, ListFilter } from "lucide-react";
+import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks, Building2, ChevronDown, ChevronRight, Gift, ListFilter, Satellite } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -37,6 +37,7 @@ const navItems = [
   { id: "leads", label: "Leads", icon: GitBranch },
   { id: "followups", label: "Follow-ups", icon: ListChecks },
   { id: "fleet", label: "View Fleet", icon: Car },
+  { id: "gps-tracking", label: "GPS Tracking", icon: Satellite },
   { id: "vehicle-performance", label: "Vehicle Performance", icon: Wrench, restrictedForManagers: true },
   { id: "drivers", label: "Manage Drivers", icon: Users, restrictedForManagers: true },
   { id: "driver-attendance", label: "Driver Attendance", icon: ClipboardCheck, restrictedForManagers: true },
