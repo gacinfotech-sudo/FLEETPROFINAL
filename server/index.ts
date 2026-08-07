@@ -42,6 +42,7 @@ import { storage } from "./storage-mongodb";
 import mongoose from "mongoose";
 import { Server as SocketIOServer } from "socket.io";
 import { setTelephonyEventEmitter, type TelephonyEvent } from "./telephony/index";
+import { startGpsPollingScheduler, stopGpsPollingScheduler } from "./gps/ingestion/pollingScheduler";
 
 const app = express();
 // Trust only the known number of reverse-proxy hops. `true` trusts arbitrary
@@ -55,15 +56,13 @@ app.set('trust proxy', Number.isInteger(configuredProxyHops) && configuredProxyH
 // materially cuts transfer time for JSON API responses and any
 // non-Vite-bundled assets; negligible CPU cost on a local dev machine.
 app.use(compression());
-// Integrator addition (TASK-02 telephony webhook signature verification,
-// see .claude/tasks/reports/TASK-02-report.md "Proposed WebSocket
-// bootstrap + room design" section 2): capture the raw request body bytes
-// alongside the parsed JSON. server/telephony/routes/webhook.ts previously
-// had to re-serialize req.body with JSON.stringify() as a stand-in for the
-// true raw bytes (unsafe for a provider that signs the literal wire bytes,
-// e.g. differing whitespace/key order) because no raw body was available
-// anywhere in the app. This is additive — every existing express.json()
-// consumer is unaffected; req.rawBody is simply now also populated.
+// Capture the raw request body bytes alongside the parsed JSON — needed by
+// both the telephony webhook (TASK-02) and GPS webhook (TASK-GPS-INGESTION-04)
+// receivers to verify provider signatures against the actual wire bytes sent,
+// not a reconstructed/re-serialized buffer (unsafe for a provider that signs
+// literal bytes, e.g. differing whitespace/key order). Additive — every
+// existing express.json() consumer is unaffected; req.rawBody is simply also
+// populated now.
 app.use(express.json({
   verify: (req: any, _res, buf) => { req.rawBody = buf; },
 }));
@@ -288,6 +287,15 @@ app.use((req, res, next) => {
   mongoose.connection.on('connected', startBackgroundJob);
   mongoose.connection.on('disconnected', stopBackgroundJob);
 
+  // GPS telemetry polling (TASK-GPS-INGESTION-04) — same guarded-single-interval pattern as
+  // the background job above; startGpsPollingScheduler() is itself idempotent (no-ops if
+  // already running), so this is safe even if 'connected' fires more than once.
+  if (mongoose.connection.readyState === 1) {
+    startGpsPollingScheduler();
+  }
+  mongoose.connection.on('connected', () => startGpsPollingScheduler());
+  mongoose.connection.on('disconnected', () => stopGpsPollingScheduler());
+
   // NOTE: this in-process interval only runs once per Node process. If this
   // app is ever deployed with multiple instances/replicas, move this sweep
   // to a dedicated cron/worker process or use a distributed lock (e.g. a
@@ -297,11 +305,13 @@ app.use((req, res, next) => {
   // Cleanup on process termination
   process.on('SIGINT', () => {
     clearInterval(backgroundJobInterval);
+    stopGpsPollingScheduler();
     process.exit(0);
   });
 
   process.on('SIGTERM', () => {
     clearInterval(backgroundJobInterval);
+    stopGpsPollingScheduler();
     process.exit(0);
   });
 })();

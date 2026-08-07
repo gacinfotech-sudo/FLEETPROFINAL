@@ -51,7 +51,11 @@ export const mongoVehicleSchema = z.object({
   capacity: z.number().int().positive().optional(),
   type: z.enum(['economy', 'standard', 'premium', 'luxury', 'suv', 'sedan', 'hatchback', 'coupe', 'convertible']).default('economy'),
   vehicleType: z.string().optional(),
-  status: z.enum(['available', 'on_trip', 'maintenance']).default('available'),
+  status: z.enum([
+    'available', 'on_trip', 'maintenance',
+    'RESERVED', 'ASSIGNED', 'RETURNING', 'CLEANING', 'MAINTENANCE_DUE',
+    'IN_MAINTENANCE', 'BREAKDOWN', 'ACCIDENT_HOLD', 'INACTIVE', 'SOLD',
+  ]).default('available'),
   features: z.array(z.string()).default([]),
   pricePerDay: z.number().min(0).default(0),
   pricePerHour: z.number().min(0).default(0),
@@ -62,7 +66,14 @@ export const mongoVehicleSchema = z.object({
   color: z.string().optional(),
   fuelType: z.string().optional(),
   transmission: z.string().optional(),
-  model: z.string().optional()
+  model: z.string().optional(),
+  // --- Vehicle 360 additions (TASK-VEHICLE-DOMAIN-01) ---
+  vehicleCategory: z.string().optional(),
+  variant: z.string().optional(),
+  ownershipType: z.enum(['owned', 'leased', 'financed', 'rented']).optional(),
+  currentOdometer: z.number().min(0).optional(),
+  branch: z.string().optional(),
+  isDraft: z.boolean().optional(),
 });
 
 // MongoDB Driver Schema

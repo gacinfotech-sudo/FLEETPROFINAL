@@ -768,7 +768,23 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       if (match) {
         try {
           const body = JSON.parse(match[2]);
-          if (body?.message) description = body.message;
+          // Zod validation failures (400, "Invalid booking data") carry a
+          // structured `errors` array pinpointing the exact field — e.g.
+          // {path:["customerName"], message:"Customer name is required"}.
+          // Surface that instead of the generic top-level message, which
+          // was previously the only thing shown, making every validation
+          // failure indistinguishable from every other one.
+          if (Array.isArray(body?.errors) && body.errors.length > 0) {
+            description = body.errors
+              .map((e: any) => {
+                const field = Array.isArray(e?.path) ? e.path.join('.') : undefined;
+                return field ? `${field}: ${e.message}` : e.message;
+              })
+              .filter(Boolean)
+              .join('; ');
+          } else if (body?.message) {
+            description = body.message;
+          }
         } catch { /* not JSON, keep generic message */ }
       }
       toast({
@@ -2676,8 +2692,8 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                               <FormControl>
                                 <div className="relative">
                                   <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                                  <Input 
-                                    type="number" 
+                                  <Input
+                                    type="number"
                                     placeholder="Enter final amount"
                                     value={field.value || 0}
                                     onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
