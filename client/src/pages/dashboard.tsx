@@ -525,6 +525,27 @@ export default function Dashboard() {
     queryKey: ["/api/bookings"],
   });
 
+  // viewingBooking/editingBooking are snapshots taken at click-time, not derived from
+  // the `bookings` query — so when a payment is recorded (or any other mutation
+  // invalidates /api/bookings), the refetched list has the correct new
+  // totalAmount/advanceReceived/paymentStatus, but the open dialog kept showing the
+  // stale snapshot, most visibly as an incorrect "Remaining Due" in PaymentSection.
+  // Re-sync both to the latest matching record whenever the list refetches.
+  useEffect(() => {
+    if (!bookings.length) return;
+    setViewingBooking((prev: any) => {
+      if (!prev) return prev;
+      const fresh = bookings.find((b: any) => (b._id || b.id) === (prev._id || prev.id));
+      return fresh || prev;
+    });
+    setEditingBooking((prev: any) => {
+      if (!prev) return prev;
+      const fresh = bookings.find((b: any) => (b._id || b.id) === (prev._id || prev.id));
+      return fresh || prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings]);
+
   const { data: users = [] } = useQuery<any[]>({
     queryKey: ["/api/users/sub-users"],
     enabled: user?.role === 'client' || user?.role === 'admin',
