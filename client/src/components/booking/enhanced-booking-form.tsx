@@ -12,7 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, Check, Phone, Mail, IndianRupee, Download, ChevronDown, ChevronRight, Building2, Send, AlertTriangle } from "lucide-react";
+import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, Check, Phone, Mail, IndianRupee, Download, ChevronDown, ChevronRight, Building2, Send, AlertTriangle, HelpCircle, CalendarRange } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,10 +55,29 @@ const bookingSchema = z.object({
   tripType: z.enum(["one_way", "round_trip", "local", "airport"]),
   pickupLocation: z.string().min(1, "Pickup location is required"),
   dropoffLocation: z.string().min(1, "Drop-off location is required"),
-  pickupDate: z.string().min(1, "Pickup date is required"),
-  pickupTime: z.string().min(1, "Pickup time is required"),
-  returnDate: z.string().min(1, "Return date is required"),
-  returnTime: z.string().min(1, "Return time is required"),
+  // Date-certainty axis (TASK-BOOKING-UI-04, field contract from
+  // TASK-BOOKING-DOMAIN-02): pickupDate/pickupTime/returnDate/returnTime
+  // are relaxed from unconditionally-required to structurally optional
+  // here, the same pattern already used for vehicleId above — the real
+  // "required when travelDateStatus is 'confirmed' (the default)" rule is
+  // enforced procedurally, by the Step 1 Continue button below, not by
+  // this static Zod shape (mirrors how the vehicle/resourceMode
+  // requirement is enforced by the Step 2 Continue button instead of the
+  // schema). NOTE: the server-side counterpart of this relaxation
+  // (mongoBookingSchemaWithCertainty) is DOMAIN-02's proposed patch,
+  // not yet applied to this branch's backend — see this task's report.
+  pickupDate: z.string().optional(),
+  pickupTime: z.string().optional(),
+  returnDate: z.string().optional(),
+  returnTime: z.string().optional(),
+  // travelDateStatus/tentativeStartDate/tentativeEndDate/followUpAt: real
+  // field names from TASK-BOOKING-DOMAIN-02's report — do not rename.
+  // lastActivityAt is deliberately NOT a client field (server-derived only,
+  // per that report).
+  travelDateStatus: z.enum(["confirmed", "range", "not_decided"]).default("confirmed"),
+  tentativeStartDate: z.string().optional(),
+  tentativeEndDate: z.string().optional(),
+  followUpAt: z.string().optional(),
   amount: z.number().min(1, "Amount is required"),
   totalKilometers: z.number().min(0).optional(),
   tollCharges: z.number().min(0, "Toll charges must be 0 or greater").optional(),
@@ -120,6 +139,43 @@ function referralLookupStatus(inputValue: string, minLength: number, pending: bo
   if (pending) return <p className="text-xs text-gray-500">Looking up referrer…</p>;
   if (resolved) return <p className="text-xs text-green-700 font-medium">Referrer found: {resolved.name} ({resolved.primaryMobile})</p>;
   return <p className="text-xs text-red-600">No matching customer found — this booking will not be linked to a referral.</p>;
+}
+
+// Date-certainty option metadata (TASK-BOOKING-UI-04). Three states only,
+// matching travelDateStatus exactly (TASK-BOOKING-DOMAIN-02's real,
+// shipped field name/values) — do not add a fourth or rename these.
+const DATE_CERTAINTY_OPTIONS = [
+  { value: "confirmed" as const, label: "Confirmed Date", desc: "Customer knows exactly when they're traveling.", icon: Calendar },
+  { value: "range" as const, label: "Sometime in a Range", desc: "Customer has a rough window in mind.", icon: CalendarRange },
+  { value: "not_decided" as const, label: "Not Decided Yet", desc: "Date isn't fixed — we'll follow up later.", icon: HelpCircle },
+];
+
+// Combines the two independent axes — date-certainty (this task,
+// travelDateStatus) and resource-fulfilment (already shipped on the
+// inherited branch, resourceMode/selection state) — into ONE coherent
+// summary sentence instead of two disconnected badges (spec: "Confirmed
+// date, vendor sourcing in progress" as a single line). Reads the
+// existing resourceMode/selection values as given; does not change how
+// they are computed or what they mean.
+function describeCombinedBookingStatus(
+  travelDateStatus: "confirmed" | "range" | "not_decided",
+  resourceMode: "own_fleet" | "vendor_vehicle" | "outsource",
+  hasOwnVehicleSelected: boolean,
+  hasVendorVehicleSelected: boolean,
+): string {
+  const datePhrase =
+    travelDateStatus === "confirmed" ? "Confirmed date" :
+    travelDateStatus === "range" ? "Flexible date window" :
+    "Date not decided yet";
+
+  const resourcePhrase =
+    resourceMode === "own_fleet"
+      ? (hasOwnVehicleSelected ? "own fleet vehicle assigned" : "own fleet vehicle not yet selected")
+      : resourceMode === "vendor_vehicle"
+      ? (hasVendorVehicleSelected ? "vendor vehicle selected" : "vendor vehicle sourcing pending")
+      : "vendor sourcing in progress";
+
+  return `${datePhrase}, ${resourcePhrase}`;
 }
 
 export default function EnhancedBookingForm({ onSuccess, initialValues }: EnhancedBookingFormProps) {
@@ -204,6 +260,10 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       pickupTime: "",
       returnDate: "",
       returnTime: "",
+      travelDateStatus: "confirmed",
+      tentativeStartDate: "",
+      tentativeEndDate: "",
+      followUpAt: "",
       amount: 0,
       tollCharges: 0,
       parkingCharges: 0,
@@ -613,6 +673,28 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
         (bookingData as any).resourceAssignmentPending = true;
       }
 
+      // TASK-BOOKING-UI-04: date-certainty payload shaping — independent
+      // of the resourceMode block above. Only the fields relevant to the
+      // selected travelDateStatus are sent; the other axis's now-empty
+      // string fields (e.g. pickupDate="" for a 'range'/'not_decided'
+      // booking) are dropped rather than sent as empty strings, matching
+      // TASK-BOOKING-DOMAIN-02's field contract (absent, not empty-string).
+      // lastActivityAt is never sent — server-derived only, per that task's
+      // report.
+      if ((bookingData as any).travelDateStatus !== "range") {
+        delete (bookingData as any).tentativeStartDate;
+        delete (bookingData as any).tentativeEndDate;
+      }
+      if ((bookingData as any).travelDateStatus !== "not_decided") {
+        delete (bookingData as any).followUpAt;
+      }
+      if ((bookingData as any).travelDateStatus !== "confirmed") {
+        delete (bookingData as any).pickupDate;
+        delete (bookingData as any).pickupTime;
+        delete (bookingData as any).returnDate;
+        delete (bookingData as any).returnTime;
+      }
+
       const response = await apiRequest("POST", "/api/bookings", bookingData);
       return response.json();
     },
@@ -808,13 +890,13 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
     await createBookingMutation.mutateAsync(data);
   };
 
+  // TASK-BOOKING-UI-04: the caller (Step 1's Continue button below) already
+  // validated the correct date fields for the current travelDateStatus
+  // before calling this — a 'range'/'not_decided' booking has no
+  // pickupDate/returnDate at all, so this no longer re-checks them here
+  // (doing so would silently strand those two states on Step 1 forever).
   const handleDateSelection = () => {
-    const pickup = form.getValues("pickupDate");
-    const returnDate = form.getValues("returnDate");
-    
-    if (pickup && returnDate) {
-      setStep(2);
-    }
+    setStep(2);
   };
 
   const handleVehicleAndPricingSelection = (vehicleId: string, pricingType: "day" | "km") => {
@@ -828,9 +910,14 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       form.setValue("vehicleId", vehicleId);
       form.setValue("pricingType", pricingType);
       
-      // Calculate amount based on pricing type
-      const pickupDate = new Date(watchedValues.pickupDate);
-      const returnDate = new Date(watchedValues.returnDate);
+      // Calculate amount based on pricing type. pickupDate/returnDate are
+      // only optional (TASK-BOOKING-UI-04) for a 'range'/'not_decided'
+      // booking — reaching here at all requires a real own-fleet vehicle
+      // to have been offered, which only happens once dates are confirmed
+      // (see the availableVehicles query's enabled condition above), so
+      // the fallback below is a type-satisfier, not a real runtime path.
+      const pickupDate = new Date(watchedValues.pickupDate || "");
+      const returnDate = new Date(watchedValues.returnDate || "");
       const days = Math.max(1, Math.ceil((returnDate.getTime() - pickupDate.getTime()) / (1000 * 60 * 60 * 24)));
       
       let amount = 0;
@@ -952,7 +1039,66 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
               <p className="text-blue-100 text-xs sm:text-sm">Tell us when and where you need to go</p>
             </CardHeader>
             <CardContent className="p-4 sm:p-8">
-              {/* Date & Time Section */}
+              {/* Date-Certainty Section (TASK-BOOKING-UI-04) — positioned
+                  before the date-entry section below, per spec. Three
+                  states only, matching travelDateStatus exactly
+                  (TASK-BOOKING-DOMAIN-02's real field/values). This is an
+                  independent axis from the resource-fulfilment selection
+                  in Step 2 below (untouched by this task) — the two are
+                  only combined for display, in the Review step's summary
+                  line. */}
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                  <Calendar className="w-5 h-5 mr-2 text-blue-500" />
+                  How certain is the travel date?
+                </h3>
+                <FormField
+                  control={form.control}
+                  name="travelDateStatus"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div role="radiogroup" aria-label="How certain is the travel date?" className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {DATE_CERTAINTY_OPTIONS.map((option) => (
+                            <div
+                              key={option.value}
+                              id={`date-certainty-${option.value}`}
+                              role="radio"
+                              aria-checked={field.value === option.value}
+                              aria-label={option.label}
+                              tabIndex={0}
+                              onClick={() => field.onChange(option.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  field.onChange(option.value);
+                                }
+                              }}
+                              className={`min-w-0 p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+                                field.value === option.value
+                                  ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              <option.icon className={`w-5 h-5 mb-1.5 ${field.value === option.value ? 'text-blue-600' : 'text-gray-400'}`} />
+                              <div className="font-medium text-xs sm:text-sm break-words">{option.label}</div>
+                              <div className="text-xs text-gray-500 mt-0.5 break-words hidden sm:block">{option.desc}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <Separator className="my-8" />
+
+              {/* Date & Time Section — only when the date is actually
+                  confirmed (travelDateStatus === 'confirmed', the
+                  default). Unchanged fields/validation for that case. */}
+              {watchedValues.travelDateStatus === "confirmed" && (
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                   <Calendar className="w-5 h-5 mr-2 text-blue-500" />
@@ -970,9 +1116,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                             Pickup Date
                           </FormLabel>
                           <FormControl>
-                            <Input 
-                              type="date" 
-                              {...field} 
+                            <Input
+                              type="date"
+                              {...field}
                               min={new Date().toISOString().split('T')[0]}
                               className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
                             />
@@ -991,8 +1137,8 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                             Pickup Time
                           </FormLabel>
                           <FormControl>
-                            <Input 
-                              type="time" 
+                            <Input
+                              type="time"
                               {...field}
                               className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
                             />
@@ -1002,7 +1148,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                       )}
                     />
                   </div>
-                  
+
                   <div className="space-y-4">
                     <FormField
                       control={form.control}
@@ -1014,9 +1160,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                             Return Date
                           </FormLabel>
                           <FormControl>
-                            <Input 
-                              type="date" 
-                              {...field} 
+                            <Input
+                              type="date"
+                              {...field}
                               min={watchedValues.pickupDate || new Date().toISOString().split('T')[0]}
                               className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
                             />
@@ -1035,8 +1181,8 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                             Return Time
                           </FormLabel>
                           <FormControl>
-                            <Input 
-                              type="time" 
+                            <Input
+                              type="time"
                               {...field}
                               className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
                             />
@@ -1048,6 +1194,98 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   </div>
                 </div>
               </div>
+              )}
+
+              {/* Tentative range — shown only when travelDateStatus === 'range'. */}
+              {watchedValues.travelDateStatus === "range" && (
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                  <CalendarRange className="w-5 h-5 mr-2 text-blue-500" />
+                  What's the earliest and latest date?
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="tentativeStartDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center text-sm font-medium text-gray-700">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Earliest Date
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            {...field}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="tentativeEndDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center text-sm font-medium text-gray-700">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Latest Date
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            {...field}
+                            min={watchedValues.tentativeStartDate || new Date().toISOString().split('T')[0]}
+                            className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-3">Exact pickup/return date and time can be pinned down once the customer confirms — this booking will still show as ready to review.</p>
+              </div>
+              )}
+
+              {/* Not decided yet — shown only when travelDateStatus === 'not_decided'.
+                  followUpAt is optional (no prior concept existed for it —
+                  see TASK-BOOKING-DOMAIN-02's report). */}
+              {watchedValues.travelDateStatus === "not_decided" && (
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                  <HelpCircle className="w-5 h-5 mr-2 text-blue-500" />
+                  Follow-up (optional)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="followUpAt"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center text-sm font-medium text-gray-700">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          When should we follow up?
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            {...field}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-3">No travel date is required to save this booking — it will show as Date Pending until the customer decides.</p>
+              </div>
+              )}
 
               <Separator className="my-8" />
 
@@ -1204,20 +1442,34 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   type="button" 
                   onClick={() => {
                     const dropoffValid = routeType !== "custom" || form.getValues("dropoffLocation");
-                    const isValid = form.getValues("pickupDate") && 
-                                   form.getValues("returnDate") && 
-                                   form.getValues("pickupTime") && 
-                                   form.getValues("returnTime") &&
+                    // TASK-BOOKING-UI-04: which date fields are required
+                    // depends on travelDateStatus — 'confirmed' (default)
+                    // keeps today's exact pickup/return date+time
+                    // requirement; 'range' requires the tentative window
+                    // instead; 'not_decided' requires no date field at all.
+                    const travelDateStatus = form.getValues("travelDateStatus");
+                    const dateFieldsValid =
+                      travelDateStatus === "range"
+                        ? !!(form.getValues("tentativeStartDate") && form.getValues("tentativeEndDate"))
+                        : travelDateStatus === "not_decided"
+                        ? true
+                        : !!(form.getValues("pickupDate") && form.getValues("returnDate") &&
+                             form.getValues("pickupTime") && form.getValues("returnTime"));
+                    const isValid = dateFieldsValid &&
                                    form.getValues("pickupLocation") &&
                                    dropoffValid &&
                                    form.getValues("tripType");
-                    
+
                     if (isValid) {
                       handleDateSelection();
                     } else {
                       toast({
                         title: "Please fill all required fields",
-                        description: "All date, time, location and trip type fields are required.",
+                        description: travelDateStatus === "range"
+                          ? "Earliest/latest date, location and trip type fields are required."
+                          : travelDateStatus === "not_decided"
+                          ? "Location and trip type fields are required."
+                          : "All date, time, location and trip type fields are required.",
                         variant: "destructive"
                       });
                     }
@@ -2196,6 +2448,24 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
               <p className="text-orange-100 text-xs sm:text-sm">Review all details before confirming</p>
             </CardHeader>
             <CardContent className="p-4 sm:p-8">
+              {/* Combined date-certainty + resource-fulfilment summary
+                  (TASK-BOOKING-UI-04) — the two axes read together as ONE
+                  coherent line (e.g. "Confirmed date, vendor sourcing in
+                  progress"), not two disconnected badges. resourceMode and
+                  the vehicle-selection state it reads are the inherited
+                  branch's own, untouched values. */}
+              <div className="mb-6 p-3 sm:p-4 rounded-lg border-2 border-blue-200 bg-blue-50 flex items-start gap-2 min-w-0">
+                <Calendar className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <p id="combined-booking-status-line" className="text-sm sm:text-base font-medium text-blue-900 min-w-0 break-words">
+                  {describeCombinedBookingStatus(
+                    watchedValues.travelDateStatus || "confirmed",
+                    resourceMode,
+                    !!selectedVehicleId,
+                    !!selectedVendorVehicleId,
+                  )}
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Left Column - Trip Details */}
                 <div className="space-y-6">
@@ -2211,13 +2481,34 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                         <span className="font-medium">{watchedValues.dropoffLocation}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Pickup:</span>
-                        <span className="font-medium">{watchedValues.pickupDate} at {watchedValues.pickupTime}</span>
+                        <span className="text-gray-600">Date Certainty:</span>
+                        <Badge variant="outline">
+                          {watchedValues.travelDateStatus === "range" ? "Flexible Window" :
+                           watchedValues.travelDateStatus === "not_decided" ? "Not Decided Yet" : "Confirmed"}
+                        </Badge>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Return:</span>
-                        <span className="font-medium">{watchedValues.returnDate} at {watchedValues.returnTime}</span>
-                      </div>
+                      {watchedValues.travelDateStatus === "range" ? (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Window:</span>
+                          <span className="font-medium">{watchedValues.tentativeStartDate} to {watchedValues.tentativeEndDate}</span>
+                        </div>
+                      ) : watchedValues.travelDateStatus === "not_decided" ? (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Follow up:</span>
+                          <span className="font-medium">{watchedValues.followUpAt || "Not set"}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Pickup:</span>
+                            <span className="font-medium">{watchedValues.pickupDate} at {watchedValues.pickupTime}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Return:</span>
+                            <span className="font-medium">{watchedValues.returnDate} at {watchedValues.returnTime}</span>
+                          </div>
+                        </>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-gray-600">Trip Type:</span>
                         <Badge variant="outline">
@@ -2305,7 +2596,13 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Duration:</span>
-                            <span>{Math.ceil((new Date(watchedValues.returnDate).getTime() - new Date(watchedValues.pickupDate).getTime()) / (1000 * 60 * 60 * 24))} days</span>
+                            {/* TASK-BOOKING-UI-04: pickupDate/returnDate
+                                are now typed optional, but this branch
+                                only renders once selectedPricingType is
+                                "day", which only own-fleet's confirmed-date
+                                flow can set — the fallback below is a type
+                                satisfier, not a real runtime path. */}
+                            <span>{Math.ceil((new Date(watchedValues.returnDate || "").getTime() - new Date(watchedValues.pickupDate || "").getTime()) / (1000 * 60 * 60 * 24))} days</span>
                           </div>
                         </>
                       ) : selectedPricingType === "km" ? (
@@ -2352,7 +2649,18 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Duration:</span>
-                            <span>{Math.ceil((new Date(watchedValues.returnDate).getTime() - new Date(watchedValues.pickupDate).getTime()) / (1000 * 60 * 60 * 24))} days</span>
+                            {/* TASK-BOOKING-UI-04: pickupDate/returnDate are
+                                empty for a 'range'/'not_decided' booking
+                                (this branch is reached whenever no pricing
+                                type has been picked, i.e. the Vendor
+                                Vehicle/Outsource paths) — guard against
+                                NaN rather than compute a meaningless
+                                duration from two empty strings. */}
+                            <span>
+                              {watchedValues.pickupDate && watchedValues.returnDate
+                                ? `${Math.ceil((new Date(watchedValues.returnDate).getTime() - new Date(watchedValues.pickupDate).getTime()) / (1000 * 60 * 60 * 24))} days`
+                                : "—"}
+                            </span>
                           </div>
                         </>
                       )}

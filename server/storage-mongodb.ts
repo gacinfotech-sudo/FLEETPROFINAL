@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import mongoose from 'mongoose';
-import { Tenant, User, Vehicle, Driver, Booking, Expense, ITenant, IUser, IVehicle, IDriver, IBooking, IExpense } from './models';
+import { Tenant, User, Vehicle, Driver, Booking, Expense, VehicleBookingLock, ITenant, IUser, IVehicle, IDriver, IBooking, IExpense } from './models';
 import { findVehicleConflicts, findDriverConflicts, findTentativeDraftConflicts, combineDateTime } from './services/availability';
 // TASK-02 (telephony/RBAC isolation) additive import — CallSession/
 // TelephonyIdentity were originally owned by server/telephony/models/*
@@ -133,6 +133,40 @@ export interface IStorage {
   updateExpense(id: string, data: any, tenantId?: string): Promise<IExpense | undefined>;
   deleteExpense(id: string, tenantId?: string): Promise<void>;
   getTotalExpenses(tenantId: string, startDate?: string, endDate?: string): Promise<number>;
+}
+
+// Serializes concurrent createBooking() calls for the same vehicle when running
+// against a standalone (non-replica-set) MongoDB, where session.withTransaction()
+// throws and createBooking() falls back to a non-atomic check-then-insert — without
+// this, two requests can both pass the conflict check before either saves,
+// double-booking the vehicle. Acquisition is a single atomic insert on a unique _id
+// (tenantId:vehicleId), so it holds even across multiple server processes; the
+// lock's own TTL index (models/index.ts) cleans up if a process crashes mid-lock.
+async function withVehicleLock<T>(tenantId: string, vehicleId: string, fn: () => Promise<T>): Promise<T> {
+  const lockId = `${tenantId}:${vehicleId}`;
+  const maxAttempts = 40;
+  let acquired = false;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      await VehicleBookingLock.create({ _id: lockId });
+      acquired = true;
+      break;
+    } catch (err: any) {
+      if (err?.code === 11000) {
+        await new Promise((resolve) => setTimeout(resolve, 25 + Math.random() * 50));
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (!acquired) {
+    throw new Error('Could not acquire vehicle booking lock — another booking attempt is still in progress for this vehicle.');
+  }
+  try {
+    return await fn();
+  } finally {
+    await VehicleBookingLock.deleteOne({ _id: lockId }).catch(() => {});
+  }
 }
 
 export class MongoDBStorage implements IStorage {
@@ -729,9 +763,13 @@ export class MongoDBStorage implements IStorage {
       }
     } catch (error: any) {
       // Standalone MongoDB (no replica set) does not support transactions;
-      // fall back to a best-effort, non-transactional check-then-insert.
+      // fall back to a best-effort, non-transactional check-then-insert, made safe
+      // against concurrent double-booking of the same vehicle via withVehicleLock.
       if (typeof error?.message === 'string' && error.message.includes('Transaction numbers')) {
         try {
+          if (checkVehicleOverlap) {
+            return await withVehicleLock(bookingData.tenantId.toString(), bookingData.vehicleId.toString(), () => runCreate(undefined));
+          }
           return await runCreate(undefined);
         } catch (fallbackError) {
           console.error('Error creating booking (no-transaction fallback):', fallbackError);
