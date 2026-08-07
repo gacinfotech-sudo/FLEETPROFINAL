@@ -74,9 +74,12 @@ export interface IVehicle extends Document {
   vehicleModel?: string; // Optional
   year?: number; // Optional
   licensePlate?: string; // Optional
+  normalizedLicensePlate?: string; // Vehicle 360 (TASK-VEHICLE-DOMAIN-01) — mirrors VendorVehicle's normalizedRegistrationNumber
   capacity?: number; // Optional
   type: 'economy' | 'standard' | 'premium' | 'luxury' | 'suv' | 'sedan' | 'hatchback' | 'coupe' | 'convertible';
-  status: 'available' | 'on_trip' | 'maintenance';
+  status: 'available' | 'on_trip' | 'maintenance'
+    | 'RESERVED' | 'ASSIGNED' | 'RETURNING' | 'CLEANING' | 'MAINTENANCE_DUE'
+    | 'IN_MAINTENANCE' | 'BREAKDOWN' | 'ACCIDENT_HOLD' | 'INACTIVE' | 'SOLD'; // Vehicle 360 — additive superset, existing lowercase values unchanged
   features: string[];
   pricePerDay: number;
   pricePerHour: number;
@@ -85,6 +88,23 @@ export interface IVehicle extends Document {
   fuelType?: string;
   transmission?: string;
   createdAt: Date;
+  // --- Vehicle 360 additions (TASK-VEHICLE-DOMAIN-01), all optional/additive ---
+  vehicleCategory?: string;
+  variant?: string;
+  registrationDate?: Date;
+  transportClassification?: 'transport' | 'non_transport';
+  vin?: string;
+  chassisNumber?: string;
+  engineNumber?: string;
+  currentOdometer?: number;
+  engineHours?: number;
+  ownershipType?: 'owned' | 'leased' | 'financed' | 'rented';
+  acquisitionDate?: Date;
+  purchaseValue?: number; // Accounts-restricted by RBAC at the route/permission layer
+  branch?: string;
+  baseLocation?: string;
+  currentDriverId?: mongoose.Types.ObjectId; // denormalized pointer; source of truth remains VehicleHandover events
+  isDraft?: boolean; // backs Quick-Add's "Save Draft" action
 }
 
 export interface IDriver extends Document {
@@ -392,7 +412,10 @@ export interface IBooking extends Document {
 export interface IExpense extends Document {
   tenantId: mongoose.Types.ObjectId;
   vehicleId: mongoose.Types.ObjectId;
-  category: 'maintenance' | 'damage' | 'tires' | 'fuel' | 'other';
+  category: 'maintenance' | 'damage' | 'tires' | 'fuel' | 'other'
+    | 'repair' | 'battery' | 'insurance' | 'permit' | 'fitness' | 'puc' | 'tax'
+    | 'toll' | 'parking' | 'cleaning' | 'accessories' | 'challan' | 'emi'
+    | 'lease' | 'gps_subscription'; // Vehicle 360 (TASK-VEHICLE-FUEL-EXPENSE-04), additive
   amount: number;
   date: Date;
   description?: string;
@@ -486,15 +509,20 @@ const VehicleSchema = new Schema<IVehicle>({
   vehicleModel: { type: String }, // Optional
   year: { type: Number }, // Optional
   licensePlate: { type: String }, // Optional
+  normalizedLicensePlate: { type: String },
   capacity: { type: Number }, // Optional
-  type: { 
-    type: String, 
-    enum: ['economy', 'standard', 'premium', 'luxury', 'suv', 'sedan', 'hatchback', 'coupe', 'convertible'], 
-    default: 'economy' 
+  type: {
+    type: String,
+    enum: ['economy', 'standard', 'premium', 'luxury', 'suv', 'sedan', 'hatchback', 'coupe', 'convertible'],
+    default: 'economy'
   },
   status: {
     type: String,
-    enum: ['available', 'on_trip', 'maintenance'],
+    enum: [
+      'available', 'on_trip', 'maintenance',
+      'RESERVED', 'ASSIGNED', 'RETURNING', 'CLEANING', 'MAINTENANCE_DUE',
+      'IN_MAINTENANCE', 'BREAKDOWN', 'ACCIDENT_HOLD', 'INACTIVE', 'SOLD',
+    ],
     default: 'available'
   },
   features: [{ type: String }],
@@ -504,7 +532,24 @@ const VehicleSchema = new Schema<IVehicle>({
   color: { type: String },
   fuelType: { type: String },
   transmission: { type: String },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  // --- Vehicle 360 additions (TASK-VEHICLE-DOMAIN-01) ---
+  vehicleCategory: { type: String },
+  variant: { type: String },
+  registrationDate: { type: Date },
+  transportClassification: { type: String, enum: ['transport', 'non_transport'] },
+  vin: { type: String },
+  chassisNumber: { type: String },
+  engineNumber: { type: String },
+  currentOdometer: { type: Number },
+  engineHours: { type: Number },
+  ownershipType: { type: String, enum: ['owned', 'leased', 'financed', 'rented'] },
+  acquisitionDate: { type: Date },
+  purchaseValue: { type: Number },
+  branch: { type: String },
+  baseLocation: { type: String },
+  currentDriverId: { type: Schema.Types.ObjectId, ref: 'Driver' },
+  isDraft: { type: Boolean, default: false },
 });
 
 // Driver Schema
@@ -866,10 +911,15 @@ BookingSchema.pre('findOneAndUpdate', function (next) {
 const ExpenseSchema = new Schema<IExpense>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
   vehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle', required: true },
-  category: { 
-    type: String, 
-    enum: ['maintenance', 'damage', 'tires', 'fuel', 'other'], 
-    required: true 
+  category: {
+    type: String,
+    enum: [
+      'maintenance', 'damage', 'tires', 'fuel', 'other',
+      'repair', 'battery', 'insurance', 'permit', 'fitness', 'puc', 'tax',
+      'toll', 'parking', 'cleaning', 'accessories', 'challan', 'emi',
+      'lease', 'gps_subscription',
+    ],
+    required: true
   },
   amount: { type: Number, required: true },
   date: { type: Date, required: true },
@@ -1651,6 +1701,12 @@ export const Referral = mongoose.model<IReferral>('Referral', ReferralSchema);
 // Create indexes for better performance
 UserSchema.index({ sessionId: 1 });
 VehicleSchema.index({ tenantId: 1, status: 1 });
+// Vehicle 360 (TASK-VEHICLE-DOMAIN-01) — real duplicate-registration
+// protection, mirroring VendorVehicle's normalizedRegistrationNumber index.
+VehicleSchema.index(
+  { tenantId: 1, normalizedLicensePlate: 1 },
+  { unique: true, partialFilterExpression: { normalizedLicensePlate: { $type: 'string' } } },
+);
 DriverSchema.index({ tenantId: 1, status: 1 });
 BookingSchema.index({ tenantId: 1, status: 1 });
 BookingSchema.index(

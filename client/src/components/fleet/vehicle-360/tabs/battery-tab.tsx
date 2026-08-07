@@ -5,9 +5,9 @@ import { TabDataList } from "../tab-data-list";
 export function BatteryTab({ vehicleId }: { vehicleId: string }) {
   return (
     <TabDataList<any>
-      queryKey={[`/api/vehicles/${vehicleId}/batteries`]}
+      queryKey={[`/api/vehicles/${vehicleId}/battery`]}
       queryFn={async () => {
-        const res = await fetch(`/api/vehicles/${vehicleId}/batteries`, { credentials: 'include' });
+        const res = await fetch(`/api/vehicles/${vehicleId}/battery`, { credentials: 'include' });
         if (!res.ok) throw new Error('not available');
         return res.json();
       }}

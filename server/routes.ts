@@ -112,6 +112,11 @@ import { registerDriverDomainRoutes } from "./driver/domain/routes";
 import { registerDriverDocumentModule } from "./driver/documents/index";
 import { registerVehicleHandoverRoutes } from "./driver/handover/index";
 import { acceptHandoverHandler, getPendingHandoversForDriverPortal } from "./driver/handover/driverPortalRoutes";
+import { registerVehicleDocumentRoutes } from "./vehicle/documents/routes";
+import { registerVehicleMaintenanceRoutes } from "./vehicle/maintenance/routes";
+import { registerVehicleFuelRoutes } from "./vehicle/expenses/routes";
+import { registerVehicleFastagRoutes } from "./vehicle/fastag/routes";
+import { registerVehicleIncidentRoutes } from "./vehicle/incidents/routes";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -312,6 +317,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerDriverDomainRoutes(app);
   registerDriverDocumentModule(app);
   registerVehicleHandoverRoutes(app);
+  registerVehicleDocumentRoutes(app);
+  registerVehicleMaintenanceRoutes(app);
+  registerVehicleFuelRoutes(app);
+  registerVehicleFastagRoutes(app);
+  registerVehicleIncidentRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
