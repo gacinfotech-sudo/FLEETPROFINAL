@@ -4,12 +4,14 @@ import mongoose from 'mongoose';
 import { Tenant, User, Vehicle, Driver, Booking, Expense, ITenant, IUser, IVehicle, IDriver, IBooking, IExpense } from './models';
 import { findVehicleConflicts, findDriverConflicts, findTentativeDraftConflicts, combineDateTime } from './services/availability';
 // TASK-02 (telephony/RBAC isolation) additive import — CallSession/
-// TelephonyIdentity are owned by server/telephony/models/* (a separate
-// collection outside the shared server/models/index.ts, which this task is
-// forbidden from editing; see .claude/tasks/reports/TASK-02-report.md).
-// Only new, additively-named methods below reference these — no existing
-// method in this file was touched to add telephony support.
-import { CallSession, ICallSession, TelephonyIdentity, ITelephonyIdentity } from './telephony/models';
+// TelephonyIdentity were originally owned by server/telephony/models/*
+// (a separate collection outside the shared server/models/index.ts, which
+// TASK-02 was forbidden from editing); the Integrator consolidated them
+// into server/models/index.ts per TASK-02-report.md's proposed patch and
+// repointed this import accordingly. Only new, additively-named methods
+// below reference these — no existing method in this file was touched to
+// add telephony support.
+import { CallSession, ICallSession, TelephonyIdentity, ITelephonyIdentity } from './models';
 // TASK-03 (performance QA) — additive import for the new paginated/lean
 // query helpers appended below (getCustomersListPaginated). The existing
 // import above is left untouched; Customer wasn't previously imported

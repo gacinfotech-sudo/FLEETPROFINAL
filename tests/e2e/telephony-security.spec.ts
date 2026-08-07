@@ -8,7 +8,7 @@ import {
 } from '../../server/telephony/security/credentialEncryption';
 import { setTelephonyEventEmitter, type TelephonyEvent } from '../../server/telephony/index';
 import { Tenant, User } from '../../server/models';
-import { TelephonyIdentity } from '../../server/telephony/models';
+import { TelephonyIdentity } from '../../server/models';
 
 // Pure unit test — no server/DB required. Mirrors
 // tests/e2e/gps-connection-security.spec.ts's encryption round-trip test

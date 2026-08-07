@@ -1,6 +1,6 @@
 import { storage } from '../../storage-mongodb';
 import { telephonyProvider } from '../providers/registry';
-import type { ICallSession } from '../models/callSession';
+import type { ICallSession } from '../../models';
 import type { NormalizedTelephonyEvent } from '../types';
 
 export type ActingUser = { userId: string; role: 'admin' | 'client' | 'manager' };

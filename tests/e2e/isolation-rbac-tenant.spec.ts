@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import mongoose from 'mongoose';
 import { login } from './helpers';
 import { Tenant, User } from '../../server/models';
-import { CallSession, TelephonyIdentity } from '../../server/telephony/models';
+import { CallSession, TelephonyIdentity } from '../../server/models';
 
 // TASK-04 cross-cutting RBAC/tenant-isolation coverage. Reuses the exact
 // fixture pattern TASK-02 established in telephony-isolation.spec.ts (a

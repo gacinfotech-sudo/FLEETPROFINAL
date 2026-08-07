@@ -1,5 +1,5 @@
 import { storage } from '../../storage-mongodb';
-import type { ITelephonyIdentity } from '../models/telephonyIdentity';
+import type { ITelephonyIdentity } from '../../models';
 import { encryptTelephonyCredentials } from '../security/credentialEncryption';
 
 /** Never include encryptedCredentials/credentialFields in anything that

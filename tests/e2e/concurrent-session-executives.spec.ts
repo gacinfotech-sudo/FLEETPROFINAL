@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import mongoose from 'mongoose';
 import { login } from './helpers';
 import { Tenant, User } from '../../server/models';
-import { CallSession, TelephonyIdentity } from '../../server/telephony/models';
+import { CallSession, TelephonyIdentity } from '../../server/models';
 
 // TASK-04 concurrency coverage: two genuinely independent browser contexts
 // (browser.newContext(), not two tabs sharing one session) acting as two
