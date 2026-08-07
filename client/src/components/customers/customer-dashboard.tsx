@@ -18,6 +18,7 @@ import CustomerRewardsPanel from "./customer-rewards-panel";
 import CustomerReferralPanel from "./customer-referral-panel";
 import CustomerMessageCenter from "./customer-message-center";
 import CustomerRequirements from "./customer-requirements";
+import PreviousBookingReuse from "@/components/booking-queues/previous-booking-reuse";
 import CustomerDuplicateReview from "./customer-duplicate-review";
 import CustomerPaymentReceipt from "./customer-payment-receipt";
 import CustomerInvoices from "./customer-invoices";
@@ -535,6 +536,11 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
           Advance/Due shown here are then just the recomputed result. */}
       <div>
         <Label className="text-sm font-medium text-gray-700 mb-2 block">Booking History</Label>
+        {onNewBooking && (
+          <div className="mb-3">
+            <PreviousBookingReuse customerId={customerId} onReuse={onNewBooking} />
+          </div>
+        )}
         {loadingBookings ? (
           <p className="text-sm text-gray-500">Loading...</p>
         ) : rows.length === 0 ? (
