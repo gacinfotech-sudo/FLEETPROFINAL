@@ -62,6 +62,10 @@ test('Customer financial summary, receipt and statement use the immutable paymen
 
   await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(phone);
+  // customers.tsx debounces the search box 350ms before re-querying; wait
+  // for it to settle (and the "Updating results..." guard to clear) so this
+  // doesn't click the still-rendered stale table and open the wrong record.
+  await page.waitForTimeout(600);
   await page.locator('table tbody tr').first().click();
   const dashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });
   await expect(dashboard.getByText('Lifetime Collected')).toBeVisible();
