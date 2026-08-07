@@ -15,23 +15,19 @@ export function registerTelephonyWebhookRoutes(app: Express): void {
   // verifyWebhookSignature() below (same contract as
   // GpsProviderAdapter.verifyWebhookSignature), not by session/cookie.
   //
-  // KNOWN LIMITATION (documented, not silently papered over): true
-  // byte-exact signature verification needs the *raw* request body, but
-  // server/index.ts (protected/Integrator-owned — see "Files forbidden to
-  // modify") already applies `express.json()` globally before routes are
-  // registered, so `req.body` here is already-parsed JSON, not a Buffer.
-  // This route re-serializes req.body as a stand-in for the raw bytes,
-  // which is NOT safe for a provider that signs the literal wire bytes
-  // (whitespace/key-order sensitive). TASK-02-report.md's WebSocket
-  // bootstrap section also flags the one-line raw-body-capture fix
-  // (`express.json({ verify: (req, res, buf) => { (req as any).rawBody =
-  // buf } })`) for the Integrator to apply alongside the other deferred
-  // server/index.ts changes; once that lands, swap the Buffer.from() below
-  // for `(req as any).rawBody`.
+  // Byte-exact signature verification needs the *raw* request body.
+  // server/index.ts's `express.json({ verify: ... })` (Integrator addition,
+  // see .claude/tasks/reports/TASK-02-report.md's WebSocket bootstrap
+  // section) captures the exact wire bytes into req.rawBody alongside the
+  // parsed req.body, so this no longer relies on re-serializing req.body
+  // (which was not safe for a provider that signs literal wire bytes —
+  // whitespace/key-order sensitive).
   app.post(
     '/api/telephony/webhook',
     safeAsync(async (req, res) => {
-      const rawBody = Buffer.from(JSON.stringify(req.body ?? {}), 'utf8');
+      const rawBody = (req as any).rawBody instanceof Buffer
+        ? (req as any).rawBody as Buffer
+        : Buffer.from(JSON.stringify(req.body ?? {}), 'utf8');
       const headers: Record<string, string> = {};
       for (const [key, value] of Object.entries(req.headers)) {
         if (typeof value === 'string') headers[key] = value;

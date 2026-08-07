@@ -138,6 +138,21 @@ function googleReviewRequestMessage(customer: any, booking: any, tenant: any, re
   ].join('\n');
 }
 
+// Integrator addition (telephony WebSocket bootstrap, see TASK-02-report.md
+// "Proposed WebSocket bootstrap + room design"): the same express-session
+// middleware instance configured below needs to be reused by
+// server/index.ts's Socket.IO handshake (`io.engine.use(sessionMiddleware)`)
+// so a socket can only ever join rooms for the tenant/user its *existing*
+// authenticated HTTP session already belongs to — never a client-supplied
+// id. Captured into this module-level variable when registerRoutes() runs
+// and exposed via the getter below; server/index.ts calls the getter only
+// after `await registerRoutes(app)` has resolved, so it is always populated
+// by the time it's read.
+let sessionMiddlewareInstance: ReturnType<typeof session> | undefined;
+export function getSessionMiddleware(): ReturnType<typeof session> | undefined {
+  return sessionMiddlewareInstance;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // P0 SECURITY HELPER: admin users are allowed cross-tenant access (see
   // requireTenant middleware); everyone else must be scoped to their own
@@ -254,7 +269,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Session configuration with enhanced security and PWA support
-  app.use(session({
+  const sessionMiddleware = session({
     secret: sessionSecret,
     name: 'fleetpro.sid', // avoid leaking that this is an express app via default 'connect.sid'
     resave: false,
@@ -273,7 +288,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days for PWA persistence
       sameSite: 'lax' // Changed from 'strict' to 'lax' for better PWA compatibility
     }
-  }));
+  });
+  sessionMiddlewareInstance = sessionMiddleware; // see getSessionMiddleware() above
+  app.use(sessionMiddleware);
 
   // Apply session security middleware (hijacking/fingerprint checks)
   app.use(sessionSecurityMiddleware);

@@ -34,11 +34,13 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
+import { registerRoutes, getSessionMiddleware } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import connectDB from "./connectDB";
 import { storage } from "./storage-mongodb";
 import mongoose from "mongoose";
+import { Server as SocketIOServer } from "socket.io";
+import { setTelephonyEventEmitter, type TelephonyEvent } from "./telephony/index";
 
 const app = express();
 // Trust only the known number of reverse-proxy hops. `true` trusts arbitrary
@@ -48,7 +50,18 @@ const configuredProxyHops = Number(process.env.TRUST_PROXY_HOPS);
 app.set('trust proxy', Number.isInteger(configuredProxyHops) && configuredProxyHops >= 0
   ? configuredProxyHops
   : (process.env.NODE_ENV === 'production' ? 1 : false));
-app.use(express.json());
+// Integrator addition (TASK-02 telephony webhook signature verification,
+// see .claude/tasks/reports/TASK-02-report.md "Proposed WebSocket
+// bootstrap + room design" section 2): capture the raw request body bytes
+// alongside the parsed JSON. server/telephony/routes/webhook.ts previously
+// had to re-serialize req.body with JSON.stringify() as a stand-in for the
+// true raw bytes (unsafe for a provider that signs the literal wire bytes,
+// e.g. differing whitespace/key order) because no raw body was available
+// anywhere in the app. This is additive — every existing express.json()
+// consumer is unaffected; req.rawBody is simply now also populated.
+app.use(express.json({
+  verify: (req: any, _res, buf) => { req.rawBody = buf; },
+}));
 app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
@@ -97,9 +110,95 @@ app.use((req, res, next) => {
   }
   
   const server = await registerRoutes(app);
-  
+
   // Store server instance globally for notifications
   (global as any).notificationServer = server;
+
+  // Integrator addition (TASK-02 telephony real-time hand-off — see
+  // .claude/tasks/reports/TASK-02-report.md "Proposed WebSocket bootstrap
+  // + room design"). No WebSocket/Socket.IO layer existed anywhere in this
+  // codebase before this; server/telephony/services/callService.ts already
+  // calls emitTelephonyEvent() at every point a room event should fire and
+  // was a no-op until setTelephonyEventEmitter() below is wired in.
+  //
+  // Auth: reuse the existing session cookie via the same express-session
+  // middleware instance server/routes.ts configured (exported via
+  // getSessionMiddleware()), so a socket can only ever join rooms for the
+  // tenant/user it already has an authenticated HTTP session for. Room
+  // membership is decided entirely server-side from that session — never
+  // from a client-supplied tenantId/userId — so a compromised client
+  // cannot join another tenant's or another user's room by requesting it.
+  const io = new SocketIOServer(server, {
+    path: '/ws/telephony',
+    cors: { origin: false }, // same-origin only; revisit if a separate frontend origin is introduced
+  });
+
+  const sessionMiddleware = getSessionMiddleware();
+  if (sessionMiddleware) {
+    io.engine.use(sessionMiddleware);
+  } else {
+    console.error('Telephony WebSocket: session middleware unavailable — sockets will be rejected.');
+  }
+
+  io.on('connection', (socket) => {
+    void (async () => {
+      try {
+        const req = socket.request as any;
+        const sessionUserId = req.session?.userId as string | undefined;
+        if (!sessionUserId) {
+          socket.disconnect(true);
+          return;
+        }
+        const user = await storage.getUserBySessionId(sessionUserId);
+        if (!user || !user.isActive) {
+          socket.disconnect(true);
+          return;
+        }
+
+        // Room membership, decided server-side from the authenticated
+        // session only — see the room design table in TASK-02-report.md.
+        socket.join(`user:${user.userId}`);
+        const tenantId = user.tenantId
+          ? (typeof user.tenantId === 'object' ? (user.tenantId as any)._id?.toString() : (user.tenantId as any).toString())
+          : undefined;
+        if (tenantId && (user.role === 'client' || user.role === 'admin')) {
+          // Owner/admin combined-pipeline aggregation view (any executive's
+          // call). `team:<tenantId>` is reserved for a future distinct
+          // "manager over multiple executives" tier that doesn't exist in
+          // the current admin|manager|client role enum.
+          socket.join(`tenant:${tenantId}`);
+        }
+
+        // A client-initiated, explicitly-scoped join for whoever has a
+        // specific call's detail page open. Gated by the same ownership
+        // check as GET /api/telephony/calls/:id so a socket can't join an
+        // arbitrary call room it has no access to.
+        socket.on('telephony:subscribeCall', async (callSessionId: unknown) => {
+          if (typeof callSessionId !== 'string' || !tenantId) return;
+          try {
+            const { getCallSessionForActor } = await import('./telephony/services/callService');
+            const actor = { userId: user.userId, role: user.role as 'admin' | 'client' | 'manager' };
+            const call = await getCallSessionForActor(actor, tenantId, callSessionId);
+            if (call) socket.join(`call:${callSessionId}`);
+          } catch (error) {
+            console.error('telephony:subscribeCall error:', error instanceof Error ? error.message : error);
+          }
+        });
+        socket.on('telephony:unsubscribeCall', (callSessionId: unknown) => {
+          if (typeof callSessionId === 'string') socket.leave(`call:${callSessionId}`);
+        });
+      } catch (error) {
+        console.error('Telephony WebSocket connection error:', error instanceof Error ? error.message : error);
+        socket.disconnect(true);
+      }
+    })();
+  });
+
+  setTelephonyEventEmitter((event: TelephonyEvent) => {
+    if (event.targetUserId) io.to(`user:${event.targetUserId}`).emit(event.type, event.payload);
+    io.to(`tenant:${event.tenantId}`).emit(event.type, event.payload); // owner/admin aggregation view
+    io.to(`call:${event.callSessionId}`).emit(event.type, event.payload); // anyone actively viewing this call's detail page
+  });
 
   // P0 FIX: the global error handler must never throw after sending a
   // response — doing so previously crashed the Node process (or, depending
