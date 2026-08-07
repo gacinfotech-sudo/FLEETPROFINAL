@@ -205,5 +205,46 @@ additive-only commits with no other committed work depending on them.
 `registerDriverDomainRoutes(app)` is still not mounted in `server/routes.ts` on either
 trunk lineage — this pass only mounted it temporarily, locally, for test verification, and
 reverted it before each commit, per this task's existing file-ownership boundary
-(`TASK-DRIVER-DOMAIN-02`'s own report already documents the same one-line proposed patch).
-None of this work is reachable by a real user until that mount lands.
+(`TASK-DRIVER-DOMAIN-02`'s own report already documents the same one-line proposed patch;
+repeated here, verified against this branch's current `server/routes.ts`, for a mechanical
+apply — no unrelated line touched or reordered). **Actually trial-applied and verified in
+this pass, then reverted before committing:** `git diff --check` clean, `npm run check`
+clean with the patch in place, confirming it compiles correctly against this branch's real
+current state rather than being asserted from reading the code alone.
+
+**Exact patch**, `server/routes.ts` (driver/domain-02-lifecycle @ `d5d75a1`):
+
+```diff
+@@ line 96 (after the existing driverAuth import) @@
+ import { authenticateDriver, type DriverAuthRequest } from "./middleware/driverAuth";
++import { registerDriverDomainRoutes } from "./driver/domain/routes";
+ import { registerGpsConnectionRoutes } from "./gps/routes/connections";
+
+@@ line 293 (after the existing GPS registrations) @@
+   registerGpsConnectionRoutes(app);
+   registerGpsDeviceRoutes(app);
+   registerGpsAssignmentRoutes(app);
++  registerDriverDomainRoutes(app);
+```
+
+No file/line outside these two hunks needs to change. Checked for path collisions against
+every route this module would add — none exist in `server/routes.ts` today:
+
+| Method | Path |
+|---|---|
+| GET/POST | `/api/drivers/:id/contacts` |
+| POST | `/api/drivers/:id/contacts/:contactId/verification` |
+| DELETE | `/api/drivers/:id/contacts/:contactId` |
+| GET/POST | `/api/driver-contact-policy` |
+| GET/POST | `/api/drivers/:id/employment-history` |
+| POST | `/api/drivers/:id/employment-history/:entryId/verification` |
+| DELETE | `/api/drivers/:id/employment-history/:entryId` |
+| GET/POST | `/api/drivers/:id/lifecycle-stage` |
+| GET | `/api/drivers/:id/audit-log` |
+| GET | `/api/drivers/:id/assignment-eligibility` |
+| GET | `/api/drivers/:id/completeness` (added this pass) |
+
+None of this work — the contact-threshold fix, the completeness engine, the Driver 360
+card, or the document expiry/missing changes — is reachable by a real user until this mount
+lands. The client-side pieces (`driver-onboarding-interface`) already degrade gracefully
+without it (confirmed live, see above); they simply show nothing until the API exists.
