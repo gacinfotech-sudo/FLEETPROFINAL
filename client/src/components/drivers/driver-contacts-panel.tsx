@@ -94,7 +94,9 @@ export default function DriverContactsPanel({ driverId }: Props) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2"><Users className="h-4 w-4" /> Emergency Contacts &amp; References</h3>
-          <p className="text-xs text-gray-500">Minimum 2 emergency contacts and 2 verified references recommended before Approved.</p>
+          <p className="text-xs text-gray-500">
+            {contacts.length} / {DEFAULT_CONTACT_THRESHOLD} PROFILE TARGET — all contacts remain optional; 2 emergency contacts and 2 verified references are recommended before Approved, not required to save.
+          </p>
         </div>
         <Button size="sm" onClick={() => setShowAddForm((v) => !v)} className="w-full sm:w-auto">
           <Plus className="h-4 w-4 mr-1" /> Add Contact
@@ -158,7 +160,7 @@ export default function DriverContactsPanel({ driverId }: Props) {
             </div>
           </div>
           <p className="text-xs text-gray-500">
-            Beyond the default {DEFAULT_CONTACT_THRESHOLD} contacts, the tenant contact policy requires a stated business purpose and this contact's consent/notification status to be set explicitly — the server enforces this and will reject the save with a clear message if not met.
+            Up to {DEFAULT_CONTACT_THRESHOLD} contacts per driver — this is a profile target, not a requirement to save.
           </p>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => setShowAddForm(false)}>Cancel</Button>

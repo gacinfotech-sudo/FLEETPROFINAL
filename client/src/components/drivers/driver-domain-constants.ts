@@ -120,8 +120,12 @@ export type ConsentStatus = typeof CONSENT_STATUSES[number];
 export const NOTIFICATION_STATUSES = ['not_notified', 'notified', 'acknowledged'] as const;
 export type NotificationStatus = typeof NOTIFICATION_STATUSES[number];
 
-// Contact Data Rule (DRIVER-LIFECYCLE-SPEC.md §2).
-export const DEFAULT_CONTACT_THRESHOLD = 4;
+// Zero-block onboarding policy: tenant contact target is 10 by default
+// (mirrors server/driver/domain/types.ts's DEFAULT_CONTACT_THRESHOLD — keep
+// these two constants in sync). Was 4; raising it removed a real block
+// where a driver's 5th contact was rejected unless an admin had opted the
+// tenant into a higher policy limit.
+export const DEFAULT_CONTACT_THRESHOLD = 10;
 
 export function verificationBadgeClass(status: string): string {
   switch (status) {
