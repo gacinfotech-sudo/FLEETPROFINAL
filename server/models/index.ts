@@ -2954,6 +2954,22 @@ const BookingDraftSchema = new Schema<IBookingDraft>({
 BookingDraftSchema.index({ tenantId: 1, userId: 1 }, { unique: true });
 export const BookingDraft = mongoose.model<IBookingDraft>('BookingDraft', BookingDraftSchema);
 
+// Cross-process mutex for Booking creation against a standalone (non-replica-set)
+// MongoDB, where session.withTransaction() cannot run and createBooking() falls back
+// to a non-atomic check-then-insert (see storage-mongodb.ts's withVehicleLock). The
+// _id (tenantId:vehicleId) doubling as the unique index makes acquisition a single
+// atomic insert; the TTL index is a safety net if a process crashes mid-lock.
+export interface IVehicleBookingLock extends Document<string> {
+  _id: string;
+  createdAt: Date;
+}
+
+const VehicleBookingLockSchema = new Schema<IVehicleBookingLock>({
+  _id: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now, expires: 30 },
+});
+export const VehicleBookingLock = mongoose.model<IVehicleBookingLock>('VehicleBookingLock', VehicleBookingLockSchema);
+
 // ---------------------------------------------------------------------
 // Vendor 360°
 // ---------------------------------------------------------------------
