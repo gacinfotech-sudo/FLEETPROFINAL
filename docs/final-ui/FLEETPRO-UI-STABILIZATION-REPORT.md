@@ -207,13 +207,25 @@ dates) in the upcoming-bookings suite. `customer-360`/`customer-segments` re-run
 
 ## CANDIDATE COMMIT
 
-See `git log ui/final-dashboard-redesign` — single commit on top of `eab3581`.
+- `231a3b7` — the redesign, on top of base `eab3581`.
+- `d321b87` — merge of the concurrently-landed trunk commit `3fb3ed1` (Add Driver 400
+  permanent fix) into the candidate; re-verified (tsc, 12/12 regressions) after the
+  merge, before promotion.
 
 ## CANONICAL LIVE COMMIT
 
-Promotion target: `booking/integration-preview` (fleetpro-main, `:5050`) via
-fast-forward merge of `ui/final-dashboard-redesign`. The dev server (`tsx` watch +
-Vite) picks up the merge without manual restart. Recorded below after promotion.
+**`d321b87` on `booking/integration-preview` (`fleetpro-main`, `:5050`).**
+
+Promotion procedure actually used: the other session's uncommitted WIP in
+`fleetpro-main` (auth.ts, routes.ts single-booking route, storage, closure docs) was
+stashed, the branch fast-forwarded `3fb3ed1 → d321b87`, and the stash popped back
+cleanly — nothing discarded. The running `:5050` process was plain `tsx` (no watch),
+so the server was given the shortest controlled restart (PID-targeted kill of 14349
+only, per the repo's process-safety rule; new PID recorded in
+`/tmp/fleetpro-5050.log`). Post-promotion, the full
+`tests/e2e/ui-shell-redesign.spec.ts` suite was re-run against the live `:5050`
+preview itself: **12/12 passed**. The temporary candidate server on `:5210` was shut
+down afterwards so exactly one canonical Manual-Test Preview remains.
 
 ## ROLLBACK
 
