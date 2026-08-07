@@ -2,8 +2,7 @@ import type { Express, NextFunction, Response } from 'express';
 import mongoose from 'mongoose';
 import { z } from 'zod';
 import { authenticateUser, requireTenant, type AuthRequest } from '../../middleware/auth';
-import { requirePermission } from '../../middleware/permissions';
-import { TELEPHONY_PERMISSIONS } from '../permissions';
+import { requirePermission, PERMISSIONS } from '../../middleware/permissions';
 import {
   getCallSessionForActor,
   initiateOutboundCall,
@@ -68,7 +67,7 @@ export function registerTelephonyCallRoutes(app: Express): void {
     '/api/telephony/calls',
     authenticateUser,
     requireTenant,
-    requirePermission(TELEPHONY_PERMISSIONS.CALL_INITIATE),
+    requirePermission(PERMISSIONS.CALL_INITIATE),
     safeAsync(async (req, res) => {
       const tenantId = resolveTenantId(req);
       if (!tenantId) return res.status(403).json({ message: 'Tenant context is required.' });
@@ -101,7 +100,7 @@ export function registerTelephonyCallRoutes(app: Express): void {
     '/api/telephony/calls',
     authenticateUser,
     requireTenant,
-    requirePermission(TELEPHONY_PERMISSIONS.CALL_VIEW_OWN),
+    requirePermission(PERMISSIONS.CALL_VIEW_OWN),
     safeAsync(async (req, res) => {
       const tenantId = resolveTenantId(req);
       if (!tenantId) return res.status(403).json({ message: 'Tenant context is required.' });
@@ -127,7 +126,7 @@ export function registerTelephonyCallRoutes(app: Express): void {
     '/api/telephony/calls/:id',
     authenticateUser,
     requireTenant,
-    requirePermission(TELEPHONY_PERMISSIONS.CALL_VIEW_OWN),
+    requirePermission(PERMISSIONS.CALL_VIEW_OWN),
     safeAsync(async (req, res) => {
       const tenantId = resolveTenantId(req);
       if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ message: 'Call not found.' });
@@ -141,7 +140,7 @@ export function registerTelephonyCallRoutes(app: Express): void {
     '/api/telephony/calls/:id',
     authenticateUser,
     requireTenant,
-    requirePermission(TELEPHONY_PERMISSIONS.CALL_MANAGE),
+    requirePermission(PERMISSIONS.CALL_MANAGE),
     safeAsync(async (req, res) => {
       const tenantId = resolveTenantId(req);
       if (!tenantId) return res.status(403).json({ message: 'Tenant context is required.' });

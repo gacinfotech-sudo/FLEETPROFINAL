@@ -1,8 +1,7 @@
 import type { Express, NextFunction, Response } from 'express';
 import { z } from 'zod';
 import { authenticateUser, requireTenant, type AuthRequest } from '../../middleware/auth';
-import { requirePermission } from '../../middleware/permissions';
-import { TELEPHONY_PERMISSIONS } from '../permissions';
+import { requirePermission, PERMISSIONS } from '../../middleware/permissions';
 import { getTelephonyIdentity, publicTelephonyIdentity, upsertTelephonyIdentity } from '../services/identityService';
 
 function safeAsync(handler: (req: AuthRequest, res: Response) => Promise<unknown>) {
@@ -65,7 +64,7 @@ export function registerTelephonyIdentityRoutes(app: Express): void {
     '/api/telephony/identities/:userId',
     authenticateUser,
     requireTenant,
-    requirePermission(TELEPHONY_PERMISSIONS.TELEPHONY_IDENTITY_MANAGE),
+    requirePermission(PERMISSIONS.TELEPHONY_IDENTITY_MANAGE),
     safeAsync(async (req, res) => {
       const tenantId = resolveTenantId(req);
       if (!tenantId) return res.status(403).json({ message: 'Tenant context is required.' });

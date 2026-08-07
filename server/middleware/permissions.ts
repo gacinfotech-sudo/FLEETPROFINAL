@@ -125,4 +125,16 @@ export const PERMISSIONS = {
   OUTSOURCING_VIEW: 'outsourcing.view',
   OUTSOURCING_CREATE: 'outsourcing.create',
   OUTSOURCING_MANAGE: 'outsourcing.manage',
+  // Telephony / multi-user call ownership (TASK-02) — see
+  // server/telephony/routes/** for the call sites. Previously exposed as
+  // server/telephony/permissions.ts's TELEPHONY_PERMISSIONS string
+  // constants (identical values) before the Integrator consolidated them
+  // here; see .claude/tasks/reports/TASK-02-report.md.
+  CALL_VIEW_OWN: 'call.view_own',
+  CALL_VIEW_TEAM: 'call.view_team',
+  CALL_INITIATE: 'call.initiate',
+  CALL_MANAGE: 'call.manage',
+  CALL_REASSIGN: 'call.reassign',
+  TELEPHONY_IDENTITY_VIEW: 'telephony.identity.view',
+  TELEPHONY_IDENTITY_MANAGE: 'telephony.identity.manage',
 } as const;
