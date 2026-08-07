@@ -89,6 +89,8 @@ export const mongoDriverSchema = z.object({
 export const mongoBookingSchema = z.object({
   tenantId: z.string(),
   bookingId: z.string().optional(),
+  // TASK-BOOKING-CODE-02: short public code, additive alongside bookingId.
+  bookingCode: z.string().optional(),
   // Same "must be declared or Zod silently strips it" trap noted on
   // createdBy just below — declared explicitly so the duplicate-booking
   // idempotency check in server/routes.ts actually receives this field.
