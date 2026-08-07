@@ -315,3 +315,65 @@ construction, so it was left as-is.
 them — the root cause was identical across `customer-merge.spec.ts`,
 `customer-financial-summary.spec.ts`, `customer-invoice.spec.ts`, and
 `invoice-deferred-numbering.spec.ts`.
+
+## Follow-up fix applied (webhook inbound-event de-dupe race)
+
+Fixes "Follow-up needed from user" item 2 above, commit `78ff849` on
+`integration/preview-20260807`.
+
+**What changed** — `server/storage-mongodb.ts`: new
+`upsertInboundCallSession(tenantId, providerCallId, identityFields,
+mutableFields)`, a single `CallSession.findOneAndUpdate(..., { upsert:
+true, new: true, includeResultMetadata: true })` keyed on `(tenantId,
+providerCallId)`. Identity fields (`direction`, `userId`,
+`assignedUserId`, contact numbers, `createdBy`, etc.) apply only via
+`$setOnInsert`; mutable fields (`status`, `durationSeconds`,
+`updatedBy`) apply via `$set` on every write, so a duplicate delivery
+still refreshes status instead of being a no-op. `server/telephony/
+services/callService.ts`'s `resolveInboundEvent()` now calls this
+instead of the previous `findCallSessionByProviderCallId` +
+`createCallSessionRecord`/`updateCallSessionFields` check-then-act
+pair, and only fires the `call.ringing` screen-pop event when the
+upsert's `created` flag is true (matching the previous behavior of
+only notifying on first delivery).
+
+**Why this needed fixing, not just flagging**: the previous pattern's
+race window was real, not theoretical — two concurrent deliveries of
+the same provider event (an ordinary webhook-retry scenario) could
+both observe "no existing record" before either write landed, and the
+DB's unique index would only stop the *second* `create`, surfacing as
+an unhandled exception rather than a clean resolve to one record.
+
+**Tests added** — `tests/e2e/telephony-isolation.spec.ts`: "Two truly
+concurrent deliveries of a brand-new provider event resolve atomically
+to one record" — fires both webhook deliveries via `Promise.all` (not
+sequentially, which the pre-existing duplicate-delivery test already
+covered) for a `providerCallId` never seen before, asserts both
+requests succeed and exactly one `CallSession` document exists.
+
+**Test results**:
+- `npm run check` — clean, before and after.
+- Standalone verification script (12 concurrent
+  `upsertInboundCallSession` calls issued directly against MongoDB,
+  bypassing the HTTP/browser layer, run and deleted before commit —
+  not part of the shipped diff): 0 errors, exactly 1 `created: true`,
+  11 `created: false`, exactly 1 document in the DB, all 12 results
+  referencing the same document id.
+- `npx playwright test tests/e2e/telephony-isolation.spec.ts --grep
+  "inbound|concurrent"` → **3/3 passed**, including the new test,
+  against the real HTTP webhook route.
+- Full-suite regression was not re-run for this follow-up (single,
+  additive, mechanically-verified change to one already-isolated code
+  path with its own passing tests) — the dev server for this worktree
+  was found dead mid-verification (same unscoped-process-kill class of
+  incident already documented above and in `TASK-02-report.md`) and
+  had to be restarted before the targeted tests above could complete;
+  machine load during this session (`uptime` load average ~40-43,
+  ~20 concurrent Claude Code sessions) caused two earlier full-file
+  runs to fail on unrelated pre-existing tests (`page.goto('/login')`
+  timeouts, a plain GET exceeding a 60s timeout) — consistent with,
+  not contradicting, this report's own "Shared dev MongoDB /
+  concurrent-worktree contention" finding (item 3 below). The targeted
+  re-run above avoided that contention by skipping the unrelated
+  flaky login-dependent test via `--grep` and by verifying the core
+  mechanism directly against the database first.
