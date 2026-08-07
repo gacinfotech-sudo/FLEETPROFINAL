@@ -8,7 +8,7 @@ import EnhancedBookingForm from "../components/booking/enhanced-booking-form";
 import VehicleForm from "../components/fleet/vehicle-form";
 import VehicleFeedbackProfile from "../components/fleet/vehicle-feedback-profile";
 import DriverForm from "../components/drivers/driver-form";
-import DriverFeedbackProfile from "../components/drivers/driver-feedback-profile";
+import Driver360 from "../components/drivers/driver-360";
 import RevenueReport from "../components/reports/revenue-report";
 import VendorSettlementPage from "./vendor-settlement";
 import BookingHistoryPDF from "../components/reports/booking-history-pdf";
@@ -43,7 +43,6 @@ import AssignVendorDialog from "../components/booking/assign-vendor-dialog";
 import ResourceFulfilmentPanel from "../components/booking/resource-fulfilment-panel";
 import PaymentSection from "../components/booking/payment-section";
 import TripCostSummary from "../components/booking/trip-cost-summary";
-import SetDriverPinDialog from "../components/drivers/set-driver-pin-dialog";
 import PipelineStepper from "../components/pipeline/pipeline-stepper";
 import { bookingPipelineInfo } from "../lib/pipelineStages";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -1301,16 +1300,16 @@ export default function Dashboard() {
                     Add Driver
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>{editingDriver ? 'Edit Driver' : 'Add New Driver'}</DialogTitle>
                   </DialogHeader>
-                  <DriverForm 
-                    driver={editingDriver} 
+                  <DriverForm
+                    driver={editingDriver}
                     onSuccess={() => {
                       setShowDriverForm(false);
                       setEditingDriver(null);
-                    }} 
+                    }}
                   />
                 </DialogContent>
               </Dialog>
@@ -3070,9 +3069,13 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* View Driver Profile Modal */}
+      {/* View Driver Profile Modal — real Driver 360° view (contacts,
+          documents with compliance/expiry status, employment history,
+          lifecycle stage). See client/src/components/drivers/driver-360.tsx
+          for the dead viewingDriver.age/.licenseType/.licenseExpiry/.notes
+          resolution. */}
       <Dialog open={!!viewingDriver} onOpenChange={() => setViewingDriver(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <Users className="text-blue-600" size={24} />
@@ -3080,152 +3083,13 @@ export default function Dashboard() {
             </DialogTitle>
           </DialogHeader>
           {viewingDriver && (
-            <div className="space-y-6">
-              {/* Header with driver photo and basic info */}
-              <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 text-2xl">👤</span>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">{viewingDriver.name}</h2>
-                  <p className="text-gray-600">{viewingDriver.phone}</p>
-                  <Badge
-                    variant={viewingDriver.status === "available" ? "default" :
-                            viewingDriver.status === "on_duty" ? "secondary" : "destructive"}
-                  >
-                    {viewingDriver.status}
-                  </Badge>
-                </div>
-                <div className="ml-auto">
-                  <SetDriverPinDialog driverId={viewingDriver._id || viewingDriver.id} driverName={viewingDriver.name} />
-                </div>
-              </div>
-
-              {/* Main driver details in grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Basic Information */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Basic Information</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Full Name</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.name}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Phone Number</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.phone}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Email</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.email || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Age</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.age || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Experience</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.experience || "Not provided"} years</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Legacy Manual Rating</Label>
-                      <div className="flex items-center">
-                        <span className="text-yellow-500">⭐</span>
-                        <span className="ml-1 text-sm text-gray-900">{viewingDriver.rating ?? "Not rated"}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* License Information */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">License Information</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">License Number</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.licenseNumber || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">License Type</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.licenseType || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">License Expiry</Label>
-                      <p className="text-sm text-gray-900">
-                        {viewingDriver.licenseExpiry ? new Date(viewingDriver.licenseExpiry).toLocaleDateString() : "Not provided"}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Current Status</Label>
-                      <Badge 
-                        variant={viewingDriver.status === "available" ? "default" : 
-                                viewingDriver.status === "on_duty" ? "secondary" : "destructive"}
-                      >
-                        {viewingDriver.status}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Additional Personal Details */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Personal Details</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Permanent Address</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.permanentAddress || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Current Address</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.currentAddress || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Marital Status</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.maritalStatus || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Date of Joining</Label>
-                      <p className="text-sm text-gray-900">
-                        {viewingDriver.dateOfJoining ? new Date(viewingDriver.dateOfJoining).toLocaleDateString() : "Not provided"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Government Documents */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Government Documents</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Aadhar Number</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.aadharNumber || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">PAN Number</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.panNumber || "Not provided"}</p>
-                    </div>
-
-                  </div>
-                </div>
-              </div>
-
-              {/* Additional notes or comments if any */}
-              {viewingDriver.notes && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Additional Notes</h3>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">{viewingDriver.notes}</p>
-                </div>
-              )}
-
-              <DriverFeedbackProfile
-                driverId={viewingDriver._id || viewingDriver.id}
-                onOpenBooking={(booking) => { setViewingDriver(null); handleViewBooking(booking); }}
-              />
-            </div>
+            <Driver360
+              driver={viewingDriver}
+              onOpenBooking={(booking) => { setViewingDriver(null); handleViewBooking(booking); }}
+            />
           )}
           <DialogFooter>
-            <Button 
+            <Button
               variant="outline"
               onClick={() => setViewingDriver(null)}
             >
