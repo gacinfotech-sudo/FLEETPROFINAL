@@ -76,7 +76,19 @@ export function serveStatic(app: Express) {
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, {
+    // Vite's build output hashes JS/CSS/asset filenames by content, so
+    // those are safe to cache aggressively; index.html is not hashed and
+    // must always be revalidated or it would keep pointing at stale
+    // asset hashes after the next build.
+    maxAge: "1y",
+    immutable: true,
+    setHeaders: (res, filePath) => {
+      if (path.basename(filePath) === "index.html") {
+        res.setHeader("Cache-Control", "no-cache");
+      }
+    },
+  }));
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {

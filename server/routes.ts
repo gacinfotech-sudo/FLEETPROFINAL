@@ -292,7 +292,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       autoRemove: 'native',
     }),
     cookie: {
-      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+      // HTTPS only in production, UNLESS explicitly overridden — needed to
+      // run a production build (for LAN load-time) over plain HTTP on a
+      // local network with no TLS termination; a browser silently refuses
+      // to send a Secure cookie over non-HTTPS, which would break login
+      // with no visible error otherwise. Unset behavior is unchanged.
+      secure: process.env.SESSION_COOKIE_SECURE != null
+        ? process.env.SESSION_COOKIE_SECURE === 'true'
+        : process.env.NODE_ENV === 'production',
       httpOnly: true,
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days for PWA persistence
       sameSite: 'lax' // Changed from 'strict' to 'lax' for better PWA compatibility
