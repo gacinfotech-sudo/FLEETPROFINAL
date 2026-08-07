@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { useState } from "react";
-import { apiRequest } from "../../lib/api";
+import { apiRequest, ApiError } from "../../lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -62,6 +62,26 @@ const WIZARD_STEPS: { key: WizardStepKey; label: string; icon: any; requiresDriv
   { key: "lifecycle", label: "Lifecycle & Review", icon: GitBranch, requiresDriverId: true },
 ];
 
+// Which wizard step renders each field's FormMessage — "Save & Continue"
+// only lives on the "identity" step, so a server-side field error for a
+// field on an earlier step (e.g. licenseNumber, on "basic") would
+// otherwise be set on form state but never actually visible on screen.
+// Used to jump the wizard back to the right step when that happens.
+const STEP_FOR_FIELD: Partial<Record<keyof DriverFormData, WizardStepKey>> = {
+  name: "basic",
+  phone: "basic",
+  licenseNumber: "basic",
+  experience: "basic",
+  rating: "basic",
+  status: "basic",
+  permanentAddress: "personal",
+  currentAddress: "personal",
+  maritalStatus: "personal",
+  dateOfJoining: "personal",
+  aadharNumber: "identity",
+  panNumber: "identity",
+};
+
 export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -105,6 +125,33 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
     },
   });
 
+  // TASK-DRIVER-ADD-400-FIX: 400s from mongoDriverSchema now come back as
+  // { message, fields: { <fieldName>: <friendly message> } } instead of a
+  // raw Zod issues array (see server/routes.ts POST/PUT /api/drivers).
+  // This renders those as field-specific FormMessage errors via RHF's
+  // setError instead of dumping the whole thing in a toast — and, since
+  // nothing here ever calls form.reset()/clears state on error, whatever
+  // the user already typed stays exactly as they left it.
+  const applyServerFieldErrors = (error: unknown): boolean => {
+    if (!(error instanceof ApiError) || !error.fields) return false;
+    let applied = false;
+    let earliestStepIndex: number | null = null;
+    for (const [field, message] of Object.entries(error.fields)) {
+      if (!(field in form.getValues())) continue;
+      form.setError(field as keyof DriverFormData, { type: "server", message });
+      applied = true;
+      const stepKey = STEP_FOR_FIELD[field as keyof DriverFormData];
+      const idx = stepKey ? WIZARD_STEPS.findIndex((s) => s.key === stepKey) : -1;
+      if (idx >= 0 && (earliestStepIndex === null || idx < earliestStepIndex)) {
+        earliestStepIndex = idx;
+      }
+    }
+    if (earliestStepIndex !== null && earliestStepIndex !== stepIndex) {
+      setStepIndex(earliestStepIndex);
+    }
+    return applied;
+  };
+
   const createDriverMutation = useMutation({
     mutationFn: async (data: DriverFormData) => {
       const response = await apiRequest("POST", "/api/drivers", data);
@@ -119,9 +166,13 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
           variant: "destructive",
           duration: 5000,
         });
-      } else {
-        toast({ title: "Error", description: errorMessage, variant: "destructive" });
+        return;
       }
+      if (applyServerFieldErrors(error)) {
+        toast({ title: "Please check the highlighted fields", description: errorMessage, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     },
   });
 
@@ -132,7 +183,12 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
       return response.json();
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to update driver", variant: "destructive" });
+      const errorMessage = error.message || "Failed to update driver";
+      if (applyServerFieldErrors(error)) {
+        toast({ title: "Please check the highlighted fields", description: errorMessage, variant: "destructive" });
+        return;
+      }
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
     },
   });
 
@@ -153,7 +209,8 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
         setStepIndex(3); // jump to Emergency Contacts
       }
     } catch {
-      // Errors already surfaced via the mutations' onError toasts.
+      // Errors already surfaced via the mutations' onError toasts/field
+      // errors above — form values are left untouched either way.
     }
   };
 
