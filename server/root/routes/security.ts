@@ -12,20 +12,18 @@
 // `POST /tenants/:id/support-access` below resolves to the expected API
 // `POST /api/root/tenants/:id/support-access`.
 //
-// `requirePlatformRoleLocal` below is a deliberately narrow, locally-named
-// stand-in for `RootAccessService.requirePlatformRole` (TASK-ROOT-DOMAIN-01,
-// `server/root/services/rootAccessService.ts` — forbidden for this task to
-// create/edit even as a placeholder, per this task's file-ownership list).
-// It checks the same additive `req.user.platformRole` field the documented
-// contract describes. ACTION FOR INTEGRATOR: once TASK-ROOT-DOMAIN-01 lands,
-// delete `requirePlatformRoleLocal` and replace every use below with the
-// real `rootAccessService.requirePlatformRole`.
+// INTEGRATION NOTE (resolved at merge of integration/root-control-plane-wave1):
+// this router now uses the real `rootAccessService.requirePlatformRole` from
+// TASK-ROOT-DOMAIN-01's `server/root/services/rootAccessService.ts` (identical
+// behavior to the `requirePlatformRoleLocal` stand-in this task originally
+// shipped — 403 unless `req.user.platformRole` is in the allowed list).
 
 import { Router, Response, NextFunction } from 'express';
 import mongoose from 'mongoose';
 import type { AuthRequest } from '../../middleware/auth';
 import { loginAttempts, type LoginAttempt } from '../../middleware/security';
 import type { PlatformRole } from '../types';
+import { rootAccessService } from '../services/rootAccessService';
 import { recordPlatformAuditEvent } from '../models/auditLog';
 import {
   createBreakGlassEvent,
@@ -44,16 +42,10 @@ const ALL_PLATFORM_ROLES: PlatformRole[] = [
   'PLATFORM_READ_ONLY_AUDITOR',
 ];
 
-/** See file header — temporary local stand-in, to be deleted at integration. */
-export function requirePlatformRoleLocal(allowed: PlatformRole[]) {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
-    const platformRole = (req.user as { platformRole?: PlatformRole } | undefined)?.platformRole;
-    if (!platformRole || !allowed.includes(platformRole)) {
-      return res.status(403).json({ message: 'Platform role access required' });
-    }
-    next();
-  };
-}
+/** Delegates to the canonical `RootAccessService.requirePlatformRole`. Kept as
+ * a named export (still called `requirePlatformRoleLocal` elsewhere in this
+ * router and re-exported for `audit.ts`) to minimize diff churn. */
+export const requirePlatformRoleLocal = rootAccessService.requirePlatformRole;
 
 export const securityRouter = Router();
 

@@ -14,8 +14,16 @@
 import type { Express, NextFunction, Response } from 'express';
 import { z } from 'zod';
 import { authenticateUser, type AuthRequest } from '../../middleware/auth';
-import { ALL_PLATFORM_ROLES, requirePlatformRoleLocal } from '../services/errorCaptureService';
+import { PLATFORM_ROLES, type PlatformRole } from '../types';
+import { rootAccessService } from '../services/rootAccessService';
 import { ERROR_RECORD_SOURCES, ErrorRecord } from '../models/errorRecord';
+
+// Repointed at integration to the canonical RootAccessService — see
+// support.ts's header comment for why errorCaptureService.ts's original
+// `requirePlatformRoleLocal`/`ALL_PLATFORM_ROLES` placeholders remain in
+// that file (still exercised directly by errorCaptureService.test.ts).
+const ALL_PLATFORM_ROLES: PlatformRole[] = [...PLATFORM_ROLES];
+const requirePlatformRoleLocal = rootAccessService.requirePlatformRole;
 
 function safeAsync(handler: (req: AuthRequest, res: Response) => Promise<unknown>) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {

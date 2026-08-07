@@ -23,7 +23,13 @@ import {
   resolveFeatureState,
   type FeatureModule,
 } from '../models/featureFlag';
-import { requirePlatformRole, recordAuditEvent } from './_localPlatformAccess';
+import { rootAccessService } from '../services/rootAccessService';
+
+// Repointed at integration to the canonical RootAccessService — see
+// sales.ts's header comment for why _localPlatformAccess.ts remains (its
+// own tests still exercise it directly).
+const requirePlatformRole = rootAccessService.requirePlatformRole;
+const recordAuditEvent = rootAccessService.recordAuditEvent;
 
 const FEATURE_ROLES = ['PLATFORM_ROOT', 'PLATFORM_SUPER_ADMIN'] as const;
 
@@ -82,17 +88,16 @@ export function registerFeatureFlagRoutes(app: Express): void {
         { new: true, upsert: true, setDefaultsOnInsert: true },
       );
 
-      // Every change MUST produce an audit event — this is the local
-      // placeholder for RootAccessService.recordAuditEvent (see
-      // routes/_localPlatformAccess.ts). Deliberately does not touch any
-      // collection other than FeatureFlag + this audit ledger.
+      // Every change MUST produce an audit event, now through the canonical
+      // RootAccessService.recordAuditEvent. Deliberately does not touch any
+      // collection other than FeatureFlag.
       await recordAuditEvent({
         actorUserId: req.userId!,
-        actorRole: (req.user as any)?.platformRole,
+        actorPlatformRole: (req.user as any)?.platformRole,
         action: 'features.flag.updated',
-        tenantId: req.params.tenantId,
-        targetType: 'FeatureFlag',
-        targetId: String(feature),
+        targetTenantId: req.params.tenantId,
+        resourceType: 'FeatureFlag',
+        resourceId: String(feature),
         oldValue: { feature, state: oldState },
         newValue: { feature, state },
         reason,

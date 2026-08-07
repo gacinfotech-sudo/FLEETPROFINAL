@@ -5,22 +5,27 @@
 // call (mirrors the existing `registerGpsConnectionRoutes(app)` pattern in
 // server/routes.ts, which this task is forbidden to edit directly).
 //
-// Every route here requires an authenticated platform-role user
-// (`requirePlatformRoleLocal`, a local placeholder for
-// `RootAccessService.requirePlatformRole` — see
-// server/root/services/errorCaptureService.ts's header comment). A
-// tenant-scoped session (no `platformRole`) always gets 403, proven in
-// server/root/routes/support.test.ts.
+// Every route here requires an authenticated platform-role user, gated by
+// the canonical `RootAccessService.requirePlatformRole`
+// (server/root/services/rootAccessService.ts, TASK-ROOT-DOMAIN-01 —
+// repointed here at integration from this task's original
+// `requirePlatformRoleLocal` placeholder in errorCaptureService.ts, which
+// remains in that file only because errorCaptureService.test.ts still
+// exercises it directly). A tenant-scoped session (no `platformRole`)
+// always gets 403, proven in server/root/routes/support.test.ts.
 
 import type { Express, NextFunction, Response } from 'express';
 import { z } from 'zod';
 import { customAlphabet } from 'nanoid';
 import { authenticateUser, type AuthRequest } from '../../middleware/auth';
-import {
-  ALL_PLATFORM_ROLES,
-  MUTATION_PLATFORM_ROLES,
-  requirePlatformRoleLocal,
-} from '../services/errorCaptureService';
+import { PLATFORM_ROLES, type PlatformRole } from '../types';
+import { rootAccessService } from '../services/rootAccessService';
+
+const ALL_PLATFORM_ROLES: PlatformRole[] = [...PLATFORM_ROLES];
+const MUTATION_PLATFORM_ROLES: PlatformRole[] = ALL_PLATFORM_ROLES.filter(
+  (role) => role !== 'PLATFORM_READ_ONLY_AUDITOR',
+);
+const requirePlatformRoleLocal = rootAccessService.requirePlatformRole;
 import {
   SUPPORT_TICKET_MODULES,
   SUPPORT_TICKET_SEVERITIES,

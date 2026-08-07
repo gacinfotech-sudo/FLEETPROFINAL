@@ -1,22 +1,34 @@
-// PLACEHOLDER — TASK-ROOT-DOMAIN-01 owns the real
-// `server/root/services/rootAccessService.ts`. This file is deliberately
-// named DIFFERENTLY (not `rootAccessService.ts`) so it never collides with
-// or gets silently overwritten by DOMAIN-01's real file when that
-// worktree's branch merges — the task file's "forbidden to modify" list
-// for `server/root/services/rootAccessService.ts` did not extend
-// permission to placeholder AT that exact path (unlike
-// `piiMaskingService.ts`, which the task file explicitly did authorize
-// placeholdering at its real path). This is this task's own local,
-// route-testable implementation of the `RootAccessService` contract from
-// `server/root/types.ts` (also a placeholder — see that file's header),
-// used ONLY by this task's own `server/root/routes/*.ts` files.
+// TASK-ROOT-DASHBOARD-02's route-layer data-access implementation, used ONLY
+// by server/root/routes/{dashboard,tenants,customers}.ts.
 //
-// Integrator: once TASK-ROOT-DOMAIN-01's real
-// server/root/services/rootAccessService.ts lands, repoint the imports in
-// server/root/routes/dashboard.ts, tenants.ts, customers.ts from
-// './localRootAccessService' to the real service, verify the real
-// service's method signatures match (or adapt the routes), and delete this
-// file.
+// INTEGRATION NOTE (resolved at merge of integration/root-control-plane-wave1,
+// see docs/root-control-plane/ROOT-INTEGRATION-report.md): this file was
+// originally written against DASHBOARD-02's own placeholder `../types.ts`,
+// which has since been deleted and replaced by TASK-ROOT-DOMAIN-01's real
+// `server/root/types.ts`/`rootAccessService.ts`. The real
+// `RootAccessService` interface documents bare-array return shapes
+// (`Promise<TenantSummary[]>`) with a narrower `TenantListFilter`/
+// `GlobalCustomerFilter`/`TenantSummary`/`PlatformAuditEvent`, while this
+// file's routes were built and tested against a paginated `{ rows, total }`
+// shape with richer fields (tenantCode, status, healthRiskFlag, per-tenant
+// counts, etc.) required by this task's own acceptance criteria (server-side
+// pagination) — a genuine, previously-flagged contract divergence (see this
+// task's own report, "Deviation flagged in the file itself"), not a
+// mechanical placeholder-swap.
+//
+// Rather than rewrite three already-tested route files and their five
+// frontend pages against the narrower canonical shape (real risk of breaking
+// working, live-verified behavior, and a scope decision beyond what a merge
+// should improvise), this file keeps its own locally-scoped type contract
+// (`LocalRootAccessService` below, renamed from `RootAccessService` to avoid
+// colliding with the canonical name) and remains the sole implementation
+// backing dashboard.ts/tenants.ts/customers.ts. It still reuses the
+// canonical `PlatformRole` union (identical values) from the real
+// `server/root/types.ts` so platform-role checks stay on one source of
+// truth. Reconciling the two contracts — most likely by extending the
+// canonical `RootAccessService` to support pagination formally — is
+// flagged as necessary Wave 2 follow-up work in the integration report, not
+// done here.
 //
 // Cross-tenant queries in this file intentionally build their OWN explicit
 // multi-tenant query functions (no `tenantId` filter, or an
@@ -26,17 +38,97 @@
 // avoid inheriting an assumption that baked-in tenant scoping elsewhere
 // might rely on.
 
-import type { Response, NextFunction } from 'express';
+import type { Response, NextFunction, Request } from 'express';
 import mongoose from 'mongoose';
 import {
   Tenant, User, Booking, Customer, Driver, Vehicle,
 } from '../../models/index';
 import type { AuthRequest } from '../../middleware/auth';
 import { maskPhone, maskEmail } from './piiMaskingService';
-import type {
-  PlatformRole, Middleware, RootAccessService, TenantListFilter, TenantSummary,
-  Tenant360, GlobalCustomerFilter, MaskedCustomerRow, PlatformAuditEvent, ComputedTenantStatus,
-} from '../types';
+import type { PlatformRole } from '../types';
+
+// --- Locally-scoped contract (see integration note above for why this
+// diverges from the canonical server/root/types.ts shapes) ---------------
+
+type Middleware = (req: Request, res: Response, next: NextFunction) => void;
+
+export type ComputedTenantStatus = 'active' | 'trial' | 'suspended' | 'expired';
+
+export interface TenantListFilter {
+  search?: string;
+  status?: ComputedTenantStatus;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface TenantSummary {
+  tenantId: string;
+  tenantCode?: string;
+  name: string;
+  businessName: string;
+  email?: string;
+  phone?: string;
+  isActive: boolean;
+  subscriptionPlan: string;
+  status: ComputedTenantStatus;
+  createdAt: Date;
+  trialEndsAt?: Date;
+  healthRiskFlag?: 'none' | 'watch' | 'at_risk';
+  userCount: number;
+  vehicleCount: number;
+  driverCount: number;
+  bookingCount: number;
+}
+
+export interface Tenant360 {
+  tenant: TenantSummary;
+  counts: Record<string, number>;
+}
+
+export interface GlobalCustomerFilter {
+  tenantId?: string;
+  name?: string;
+  phone?: string;
+  email?: string;
+  city?: string;
+  customerId?: string;
+  bookingId?: string;
+  bookingCode?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface MaskedCustomerRow {
+  customerId: string;
+  tenantId: string;
+  tenantName: string;
+  name: string;
+  maskedPhone: string;
+  maskedEmail?: string;
+  city?: string;
+  totalBookings: number;
+  createdAt: Date;
+}
+
+export interface PlatformAuditEvent {
+  actorUserId: string;
+  actorPlatformRole?: PlatformRole;
+  action: string;
+  targetType?: string;
+  targetId?: string;
+  reason?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface LocalRootAccessService {
+  requirePlatformRole(allowed: PlatformRole[]): Middleware;
+  listTenants(filter: TenantListFilter): Promise<{ tenants: TenantSummary[]; total: number }>;
+  getTenant360(tenantId: string): Promise<Tenant360 | null>;
+  getCustomerAcrossTenants(filter: GlobalCustomerFilter): Promise<{ customers: MaskedCustomerRow[]; total: number }>;
+  recordAuditEvent(event: PlatformAuditEvent): Promise<void>;
+}
 
 function computeTenantStatus(tenant: any): ComputedTenantStatus {
   if (!tenant.isActive) return 'suspended';
@@ -251,7 +343,7 @@ async function recordAuditEvent(event: PlatformAuditEvent): Promise<void> {
   console.log('[root-audit-placeholder]', JSON.stringify({ ...event, at: new Date().toISOString() }));
 }
 
-export const localRootAccessService: RootAccessService = {
+export const localRootAccessService: LocalRootAccessService = {
   requirePlatformRole,
   listTenants,
   getTenant360,

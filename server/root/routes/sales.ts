@@ -15,7 +15,15 @@ import { authenticateUser, type AuthRequest } from '../../middleware/auth';
 import { storage } from '../../storage-mongodb';
 import { mongoTenantSchema } from '../../schemas/mongodb-schemas';
 import { Prospect, PROSPECT_STAGES, isValidStageTransition, type ProspectStage } from '../models/prospect';
-import { requirePlatformRole, recordAuditEvent } from './_localPlatformAccess';
+import { rootAccessService } from '../services/rootAccessService';
+
+// Repointed at integration to the canonical RootAccessService
+// (server/root/services/rootAccessService.ts, TASK-ROOT-DOMAIN-01) — this
+// task's original `_localPlatformAccess.ts` placeholder remains in the repo
+// only because this task's own tests (server/root/__tests__/*.test.ts)
+// still exercise it directly by name.
+const requirePlatformRole = rootAccessService.requirePlatformRole;
+const recordAuditEvent = rootAccessService.recordAuditEvent;
 
 // Wave-1 policy choice (documented in this task's report): Sales CRM is
 // gated to the two broadest platform roles. A future task can widen this
@@ -91,10 +99,10 @@ export function registerSalesRoutes(app: Express): void {
       });
       await recordAuditEvent({
         actorUserId: req.userId!,
-        actorRole: (req.user as any)?.platformRole,
+        actorPlatformRole: (req.user as any)?.platformRole,
         action: 'sales.prospect.created',
-        targetType: 'Prospect',
-        targetId: prospect.id,
+        resourceType: 'Prospect',
+        resourceId: prospect.id,
         newValue: { companyName: prospect.companyName, stage: prospect.stage },
       });
       res.status(201).json(prospect);
@@ -147,10 +155,10 @@ export function registerSalesRoutes(app: Express): void {
         }
         await recordAuditEvent({
           actorUserId: req.userId!,
-          actorRole: (req.user as any)?.platformRole,
+          actorPlatformRole: (req.user as any)?.platformRole,
           action: 'sales.prospect.stage_changed',
-          targetType: 'Prospect',
-          targetId: prospect.id,
+          resourceType: 'Prospect',
+          resourceId: prospect.id,
           oldValue: { stage: oldStage },
           newValue: { stage: nextStage },
         });
@@ -210,11 +218,11 @@ export function registerSalesRoutes(app: Express): void {
 
       await recordAuditEvent({
         actorUserId: req.userId!,
-        actorRole: (req.user as any)?.platformRole,
+        actorPlatformRole: (req.user as any)?.platformRole,
         action: 'sales.prospect.tenant_created',
-        tenantId: String(tenant._id),
-        targetType: 'Prospect',
-        targetId: prospect.id,
+        targetTenantId: String(tenant._id),
+        resourceType: 'Prospect',
+        resourceId: prospect.id,
         oldValue: { stage: oldStage },
         newValue: { stage: 'TENANT_CREATED', tenantId: String(tenant._id) },
       });

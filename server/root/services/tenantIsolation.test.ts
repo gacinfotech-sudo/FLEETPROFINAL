@@ -118,7 +118,18 @@ describe('Global Customer Database — tenant-isolation + PII-masking proof', ()
     assert.ok(!rawJson.includes('bob@gmail.com'), 'raw email must never appear in the response');
 
     for (const c of customers) {
-      assert.match(c.maskedPhone, /^\d{5}X{5}$/, `maskedPhone "${c.maskedPhone}" must match the documented 98765XXXXX shape`);
+      // INTEGRATION NOTE (merge of integration/root-control-plane-wave1):
+      // this used to assert the exact `98765XXXXX` shape produced by this
+      // task's own now-replaced masking placeholder. The real, canonical
+      // TASK-ROOT-SECURITY-05 `piiMaskingService.ts` masks the trailing 5
+      // digit characters in place without stripping any country-code
+      // prefix (so a seeded "91"-prefixed number masks to
+      // "9198765XXXXX", not "98765XXXXX") — same security property (last 5
+      // digits never visible), different cosmetic shape. See
+      // tests/e2e/root-security-pii-masking.spec.ts for that algorithm's
+      // own authoritative shape coverage.
+      assert.match(c.maskedPhone, /X{5}$/, `maskedPhone "${c.maskedPhone}" must end with 5 masked digits`);
+      assert.doesNotMatch(c.maskedPhone, /^\d+$/, `maskedPhone "${c.maskedPhone}" must not be all-digits (i.e. must actually be masked)`);
       if (c.maskedEmail) {
         assert.match(c.maskedEmail, /^.{1,2}\*\*\*@/, `maskedEmail "${c.maskedEmail}" must match the documented ra***@... shape`);
       }

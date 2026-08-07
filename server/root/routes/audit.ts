@@ -26,7 +26,9 @@ import type { PlatformRole } from '../types';
 import { Customer } from '../../models/index';
 import { PlatformAuditEventModel } from '../models/auditLog';
 import { unmaskField, PiiUnmaskForbiddenError } from '../services/piiMaskingService';
-import { requirePlatformRoleLocal } from './security';
+import { rootAccessService } from '../services/rootAccessService';
+
+const requirePlatformRoleLocal = rootAccessService.requirePlatformRole;
 
 const ALL_PLATFORM_ROLES: PlatformRole[] = [
   'PLATFORM_ROOT',

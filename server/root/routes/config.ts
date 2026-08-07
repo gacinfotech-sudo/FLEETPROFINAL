@@ -15,7 +15,13 @@ import mongoose, { Schema, Document } from 'mongoose';
 import { z } from 'zod';
 import { authenticateUser, type AuthRequest } from '../../middleware/auth';
 import { Plan, PLAN_CODES, LEGACY_SUBSCRIPTION_PLANS, ensureDefaultPlansSeeded } from '../models/plan';
-import { requirePlatformRole, recordAuditEvent } from './_localPlatformAccess';
+import { rootAccessService } from '../services/rootAccessService';
+
+// Repointed at integration to the canonical RootAccessService — see
+// sales.ts's header comment for why _localPlatformAccess.ts remains (its
+// own tests still exercise it directly).
+const requirePlatformRole = rootAccessService.requirePlatformRole;
+const recordAuditEvent = rootAccessService.recordAuditEvent;
 
 const CONFIG_ROLES = ['PLATFORM_ROOT', 'PLATFORM_SUPER_ADMIN'] as const;
 
@@ -130,10 +136,10 @@ export function registerConfigRoutes(app: Express): void {
 
       await recordAuditEvent({
         actorUserId: req.userId!,
-        actorRole: (req.user as any)?.platformRole,
+        actorPlatformRole: (req.user as any)?.platformRole,
         action: 'config.product_config.updated',
-        targetType: 'ProductConfig',
-        targetId: config.id,
+        resourceType: 'ProductConfig',
+        resourceId: config.id,
         oldValue,
         newValue: config.toObject(),
       });
@@ -165,10 +171,10 @@ export function registerConfigRoutes(app: Express): void {
       const plan = await Plan.create(data);
       await recordAuditEvent({
         actorUserId: req.userId!,
-        actorRole: (req.user as any)?.platformRole,
+        actorPlatformRole: (req.user as any)?.platformRole,
         action: 'config.plan.created',
-        targetType: 'Plan',
-        targetId: plan.id,
+        resourceType: 'Plan',
+        resourceId: plan.id,
         newValue: plan.toObject(),
       });
       res.status(201).json(plan);
@@ -200,10 +206,10 @@ export function registerConfigRoutes(app: Express): void {
 
       await recordAuditEvent({
         actorUserId: req.userId!,
-        actorRole: (req.user as any)?.platformRole,
+        actorPlatformRole: (req.user as any)?.platformRole,
         action: 'config.plan.updated',
-        targetType: 'Plan',
-        targetId: plan.id,
+        resourceType: 'Plan',
+        resourceId: plan.id,
         oldValue,
         newValue: plan.toObject(),
       });

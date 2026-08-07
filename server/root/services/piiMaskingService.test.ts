@@ -1,6 +1,18 @@
-// Tests for TASK-ROOT-DASHBOARD-02's PII masking placeholder
-// (server/root/services/piiMaskingService.ts). Matches the documented
-// contract shapes from the task file: `98765XXXXX` / `ra***@gmail.com`.
+// Tests for server/root/services/piiMaskingService.ts.
+//
+// INTEGRATION NOTE (resolved at merge of integration/root-control-plane-wave1):
+// this file originally tested TASK-ROOT-DASHBOARD-02's own placeholder
+// implementation, which stripped any country-code prefix before masking
+// (`+91 98765 43210` -> `98765XXXXX`). At merge, TASK-ROOT-SECURITY-05's real
+// `piiMaskingService.ts` (this task's canonical owner per the manifest)
+// replaced that placeholder — its algorithm masks the last 5 *digit
+// characters in place* without stripping/normalizing any country-code
+// prefix (`+91 98765 43210` -> `+91 98765 XXXXX`). Both algorithms satisfy
+// the same security invariant (the last 5 digits are never visible, the raw
+// number is never returned verbatim) — only the cosmetic shape differs. The
+// three assertions below were updated to match the real algorithm's actual
+// output; see tests/e2e/root-security-pii-masking.spec.ts for that
+// algorithm's own authoritative test coverage.
 //
 // No test runner (Jest/Vitest) is configured in this repo — run directly
 // via tsx, same convention as server/services/bookingCodeService.test.ts:
@@ -16,12 +28,12 @@ describe('maskPhone', () => {
     assert.equal(maskPhone('9876543210'), '98765XXXXX');
   });
 
-  test('strips a +91 country-code prefix and masks the local 10 digits', () => {
-    assert.equal(maskPhone('+91 98765 43210'), '98765XXXXX');
+  test('masks the trailing 5 digits of a +91-prefixed number, prefix retained', () => {
+    assert.equal(maskPhone('+91 98765 43210'), '+91 98765 XXXXX');
   });
 
-  test('strips a normalized "91XXXXXXXXXX" (Customer.primaryMobile) prefix identically', () => {
-    assert.equal(maskPhone('919876543210'), '98765XXXXX');
+  test('masks the trailing 5 digits of a normalized "91XXXXXXXXXX" (Customer.primaryMobile) number', () => {
+    assert.equal(maskPhone('919876543210'), '9198765XXXXX');
   });
 
   test('never returns the full original number embedded verbatim', () => {
