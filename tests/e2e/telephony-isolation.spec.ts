@@ -305,3 +305,37 @@ test('Duplicate inbound provider events do not create a second popup/record', as
   expect(matches).toHaveLength(1);
   expect(matches[0].status).toBe('in_progress');
 });
+
+test('Two truly concurrent deliveries of a brand-new provider event resolve atomically to one record', async ({ page }) => {
+  // Regression test for the resolveInboundEvent check-then-act race fixed
+  // via storage.upsertInboundCallSession: fire both webhook deliveries in
+  // parallel (not sequential like the test above, which only proves the
+  // second-delivery-after-the-first-completed case) for a providerCallId
+  // that has never been seen before, so both requests race to be "the"
+  // creator. Before the fix, both could observe "no existing record" and
+  // both attempt storage.createCallSessionRecord, with only the DB's
+  // unique index stopping the second — surfacing as an unhandled 500, not
+  // a clean resolve. After the fix, exactly one becomes the atomic upsert
+  // winner and the other is a no-op update; neither should error.
+  const providerCallId = `${marker}_inbound_concurrent`;
+  const basePayload = {
+    providerCallId,
+    direction: 'inbound',
+    fromNumber: '+919812388888',
+    toNumber: `${marker}_vn1`,
+    virtualNumber: `${marker}_vn1`,
+    occurredAt: new Date().toISOString(),
+  };
+
+  const [first, second] = await Promise.all([
+    page.request.post('/api/telephony/webhook', { data: { ...basePayload, status: 'ringing' } }),
+    page.request.post('/api/telephony/webhook', { data: { ...basePayload, status: 'ringing' } }),
+  ]);
+
+  expect(first.ok(), JSON.stringify(await first.json())).toBe(true);
+  expect(second.ok(), JSON.stringify(await second.json())).toBe(true);
+
+  const matches = await CallSession.find({ tenantId: tenantAId, providerCallId });
+  expect(matches).toHaveLength(1);
+  expect(matches[0].userId).toBe(exec1UserId);
+});

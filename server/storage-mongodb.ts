@@ -1595,6 +1595,44 @@ export class MongoDBStorage implements IStorage {
     return CallSession.create(data as any);
   }
 
+  /** Atomic find-or-create for inbound webhook resolution, keyed on the
+   * same (tenantId, providerCallId) pair the unique index enforces.
+   * Replaces the previous find-then-create/update pattern in
+   * callService.ts's resolveInboundEvent, which was a check-then-act race:
+   * two concurrent deliveries of the same provider event (a real webhook
+   * retry scenario, not hypothetical) could both pass the "no existing
+   * record" check before either write landed, and the second `create`
+   * would only be stopped by the DB throwing a duplicate-key error after
+   * the fact — an unhandled exception, not a clean update. A single
+   * `findOneAndUpdate` with `upsert: true` makes the resolve atomic at the
+   * database level: Mongo guarantees only one of two concurrent upserts on
+   * the same key creates a document, the other updates it — no
+   * duplicate-key race window and no thrown error to handle.
+   * `identityFields` (direction/owner/contact numbers/etc.) apply only on
+   * insert via $setOnInsert, preserving original-record attribution the
+   * same way `updateCallSessionFields` already does for the general
+   * update path. `mutableFields` (status/duration/updatedBy) apply on
+   * every write via $set, so a duplicate delivery still refreshes status
+   * instead of being a no-op. */
+  async upsertInboundCallSession(
+    tenantId: string,
+    providerCallId: string,
+    identityFields: Partial<ICallSession>,
+    mutableFields: Partial<ICallSession>,
+  ): Promise<{ session: ICallSession; created: boolean }> {
+    const result = await CallSession.findOneAndUpdate(
+      { tenantId, providerCallId },
+      {
+        $set: mutableFields,
+        $setOnInsert: { tenantId, providerCallId, ...identityFields },
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true, includeResultMetadata: true },
+    );
+    const session = result.value as unknown as ICallSession;
+    const created = !result.lastErrorObject?.updatedExisting;
+    return { session, created };
+  }
+
   /** Generic tenant-scoped field patch (status/timing/provider linkage
    * updates) — never touches userId/createdBy, so historical ownership
    * attribution is preserved by construction (callers simply don't pass
