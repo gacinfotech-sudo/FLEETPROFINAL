@@ -141,6 +141,29 @@ pass (one run hit an unrelated transient page-load timeout, not reproducible on 
 confirmed unrelated to this change since it failed before ever reaching document-panel
 code).
 
+## Fifth fix: always-visible 3 employer slots + First-Time Driver
+
+`driver-onboarding-interface` @ `30bc48d`. Replaces the dynamic "Add Entry" list with
+three fixed, always-visible Employer 1/2/3 slots (§9), mapped positionally by `startDate`
+descending since no `slotNumber` field exists on the backend model (adding one is a schema
+change outside this panel's ownership). Empty slots show "Not Provided ⚠ — Add" rather than
+being hidden; anything beyond 3 entries is preserved under "Additional Employers", never
+dropped. Adds a "First-Time Driver / No Previous Company" checkbox (§11) that swaps the
+slots for the Fresher message — **client-only for this pass**: it does not persist to the
+backend or change the Profile Completeness score, since that belongs on the
+Driver/domain model. Also surfaces "Experience Evidence Pending" per entry (§10 example
+format) when neither experience-letter nor experience-certificate link is set.
+
+**Verification is incomplete, honestly:** `npm run check` is clean, but live Playwright
+verification was blocked — partway through this pass, the shared `qaclient` test account
+started failing login tenant-wide (`401 Invalid credentials`) against a dedicated dev
+server. Confirmed not caused by this change (`git diff --stat` shows only this one
+rendering file touched, nothing auth-related), and consistent with this repo's known
+shared-test-DB side-effect problem — most likely another concurrent session reset that
+account. **The 3-slot redesign has not been visually confirmed in a browser.** Re-run
+`driver-ui-onboarding-360.spec.ts` once `qaclient` login is confirmed working again before
+treating this as done.
+
 ## What this pass did NOT do — remaining scope
 
 None of the following were implemented. Each is a real, separate piece of work, not a
@@ -148,15 +171,10 @@ quick follow-on:
 
 - **"Complete Now" jump-to-tab action and true modal/popup presentation** (§4-5): the
   reminder card above covers the substance but not this exact interaction.
-- **Three always-visible employer slots** (§9): the existing
-  `driver-employment-history-panel.tsx` is a dynamic add-one-at-a-time list, not a
-  fixed "Employer 1 / 2 / 3" layout. A concurrent session (commit `a43f886` in
-  `driver-onboarding-interface`, `c02b949` in `driver-domain-lifecycle`) added 4 new
-  fields to this same panel (`supervisorName`, `supervisorMobile`,
-  `experienceLetterLink`, `experienceCertificateLink`) while this pass was in progress —
-  worth reviewing together before attempting the 3-slot layout change, since both touch
-  the same file.
-- **First-Time Driver / Fresher flag** (§11): not present.
+- **First-Time Driver persisted server-side** (§11): the checkbox is client-only for this
+  pass (see fifth fix above) — it doesn't stop the completeness card from listing
+  "previous employer records pending" for a genuine fresher. Needs a real field on the
+  Driver/domain model to fix properly.
 - **Experience summary (declared/verified/unverified)** (§12): not built.
 - **Google Drive/Sheet optional fields in the UI** (§16): not verified.
 - **Dashboard/list completeness indicator + filters** (§21-23): not built.
@@ -171,14 +189,17 @@ quick follow-on:
 
 ## Final state
 
-**Not `DRIVER_ZERO_BLOCK_ONBOARDING_VERIFIED`.** Four real, verified pieces landed:
-`PARTIAL — CONTACT_THRESHOLD_BLOCK_FIXED_AND_VERIFIED, COMPLETENESS_ENGINE_BUILT_AND_VERIFIED,
-DRIVER_360_REMINDER_CARD_BUILT_AND_VERIFIED (rendering only, not yet visually confirmed with
-real populated data end-to-end), DOCUMENT_EXPIRY_TIERS_AND_MISSING_SUMMARY_BUILT_AND_VERIFIED`.
-The remaining scope above is substantial and should be treated as separate follow-on work,
-ideally by whichever session(s) already own the adjacent files (the employment-history
-panel is already being actively extended by another session; Google Drive connection UI
-belongs to `driver-google-documents`).
+**Not `DRIVER_ZERO_BLOCK_ONBOARDING_VERIFIED`.** Six real pieces landed, five fully
+verified live, one (`EMPLOYER_SLOTS`) verified only by typecheck due to an external
+blocker: `PARTIAL — CONTACT_THRESHOLD_BLOCK_FIXED_AND_VERIFIED,
+COMPLETENESS_ENGINE_BUILT_AND_VERIFIED, DRIVER_360_REMINDER_CARD_BUILT_AND_VERIFIED
+(rendering only, not yet visually confirmed with real populated data end-to-end),
+DOCUMENT_EXPIRY_TIERS_AND_MISSING_SUMMARY_BUILT_AND_VERIFIED,
+INTEGRATOR_ROUTE_MOUNT_PATCH_VERIFIED, EMPLOYER_SLOTS_TYPECHECKED_NOT_LIVE_VERIFIED
+(blocked by a shared-test-DB login failure unrelated to this change — see fifth fix)`.
+The remaining scope above is substantial and should be treated as separate follow-on work;
+Google Drive connection UI belongs to `driver-google-documents`, and the dashboard/list
+indicator + filters likely belong wherever the driver list page itself is owned.
 
 ## Commits
 
@@ -186,6 +207,8 @@ belongs to `driver-google-documents`).
   `tests/e2e/driver-domain-lifecycle.spec.ts` (contact-threshold fix)
 - `driver-domain-lifecycle` @ `1308839` — `server/driver/domain/completenessService.ts`,
   `index.ts`, `routes.ts` (completeness engine)
+- `driver-domain-lifecycle` @ `caed815` — verified, ready-to-apply Integrator route-mount
+  patch (report only, no code change)
 - `driver-onboarding-interface` @ `0ae5430` — `client/src/components/drivers/
   driver-contacts-panel.tsx`, `client/src/components/drivers/driver-domain-constants.ts`
   (contact-threshold client mirror)
@@ -193,11 +216,14 @@ belongs to `driver-google-documents`).
   driver-completeness-card.tsx`, `driver-360.tsx` (reminder card)
 - `driver-onboarding-interface` @ `b92ae8e` — `client/src/components/drivers/
   driver-documents-panel.tsx`, `driver-domain-constants.ts` (expiry tiers + missing-type summary)
+- `driver-onboarding-interface` @ `30bc48d` — `client/src/components/drivers/
+  driver-employment-history-panel.tsx` (3 employer slots + First-Time Driver;
+  typecheck-verified only, see Final state above)
 
 ## Rollback
 
 `git revert 935402d 1308839` on `driver/domain-02-lifecycle` and
-`git revert 0ae5430 b6e3558 b92ae8e` on `driver/onboarding-ui-04` — all isolated,
+`git revert 0ae5430 b6e3558 b92ae8e 30bc48d` on `driver/onboarding-ui-04` — all isolated,
 additive-only commits with no other committed work depending on them.
 
 ## Shared wiring required (Integrator)
