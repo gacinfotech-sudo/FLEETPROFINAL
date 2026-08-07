@@ -82,13 +82,30 @@ the required wording) instead of the old blocking-sounding policy warning.
   - Dev server shut down afterward via its exact tracked PID (not a pattern-matched
     `pkill`) — no other worktree's process was touched.
 
+## Second fix: Profile Completeness engine (informational only)
+
+Added `server/driver/domain/completenessService.ts` and `GET /api/drivers/:id/completeness`
+(commit `1308839`). Computes an advisory score across Contacts (target 10), Addresses (2 of
+2 available fields — see the commit message for why not 3), Previous Employers (target 3,
+matching §9's UI target even though the 3-slot UI itself isn't built), and Lifecycle Stage.
+Extensible via `registerCompletenessSection()` (same pattern as `eligibility.ts`'s
+`registerEligibilityCheck()`) so Documents-03 or a later Integrator pass can add a
+Documents/Compliance/Drive section without editing this file — that model doesn't exist in
+this branch yet, so it isn't scored here.
+
+**Verified live**, same method as the contact-threshold fix (dedicated dev server, temporary
+route mount reverted before commit): a genuinely pre-existing legacy driver computes cleanly
+with no error (backward compatibility proof), and a driver with 10 real contacts correctly
+reports `10/10` and correctly excludes contacts from the `missing` list.
+
+This is the foundational piece the reminder popup, dashboard indicator, and filters below
+would all read from — none of those consumers exist yet.
+
 ## What this pass did NOT do — remaining scope
 
 None of the following were implemented. Each is a real, separate piece of work, not a
 quick follow-on:
 
-- **Profile Completeness engine** (§3): no percentage-scoring across
-  contacts/addresses/employment/documents/compliance exists yet, anywhere.
 - **Always-on reminder popup** (§4-5) with severity classification (info/amber/red),
   "Complete Now / Remind Later / Continue Anyway" actions, and session-scoped dismissal
   memory: not built.
@@ -117,22 +134,32 @@ quick follow-on:
 
 ## Final state
 
-**Not `DRIVER_ZERO_BLOCK_ONBOARDING_VERIFIED`.** One real, verified fix landed:
-`PARTIAL — CONTACT_THRESHOLD_BLOCK_FIXED_AND_VERIFIED`. The remaining scope above is
-substantial and should be treated as separate follow-on work, ideally by whichever
-session(s) already own the adjacent files (the employment-history panel is already being
-actively extended by another session; documents/Drive fields belong to
-`driver-google-documents`).
+**Not `DRIVER_ZERO_BLOCK_ONBOARDING_VERIFIED`.** Two real, verified pieces landed:
+`PARTIAL — CONTACT_THRESHOLD_BLOCK_FIXED_AND_VERIFIED, COMPLETENESS_ENGINE_BUILT_AND_VERIFIED`.
+The remaining scope above is substantial and should be treated as separate follow-on work,
+ideally by whichever session(s) already own the adjacent files (the employment-history
+panel is already being actively extended by another session; documents/Drive fields belong
+to `driver-google-documents`).
 
 ## Commits
 
 - `driver-domain-lifecycle` @ `935402d` — `server/driver/domain/types.ts`,
-  `tests/e2e/driver-domain-lifecycle.spec.ts`
+  `tests/e2e/driver-domain-lifecycle.spec.ts` (contact-threshold fix)
+- `driver-domain-lifecycle` @ `1308839` — `server/driver/domain/completenessService.ts`,
+  `index.ts`, `routes.ts` (completeness engine)
 - `driver-onboarding-interface` @ `0ae5430` — `client/src/components/drivers/
   driver-contacts-panel.tsx`, `client/src/components/drivers/driver-domain-constants.ts`
 
 ## Rollback
 
-`git revert 935402d` on `driver/domain-02-lifecycle` and `git revert 0ae5430` on
-`driver/onboarding-ui-04` — both isolated, additive-only commits with no other committed
+`git revert 935402d 1308839` on `driver/domain-02-lifecycle` and `git revert 0ae5430` on
+`driver/onboarding-ui-04` — all isolated, additive-only commits with no other committed
 work depending on them.
+
+## Shared wiring required (Integrator)
+
+`registerDriverDomainRoutes(app)` is still not mounted in `server/routes.ts` on either
+trunk lineage — this pass only mounted it temporarily, locally, for test verification, and
+reverted it before each commit, per this task's existing file-ownership boundary
+(`TASK-DRIVER-DOMAIN-02`'s own report already documents the same one-line proposed patch).
+None of this work is reachable by a real user until that mount lands.
