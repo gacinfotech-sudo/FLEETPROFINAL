@@ -34,11 +34,13 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import connectDB from "./connectDB";
 import { storage } from "./storage-mongodb";
 import mongoose from "mongoose";
+import { startGpsPollingScheduler, stopGpsPollingScheduler } from "./gps/ingestion/pollingScheduler";
 
 const app = express();
 // Trust only the known number of reverse-proxy hops. `true` trusts arbitrary
@@ -48,7 +50,19 @@ const configuredProxyHops = Number(process.env.TRUST_PROXY_HOPS);
 app.set('trust proxy', Number.isInteger(configuredProxyHops) && configuredProxyHops >= 0
   ? configuredProxyHops
   : (process.env.NODE_ENV === 'production' ? 1 : false));
-app.use(express.json());
+// gzip/br response compression — over a real LAN link (vs loopback) this
+// materially cuts transfer time for JSON API responses and any
+// non-Vite-bundled assets; negligible CPU cost on a local dev machine.
+app.use(compression());
+// verify captures the raw request body alongside the existing parsed-body
+// behavior — needed by the GPS webhook receiver (TASK-GPS-INGESTION-04) to
+// verify provider signatures against the actual bytes sent, not a
+// reconstructed buffer. Nothing about existing routes' req.body usage changes.
+app.use(express.json({
+  verify: (req: any, _res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 app.use(express.urlencoded({ extended: false }));
 
 app.use((req, res, next) => {
@@ -134,13 +148,14 @@ app.use((req, res, next) => {
   // Render, Heroku, etc — which assign the port dynamically) instead of a
   // hard-coded value, falling back to 5000 for local development.
   const port = Number(process.env.PORT) || 5000;
-  // HOST override for local/sandboxed dev environments where binding
-  // 0.0.0.0 with SO_REUSEPORT isn't permitted; unset in real deployments.
   const host = process.env.HOST || "0.0.0.0";
+  // reusePort (SO_REUSEPORT) is for multiple processes sharing one port;
+  // this app is a single process, so it's never needed, and enabling it
+  // on a 0.0.0.0 bind crashes with ENOTSUP on this macOS/Node combo —
+  // that crash was the actual root cause of LAN access being unreachable.
   server.listen({
     port,
     host,
-    reusePort: host === "0.0.0.0",
   }, () => {
     log(`serving on port ${port}`);
   });
@@ -183,6 +198,15 @@ app.use((req, res, next) => {
   mongoose.connection.on('connected', startBackgroundJob);
   mongoose.connection.on('disconnected', stopBackgroundJob);
 
+  // GPS telemetry polling (TASK-GPS-INGESTION-04) — same guarded-single-interval pattern as
+  // the background job above; startGpsPollingScheduler() is itself idempotent (no-ops if
+  // already running), so this is safe even if 'connected' fires more than once.
+  if (mongoose.connection.readyState === 1) {
+    startGpsPollingScheduler();
+  }
+  mongoose.connection.on('connected', () => startGpsPollingScheduler());
+  mongoose.connection.on('disconnected', () => stopGpsPollingScheduler());
+
   // NOTE: this in-process interval only runs once per Node process. If this
   // app is ever deployed with multiple instances/replicas, move this sweep
   // to a dedicated cron/worker process or use a distributed lock (e.g. a
@@ -192,11 +216,13 @@ app.use((req, res, next) => {
   // Cleanup on process termination
   process.on('SIGINT', () => {
     clearInterval(backgroundJobInterval);
+    stopGpsPollingScheduler();
     process.exit(0);
   });
 
   process.on('SIGTERM', () => {
     clearInterval(backgroundJobInterval);
+    stopGpsPollingScheduler();
     process.exit(0);
   });
 })();

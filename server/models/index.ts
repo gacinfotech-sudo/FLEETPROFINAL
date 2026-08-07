@@ -96,6 +96,15 @@ export interface IDriver extends Document {
   experience?: number;
   rating?: number;
   status: 'available' | 'on_duty' | 'inactive';
+  // Additive, second axis alongside `status` — see TASK-DRIVER-DOMAIN-02's
+  // report. Default 'active' preserves current behavior for every existing
+  // driver document (they're already past onboarding by construction).
+  // Resolves the former server/routes.ts 'suspended'-not-in-enum dead code:
+  // 'suspended' now lives here, not on `status`.
+  lifecycleStage?: 'candidate' | 'application' | 'document_collection' |
+    'identity_verification' | 'police_verification' | 'medical_fitness' |
+    'reference_verification' | 'employment_verification' | 'training' |
+    'approved' | 'active' | 'suspended' | 'on_leave' | 'offboarding' | 'offboarded';
   languages?: string[];
   // Additional fields
   permanentAddress?: string;
@@ -511,6 +520,14 @@ const DriverSchema = new Schema<IDriver>({
     type: String,
     enum: ['available', 'on_duty', 'inactive'],
     default: 'available'
+  },
+  lifecycleStage: {
+    type: String,
+    enum: ['candidate', 'application', 'document_collection', 'identity_verification',
+      'police_verification', 'medical_fitness', 'reference_verification',
+      'employment_verification', 'training', 'approved', 'active', 'suspended',
+      'on_leave', 'offboarding', 'offboarded'],
+    default: 'active',
   },
   languages: [{ type: String }],
   // Additional fields
