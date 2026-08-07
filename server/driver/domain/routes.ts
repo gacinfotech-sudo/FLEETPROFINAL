@@ -32,6 +32,7 @@ import {
   listEmploymentHistory, setEmploymentHistoryVerificationStatus,
 } from './employmentHistoryService';
 import { isEligibleForAssignment } from './eligibility';
+import { computeDriverCompleteness, DriverNotFoundError as CompletenessDriverNotFoundError } from './completenessService';
 import {
   DriverNotFoundError as LifecycleDriverNotFoundError,
   InvalidLifecycleTransitionError, getEffectiveLifecycleStage, transitionLifecycleStage,
@@ -257,5 +258,20 @@ export function registerDriverDomainRoutes(app: Express): void {
     if (!mongoose.isValidObjectId(req.params.id)) return invalidId(res);
     const result = await isEligibleForAssignment(req.tenantId!, req.params.id);
     res.json(result);
+  }));
+
+  // ---------------------------------------------------------------------
+  // Profile completeness (zero-block onboarding, informational only —
+  // never blocks Driver creation/save; see completenessService.ts).
+  // ---------------------------------------------------------------------
+  app.get('/api/drivers/:id/completeness', authenticateUser, requireTenant, safeAsync(async (req, res) => {
+    if (!mongoose.isValidObjectId(req.params.id)) return invalidId(res);
+    try {
+      const result = await computeDriverCompleteness(req.tenantId!, req.params.id);
+      res.json(result);
+    } catch (error) {
+      if (error instanceof CompletenessDriverNotFoundError) return res.status(404).json({ message: 'Driver not found.' });
+      throw error;
+    }
   }));
 }
