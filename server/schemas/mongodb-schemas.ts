@@ -210,8 +210,49 @@ export const mongoBookingSchema = z.object({
   thirdPartyDriverAddress: z.string().optional()
 });
 
+// Mirrors the TelephonyIdentity/CallSession Mongoose schemas in
+// server/models/index.ts — required together per AUDIT.md #8
+// (Mongoose/Zod drift). See TASK-02-report.md's "Proposed
+// server/schemas/mongodb-schemas.ts patch".
+export const mongoTelephonyIdentitySchema = z.object({
+  tenantId: z.string(),
+  userId: z.string().min(1),
+  providerKey: z.string().trim().toLowerCase().max(64).default('mock'),
+  providerAgentId: z.string().trim().max(200).optional(),
+  registeredNumber: z.string().trim().max(32).optional(),
+  virtualNumber: z.string().trim().max(32).optional(),
+  extension: z.string().trim().max(16).optional(),
+  incomingEnabled: z.boolean().default(true),
+  outgoingEnabled: z.boolean().default(true),
+  status: z.enum(['available', 'busy', 'wrap_up', 'offline', 'disabled']).default('offline'),
+  // Plaintext credentials are accepted only at the API boundary and
+  // encrypted before persistence — this schema validates the *input*
+  // shape, never the stored (encrypted) shape.
+  credentials: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const mongoCallSessionSchema = z.object({
+  tenantId: z.string(),
+  direction: z.enum(['outbound', 'inbound']),
+  status: z.enum(['initiated', 'ringing', 'in_progress', 'completed', 'failed', 'missed', 'no_answer', 'cancelled']).default('initiated'),
+  userId: z.string().min(1),
+  assignedUserId: z.string().min(1),
+  fromNumber: z.string().trim().min(3).max(32),
+  toNumber: z.string().trim().min(3).max(32),
+  virtualNumber: z.string().trim().max(32).optional(),
+  providerKey: z.string().trim().toLowerCase().max(64).default('mock'),
+  providerCallId: z.string().trim().max(200).optional(),
+  providerAgentId: z.string().trim().max(200).optional(),
+  customerId: z.string().optional(),
+  inquiryId: z.string().optional(),
+  leadId: z.string().optional(),
+  createdBy: z.object({ userId: z.string(), role: z.string() }),
+});
+
 export type MongoTenant = z.infer<typeof mongoTenantSchema>;
 export type MongoUser = z.infer<typeof mongoUserSchema>;
 export type MongoVehicle = z.infer<typeof mongoVehicleSchema>;
 export type MongoDriver = z.infer<typeof mongoDriverSchema>;
 export type MongoBooking = z.infer<typeof mongoBookingSchema>;
+export type MongoTelephonyIdentity = z.infer<typeof mongoTelephonyIdentitySchema>;
+export type MongoCallSession = z.infer<typeof mongoCallSessionSchema>;

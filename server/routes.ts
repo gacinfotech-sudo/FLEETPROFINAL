@@ -106,6 +106,9 @@ import { registerGpsConnectionRoutes } from "./gps/routes/connections";
 import { registerGpsDeviceRoutes } from "./gps/routes/devices";
 import { registerGpsAssignmentRoutes } from "./gps/routes/assignments";
 import { registerBookingQueuesRoutes } from "./booking/queues";
+// TASK-02 (telephony/RBAC isolation) additive import — new namespace only,
+// no existing route/import in this file was touched.
+import { registerTelephonyRoutes } from "./telephony/index";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -142,6 +145,21 @@ function googleReviewRequestMessage(customer: any, booking: any, tenant: any, re
     'Review dena poori tarah optional hai. Aapke honest feedback se hume service improve karne mein madad milegi.',
     `- ${business}`,
   ].join('\n');
+}
+
+// Integrator addition (telephony WebSocket bootstrap, see TASK-02-report.md
+// "Proposed WebSocket bootstrap + room design"): the same express-session
+// middleware instance configured below needs to be reused by
+// server/index.ts's Socket.IO handshake (`io.engine.use(sessionMiddleware)`)
+// so a socket can only ever join rooms for the tenant/user its *existing*
+// authenticated HTTP session already belongs to — never a client-supplied
+// id. Captured into this module-level variable when registerRoutes() runs
+// and exposed via the getter below; server/index.ts calls the getter only
+// after `await registerRoutes(app)` has resolved, so it is always populated
+// by the time it's read.
+let sessionMiddlewareInstance: ReturnType<typeof session> | undefined;
+export function getSessionMiddleware(): ReturnType<typeof session> | undefined {
+  return sessionMiddlewareInstance;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -260,7 +278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Session configuration with enhanced security and PWA support
-  app.use(session({
+  const sessionMiddleware = session({
     secret: sessionSecret,
     name: 'fleetpro.sid', // avoid leaking that this is an express app via default 'connect.sid'
     resave: false,
@@ -279,7 +297,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days for PWA persistence
       sameSite: 'lax' // Changed from 'strict' to 'lax' for better PWA compatibility
     }
-  }));
+  });
+  sessionMiddlewareInstance = sessionMiddleware; // see getSessionMiddleware() above
+  app.use(sessionMiddleware);
 
   // Apply session security middleware (hijacking/fingerprint checks)
   app.use(sessionSecurityMiddleware);
@@ -301,6 +321,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerGpsDeviceRoutes(app);
   registerGpsAssignmentRoutes(app);
   registerBookingQueuesRoutes(app);
+  // TASK-02 (telephony/RBAC isolation) additive registration — new
+  // /api/telephony/* namespace only, appended after the existing GPS
+  // registrations without reordering or editing any existing line.
+  registerTelephonyRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
@@ -1964,8 +1988,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Booking Routes
   app.get("/api/bookings", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
+      if (req.query.limit || req.query.skip) {
+        const limit = Math.min(500, Math.max(1, parseInt(req.query.limit as string) || 100));
+        const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
+        const { rows, total } = await storage.getBookingsByTenantPaginated(req.tenantId!, { limit, skip });
+        return res.json({ rows, total, limit, skip });
+      }
       const bookings = await storage.getBookingsByTenant(req.tenantId!);
-
 
 
       res.json(bookings);
@@ -2961,7 +2990,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ] : []),
         ];
       }
-      const customers = await Customer.find(query).sort({ lastBookingDate: -1, createdAt: -1 }).limit(500);
+      const limit = Math.min(500, Math.max(1, parseInt(req.query.limit as string) || 500));
+      const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
+      const { rows: customers } = await storage.getCustomersListPaginated(query, { limit, skip });
       res.json(customers);
     } catch (error: any) {
       console.error('List customers error:', error?.message || error);

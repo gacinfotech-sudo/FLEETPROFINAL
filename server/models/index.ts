@@ -1339,6 +1339,11 @@ CustomerSchema.index(
   { tenantId: 1, referralCode: 1 },
   { unique: true, partialFilterExpression: { referralCode: { $type: 'string' } } }
 );
+// TASK-03 (performance QA) — backs GET /api/customers' default
+// find({tenantId, isDeleted}).sort({lastBookingDate:-1, createdAt:-1}) so
+// Mongo can satisfy the sort from the index instead of a blocking
+// in-memory SORT stage. See .claude/tasks/reports/TASK-03-report.md.
+CustomerSchema.index({ tenantId: 1, isDeleted: 1, lastBookingDate: -1, createdAt: -1 });
 CustomerSchema.pre('save', function (next) { this.updatedAt = new Date(); next(); });
 
 // Reward rules — tenant-configurable, not hard-coded (spec explicitly
@@ -1646,6 +1651,12 @@ BookingSchema.index(
 // grows exactly where it matters most (assignment time).
 BookingSchema.index({ tenantId: 1, driverId: 1, status: 1, scheduledStartDateTime: 1, scheduledEndDateTime: 1 });
 BookingSchema.index({ tenantId: 1, vehicleId: 1, status: 1, scheduledStartDateTime: 1, scheduledEndDateTime: 1 });
+// TASK-03 (performance QA) — backs getBookingsByTenant/getBookingsByTenantPaginated's
+// sort, and getUpcomingBookings' {tenantId,status,pickupDate} filter+sort (previously
+// only {tenantId,status} was indexed, forcing an in-memory sort on pickupDate). See
+// .claude/tasks/reports/TASK-03-report.md.
+BookingSchema.index({ tenantId: 1, createdAt: -1 });
+BookingSchema.index({ tenantId: 1, status: 1, pickupDate: 1 });
 ExpenseSchema.index({ tenantId: 1, date: 1 });
 ExpenseSchema.index({ tenantId: 1, vehicleId: 1 });
 // Backs the Trip Cost Summary's per-booking expense lookup.
@@ -2340,6 +2351,149 @@ LeadSchema.index(
   { unique: true, partialFilterExpression: { leadNumber: { $type: 'string' } } },
 );
 export const Lead = mongoose.model<ILead>('Lead', LeadSchema);
+
+// ---------------------------------------------------------------------
+// Telephony (TASK-02) — per-executive telephony identity + CallSession.
+// Consolidated from server/telephony/models/telephonyIdentity.ts and
+// server/telephony/models/callSession.ts (TASK-02) into the shared model
+// file by the Integrator; see .claude/tasks/reports/TASK-02-report.md's
+// "Proposed server/models/index.ts patch" and
+// .claude/tasks/reports/INTEGRATION-report.md. server/telephony/models/*
+// has been removed and every importer repointed at this file.
+// ---------------------------------------------------------------------
+
+export type TelephonyIdentityStatus = 'available' | 'busy' | 'wrap_up' | 'offline' | 'disabled';
+
+export interface ITelephonyIdentity extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  userId: string;
+  providerKey: string;
+  providerAgentId?: string;
+  registeredNumber?: string;
+  virtualNumber?: string;
+  extension?: string;
+  incomingEnabled: boolean;
+  outgoingEnabled: boolean;
+  status: TelephonyIdentityStatus;
+  encryptedCredentials?: string;
+  credentialFields: string[];
+  createdBy: string;
+  updatedBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const TelephonyIdentitySchema = new Schema<ITelephonyIdentity>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  userId: { type: String, required: true, lowercase: true, trim: true },
+  providerKey: { type: String, required: true, trim: true, lowercase: true, default: 'mock' },
+  providerAgentId: { type: String, trim: true, maxlength: 200 },
+  registeredNumber: { type: String, trim: true, maxlength: 32 },
+  virtualNumber: { type: String, trim: true, maxlength: 32 },
+  extension: { type: String, trim: true, maxlength: 16 },
+  incomingEnabled: { type: Boolean, default: true },
+  outgoingEnabled: { type: Boolean, default: true },
+  status: { type: String, enum: ['available', 'busy', 'wrap_up', 'offline', 'disabled'], default: 'offline' },
+  encryptedCredentials: { type: String, select: false },
+  credentialFields: { type: [String], default: [] },
+  createdBy: { type: String, required: true },
+  updatedBy: { type: String, required: true },
+}, { timestamps: true });
+TelephonyIdentitySchema.index({ tenantId: 1, userId: 1 }, { unique: true });
+export const TelephonyIdentity = mongoose.model<ITelephonyIdentity>('TelephonyIdentity', TelephonyIdentitySchema);
+
+export type TelephonyCallDirection = 'outbound' | 'inbound';
+export type TelephonyCallStatus =
+  | 'initiated' | 'ringing' | 'in_progress' | 'completed' | 'failed' | 'missed' | 'no_answer' | 'cancelled';
+
+export interface ICallNote {
+  text: string;
+  createdBy: { userId: string; role: string };
+  createdAt: Date;
+}
+export interface ICallReassignmentEvent {
+  fromUserId: string;
+  toUserId: string;
+  changedBy: { userId: string; role: string };
+  changedAt: Date;
+  reason?: string;
+}
+
+export interface ICallSession extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  direction: TelephonyCallDirection;
+  status: TelephonyCallStatus;
+  userId: string;
+  assignedUserId: string;
+  fromNumber: string;
+  toNumber: string;
+  virtualNumber?: string;
+  providerKey: string;
+  providerCallId?: string;
+  providerAgentId?: string;
+  customerId?: mongoose.Types.ObjectId;
+  inquiryId?: mongoose.Types.ObjectId;
+  leadId?: mongoose.Types.ObjectId;
+  startedAt?: Date;
+  endedAt?: Date;
+  durationSeconds?: number;
+  notes: ICallNote[];
+  reassignmentHistory: ICallReassignmentEvent[];
+  createdBy: { userId: string; role: string };
+  updatedBy: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const CallNoteSchema = new Schema<ICallNote>({
+  text: { type: String, required: true, maxlength: 5000 },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  createdAt: { type: Date, default: Date.now },
+}, { _id: false });
+
+const CallReassignmentEventSchema = new Schema<ICallReassignmentEvent>({
+  fromUserId: { type: String, required: true },
+  toUserId: { type: String, required: true },
+  changedBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  changedAt: { type: Date, default: Date.now },
+  reason: { type: String, maxlength: 500 },
+}, { _id: false });
+
+const CallSessionSchema = new Schema<ICallSession>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  direction: { type: String, enum: ['outbound', 'inbound'], required: true },
+  status: {
+    type: String,
+    enum: ['initiated', 'ringing', 'in_progress', 'completed', 'failed', 'missed', 'no_answer', 'cancelled'],
+    default: 'initiated',
+  },
+  userId: { type: String, required: true, lowercase: true, trim: true },
+  assignedUserId: { type: String, required: true, lowercase: true, trim: true },
+  fromNumber: { type: String, required: true, trim: true, maxlength: 32 },
+  toNumber: { type: String, required: true, trim: true, maxlength: 32 },
+  virtualNumber: { type: String, trim: true, maxlength: 32 },
+  providerKey: { type: String, required: true, trim: true, lowercase: true, default: 'mock' },
+  providerCallId: { type: String, trim: true, maxlength: 200 },
+  providerAgentId: { type: String, trim: true, maxlength: 200 },
+  customerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
+  inquiryId: { type: Schema.Types.ObjectId, ref: 'Inquiry' },
+  leadId: { type: Schema.Types.ObjectId, ref: 'Lead' },
+  startedAt: { type: Date },
+  endedAt: { type: Date },
+  durationSeconds: { type: Number, min: 0 },
+  notes: { type: [CallNoteSchema], default: [] },
+  reassignmentHistory: { type: [CallReassignmentEventSchema], default: [] },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+}, { timestamps: true });
+
+CallSessionSchema.index({ tenantId: 1, userId: 1, createdAt: -1 });
+CallSessionSchema.index({ tenantId: 1, assignedUserId: 1, createdAt: -1 });
+CallSessionSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
+CallSessionSchema.index({ tenantId: 1, providerCallId: 1 }, { unique: true, partialFilterExpression: { providerCallId: { $type: 'string' } } });
+CallSessionSchema.index({ tenantId: 1, virtualNumber: 1 });
+
+export const CallSession = mongoose.model<ICallSession>('CallSession', CallSessionSchema);
 
 // Quotation — one or more priced vehicle/package options prepared against a
 // Lead. Money is stored as integer paise throughout (spec §18) to avoid the

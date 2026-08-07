@@ -2547,7 +2547,10 @@ export default function Dashboard() {
         onSelectCustomer={handleSelectCustomerFromSearch}
       />
       
-      <main className="flex-1 overflow-y-auto lg:ml-0 pt-16 lg:pt-0 transition-all duration-300 ease-in-out">
+      {/* min-w-0: flex items default to min-width:auto, which let wide
+          content (e.g. tables) push this whole panel past the viewport
+          instead of scrolling internally. */}
+      <main className="flex-1 min-w-0 overflow-y-auto lg:ml-0 pt-16 lg:pt-0 transition-all duration-300 ease-in-out">
         <div className="px-3 sm:px-6 lg:px-8 py-4 lg:py-8">
           <div className="animate-in slide-in-from-bottom-2 duration-300">
             {renderContent()}
