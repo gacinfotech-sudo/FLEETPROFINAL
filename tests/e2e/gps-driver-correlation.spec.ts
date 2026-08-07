@@ -216,6 +216,48 @@ test.describe('Driver <-> GPS device correlation (TASK-GPS-MAPPING-03)', () => {
     }
   });
 
+  test('same-driver overlap (late handover): resolved as found, not ambiguous', async () => {
+    if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI is required for correlation verification.');
+    await mongoose.connect(process.env.MONGODB_URI);
+    try {
+      const marker = String(Date.now());
+      const tenantId = new mongoose.Types.ObjectId().toString();
+      const vehicleId = new mongoose.Types.ObjectId().toString();
+      const driverId = new mongoose.Types.ObjectId().toString();
+
+      // Same driver, back-to-back trips where the previous trip's actual
+      // end runs a few minutes past the next trip's actual start (a normal
+      // handover, not a data-quality problem) — both overlap the window
+      // being asked about (the second booking's own window).
+      const previousBooking = await createBooking({
+        tenantId, vehicleId, driverId,
+        bookingId: `CORR-HANDOVER-PREV-${marker}`,
+        actualStartDateTime: new Date('2026-01-10T07:30:00Z'),
+        actualEndDateTime: new Date('2026-01-10T09:05:00Z'),
+      });
+      const windowStart = new Date('2026-01-10T09:00:00Z');
+      const windowEnd = new Date('2026-01-10T17:00:00Z');
+      const currentBooking = await createBooking({
+        tenantId, vehicleId, driverId,
+        bookingId: `CORR-HANDOVER-CURRENT-${marker}`,
+        actualStartDateTime: windowStart,
+        actualEndDateTime: windowEnd,
+      });
+
+      const result = await correlateDriverAndDevice(tenantId, vehicleId, windowStart, windowEnd);
+
+      expect(result.driver.status).toBe('found');
+      expect((result.driver as any).driverId).toBe(driverId);
+      // The reported booking is the one whose own window contains
+      // windowStart — the booking actually being asked about — not the
+      // tail end of the previous, merely-adjacent trip.
+      expect((result.driver as any).bookingId).toBe(String(currentBooking._id));
+      void previousBooking;
+    } finally {
+      await mongoose.disconnect();
+    }
+  });
+
   test('a booking that does not overlap the window at all is excluded (adjacent, non-overlapping)', async () => {
     if (!process.env.MONGODB_URI) throw new Error('MONGODB_URI is required for correlation verification.');
     await mongoose.connect(process.env.MONGODB_URI);
