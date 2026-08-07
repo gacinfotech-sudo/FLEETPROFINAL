@@ -702,7 +702,18 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       if (draftEnabled) {
-        apiRequest("DELETE", "/api/booking-drafts/mine").catch(() => {});
+        // DEF-002 fix: this was previously fire-and-forget
+        // (`.catch(() => {})` with no `await`), which raced any
+        // near-immediate next Add Booking visit (rapid automated retries,
+        // or simply a fast real user) — the draft could still exist server-
+        // side when the next page's "resume?" check ran, showing a stale
+        // "Resume your unfinished booking?" dialog for a booking that had
+        // already been successfully submitted. Awaiting it here means the
+        // draft is guaranteed gone before this success flow (and any
+        // subsequent navigation away from this form) completes. Best-effort
+        // is preserved — a failed delete still doesn't block the booking
+        // itself, which already succeeded.
+        await apiRequest("DELETE", "/api/booking-drafts/mine").catch(() => {});
       }
 
       // Vendor Vehicle path: link the selected vendor vehicle/driver via
