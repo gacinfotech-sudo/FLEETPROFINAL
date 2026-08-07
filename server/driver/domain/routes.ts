@@ -167,7 +167,11 @@ export function registerDriverDomainRoutes(app: Express): void {
         tenantId: req.tenantId!, driverId: req.params.id, actor: actorFrom(req),
         employerName: req.body.employerName, role: req.body.role,
         startDate: req.body.startDate, endDate: req.body.endDate,
-        contactForVerification: req.body.contactForVerification, notes: req.body.notes,
+        contactForVerification: req.body.contactForVerification,
+        supervisorName: req.body.supervisorName, supervisorMobile: req.body.supervisorMobile,
+        experienceLetterLink: req.body.experienceLetterLink,
+        experienceCertificateLink: req.body.experienceCertificateLink,
+        notes: req.body.notes,
       });
       res.status(201).json(entry);
     } catch (error) {

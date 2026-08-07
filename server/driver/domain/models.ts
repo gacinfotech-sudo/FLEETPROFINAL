@@ -115,6 +115,20 @@ export interface IDriverEmploymentHistory extends Document {
   startDate: Date;
   endDate?: Date;
   contactForVerification?: string;
+  // Structured supervisor contact, additive alongside the free-text
+  // contactForVerification field above (kept for backward compatibility
+  // with any existing entry/consumer) — the onboarding form asks for these
+  // as distinct fields rather than one combined string.
+  supervisorName?: string;
+  supervisorMobile?: string;
+  // Lightweight external links (e.g. a Google Drive shareable link), not a
+  // driveFileId-backed managed upload — that heavier, service-account-based
+  // flow belongs to the separate driver document registry
+  // (server/driver/documents/**, TASK-DRIVER-DOCUMENTS-03). These two
+  // fields exist so an employment entry can carry its own proof documents
+  // without requiring that full pipeline.
+  experienceLetterLink?: string;
+  experienceCertificateLink?: string;
   verificationStatus: VerificationStatus;
   verifiedBy?: { userId: string; role: string };
   verifiedAt?: Date;
@@ -133,6 +147,10 @@ const DriverEmploymentHistorySchema = new Schema<IDriverEmploymentHistory>({
   startDate: { type: Date, required: true },
   endDate: { type: Date },
   contactForVerification: { type: String, maxlength: 200 },
+  supervisorName: { type: String, trim: true, maxlength: 150 },
+  supervisorMobile: { type: String, trim: true, maxlength: 20 },
+  experienceLetterLink: { type: String, trim: true, maxlength: 2000 },
+  experienceCertificateLink: { type: String, trim: true, maxlength: 2000 },
   verificationStatus: { type: String, enum: VERIFICATION_STATUSES, default: 'unverified' },
   verifiedBy: {
     userId: { type: String },
