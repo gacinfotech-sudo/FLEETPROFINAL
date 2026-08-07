@@ -109,7 +109,7 @@ test('driver feedback links Customer, Booking and Driver profiles without unveri
   expect(customerDriver.averageRating).toBe(5);
   expect(customerDriver.feedback.some((row: any) => row._id === feedback._id)).toBe(true);
 
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(phone);
   await page.locator('table tbody tr').first().click();
   const customerDashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });

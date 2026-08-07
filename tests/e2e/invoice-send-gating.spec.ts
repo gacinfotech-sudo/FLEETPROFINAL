@@ -47,7 +47,7 @@ test('UI: Email/WhatsApp are disabled with an explanatory tooltip on a draft inv
   const created = await createRes.json();
   expect(createRes.ok(), JSON.stringify(created)).toBe(true);
 
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(booking.customerPhone);
   await page.locator('table tbody tr').first().click();
   const dashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });

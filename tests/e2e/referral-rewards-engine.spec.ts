@@ -388,7 +388,7 @@ test.describe('Referral capture + configurable reward event rules', () => {
     });
     expect(captureRes.status()).toBe(201);
 
-    await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+    await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
     await page.getByPlaceholder('Search name, mobile, or email').fill(mobile);
     await page.getByText(`Panel Referrer ${marker}`, { exact: true }).click();
 

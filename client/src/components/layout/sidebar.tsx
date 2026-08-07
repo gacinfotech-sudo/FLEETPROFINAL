@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks, Building2, ChevronDown, ChevronRight, Gift, ListFilter, Satellite } from "lucide-react";
+import { Car, BarChart3, Calendar, Users, History, TrendingUp, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks, Building2, ChevronDown, ChevronRight, Gift, ListFilter, Satellite, UserRoundPlus, Users2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -13,25 +13,27 @@ interface SidebarProps {
   onToggle: () => void;
   // Optional — when supplied, a "Search customers..." trigger renders at
   // the top of the sidebar (the only element persistent across every page
-  // and both mobile/desktop layouts; the standalone header.tsx component
-  // is dead code, never mounted anywhere, so it couldn't host this).
+  // and both mobile/desktop layouts).
   onSelectCustomer?: (customerId: string) => void;
 }
 
 // `group` is purely a sidebar-presentation grouping — it does not change
 // an item's id, route, permission flags, or the page component it renders.
-// Every existing ViewType/route/deep-link keeps working unchanged; only
-// how these entries are visually clustered in the nav changes. Booking is
-// the primary operational function (see docs/CURRENT_INTERFACE_AUDIT.md),
-// so its group sits directly under Dashboard rather than being scattered
-// among unrelated entries as it was before.
+//
+// MANDATED PRIMARY ORDER (see docs/final-ui report): Dashboard, then
+// Customers (All Customers / Add Customer), then Bookings. Future modules
+// must be appended AFTER the Bookings group, never between Dashboard and
+// Bookings — there is a permanent e2e regression for this order
+// (tests/e2e/ui-shell-redesign.spec.ts).
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: BarChart3 },
+  { id: "customers", label: "All Customers", icon: Contact, group: "customers" },
+  { id: "customers-add", label: "Add Customer", icon: UserRoundPlus, group: "customers" },
   { id: "bookings", label: "Add Booking", icon: Calendar, group: "bookings" },
   { id: "live-bookings", label: "Live Bookings", icon: Radio, group: "bookings" },
   { id: "upcoming-bookings", label: "Upcoming Bookings", icon: CalendarClock, group: "bookings" },
   { id: "booking-queues", label: "Booking Queues", icon: ListFilter, group: "bookings" },
-  { id: "payment-dues", label: "Payment Collection Due", icon: Wallet, group: "bookings" },
+  { id: "payment-dues", label: "Payment Collection", icon: Wallet, group: "bookings" },
   { id: "history", label: "Booking History", icon: History, group: "bookings" },
   { id: "inquiries", label: "Inquiries", icon: PhoneIncoming },
   { id: "leads", label: "Leads", icon: GitBranch },
@@ -43,7 +45,6 @@ const navItems = [
   { id: "driver-attendance", label: "Driver Attendance", icon: ClipboardCheck, restrictedForManagers: true },
   { id: "driver-leave", label: "Driver Leave", icon: UserX, restrictedForManagers: true },
   { id: "driver-performance", label: "Driver Performance", icon: Gauge, restrictedForManagers: true },
-  { id: "customers", label: "Customers", icon: Contact },
   { id: "after-sales", label: "After-Sales", icon: HeartHandshake, restrictedForManagers: true },
   { id: "campaigns", label: "Campaigns", icon: Megaphone, restrictedForManagers: true },
   { id: "rewards-referrals", label: "Rewards & Referrals", icon: Gift, restrictedForManagers: true },
@@ -58,12 +59,12 @@ const navItems = [
 ];
 
 const NAV_GROUPS: Record<string, { label: string; icon: typeof Calendar }> = {
+  customers: { label: "Customers", icon: Users2 },
   bookings: { label: "Bookings", icon: Calendar },
 };
 
-// Identical markup/behavior to what every nav item rendered before
-// grouping existed — extracted only so both top-level and grouped items
-// share one implementation instead of two copies drifting apart.
+// Identical markup/behavior shared by top-level and grouped items so the
+// two never drift apart visually.
 function NavButton({ item, isActive, onSelect, onToggleSidebar, compact }: {
   item: typeof navItems[number];
   isActive: boolean;
@@ -71,18 +72,18 @@ function NavButton({ item, isActive, onSelect, onToggleSidebar, compact }: {
   onToggleSidebar: () => void;
   // A grouped child already has its own left indent (the group's border);
   // stacking the top-level padding on top of that clipped longer labels
-  // ("Upcoming Bookings", "Payment Collection Due") in the fixed-width
-  // sidebar, so grouped children use a tighter, icon-sized padding.
+  // in the fixed-width sidebar, so grouped children use a tighter padding.
   compact?: boolean;
 }) {
   const Icon = item.icon;
   return (
     <Button
       variant="ghost"
+      aria-current={isActive ? "page" : undefined}
       className={cn(
-        "w-full justify-start py-3 lg:py-3 text-sm lg:text-base text-gray-700 hover:bg-gray-100 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] h-12 lg:h-auto",
-        compact ? "px-2" : "px-3 lg:px-4",
-        isActive && "bg-blue-50 border-r-4 border-blue-600 text-blue-700 shadow-sm"
+        "w-full justify-start py-2.5 text-sm text-gray-700 hover:bg-gray-100 h-10 rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1",
+        compact ? "px-2" : "px-3",
+        isActive && "bg-blue-50 text-blue-700 font-medium shadow-sm"
       )}
       onClick={() => {
         onSelect(item.id);
@@ -92,7 +93,7 @@ function NavButton({ item, isActive, onSelect, onToggleSidebar, compact }: {
         }
       }}
     >
-      <Icon className={compact ? "mr-2 shrink-0" : "mr-2 lg:mr-3 shrink-0"} size={18} />
+      <Icon className={cn("shrink-0", compact ? "mr-2" : "mr-2.5", isActive ? "text-blue-600" : "text-gray-500")} size={18} />
       <span className="truncate">{item.label}</span>
     </Button>
   );
@@ -100,10 +101,8 @@ function NavButton({ item, isActive, onSelect, onToggleSidebar, compact }: {
 
 export default function Sidebar({ currentView, onViewChange, isOpen, onToggle, onSelectCustomer }: SidebarProps) {
   const { logout, user } = useAuth();
-  // Every group starts expanded — Booking is the primary operational
-  // function (docs/CURRENT_INTERFACE_AUDIT.md), so its items must be
-  // visible without an extra click, not tucked behind a collapsed
-  // section by default.
+  // Every group starts expanded — Customers and Bookings are the primary
+  // operational functions and must be visible without an extra click.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   // Filter navigation items based on user role
@@ -118,11 +117,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle, o
   });
 
   // Groups the array's already-adjacent same-`group` entries into blocks —
-  // every entry's id/route/permission-flags are untouched, only how they
-  // are visually clustered changes. An item whose group has zero visible
-  // children after the role filter above (not possible today, since no
-  // grouped item is currently restrictedForManagers/adminOnly, but kept
-  // correct for future items) never renders an empty group header.
+  // ids/routes/permission flags untouched, only visual clustering changes.
   const navBlocks: Array<{ type: "item"; item: typeof navItems[number] } | { type: "group"; key: string; items: typeof navItems }> = [];
   for (const item of visibleNavItems) {
     if (!item.group) {
@@ -162,23 +157,36 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle, o
           onClick={onToggle}
         />
       )}
-      
-      {/* Sidebar */}
+
+      {/* Sidebar — width comes from the shell layout token, never a local
+          hard-coded value (see index.css --sidebar-width). */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col h-screen",
+          "fixed inset-y-0 left-0 z-50 w-[var(--sidebar-width)] bg-white border-r border-gray-200 shadow-xl lg:shadow-none transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col h-screen",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex items-center justify-center h-16 bg-blue-600">
-          <div className="flex items-center">
-            <Car className="text-white text-2xl mr-3" size={32} />
-            <span className="text-white text-xl font-bold">FleetPro</span>
-          </div>
-        </div>
-        
+        {/* Brand — always navigates home to the Dashboard. */}
+        <button
+          type="button"
+          aria-label="Go to Dashboard"
+          onClick={() => {
+            onViewChange("dashboard");
+            if (window.innerWidth < 1024) {
+              setTimeout(() => onToggle(), 200);
+            }
+          }}
+          className="flex items-center justify-center h-[var(--header-height)] shrink-0 bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-inset"
+        >
+          <Car className="text-white mr-3" size={28} />
+          <span className="text-white text-xl font-bold tracking-tight">FleetPro</span>
+        </button>
+
         {onSelectCustomer && (
-          <div className="pt-3 lg:pt-4">
+          // The horizontal inset lives on this wrapper, not on the trigger
+          // button itself — a w-full child with its own mx-* margins was
+          // the root cause of the long-standing sidebar-search overflow.
+          <div className="px-3 pt-3">
             <GlobalCustomerSearch
               onSelectCustomer={(customerId) => {
                 onSelectCustomer(customerId);
@@ -190,8 +198,8 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle, o
           </div>
         )}
 
-        <nav className="mt-2 lg:mt-2 flex-1 overflow-y-auto min-h-0">
-          <div className="px-3 lg:px-4 space-y-1 lg:space-y-2">
+        <nav className="mt-2 flex-1 overflow-y-auto min-h-0">
+          <div className="px-3 space-y-0.5">
             {navBlocks.map((block) => {
               if (block.type === "item") {
                 return <NavButton key={block.item.id} item={block.item} isActive={currentView === block.item.id} onSelect={onViewChange} onToggleSidebar={onToggle} />;
@@ -199,9 +207,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle, o
 
               const group = NAV_GROUPS[block.key];
               // A deep-linked/active child keeps its group visibly
-              // expanded even if the user had collapsed it earlier —
-              // never hide the currently-open page behind a collapsed
-              // section.
+              // expanded even if the user had collapsed it earlier.
               const hasActiveChild = block.items.some((child) => child.id === currentView);
               const isGroupOpen = hasActiveChild || !collapsedGroups.has(block.key);
               const GroupIcon = group.icon;
@@ -209,16 +215,19 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle, o
               return (
                 <Collapsible key={block.key}>
                   <CollapsibleTrigger
-                    className="px-3 lg:px-4 py-3 text-sm lg:text-base text-gray-700 hover:bg-gray-100 h-12 lg:h-auto"
+                    className={cn(
+                      "px-3 py-2.5 text-sm h-10 rounded-lg hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-blue-500",
+                      hasActiveChild ? "text-blue-700 font-semibold" : "text-gray-800 font-medium"
+                    )}
                     onClick={() => toggleGroup(block.key)}
                   >
                     <span className="flex items-center">
-                      <GroupIcon className="mr-2 lg:mr-3" size={18} />
+                      <GroupIcon className={cn("mr-2.5", hasActiveChild ? "text-blue-600" : "text-gray-500")} size={18} />
                       {group.label}
                     </span>
-                    {isGroupOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    {isGroupOpen ? <ChevronDown size={16} className="text-gray-400" /> : <ChevronRight size={16} className="text-gray-400" />}
                   </CollapsibleTrigger>
-                  <CollapsibleContent isOpen={isGroupOpen} className="pl-2 space-y-1 lg:space-y-2 border-l-2 border-gray-100 ml-3">
+                  <CollapsibleContent isOpen={isGroupOpen} className="pl-2 space-y-0.5 border-l-2 border-gray-100 ml-4 mb-1">
                     {block.items.map((item) => (
                       <NavButton key={item.id} item={item} isActive={currentView === item.id} onSelect={onViewChange} onToggleSidebar={onToggle} compact />
                     ))}
@@ -230,13 +239,13 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle, o
         </nav>
 
         {/* Logout Button */}
-        <div className="p-3 lg:p-4 border-t border-gray-200">
+        <div className="p-3 border-t border-gray-200 shrink-0">
           <Button
             variant="ghost"
-            className="w-full justify-start px-3 lg:px-4 py-3 text-sm lg:text-base text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] h-12 lg:h-auto"
+            className="w-full justify-start px-3 py-2.5 text-sm h-10 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700 focus-visible:ring-2 focus-visible:ring-red-500"
             onClick={handleLogout}
           >
-            <LogOut className="mr-2 lg:mr-3" size={18} />
+            <LogOut className="mr-2.5" size={18} />
             Logout
           </Button>
         </div>

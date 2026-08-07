@@ -8,9 +8,15 @@ async function getCsrfToken(page: Page): Promise<string> {
 }
 
 function dateOffset(days: number): string {
+  // Local calendar date, NOT toISOString() — the UTC date is yesterday's
+  // date until 05:30 IST, which made this suite classify "today's"
+  // booking as past when run between midnight and dawn.
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 // Deliberately does NOT use GET /api/vehicles/available — that endpoint is
@@ -126,38 +132,47 @@ test('Dashboard Upcoming Bookings: Today/Tomorrow/Future/All Upcoming classify b
   expect(idsIn(classified.today)).not.toContain(bookingB._id);
   expect(idsIn(classified.tomorrow)).not.toContain(bookingA._id);
 
-  // --- UI verification: tabs render, counts match, row click opens existing Booking Details dialog ---
+  // --- UI verification: compact card renders, respects the 3-record limit,
+  // and row click opens the existing Booking Details dialog ---
   await page.goto('/dashboard/dashboard');
   await page.waitForLoadState('networkidle');
 
-  await expect(page.getByRole('tab', { name: /Today/ })).toBeVisible();
-  await expect(page.getByRole('tab', { name: /Tomorrow/ })).toBeVisible();
-  await expect(page.getByRole('tab', { name: /^Future/ })).toBeVisible();
-  await expect(page.getByRole('tab', { name: /All Upcoming/ })).toBeVisible();
+  const upcomingCard = page.locator('main div.rounded-lg', { has: page.getByText('Upcoming Bookings', { exact: true }) }).first();
+  await expect(upcomingCard.getByRole('button', { name: /today \(/i })).toBeVisible();
+  await expect(upcomingCard.getByRole('button', { name: /tomorrow \(/i })).toBeVisible();
+  await expect(upcomingCard.getByRole('button', { name: /future \(/i })).toBeVisible();
 
-  await expect(page.getByRole('table').getByText(`Acceptance A ${marker}`)).toBeVisible();
+  // The dashboard is a summary: never more than 3 booking rows per tab,
+  // regardless of how many the API returns (record-limit regression).
+  await upcomingCard.getByRole('button', { name: /future \(/i }).click();
+  const futureRows = upcomingCard.locator('button[type="button"]').filter({ hasText: /·/ });
+  expect(await futureRows.count()).toBeLessThanOrEqual(3);
 
-  await page.getByRole('tab', { name: /^Future/ }).click();
-  await expect(page.getByRole('table').getByText(`Acceptance C ${marker}`)).toBeVisible();
-  await expect(page.getByRole('table').getByText(`Acceptance D ${marker}`)).toBeVisible();
-  await expect(page.getByText(`Acceptance E ${marker}`)).toHaveCount(0);
+  // Today tab shows booking A (created above for today) among its rows.
+  await upcomingCard.getByRole('button', { name: /today \(/i }).click();
+  await expect(upcomingCard.getByText(`Acceptance A ${marker}`)).toBeVisible();
 
   // Clicking a row opens the existing "Booking Details" dialog (no duplicate detail UI).
-  await page.getByRole('table').getByText(`Acceptance C ${marker}`).click();
+  await upcomingCard.getByText(`Acceptance A ${marker}`).click();
   await expect(page.getByRole('dialog').filter({ hasText: 'Booking Details' })).toBeVisible();
-  await expect(page.getByRole('dialog').filter({ hasText: 'Booking Details' }).getByText(`Acceptance C ${marker}`)).toBeVisible();
+
+  // "View All" routes to the full Upcoming Bookings page, where the
+  // beyond-limit records (C and D) are actually reachable.
+  await page.keyboard.press('Escape');
+  await upcomingCard.getByRole('button', { name: /View All/ }).click();
+  await expect(page).toHaveURL(/\/dashboard\/upcoming-bookings$/);
 });
 
-test('Dashboard KPI cards: Total Bookings and Total Vehicles cards navigate to their existing views', async ({ page }) => {
+test('Dashboard KPI cards: Bookings and Vehicles cards navigate to their existing views', async ({ page }) => {
   await login(page, 'qaclient', 'QaFixed456!');
   await page.goto('/dashboard/dashboard');
   await page.waitForLoadState('networkidle');
 
-  await page.getByRole('button', { name: /Total Bookings/ }).click();
+  await page.getByRole('button', { name: /Bookings — view Booking History/ }).click();
   await expect(page).toHaveURL(/\/dashboard\/history/);
 
   await page.goto('/dashboard/dashboard');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('button', { name: /Total Vehicles/ }).click();
+  await page.getByRole('button', { name: /Vehicles — view Fleet/ }).click();
   await expect(page).toHaveURL(/\/dashboard\/fleet/);
 });

@@ -60,7 +60,7 @@ test('Customer financial summary, receipt and statement use the immutable paymen
   expect(receipt.payment.amount).toBe(500);
   expect(receipt.status).toBe('valid');
 
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(phone);
   await page.locator('table tbody tr').first().click();
   const dashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });

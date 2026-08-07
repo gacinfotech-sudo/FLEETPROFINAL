@@ -45,7 +45,7 @@ test.describe('Application shell', () => {
     await login(page, 'qaclient', 'QaFixed456!');
     await page.waitForTimeout(500);
 
-    for (const label of ['Dashboard', 'WhatsApp', 'Payment Collection Due', 'Booking History']) {
+    for (const label of ['Dashboard', 'WhatsApp', 'Payment Collection', 'Booking History']) {
       await page.locator('nav').getByRole('button', { name: label }).click();
       await expect(page.locator('.bg-blue-600').getByText('FleetPro')).toBeVisible();
       await expect(page.locator('nav').getByRole('button', { name: 'Dashboard' })).toBeVisible();

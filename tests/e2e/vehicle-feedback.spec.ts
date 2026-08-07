@@ -127,7 +127,7 @@ test('vehicle feedback links Customer, Booking and Fleet profiles with odometer-
   expect(monthlyVehicle.cleanlinessRating).toBeGreaterThanOrEqual(1);
   expect(monthlyVehicle.verifiedVehicleIssueCount).toBeGreaterThanOrEqual(2);
 
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(phone);
   await page.locator('table tbody tr').first().click();
   const customerDashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });

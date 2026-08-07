@@ -29,7 +29,7 @@ test('Customer requirement versions are append-only and visible in Customer 360'
   expect(history.some((row: any) => row.tripRequirement === firstText)).toBe(true);
   expect(history.some((row: any) => row.tripRequirement === secondText)).toBe(true);
 
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(customer.primaryMobile);
   await page.locator('table tbody tr').first().click();
   const dashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });

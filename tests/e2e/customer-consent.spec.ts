@@ -71,7 +71,7 @@ test('Consent grant/opt-out ledger is real: history records every event, opt-out
   expect(afterRestore.consent.whatsapp).toBe(true);
 
   // UI: consent toggles render on the Customer Dashboard and reflect live state.
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await expect(page).toHaveURL(/\/dashboard\/customers$/);
   await page.getByPlaceholder('Search name, mobile, or email').fill(phone);
   await page.getByText('Consent Test Customer').first().click();

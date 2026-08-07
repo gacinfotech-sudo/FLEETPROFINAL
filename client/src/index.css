@@ -36,6 +36,17 @@
   --sidebar-accent-foreground: hsl(240, 5.9%, 10%);
   --sidebar-border: hsl(220, 13%, 91%);
   --sidebar-ring: hsl(217.2, 91.2%, 59.8%);
+
+  /* App-shell layout contract — the single source of truth for shell
+     geometry. The sidebar, mobile header, and page container all read
+     these; no component may hard-code its own copy of them. */
+  --sidebar-width: 16rem;
+  --header-height: 4rem;
+  --content-max-width: 90rem;
+  --page-padding-x: 1.5rem;
+  --page-padding-y: 1.5rem;
+  --section-gap: 1.5rem;
+  --card-gap: 1rem;
 }
 
 .dark {

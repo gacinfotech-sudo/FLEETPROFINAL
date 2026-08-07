@@ -78,7 +78,7 @@ test.describe('Customer segments and tags', () => {
 
   test('UI: segment chips and tag chips render and filter the customer list', async ({ page }) => {
     await login(page, 'qaclient', 'QaFixed456!');
-    await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+    await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
     await expect(page).toHaveURL(/\/dashboard\/customers$/);
     await expect(page.getByText('Segments')).toBeVisible();
     await page.waitForTimeout(1000);

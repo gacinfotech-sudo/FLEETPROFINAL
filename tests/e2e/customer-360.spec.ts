@@ -55,7 +55,7 @@ test('Customer 360 shows service, payments, rewards and five WhatsApp templates'
   expect(templateResponse.templates.find((row: any) => row.key === 'driver_details').enabled).toBe(false);
   expect(templateResponse.templates.find((row: any) => row.key === 'loyalty_offer').enabled).toBe(false);
 
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(phone);
   await page.getByText('Customer 360 Test', { exact: true }).click();
 

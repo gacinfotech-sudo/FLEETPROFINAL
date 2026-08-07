@@ -8,10 +8,10 @@ import { login, trackConsoleErrors } from './helpers';
 // only checks "did navigation happen" without checking "did it STAY"
 // would miss that bug entirely.
 const SIDEBAR_PAGES: { label: string; path: string; expectedText: RegExp }[] = [
-  { label: 'Dashboard', path: '/dashboard/dashboard', expectedText: /Dashboard Overview/i },
+  { label: 'Dashboard', path: '/dashboard/dashboard', expectedText: /Live overview of your fleet operations/i },
   { label: 'Live Bookings', path: '/dashboard/live-bookings', expectedText: /Live Bookings/i },
   { label: 'Upcoming Bookings', path: '/dashboard/upcoming-bookings', expectedText: /Upcoming Bookings/i },
-  { label: 'Payment Collection Due', path: '/dashboard/payment-dues', expectedText: /Payment Collection Due/i },
+  { label: 'Payment Collection', path: '/dashboard/payment-dues', expectedText: /Payment Collection/i },
   { label: 'View Fleet', path: '/dashboard/fleet', expectedText: /Fleet Management/i },
   { label: 'Vehicle Performance', path: '/dashboard/vehicle-performance', expectedText: /Vehicle Performance/i },
   { label: 'Manage Drivers', path: '/dashboard/drivers', expectedText: /driver/i },

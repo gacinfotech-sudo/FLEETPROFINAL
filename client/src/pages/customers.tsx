@@ -34,14 +34,23 @@ interface CustomersPageProps {
   // Forwarded to CustomerDashboard's timeline — see its own prop comment.
   onNavigateToInquiry?: (inquiryId: string) => void;
   onNavigateToLead?: (leadId: string) => void;
+  // Sidebar's "Add Customer" entry lands here with the intake dialog
+  // already open. New customers enter FleetPro through the existing
+  // Quick Inquiry funnel (there is deliberately no bare POST /api/customers
+  // — see server/services/customerService.ts's findOrCreateCustomer).
+  initialShowIntake?: boolean;
 }
 
-export default function CustomersPage({ onEditBooking, onNewBooking, initialCustomerId, onNavigateToInquiry, onNavigateToLead }: CustomersPageProps) {
+export default function CustomersPage({ onEditBooking, onNewBooking, initialCustomerId, onNavigateToInquiry, onNavigateToLead, initialShowIntake }: CustomersPageProps) {
   const [search, setSearch] = useState("");
   const [activeSegment, setActiveSegment] = useState<{ key: string; label: string } | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [viewingCustomerId, setViewingCustomerId] = useState<string | null>(null);
-  const [showQuickInquiry, setShowQuickInquiry] = useState(false);
+  const [showQuickInquiry, setShowQuickInquiry] = useState(!!initialShowIntake);
+
+  useEffect(() => {
+    if (initialShowIntake) setShowQuickInquiry(true);
+  }, [initialShowIntake]);
 
   useEffect(() => {
     if (initialCustomerId) setViewingCustomerId(initialCustomerId);
