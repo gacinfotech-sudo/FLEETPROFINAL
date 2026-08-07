@@ -261,3 +261,57 @@ No scope creep or ownership violations found.
 `fleetpro-main/.claude/tasks/active/` to `fleetpro-main/.claude/tasks/completed/`
 (main worktree's `.claude/`, per instructions — this directory is untracked/local per
 worktree in this repo).
+
+## Follow-up fix applied (debounce click-race)
+
+Fixes "Follow-up needed from user" item 1 above, commit `556c67f` on
+`integration/preview-20260807`.
+
+**What changed** — `client/src/pages/customers.tsx`: the `useQuery` for
+`/api/customers` now also destructures `isFetching`, and a new
+`isSearchStale = search !== debouncedSearch || isFetching` flag drives two
+things: (1) row `onClick` becomes a no-op while stale, so a click can no
+longer land on the still-rendered pre-filter table and open the wrong
+customer, and (2) the table gets `opacity-50 pointer-events-none` plus an
+"Updating results..." overlay while stale, so the UI honestly reflects
+that what's on screen may not match the current search box value yet.
+This covers both halves of the race: the debounce window itself
+(`search !== debouncedSearch`, before the query even re-fires) and the
+network round-trip after it fires (`isFetching`). No changes to
+`use-debounced-value.ts` — the hook's behavior was never the problem.
+
+**Tests updated** — `customer-merge.spec.ts` (the trace-confirmed one),
+plus `customer-financial-summary.spec.ts`, `customer-invoice.spec.ts`, and
+`invoice-deferred-numbering.spec.ts`. All four turned out to have the
+exact same `fill(search) → page.locator('table tbody tr').first().click()`
+pattern with zero wait in between — the suspicion in item 1 was correct
+for all three, not just the confirmed one. Each now has a
+`page.waitForTimeout(600)` between the fill and the click, matching the
+convention already used for the same reason in
+`customer-quick-actions.spec.ts` (350ms debounce + margin for the
+network round-trip). `customer-360.spec.ts` was also checked: it clicks
+via `getByText(name, { exact: true })` rather than
+`table tbody tr .first()`, which Playwright auto-retries until that
+specific (post-debounce) row exists — not vulnerable to this race by
+construction, so it was left as-is.
+
+**Test results**:
+- Before: `customer-merge.spec.ts` reproducibly failed on this race (per
+  item 1's trace evidence); `customer-financial-summary.spec.ts`,
+  `customer-invoice.spec.ts`, and `invoice-deferred-numbering.spec.ts`
+  were suspected but not independently confirmed.
+- After the fix, on a fresh dev server (port 5091, this worktree only):
+  `npx playwright test tests/e2e/customer-merge.spec.ts
+  tests/e2e/customer-financial-summary.spec.ts
+  tests/e2e/customer-invoice.spec.ts
+  tests/e2e/invoice-deferred-numbering.spec.ts` → **5/5 passed**
+  (`invoice-deferred-numbering.spec.ts` has two tests in it).
+  Regression check — `npx playwright test tests/e2e/customer-360.spec.ts
+  tests/e2e/customer-quick-actions.spec.ts` → **8/8 passed**, confirming
+  normal (non-race) search/click flows still work.
+- `npm run check` stayed clean before and after.
+
+**Pattern confirmed in all 3 suspected files**, not ruled out in any of
+them — the root cause was identical across `customer-merge.spec.ts`,
+`customer-financial-summary.spec.ts`, `customer-invoice.spec.ts`, and
+`invoice-deferred-numbering.spec.ts`.
