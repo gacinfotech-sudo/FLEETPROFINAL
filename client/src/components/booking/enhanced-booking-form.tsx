@@ -2676,11 +2676,11 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                               <FormControl>
                                 <div className="relative">
                                   <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                                  <Input 
-                                    type="number" 
+                                  <Input
+                                    type="number"
                                     placeholder="Enter final amount"
-                                    value={field.value || 0}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    value={field.value ?? ""}
+                                    onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                     className="h-12 pl-10 text-lg font-medium border-2 border-orange-300 focus:border-orange-500 rounded-lg"
                                   />
                                 </div>
