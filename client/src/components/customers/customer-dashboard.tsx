@@ -484,6 +484,9 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
                 <div className="rounded-lg bg-white border p-3">
                   <p className="text-xs text-gray-500">Booking & Route</p>
                   <p className="font-semibold">{currentBooking.bookingId}</p>
+                  {currentBooking.bookingCode && (
+                    <p className="text-xs text-gray-500 font-mono">{currentBooking.bookingCode}</p>
+                  )}
                   <p className="text-sm mt-1">{currentBooking.pickupLocation} → {currentBooking.dropoffLocation || '-'}</p>
                 </div>
                 <div className="rounded-lg bg-white border p-3">
@@ -562,7 +565,12 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
                   const googleReview = googleReviewByBooking.get(b._id) as any;
                   return (
                     <TableRow key={b._id}>
-                      <TableCell className="font-medium">{b.bookingId}</TableCell>
+                      <TableCell className="font-medium">
+                        {b.bookingId}
+                        {b.bookingCode && (
+                          <div className="text-xs text-gray-500 font-mono font-normal">{b.bookingCode}</div>
+                        )}
+                      </TableCell>
                       <TableCell>{b.pickupLocation} → {b.dropoffLocation || "-"}</TableCell>
                       <TableCell>{new Date(b.pickupDate).toLocaleDateString('en-IN')}</TableCell>
                       <TableCell>

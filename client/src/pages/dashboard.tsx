@@ -1608,8 +1608,9 @@ export default function Dashboard() {
                     {(bookings as any[])
                       .filter((booking: any) => {
                         // Search filter
-                        const matchesSearch = searchTerm === "" || 
+                        const matchesSearch = searchTerm === "" ||
                           booking.bookingId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (booking.bookingCode && booking.bookingCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
                           booking.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           booking.customerPhone.includes(searchTerm);
                         
@@ -1638,6 +1639,9 @@ export default function Dashboard() {
                       <TableRow key={booking._id || booking.id}>
                         <TableCell>
                           <div className="font-medium">{booking.bookingId}</div>
+                          {booking.bookingCode && (
+                            <div className="text-xs text-gray-500 font-mono">{booking.bookingCode}</div>
+                          )}
                           <div className="text-sm text-gray-500">
                             {new Date(booking.createdAt).toLocaleDateString()}
                           </div>
@@ -2574,6 +2578,12 @@ export default function Dashboard() {
                   <Label className="text-sm font-medium text-gray-700">Booking ID</Label>
                   <p className="text-sm text-gray-900">{viewingBooking.bookingId}</p>
                 </div>
+                {viewingBooking.bookingCode && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Booking Code</Label>
+                    <p className="text-sm text-gray-900 font-mono tracking-wide">{viewingBooking.bookingCode}</p>
+                  </div>
+                )}
                 <div>
                   <Label className="text-sm font-medium text-gray-700">Status</Label>
                   <Badge variant={viewingBooking.status === "confirmed" ? "default" : viewingBooking.status === "completed" ? "secondary" : "destructive"}>
