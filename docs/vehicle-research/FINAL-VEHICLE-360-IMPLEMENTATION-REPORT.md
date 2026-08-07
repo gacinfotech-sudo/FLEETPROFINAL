@@ -183,23 +183,48 @@ Test file: `tests/e2e/vehicle-360-acceptance-scenarios.spec.ts`.
   unambiguous evidence elsewhere in this report; flagged here rather than
   silently omitted.
 
-## Open follow-ups (not blockers)
+## Open follow-ups — status update
 
-1. Fleet-list → Vehicle 360 row link (`dashboard.tsx`) not wired — direct
-   navigation works, this is a UX convenience only.
-2. GPS & Telematics tab has nothing to read yet (no read endpoint exists
-   for `GpsVehicleLatestState` anywhere in trunk) — correctly shows "not
-   yet available", will populate once that endpoint is built (GPS batch's
-   territory, not this one's).
-3. Daily Inspections tab has no owning backend task in this entire batch
-   (flagged originally in TASK-VEHICLE-360-UI-06's own report) — shows an
-   honest "not built yet" state.
-4. `TASK-VEHICLE-MAINTENANCE-03`'s 16 tests use `node:test` outside
-   `tests/e2e/`, undiscoverable by `npx playwright test` — a mechanical fix
-   (move + convert), not a correctness issue.
-5. Fine-grained `vehicle.*` permissions are defined but not yet assigned to
-   any non-admin role — every route currently also accepts the existing
-   `MANAGE_VEHICLES`, so this doesn't block usage today.
+All 5 were completed in a follow-up integration pass (branch
+`vehicle/integration-final`, commit `8f0a32c`, merged to trunk as `b1bce7b`).
+Each was verified end-to-end against the real running app (real HTTP
+requests, real DOM assertions, no mocks) — see
+`tests/e2e/vehicle-360-fleet-list-link.spec.ts`,
+`vehicle-360-gps-telematics-tab.spec.ts`,
+`vehicle-360-manager-permissions.spec.ts`, and
+`vehicle-360-daily-inspections.spec.ts`.
+
+1. **Fleet-list → Vehicle 360 row link** — done. `dashboard.tsx`'s mobile
+   card and desktop table views both gained a "View 360" link.
+2. **GPS & Telematics tab** — done. GPS telemetry ingestion merged into
+   trunk since this report was first written, but no HTTP read route
+   existed yet. Added `GET /api/vehicles/:vehicleId/gps/latest-state`
+   (`server/gps/routes/vehicleState.ts`: resolves the vehicle's active GPS
+   assignment, reads `GpsVehicleLatestState`) and wired the tab to it.
+3. **Daily Inspections tab** — done. Built the module from scratch
+   (`server/vehicle/inspections/`: model, service, routes) since no task in
+   the batch owned it. Implements `SafetyHoldFlag`'s documented rule
+   (unresolved CRITICAL defect ⇒ `SAFETY_HOLD`) via
+   `GET /api/vehicles/:vehicleId/safety-hold`, surfaced as a banner on a
+   real (read-only, matching every sibling tab's convention) inspections
+   list. **Caveat, stated plainly**: `deriveBookingEligibility` has no live
+   callers anywhere in the app today — not just in this batch — so this
+   pass makes the `SAFETY_HOLD` signal correctly computed and readable, not
+   "wired into booking creation." Actually gating live booking creation on
+   it is separate, higher-blast-radius work (money/booking-critical code
+   already under this session's own QA bar) deliberately left undone here
+   rather than risked in a non-blocking follow-up pass.
+4. **`TASK-VEHICLE-MAINTENANCE-03`'s `node:test` files** — done. Migrated
+   to `tests/e2e/vehicle-maintenance-trigger.spec.ts` and
+   `tests/e2e/vehicle-tyre-calculations.spec.ts` (16/16 passing under the
+   canonical `npx playwright test`); the two `node:test` originals deleted.
+5. **Fine-grained `vehicle.*` permissions assignable to a manager** — done.
+   Added `PATCH /api/users/sub-users/:userId/permissions` (allowlisted to
+   the 4 legacy defaults + the 10 `vehicle.*` permissions — not the full
+   ~80-entry `PERMISSIONS` object, deliberately out of scope) and a real
+   "Edit Permissions" dialog in Manage Users (`user-management.tsx`),
+   verified including a rejected out-of-allowlist attempt
+   (`manage_users`), not just the happy path.
 
 ## Files changed by this final integration pass (beyond the six merged branches)
 
