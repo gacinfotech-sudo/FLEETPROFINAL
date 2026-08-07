@@ -164,63 +164,85 @@ test.describe('Driver Domain Lifecycle (TASK-DRIVER-DOMAIN-02)', () => {
     expect(altClashRes.status()).toBe(409);
   });
 
-  test('Tenant configuring >4 contacts without businessPurpose is blocked; with businessPurpose it is allowed, and the 5th contact requires explicit consent/notification status', async ({ page }) => {
+  test('Zero-block contact policy: up to the 10-contact target requires no policy configuration, no consent/notification, and is never blocked; the 11th contact hits the real ceiling', async ({ page }) => {
+    // Superseded by the zero-block onboarding policy
+    // (docs/driver-recovery/DRIVER-ZERO-BLOCK-ONBOARDING-REPORT.md §6):
+    // "CONTACT TARGET = 10" is the tenant's standing default, not an
+    // opt-in exception an admin must configure with a businessPurpose.
+    // DEFAULT_CONTACT_THRESHOLD now equals HARD_MAX_CONTACTS (10), so the
+    // old "5th contact needs explicit consent" / "must configure a policy
+    // with businessPurpose to go past 4" behavior this test used to assert
+    // no longer exists by design — replaced by: everything up to 10 is
+    // free, and only the true 10-contact ceiling still blocks.
     await login(page, 'qaclient', 'QaFixed456!');
     const csrf = await getCsrfToken(page);
 
-    // Blocked: no businessPurpose.
-    const blockedPolicyRes = await page.request.post('/api/driver-contact-policy', {
-      headers: { 'X-CSRF-Token': csrf }, data: { maxContacts: 5 },
-    });
-    expect(blockedPolicyRes.status()).toBe(400);
-    expect((await blockedPolicyRes.json()).code).toBe('CONTACT_POLICY_VIOLATION');
+    // This repo's shared dev DB is not reset between runs (a known,
+    // separately-flagged issue — see docs/finalization/FLEETPRO-FINAL-STATUS.md,
+    // "test infrastructure"), and both (a) primaryDriverId accumulates
+    // contacts across every prior run of this file and (b) the qaclient
+    // tenant is already at its seeded driver-count plan limit, so creating
+    // a fresh driver for this test isn't reliably possible either. Instead:
+    // reuse primaryDriverId, but first deactivate every contact it already
+    // has, so this test starts from a real, verified-clean baseline (0
+    // active contacts) rather than assuming one.
+    const runSuffix = String(Date.now()).slice(-6);
+    const ceilingDriverId = primaryDriverId;
+    const existingRes = await page.request.get(`/api/drivers/${ceilingDriverId}/contacts`);
+    expect(existingRes.ok(), await existingRes.text()).toBeTruthy();
+    const existingBody = await existingRes.json();
+    const existingContacts: any[] = Array.isArray(existingBody) ? existingBody : (existingBody.contacts ?? []);
+    for (const c of existingContacts) {
+      const delRes = await page.request.delete(`/api/drivers/${ceilingDriverId}/contacts/${c._id || c.id}`, {
+        headers: { 'X-CSRF-Token': csrf }, data: { reason: 'Zero-block ceiling test: establishing a clean baseline' },
+      });
+      expect(delRes.ok(), await delRes.text()).toBeTruthy();
+    }
 
-    // Allowed: businessPurpose stated.
-    const allowedPolicyRes = await page.request.post('/api/driver-contact-policy', {
+    // No policy configuration needed at all: configuring a tenant policy
+    // at or below the 10-contact target no longer requires a
+    // businessPurpose (it did when the default was 4).
+    const policyRes = await page.request.post('/api/driver-contact-policy', {
+      headers: { 'X-CSRF-Token': csrf }, data: { maxContacts: 10 },
+    });
+    expect(policyRes.ok(), await policyRes.text()).toBeTruthy();
+
+    // A tenant policy still can't exceed the absolute ceiling, with or
+    // without a businessPurpose — this is the one real, intentional
+    // ceiling the zero-block policy preserves (the business's own stated
+    // "up to ten" cap, not an onboarding-blocking bureaucracy).
+    const overHardCeilingRes = await page.request.post('/api/driver-contact-policy', {
       headers: { 'X-CSRF-Token': csrf },
-      data: { maxContacts: 5, businessPurpose: 'Extended emergency-contact roster for long-haul routes.' },
+      data: { maxContacts: 11, businessPurpose: 'Attempting to exceed the hard ceiling.' },
     });
-    expect(allowedPolicyRes.ok(), await allowedPolicyRes.text()).toBeTruthy();
+    expect(overHardCeilingRes.status()).toBe(400);
+    expect((await overHardCeilingRes.json()).code).toBe('CONTACT_POLICY_VIOLATION');
 
-    // primaryDriver already has 1 active contact from the previous test.
-    // Add contacts #2, #3, #4 — within the default threshold, no
-    // consent/notification required.
-    for (let i = 2; i <= 4; i++) {
-      const res = await page.request.post(`/api/drivers/${primaryDriverId}/contacts`, {
+    // Contacts #1 through #10, on a driver known to start with zero
+    // contacts, all succeed with no consent/notification status and no
+    // policy configuration required — this is the actual zero-block
+    // assertion.
+    for (let i = 1; i <= 10; i++) {
+      const res = await page.request.post(`/api/drivers/${ceilingDriverId}/contacts`, {
         headers: { 'X-CSRF-Token': csrf },
-        data: { fullName: `Threshold Contact ${i}`, contactCategory: 'other', primaryMobile: `93000000${i}`, emergencyPriority: 10 + i },
+        data: { fullName: `Target Contact ${i}`, contactCategory: 'other', primaryMobile: `9${runSuffix}0${i}`, emergencyPriority: 10 + i },
       });
       expect(res.status(), await res.text()).toBe(201);
     }
 
-    // Contact #5 (beyond the default threshold of 4) WITHOUT consent/
-    // notification status must be blocked.
-    const missingConsentRes = await page.request.post(`/api/drivers/${primaryDriverId}/contacts`, {
-      headers: { 'X-CSRF-Token': csrf },
-      data: { fullName: 'Threshold Contact 5', contactCategory: 'other', primaryMobile: '9300000099' },
-    });
-    expect(missingConsentRes.status()).toBe(400);
-    expect((await missingConsentRes.json()).code).toBe('CONTACT_POLICY_VIOLATION');
-
-    // Contact #5 WITH consent/notification status succeeds.
-    const withConsentRes = await page.request.post(`/api/drivers/${primaryDriverId}/contacts`, {
+    // Contact #11 exceeds the real 10-contact ceiling — still blocked,
+    // even with consent/notification explicitly set. Missing/optional
+    // data is never what blocks a driver; a real, stated business
+    // ceiling still can be enforced.
+    const overCeilingRes = await page.request.post(`/api/drivers/${ceilingDriverId}/contacts`, {
       headers: { 'X-CSRF-Token': csrf },
       data: {
-        fullName: 'Threshold Contact 5', contactCategory: 'other', primaryMobile: '9300000005',
-        consentStatus: 'granted', notificationStatus: 'notified',
-      },
-    });
-    expect(withConsentRes.status(), await withConsentRes.text()).toBe(201);
-
-    // Contact #6 exceeds the tenant-configured ceiling of 5 entirely.
-    const overCeilingRes = await page.request.post(`/api/drivers/${primaryDriverId}/contacts`, {
-      headers: { 'X-CSRF-Token': csrf },
-      data: {
-        fullName: 'Threshold Contact 6', contactCategory: 'other', primaryMobile: '9300000006',
+        fullName: 'Contact 11', contactCategory: 'other', primaryMobile: `9${runSuffix}11`,
         consentStatus: 'granted', notificationStatus: 'notified',
       },
     });
     expect(overCeilingRes.status()).toBe(400);
+    expect((await overCeilingRes.json()).code).toBe('CONTACT_POLICY_VIOLATION');
   });
 
   test('A normal Executive-tier session (no driver_contacts_view_full) sees only the top-priority contact, never the full list', async ({ page }) => {

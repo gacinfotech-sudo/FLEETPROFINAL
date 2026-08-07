@@ -71,20 +71,27 @@ export type ConsentStatus = typeof CONSENT_STATUSES[number];
 export const NOTIFICATION_STATUSES = ['not_notified', 'notified', 'acknowledged'] as const;
 export type NotificationStatus = typeof NOTIFICATION_STATUSES[number];
 
-// Contact Data Rule (DRIVER-LIFECYCLE-SPEC.md §2): up to this many contacts
-// per driver require no special tenant policy. Beyond it, the tenant must
-// have configured an explicit businessPurpose (see DriverContactPolicy) and
-// every contact beyond this threshold must have explicit consent/
-// notification status before the driver can reach 'approved'.
-export const DEFAULT_CONTACT_THRESHOLD = 4;
+// Zero-block onboarding policy (docs/driver-recovery/DRIVER-ZERO-BLOCK-ONBOARDING-REPORT.md
+// §6): the tenant's standing contact target is 10, not an opt-in exception —
+// "CONTACT TARGET = 10" is the default, so the free-to-add threshold equals
+// the hard ceiling and no tenant has to configure a businessPurpose just to
+// reach the number the business already asked for. Contacts remain
+// completely optional for onboarding either way; this only governs where
+// the (still-enforced) absolute ceiling and its consent/notification
+// bookkeeping kick in. Was previously 4 — raising it to 10 is the fix for a
+// real, verified block: contactService.createDriverContact() threw
+// ContactPolicyViolationError on a driver's 5th contact by default.
+export const DEFAULT_CONTACT_THRESHOLD = 10;
 // Absolute ceiling regardless of tenant policy (matrix: "configurable
 // maximum up to 10").
 export const HARD_MAX_CONTACTS = 10;
 
-// Minimum required to progress past 'reference_verification' /
-// 'approved' — tenant-configurable in a later iteration; hard-coded
-// defaults here per the spec ("minimum 2 emergency contacts, minimum 2
-// verified references").
+// Advisory-only targets for lifecycle stages that legitimately gate actual
+// road-operation readiness (e.g. 'approved') rather than Driver
+// creation/save/onboarding, which must never be blocked by these. Not
+// currently enforced as a hard requirement anywhere in this module — see
+// eligibility.ts for the one real (and narrowly-scoped, assignment-only)
+// gate this codebase enforces today.
 export const MIN_EMERGENCY_CONTACTS = 2;
 export const MIN_VERIFIED_REFERENCES = 2;
 
