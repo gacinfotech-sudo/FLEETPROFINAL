@@ -1058,13 +1058,23 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div role="radiogroup" aria-label="How certain is the travel date?" className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                           {DATE_CERTAINTY_OPTIONS.map((option) => (
                             <div
                               key={option.value}
                               id={`date-certainty-${option.value}`}
+                              role="radio"
+                              aria-checked={field.value === option.value}
+                              aria-label={option.label}
+                              tabIndex={0}
                               onClick={() => field.onChange(option.value)}
-                              className={`min-w-0 p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md ${
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  field.onChange(option.value);
+                                }
+                              }}
+                              className={`min-w-0 p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
                                 field.value === option.value
                                   ? 'border-blue-500 bg-blue-50 shadow-lg'
                                   : 'border-gray-200 hover:border-gray-300'
