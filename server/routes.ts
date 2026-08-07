@@ -2448,6 +2448,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Single booking by id — genuinely missing until now (found via DEF-001
+  // final retest: every other single-booking need is a sub-resource,
+  // e.g. /api/bookings/:id/payments, so a bare fetch-by-id was never
+  // built). Registered after every literal /api/bookings/<word> route
+  // above (upcoming) so this :id wildcard can't shadow them — Express
+  // matches in registration order. storage.getBooking() already exists
+  // and is already tenant-scoped + ObjectId-validated; this just exposes it.
+  app.get("/api/bookings/:id", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const booking = await storage.getBooking(req.params.id, req.tenantId!);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+      res.json(booking);
+    } catch (error) {
+      console.error('Get booking by id error:', error);
+      res.status(500).json({ message: "Failed to fetch booking" });
+    }
+  });
+
   // Booking wizard draft persistence — one slot per (tenant, user). Purely
   // additive: the Add Booking form works exactly as before if a caller never
   // touches these routes. Scoped to authenticateUser + requireTenant only

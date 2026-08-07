@@ -246,8 +246,16 @@ export class MongoDBStorage implements IStorage {
 
       return user;
     } catch (error) {
+      // SA-01 root cause: this previously swallowed every error (including a
+      // transient MongoDB disconnect/reconnect blip — this app's session
+      // store is Mongo-backed) and returned undefined, which
+      // authenticateUser() cannot distinguish from "no such session" — so a
+      // transient DB hiccup permanently destroyed a perfectly valid session
+      // and force-logged-out the user. Re-throw so the caller can tell
+      // "lookup failed" (retryable) apart from "not found" (destroy the
+      // session) instead of collapsing both into the same undefined.
       console.error('Error getting user by session ID:', error);
-      return undefined;
+      throw error;
     }
   }
 
