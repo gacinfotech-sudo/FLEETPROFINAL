@@ -109,6 +109,17 @@ import { registerBookingQueuesRoutes } from "./booking/queues";
 // TASK-02 (telephony/RBAC isolation) additive import — new namespace only,
 // no existing route/import in this file was touched.
 import { registerTelephonyRoutes } from "./telephony/index";
+// Integrator addition: these six modules landed in trunk with real,
+// tested route handlers but were never wired in here — confirmed live
+// (curl returned 200/SPA-fallback, not 401) before this fix. Purely
+// additive registration, same pattern as the GPS/telephony/booking-queues
+// namespaces above.
+import { registerDriverDomainRoutes } from "./driver/domain/routes";
+import { registerGoogleDriveConnectionRoutes } from "./driver/documents/routes/connectionRoutes";
+import { registerDriverDocumentRoutes } from "./driver/documents/routes/documentRoutes";
+import { registerVehicleHandoverRoutes } from "./driver/handover/routes";
+import { registerGpsBillingRoutes } from "./gps/billing/routes";
+import { registerGpsWebhookRoutes } from "./gps/ingestion/webhookRoute";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -332,6 +343,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // /api/telephony/* namespace only, appended after the existing GPS
   // registrations without reordering or editing any existing line.
   registerTelephonyRoutes(app);
+  // Integrator addition: wire up Driver domain/documents/handover and GPS
+  // billing/webhook — real handlers, already merged into this tree, never
+  // previously mounted (confirmed unreachable via live curl before this fix).
+  registerDriverDomainRoutes(app);
+  registerGoogleDriveConnectionRoutes(app);
+  registerDriverDocumentRoutes(app);
+  registerVehicleHandoverRoutes(app);
+  registerGpsBillingRoutes(app);
+  registerGpsWebhookRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
