@@ -109,6 +109,20 @@ import { registerGpsAssignmentRoutes } from "./gps/routes/assignments";
 // no existing route/import in this file was touched.
 import { registerTelephonyRoutes } from "./telephony/index";
 import { registerBookingQueuesRoutes } from "./booking/queues";
+// Root Control Plane (Wave 1) additive imports — new /api/root/** namespace
+// only, no existing route/import in this file was touched. See
+// docs/root-control-plane/ROOT-INTEGRATION-report.md for the full mount list.
+import { isPlatformRole } from "./root/types";
+import { registerRootDashboardRoutes } from "./root/routes/dashboard";
+import { registerRootTenantRoutes } from "./root/routes/tenants";
+import { registerRootCustomerRoutes } from "./root/routes/customers";
+import { securityRouter } from "./root/routes/security";
+import { auditRouter } from "./root/routes/audit";
+import { registerSupportRoutes } from "./root/routes/support";
+import { registerErrorRoutes } from "./root/routes/errors";
+import { registerSalesRoutes } from "./root/routes/sales";
+import { registerConfigRoutes } from "./root/routes/config";
+import { registerFeatureFlagRoutes } from "./root/routes/features";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -339,6 +353,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // registrations without reordering or editing any existing line.
   registerTelephonyRoutes(app);
   registerBookingQueuesRoutes(app);
+
+  // Root Control Plane (Wave 1) additive registration — new /api/root/**
+  // namespace only. See docs/root-control-plane/ROOT-INTEGRATION-report.md.
+  registerRootDashboardRoutes(app);
+  registerRootTenantRoutes(app);
+  registerRootCustomerRoutes(app);
+  app.use('/api/root', authenticateUser, securityRouter);
+  app.use('/api/root', authenticateUser, auditRouter);
+  registerSupportRoutes(app);
+  registerErrorRoutes(app);
+  registerSalesRoutes(app);
+  registerConfigRoutes(app);
+  registerFeatureFlagRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
