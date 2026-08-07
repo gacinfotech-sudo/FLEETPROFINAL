@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks, Building2, ChevronDown, ChevronRight, Gift } from "lucide-react";
+import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks, Building2, ChevronDown, ChevronRight, Gift, ListFilter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -30,6 +30,7 @@ const navItems = [
   { id: "bookings", label: "Add Booking", icon: Calendar, group: "bookings" },
   { id: "live-bookings", label: "Live Bookings", icon: Radio, group: "bookings" },
   { id: "upcoming-bookings", label: "Upcoming Bookings", icon: CalendarClock, group: "bookings" },
+  { id: "booking-queues", label: "Booking Queues", icon: ListFilter, group: "bookings" },
   { id: "payment-dues", label: "Payment Collection Due", icon: Wallet, group: "bookings" },
   { id: "history", label: "Booking History", icon: History, group: "bookings" },
   { id: "inquiries", label: "Inquiries", icon: PhoneIncoming },
