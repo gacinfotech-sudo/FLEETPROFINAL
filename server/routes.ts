@@ -39,6 +39,14 @@ import {
   mongoDriverSchema,
   mongoBookingSchema
 } from "./schemas/mongodb-schemas";
+// TASK-BOOKING-DOMAIN-02: date-certainty validation (pickupDate
+// conditional on travelDateStatus, tripType). vehicleId/
+// resourceFulfilmentStatus are untouched — that shipped separately. See
+// server/booking/domain/ for the full design.
+import {
+  mongoBookingSchemaWithCertainty,
+  mongoBookingSchemaWithCertaintyPartial,
+} from "./booking/domain";
 import {
   transitionBooking,
   getAllowedNextStatuses,
@@ -97,6 +105,7 @@ import { authenticateDriver, type DriverAuthRequest } from "./middleware/driverA
 import { registerGpsConnectionRoutes } from "./gps/routes/connections";
 import { registerGpsDeviceRoutes } from "./gps/routes/devices";
 import { registerGpsAssignmentRoutes } from "./gps/routes/assignments";
+import { registerBookingQueuesRoutes } from "./booking/queues";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -291,6 +300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerGpsConnectionRoutes(app);
   registerGpsDeviceRoutes(app);
   registerGpsAssignmentRoutes(app);
+  registerBookingQueuesRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
@@ -2374,7 +2384,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // P0 FIX: no longer logging the full mapped booking payload — it
       // contains customer PII (name, phone, email) and financial amounts.
-      const bookingData: any = mongoBookingSchema.parse(mappedData);
+      // TASK-BOOKING-DOMAIN-02: mongoBookingSchemaWithCertainty replaces
+      // the bare mongoBookingSchema here — same base validation (including
+      // the vehicleId/resourceFulfilmentStatus rule right below, untouched
+      // by this task), plus the conditional pickupDate requirement (see
+      // server/booking/domain/bookingCertaintySchema.ts). A caller that
+      // never sends travelDateStatus gets today's exact "pickupDate is
+      // required" behavior unchanged.
+      const bookingData: any = mongoBookingSchemaWithCertainty.parse(mappedData);
 
       // Flexible fulfilment: vehicleId is no longer schema-required (a
       // booking may be confirmed with the physical resource still
@@ -2658,7 +2675,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const bookingData: any = mongoBookingSchema.partial().parse(req.body);
+      // TASK-BOOKING-DOMAIN-02: mongoBookingSchemaWithCertaintyPartial
+      // only enforces the conditional pickupDate requirement when a
+      // request actually touches the date-certainty fields
+      // (travelDateStatus/pickupDate/tentativeStartDate/
+      // tentativeEndDate) — an edit that only changes e.g. `notes` is
+      // completely unaffected.
+      const bookingData: any = mongoBookingSchemaWithCertaintyPartial.parse(req.body);
 
       // advanceReceived is a ledger-derived cached summary, not a plain
       // editable field, once a booking exists — allowing a raw overwrite
