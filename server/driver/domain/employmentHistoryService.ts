@@ -16,7 +16,10 @@ async function assertDriverExists(tenantId: string, driverId: string): Promise<v
 export async function createEmploymentHistoryEntry(params: {
   tenantId: string; driverId: string; actor: ActorRef;
   employerName: string; role?: string; startDate: Date | string; endDate?: Date | string;
-  contactForVerification?: string; notes?: string;
+  contactForVerification?: string;
+  supervisorName?: string; supervisorMobile?: string;
+  experienceLetterLink?: string; experienceCertificateLink?: string;
+  notes?: string;
 }): Promise<IDriverEmploymentHistory> {
   const { tenantId, driverId, actor } = params;
   await assertDriverExists(tenantId, driverId);
@@ -28,6 +31,10 @@ export async function createEmploymentHistoryEntry(params: {
     startDate: params.startDate,
     endDate: params.endDate,
     contactForVerification: params.contactForVerification,
+    supervisorName: params.supervisorName,
+    supervisorMobile: params.supervisorMobile,
+    experienceLetterLink: params.experienceLetterLink,
+    experienceCertificateLink: params.experienceCertificateLink,
     notes: params.notes,
   });
 
