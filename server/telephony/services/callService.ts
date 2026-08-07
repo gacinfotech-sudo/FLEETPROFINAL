@@ -254,35 +254,39 @@ export async function resolveInboundEvent(event: NormalizedTelephonyEvent): Prom
   }
   const tenantId = String(identity.tenantId);
 
-  const existing = await storage.findCallSessionByProviderCallId(tenantId, event.providerCallId);
-  if (existing) {
-    // Duplicate delivery of the same provider event — update in place
-    // instead of creating a second popup/record.
-    return storage.updateCallSessionFields(existing.id, tenantId, {
+  // Atomic find-or-create keyed on (tenantId, providerCallId) — see
+  // upsertInboundCallSession's own comment for why this replaced a
+  // find-then-create check-then-act pattern (a real concurrent-webhook
+  // duplicate-delivery race, not hypothetical).
+  const { session: call, created } = await storage.upsertInboundCallSession(
+    tenantId,
+    event.providerCallId,
+    {
+      direction: 'inbound',
+      userId: identity.userId,
+      assignedUserId: identity.userId,
+      fromNumber: event.fromNumber,
+      toNumber: event.toNumber,
+      virtualNumber: event.virtualNumber,
+      providerKey: telephonyProvider.providerKey,
+      providerAgentId: event.providerAgentId,
+      startedAt: event.occurredAt,
+      notes: [],
+      reassignmentHistory: [],
+      createdBy: { userId: 'system', role: 'admin' },
+    } as Partial<ICallSession>,
+    {
       status: event.status,
       durationSeconds: event.durationSeconds,
       updatedBy: { userId: 'system', role: 'admin' },
-    } as Partial<ICallSession>);
-  }
+    } as Partial<ICallSession>,
+  );
 
-  const call = await storage.createCallSessionRecord({
-    tenantId: tenantId as any,
-    direction: 'inbound',
-    status: event.status,
-    userId: identity.userId,
-    assignedUserId: identity.userId,
-    fromNumber: event.fromNumber,
-    toNumber: event.toNumber,
-    virtualNumber: event.virtualNumber,
-    providerKey: telephonyProvider.providerKey,
-    providerCallId: event.providerCallId,
-    providerAgentId: event.providerAgentId,
-    startedAt: event.occurredAt,
-    notes: [],
-    reassignmentHistory: [],
-    createdBy: { userId: 'system', role: 'admin' },
-    updatedBy: { userId: 'system', role: 'admin' },
-  } as Partial<ICallSession>);
+  if (!created) {
+    // Duplicate delivery of the same provider event — updated in place,
+    // no second popup/record, no re-notification.
+    return call;
+  }
 
   // Screen-pop goes to exactly the routed executive's user channel — not
   // broadcast tenant-wide (spec: "Do not broadcast every incoming customer
