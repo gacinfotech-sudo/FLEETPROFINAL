@@ -3192,6 +3192,19 @@ const BookingDraftSchema = new Schema<IBookingDraft>({
   updatedAt: { type: Date, default: Date.now },
 });
 BookingDraftSchema.index({ tenantId: 1, userId: 1 }, { unique: true });
+// DEF-002 fix: a draft with no activity for 24h is considered abandoned.
+// MongoDB's TTL monitor sweeps expired documents automatically (~every 60s,
+// eventually-consistent, not instant) — no app-level filtering needed, and
+// this is additive: existing drafts simply gain an expiry from their
+// current `updatedAt`, nothing else about draft read/write/clear behavior
+// changes. Indexed on `updatedAt` (refreshed on every autosave), not
+// `createdAt`, so an actively-edited draft never expires mid-session —
+// only one truly abandoned since its last save. 24h chosen as a
+// reasonable default for "don't lose today's interrupted work, do stop
+// resurfacing indefinitely" — no existing tenant-configurable TTL
+// convention was found elsewhere in this codebase to match instead; tune
+// via TTL if a product decision sets a different value.
+BookingDraftSchema.index({ updatedAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 });
 export const BookingDraft = mongoose.model<IBookingDraft>('BookingDraft', BookingDraftSchema);
 
 // Cross-process mutex for Booking creation against a standalone (non-replica-set)
