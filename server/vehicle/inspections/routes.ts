@@ -5,7 +5,7 @@
 import type { Express, Response } from 'express';
 import { authenticateUser, requireTenant, type AuthRequest } from '../../middleware/auth';
 import { PERMISSIONS, requirePermission } from '../../middleware/permissions';
-import { computeSafetyHold, listDailyInspections, recordDailyInspection, resolveInspectionDefect } from './service';
+import { computeSafetyHold, findActiveBookingsRequiringSafetyReview, listDailyInspections, recordDailyInspection, resolveInspectionDefect } from './service';
 import type { InspectionDefectSeverity } from './models/dailyInspection';
 
 export function registerVehicleInspectionRoutes(app: Express): void {
@@ -62,7 +62,14 @@ export function registerVehicleInspectionRoutes(app: Express): void {
 
   app.get('/api/vehicles/:vehicleId/safety-hold', authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_VEHICLES), async (req: AuthRequest, res: Response) => {
     try {
-      res.json(await computeSafetyHold(req.tenantId!, req.params.vehicleId));
+      const result = await computeSafetyHold(req.tenantId!, req.params.vehicleId);
+      // "SAFETY REVIEW REQUIRED" signal (TASK-VEHICLE-SAFETY-ELIGIBILITY):
+      // only computed when actually on hold, and purely additive/read-only
+      // — no booking is touched by this request.
+      const activeBookingsRequiringReview = result.safetyHold
+        ? await findActiveBookingsRequiringSafetyReview(req.tenantId!, req.params.vehicleId)
+        : [];
+      res.json({ ...result, activeBookingsRequiringReview });
     } catch (error) {
       res.status(500).json({ message: 'Failed to compute safety hold status' });
     }
