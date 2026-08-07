@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { storage } from "../storage-mongodb";
+import { isPlatformRole } from "../root/types";
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -84,11 +85,25 @@ export const requireAdmin = (req: AuthRequest, res: Response, next: NextFunction
 };
 
 export const requireTenant = (req: AuthRequest, res: Response, next: NextFunction) => {
-  // Admin users can access all tenant resources
-  if (req.user?.role === "admin") {
+  // Platform staff (a VALID, recognized platformRole) can access all tenant
+  // resources. This REPLACES the old unconditional, unaudited
+  // `role === "admin"` bypass — see TASK-ROOT-SECURITY-05's report for the
+  // full before/after behavior analysis. `role` itself is untouched: a
+  // user can still be role:'admin' for `requireAdmin`-gated /api/admin/**
+  // routes while separately holding (or not holding) a platformRole for
+  // requireTenant-gated routes.
+  //
+  // Validated via isPlatformRole(), not a bare truthy check (integration
+  // review fix): the migration script itself only ever writes validated
+  // values, but this is the core cross-tenant bypass for the WHOLE app —
+  // it must fail closed against any future write path (a manual DB edit,
+  // a raw-driver write, a bug in not-yet-built Root User Management) that
+  // could leave an unrecognized string in this field, not just against
+  // paths this integration happens to control today.
+  if (isPlatformRole(req.user?.platformRole)) {
     return next();
   }
-  
+
   // Every non-admin role must have a tenant. Letting an orphaned manager
   // through is unsafe because optional tenant scopes are interpreted by the
   // storage layer as an intentional admin/cross-tenant query.

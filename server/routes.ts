@@ -163,12 +163,19 @@ export function getSessionMiddleware(): ReturnType<typeof session> | undefined {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // P0 SECURITY HELPER: admin users are allowed cross-tenant access (see
-  // requireTenant middleware); everyone else must be scoped to their own
-  // tenant on every single-record read/update/delete to prevent IDOR
-  // (one tenant reading/modifying another tenant's data by guessing an id).
+  // P0 SECURITY HELPER: platform staff (a VALID, recognized platformRole)
+  // are allowed cross-tenant access (see requireTenant middleware);
+  // everyone else must be scoped to their own tenant on every single-record
+  // read/update/delete to prevent IDOR (one tenant reading/modifying
+  // another tenant's data by guessing an id). Replaces the old
+  // `role === "admin"` bypass — see TASK-ROOT-SECURITY-05's report for the
+  // full before/after behavior analysis. Validated via isPlatformRole(),
+  // not a bare truthy check (integration review fix) — mirrors
+  // requireTenant's own hardening in server/middleware/auth.ts; see that
+  // file's comment for why this must fail closed independent of what
+  // currently writes this field.
   const scopeTenant = (req: AuthRequest): string | undefined =>
-    req.user?.role === "admin" ? undefined : req.tenantId;
+    isPlatformRole(req.user?.platformRole) ? undefined : req.tenantId;
 
   const escapeRegex = (value: string): string =>
     value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
