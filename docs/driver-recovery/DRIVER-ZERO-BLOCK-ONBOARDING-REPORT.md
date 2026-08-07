@@ -101,14 +101,35 @@ reports `10/10` and correctly excludes contacts from the `missing` list.
 This is the foundational piece the reminder popup, dashboard indicator, and filters below
 would all read from — none of those consumers exist yet.
 
+## Third fix: Driver 360 completeness reminder card
+
+Added `client/src/components/drivers/driver-completeness-card.tsx` in
+`driver-onboarding-interface` (commit `b6e3558`), wired into `Driver360` above the tabs —
+persistent, non-blocking, severity-colored (blue/amber/red by overall %) summary reading
+the new completeness endpoint, with a section breakdown and missing-items list. "Remind
+Later" collapses it to one line for the rest of the browser session (in-memory, not
+persisted — a fresh session shows it expanded again). No "Continue Anyway" action exists
+because the card never blocks anything to begin with.
+
+This is a simplified version of §4-5's full popup spec (no "Complete Now" jump-to-tab
+action, no modal/popup presentation — it's an inline card) but covers the substance: always
+visible, accurate, non-blocking, dismissible-not-disappearing.
+
+**Verified:** `npm run check` clean. Ran the existing, already-passing
+`driver-ui-onboarding-360.spec.ts` live (dedicated dev server, port 5072) — all 3 tests
+still pass, confirming no rendering regression. The card correctly renders nothing on this
+worktree's own server build, since the completeness API isn't mounted here (different,
+unmerged worktree) — proves graceful degradation, but **full visual verification with real
+populated data was not done**, since that requires both worktrees' changes running
+together, which is Integrator-owned scope once both are merged.
+
 ## What this pass did NOT do — remaining scope
 
 None of the following were implemented. Each is a real, separate piece of work, not a
 quick follow-on:
 
-- **Always-on reminder popup** (§4-5) with severity classification (info/amber/red),
-  "Complete Now / Remind Later / Continue Anyway" actions, and session-scoped dismissal
-  memory: not built.
+- **"Complete Now" jump-to-tab action and true modal/popup presentation** (§4-5): the
+  reminder card above covers the substance but not this exact interaction.
 - **Three always-visible employer slots** (§9): the existing
   `driver-employment-history-panel.tsx` is a dynamic add-one-at-a-time list, not a
   fixed "Employer 1 / 2 / 3" layout. A concurrent session (commit `a43f886` in
@@ -134,12 +155,13 @@ quick follow-on:
 
 ## Final state
 
-**Not `DRIVER_ZERO_BLOCK_ONBOARDING_VERIFIED`.** Two real, verified pieces landed:
-`PARTIAL — CONTACT_THRESHOLD_BLOCK_FIXED_AND_VERIFIED, COMPLETENESS_ENGINE_BUILT_AND_VERIFIED`.
-The remaining scope above is substantial and should be treated as separate follow-on work,
-ideally by whichever session(s) already own the adjacent files (the employment-history
-panel is already being actively extended by another session; documents/Drive fields belong
-to `driver-google-documents`).
+**Not `DRIVER_ZERO_BLOCK_ONBOARDING_VERIFIED`.** Three real, verified pieces landed:
+`PARTIAL — CONTACT_THRESHOLD_BLOCK_FIXED_AND_VERIFIED, COMPLETENESS_ENGINE_BUILT_AND_VERIFIED,
+DRIVER_360_REMINDER_CARD_BUILT_AND_VERIFIED (rendering only, not yet visually confirmed with
+real populated data end-to-end)`. The remaining scope above is substantial and should be
+treated as separate follow-on work, ideally by whichever session(s) already own the
+adjacent files (the employment-history panel is already being actively extended by another
+session; documents/Drive fields belong to `driver-google-documents`).
 
 ## Commits
 
@@ -149,11 +171,14 @@ to `driver-google-documents`).
   `index.ts`, `routes.ts` (completeness engine)
 - `driver-onboarding-interface` @ `0ae5430` — `client/src/components/drivers/
   driver-contacts-panel.tsx`, `client/src/components/drivers/driver-domain-constants.ts`
+  (contact-threshold client mirror)
+- `driver-onboarding-interface` @ `b6e3558` — `client/src/components/drivers/
+  driver-completeness-card.tsx`, `driver-360.tsx` (reminder card)
 
 ## Rollback
 
-`git revert 935402d 1308839` on `driver/domain-02-lifecycle` and `git revert 0ae5430` on
-`driver/onboarding-ui-04` — all isolated, additive-only commits with no other committed
+`git revert 935402d 1308839` on `driver/domain-02-lifecycle` and `git revert 0ae5430 b6e3558`
+on `driver/onboarding-ui-04` — all isolated, additive-only commits with no other committed
 work depending on them.
 
 ## Shared wiring required (Integrator)
