@@ -75,26 +75,25 @@ function toTenantSummary(tenant: any, counts: { userCount: number; vehicleCount:
  * contract documents (`User.platformRole`, not yet on the real schema —
  * DOMAIN-01's migration owns actually populating it).
  *
- * Interim bridge (flagged, temporary): until DOMAIN-01's Option A
- * migration (see docs/root-control-plane/ROOT-GAP-MATRIX.md's "Critical
- * design fork") actually lands and populates `platformRole` on real
- * accounts, this also accepts the existing `role === 'admin'` bypass
- * that already grants unscoped cross-tenant access today
- * (server/middleware/auth.ts's `requireTenant`) — an `admin` session is,
- * by definition, not a tenant-scoped session, so this preserves "never
- * reachable by a tenant-scoped session token" while DOMAIN-01's real
- * platform-role persistence isn't in this worktree yet. Integrator: once
- * DOMAIN-01 lands, this bridge should be removed so `admin`-role-without-
- * `platformRole` sessions stop being implicitly admitted.
+ * Deliberately does NOT accept the legacy `role === 'admin'` bypass that
+ * grants unscoped cross-tenant access today (server/middleware/auth.ts's
+ * `requireTenant`) — even though an `admin` session isn't literally
+ * "tenant-scoped" so a bridge would satisfy that specific acceptance
+ * criterion's wording, admitting it here would mean every existing
+ * `admin` account can already reach the new PII-touching /api/root/**
+ * surface (Global Customer Database, Tenant 360) before anyone has been
+ * explicitly granted a platform role — the exact gap Option A exists to
+ * close. Reconciled to match TASK-ROOT-SUPPORT-03/TASK-ROOT-SALES-CONFIG-04's
+ * independent placeholders, which both reject this same case (see their
+ * "legacy 'admin' role session (no platformRole) -> 403" tests). Until
+ * DOMAIN-01's migration lands and populates `platformRole` on real
+ * accounts, this route surface is simply unreachable by anyone — a
+ * stricter, safer default than a temporarily-open bridge.
  */
 function requirePlatformRole(allowed: PlatformRole[]): Middleware {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     const platformRole: PlatformRole | undefined = (req.user as any)?.platformRole;
     if (platformRole && allowed.includes(platformRole)) {
-      return next();
-    }
-    // Interim bridge — see function doc comment above.
-    if (!platformRole && req.user?.role === 'admin') {
       return next();
     }
     return res.status(403).json({ message: 'Platform access required' });

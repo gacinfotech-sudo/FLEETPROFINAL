@@ -73,14 +73,20 @@ describe('requirePlatformRole (tenant-isolation / 403 proof)', () => {
     assert.equal(r.statusCode, 403);
   });
 
-  test('interim bridge: today\'s existing role==="admin" session (no platformRole yet) is admitted', () => {
-    // Flagged, temporary — see localRootAccessService.ts's doc comment.
-    // An `admin`-role session is NOT tenant-scoped (it already bypasses
-    // requireTenant today), so admitting it here does not violate "never
-    // reachable by a tenant-scoped session token."
+  test('today\'s existing role==="admin" session with no platformRole is rejected with 403 (no bypass into the new Root surface)', () => {
+    // Reconciled during integration review: an earlier draft of this
+    // placeholder admitted a bare `admin` session as an "interim bridge"
+    // (an admin session isn't literally tenant-scoped, so it satisfied
+    // that specific acceptance-criterion wording) — but that would let
+    // every existing admin account reach the new PII-touching /api/root/**
+    // surface before anyone has an explicit platform role, which is
+    // exactly the gap Option A exists to close. Matches
+    // TASK-ROOT-SUPPORT-03/TASK-ROOT-SALES-CONFIG-04's independent
+    // placeholders, which both reject this same case.
     const { req, res, next, result } = mockReqRes({ userId: 'u5', role: 'admin' });
     localRootAccessService.requirePlatformRole(ALL_ROLES)(req, res, next);
     const r = result();
-    assert.equal(r.nextCalled, true);
+    assert.equal(r.nextCalled, false);
+    assert.equal(r.statusCode, 403);
   });
 });
