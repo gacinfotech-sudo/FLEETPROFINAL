@@ -117,9 +117,14 @@ import { registerBookingQueuesRoutes } from "./booking/queues";
 import { registerDriverDomainRoutes } from "./driver/domain/routes";
 import { registerGoogleDriveConnectionRoutes } from "./driver/documents/routes/connectionRoutes";
 import { registerDriverDocumentRoutes } from "./driver/documents/routes/documentRoutes";
-import { registerVehicleHandoverRoutes } from "./driver/handover/routes";
+import { registerVehicleHandoverRoutes, acceptHandoverHandler, getPendingHandoversForDriverPortal } from "./driver/handover/index";
 import { registerGpsBillingRoutes } from "./gps/billing/routes";
 import { registerGpsWebhookRoutes } from "./gps/ingestion/webhookRoute";
+import { registerVehicleDocumentRoutes } from "./vehicle/documents/routes";
+import { registerVehicleMaintenanceRoutes } from "./vehicle/maintenance/routes";
+import { registerVehicleFuelRoutes } from "./vehicle/expenses/routes";
+import { registerVehicleFastagRoutes } from "./vehicle/fastag/routes";
+import { registerVehicleIncidentRoutes } from "./vehicle/incidents/routes";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -352,6 +357,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerVehicleHandoverRoutes(app);
   registerGpsBillingRoutes(app);
   registerGpsWebhookRoutes(app);
+  registerVehicleDocumentRoutes(app);
+  registerVehicleMaintenanceRoutes(app);
+  registerVehicleFuelRoutes(app);
+  registerVehicleFastagRoutes(app);
+  registerVehicleIncidentRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
@@ -715,7 +725,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/driver-portal/me", authenticateDriver, async (req: DriverAuthRequest, res) => {
-    res.json({ id: req.driver._id, name: req.driver.name, phone: req.driver.phone, status: req.driver.status });
+    const pendingHandovers = await getPendingHandoversForDriverPortal(String(req.driver.tenantId), req.driverId!);
+    res.json({ id: req.driver._id, name: req.driver.name, phone: req.driver.phone, status: req.driver.status, pendingHandovers });
   });
 
   // A driver's own assigned duties only — scoped by BOTH driverId and the
@@ -752,6 +763,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to accept duty" });
     }
   });
+
+  // TASK-VEHICLE-HANDOVER-05 — the ONE new driver-portal-reachable route
+  // this task adds.
+  app.post("/api/driver-portal/handovers/:id/accept", authenticateDriver, acceptHandoverHandler);
 
   // Staff-side PIN management — a driver can never set/see their own PIN
   // hash; only office staff with MANAGE_DRIVERS can set or reset one, the

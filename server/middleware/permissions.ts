@@ -137,4 +137,18 @@ export const PERMISSIONS = {
   CALL_REASSIGN: 'call.reassign',
   TELEPHONY_IDENTITY_VIEW: 'telephony.identity.view',
   TELEPHONY_IDENTITY_MANAGE: 'telephony.identity.manage',
+  // Vehicle 360 batch — dot-namespaced per the GPS block's established
+  // convention (CURRENT-FLEET-MODULE-AUDIT.md §9). Core Vehicle CRUD
+  // continues to reuse the existing MANAGE_VEHICLES; VIEW_REVENUE continues
+  // to gate the Profitability tab — neither is duplicated here.
+  VEHICLE_COMPLIANCE_VIEW: 'vehicle.compliance.view',
+  VEHICLE_COMPLIANCE_MANAGE: 'vehicle.compliance.manage',
+  VEHICLE_MAINTENANCE_VIEW: 'vehicle.maintenance.view',
+  VEHICLE_MAINTENANCE_MANAGE: 'vehicle.maintenance.manage',
+  VEHICLE_EXPENSE_VIEW: 'vehicle.expense.view',
+  VEHICLE_EXPENSE_MANAGE: 'vehicle.expense.manage',
+  VEHICLE_FASTAG_VIEW: 'vehicle.fastag.view',
+  VEHICLE_FASTAG_MANAGE: 'vehicle.fastag.manage',
+  VEHICLE_INCIDENTS_VIEW: 'vehicle.incidents.view',
+  VEHICLE_INCIDENTS_MANAGE: 'vehicle.incidents.manage',
 } as const;
