@@ -7,14 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Briefcase, Plus, CheckCircle2, XCircle, Trash2 } from "lucide-react";
+import { Briefcase, Plus, CheckCircle2, XCircle, Trash2, FileText, ExternalLink } from "lucide-react";
 import { verificationBadgeClass } from "./driver-domain-constants";
 
 interface Props {
   driverId: string;
 }
 
-const emptyForm = { employerName: "", role: "", startDate: "", endDate: "", contactForVerification: "", notes: "" };
+const emptyForm = {
+  employerName: "", role: "", startDate: "", endDate: "",
+  supervisorName: "", supervisorMobile: "",
+  experienceLetterLink: "", experienceCertificateLink: "",
+  contactForVerification: "", notes: "",
+};
 
 export default function DriverEmploymentHistoryPanel({ driverId }: Props) {
   const { toast } = useToast();
@@ -89,8 +94,24 @@ export default function DriverEmploymentHistoryPanel({ driverId }: Props) {
               <Label>End Date</Label>
               <Input type="date" value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} />
             </div>
+            <div>
+              <Label>Supervisor</Label>
+              <Input value={form.supervisorName} onChange={(e) => setForm((f) => ({ ...f, supervisorName: e.target.value }))} placeholder="Supervisor's name" />
+            </div>
+            <div>
+              <Label>Supervisor Mobile</Label>
+              <Input type="tel" value={form.supervisorMobile} onChange={(e) => setForm((f) => ({ ...f, supervisorMobile: e.target.value }))} placeholder="+91…" />
+            </div>
+            <div>
+              <Label>Experience Letter</Label>
+              <Input value={form.experienceLetterLink} onChange={(e) => setForm((f) => ({ ...f, experienceLetterLink: e.target.value }))} placeholder="Upload / Drive link" />
+            </div>
+            <div>
+              <Label>Experience Certificate</Label>
+              <Input value={form.experienceCertificateLink} onChange={(e) => setForm((f) => ({ ...f, experienceCertificateLink: e.target.value }))} placeholder="Upload / Drive link" />
+            </div>
             <div className="sm:col-span-2">
-              <Label>Contact for Verification</Label>
+              <Label>Employer Reference</Label>
               <Input value={form.contactForVerification} onChange={(e) => setForm((f) => ({ ...f, contactForVerification: e.target.value }))} placeholder="Phone/email of a reference at this employer" />
             </div>
             <div className="sm:col-span-2">
@@ -127,6 +148,25 @@ export default function DriverEmploymentHistoryPanel({ driverId }: Props) {
                 <p className="text-xs text-gray-500 mt-1">
                   {entry.startDate ? new Date(entry.startDate).toLocaleDateString() : "?"} – {entry.endDate ? new Date(entry.endDate).toLocaleDateString() : "Present"}
                 </p>
+                {(entry.supervisorName || entry.supervisorMobile) && (
+                  <p className="text-xs text-gray-500 mt-0.5 truncate">
+                    Supervisor: {entry.supervisorName || "—"}{entry.supervisorMobile ? ` · ${entry.supervisorMobile}` : ""}
+                  </p>
+                )}
+                {(entry.experienceLetterLink || entry.experienceCertificateLink) && (
+                  <div className="flex flex-wrap gap-3 mt-1">
+                    {entry.experienceLetterLink && (
+                      <a href={entry.experienceLetterLink} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
+                        <FileText className="h-3 w-3" /> Experience Letter <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                    {entry.experienceCertificateLink && (
+                      <a href={entry.experienceCertificateLink} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
+                        <FileText className="h-3 w-3" /> Experience Certificate <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
               {entry.isActive !== false && (
                 <div className="flex gap-1 shrink-0">
