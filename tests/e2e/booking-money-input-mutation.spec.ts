@@ -128,6 +128,13 @@ test.describe('Booking money fields — root-cause regression (input mutation + 
     // pre-filled type="number" input than selectText()+Backspace, which
     // was found not to reliably clear a non-empty default (see report).
     await baseAmountInput.fill('');
+    // Root-cause fix (this pass): assert the DOM is actually empty before
+    // typing resumes. Without this, pressSequentially() can start before
+    // React's async re-render from fill('')'s onChange has committed,
+    // landing keystrokes on a DOM node that still shows the stale
+    // pre-fill value (e.g. the "1000" day-rate default) — producing
+    // concatenation like "10006000" intermittently, not a real app bug.
+    await expect(baseAmountInput).toHaveValue('');
     await baseAmountInput.pressSequentially('6000', { delay: 40 });
     await expect(baseAmountInput).toHaveValue('6000');
 
@@ -148,6 +155,13 @@ test.describe('Booking money fields — root-cause regression (input mutation + 
     // pre-filled type="number" input than selectText()+Backspace, which
     // was found not to reliably clear a non-empty default (see report).
     await baseAmountInput.fill('');
+    // Root-cause fix (this pass): assert the DOM is actually empty before
+    // typing resumes. Without this, pressSequentially() can start before
+    // React's async re-render from fill('')'s onChange has committed,
+    // landing keystrokes on a DOM node that still shows the stale
+    // pre-fill value (e.g. the "1000" day-rate default) — producing
+    // concatenation like "10006000" intermittently, not a real app bug.
+    await expect(baseAmountInput).toHaveValue('');
     await baseAmountInput.pressSequentially('6000', { delay: 40 });
     await expect(baseAmountInput).toHaveValue('6000');
 
@@ -180,6 +194,13 @@ test.describe('Booking money fields — root-cause regression (input mutation + 
     // pre-filled type="number" input than selectText()+Backspace, which
     // was found not to reliably clear a non-empty default (see report).
     await baseAmountInput.fill('');
+    // Root-cause fix (this pass): assert the DOM is actually empty before
+    // typing resumes. Without this, pressSequentially() can start before
+    // React's async re-render from fill('')'s onChange has committed,
+    // landing keystrokes on a DOM node that still shows the stale
+    // pre-fill value (e.g. the "1000" day-rate default) — producing
+    // concatenation like "10006000" intermittently, not a real app bug.
+    await expect(baseAmountInput).toHaveValue('');
     await baseAmountInput.pressSequentially('6000', { delay: 40 });
     await expect(baseAmountInput).toHaveValue('6000');
 
@@ -216,6 +237,13 @@ test.describe('Booking money fields — root-cause regression (input mutation + 
     // pre-filled type="number" input than selectText()+Backspace, which
     // was found not to reliably clear a non-empty default (see report).
     await baseAmountInput.fill('');
+    // Root-cause fix (this pass): assert the DOM is actually empty before
+    // typing resumes. Without this, pressSequentially() can start before
+    // React's async re-render from fill('')'s onChange has committed,
+    // landing keystrokes on a DOM node that still shows the stale
+    // pre-fill value (e.g. the "1000" day-rate default) — producing
+    // concatenation like "10006000" intermittently, not a real app bug.
+    await expect(baseAmountInput).toHaveValue('');
     await baseAmountInput.pressSequentially('9797', { delay: 40 });
     await expect(baseAmountInput).toHaveValue('9797');
 

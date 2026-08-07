@@ -79,7 +79,18 @@ const bookingSchema = z.object({
   tentativeStartDate: z.string().optional(),
   tentativeEndDate: z.string().optional(),
   followUpAt: z.string().optional(),
-  amount: z.number().min(1, "Amount is required"),
+  // Optional at the schema level so a transient `undefined` while the user
+  // is mid-clear does not fail live (mode:"onChange") validation — a
+  // non-optional z.number().min(1) here was the confirmed root cause of
+  // the clear-then-shows-"0" bug (see TASK-MONEY-ROOTCAUSE-01's report):
+  // the `defaultValues.amount = undefined` fix alone did not resolve it
+  // (independently re-verified, still reproduces), because the schema
+  // itself — not just the default — is what RHF's zodResolver falls back
+  // against on every keystroke in onChange mode. Actual "is it filled in"
+  // enforcement now lives in onSubmit below, the same procedural-check
+  // pattern already used for vehicleId/resourceMode elsewhere in this file
+  // (schema stays permissive, the submit gate is where it's truly required).
+  amount: z.number().min(1, "Amount is required").optional(),
   totalKilometers: z.number().min(0).optional(),
   tollCharges: z.number().min(0, "Toll charges must be 0 or greater").optional(),
   parkingCharges: z.number().min(0, "Parking charges must be 0 or greater").optional(),
@@ -177,6 +188,50 @@ function describeCombinedBookingStatus(
       : "vendor sourcing in progress";
 
   return `${datePhrase}, ${resourcePhrase}`;
+}
+
+// Root-cause fix for the "clearing Base Amount reverts the DOM to 0"
+// bug (see .claude/tasks/reports/TASK-MONEY-ROOTCAUSE-01-addendum-clear-to-zero.md
+// for the full investigation — two prior hypotheses, defaultValues.amount
+// and schema optionality, were both tested and ruled out; direct render-level
+// instrumentation showed `field.value` from RHF's Controller never actually
+// transitions to `undefined` in the DOM, even though the onChange handler
+// itself computes the correct value). Fix: stop trusting `field.value` as
+// the input's own displayed value at all. Local state is the single source
+// of truth for what's ON SCREEN; it's synced INTO the RHF field on every
+// keystroke (so calculations/submission still see the right number), and
+// synced FROM the RHF field only when an external change (vehicle/pricing
+// selection, form.reset, draft resume) sets it to something this component
+// didn't itself just type — tracked via lastPushedRef so the two directions
+// don't fight each other.
+function BaseAmountField({ field }: { field: { value: number | undefined; onChange: (v: number | undefined) => void } }) {
+  const [display, setDisplay] = useState<string>(field.value != null ? String(field.value) : "");
+  const lastPushedRef = useRef<number | undefined>(field.value);
+
+  useEffect(() => {
+    if (field.value !== lastPushedRef.current) {
+      setDisplay(field.value != null ? String(field.value) : "");
+      lastPushedRef.current = field.value;
+    }
+  }, [field.value]);
+
+  return (
+    <Input
+      type="text"
+      inputMode="decimal"
+      placeholder="Enter final amount"
+      value={display}
+      onChange={(e) => {
+        const raw = e.target.value;
+        if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return;
+        setDisplay(raw);
+        const numeric = raw === "" ? undefined : parseFloat(raw);
+        lastPushedRef.current = numeric;
+        field.onChange(numeric);
+      }}
+      className="h-12 pl-10 text-lg font-medium border-2 border-orange-300 focus:border-orange-500 rounded-lg"
+    />
+  );
 }
 
 export default function EnhancedBookingForm({ onSuccess, initialValues }: EnhancedBookingFormProps) {
@@ -889,6 +944,18 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   };
 
   const onSubmit = async (data: BookingFormData) => {
+    // amount is schema-optional (see bookingSchema's comment) so live
+    // per-keystroke validation never fights a transient cleared field —
+    // this is the real "is it filled in" gate instead, mirroring the
+    // procedural-check pattern already used for vehicleId/resourceMode.
+    if (data.amount === undefined || data.amount === null || !(data.amount > 0)) {
+      toast({
+        title: "Amount is required",
+        description: "Enter the Final Base Amount before submitting.",
+        variant: "destructive",
+      });
+      return;
+    }
     await createBookingMutation.mutateAsync(data);
   };
 
@@ -2678,29 +2745,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                               <FormControl>
                                 <div className="relative">
                                   <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                                  <Input
-                                    type="text"
-                                    inputMode="decimal"
-                                    placeholder="Enter final amount"
-                                    value={field.value ?? ""}
-                                    onChange={(e) => {
-                                      const raw = e.target.value;
-                                      // type="number" has a well-documented React
-                                      // controlled-value reconciliation quirk: React
-                                      // sometimes fails to actually clear/update the
-                                      // DOM on re-render because the browser's own
-                                      // number-input value normalization makes React
-                                      // think nothing changed — this is the root
-                                      // cause of the leading-zero/stuck-value bug
-                                      // confirmed by live testing (see this task's
-                                      // report). text + inputMode="decimal" gives the
-                                      // same numeric keyboard on mobile without that
-                                      // quirk; digits/one-decimal-point only.
-                                      if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return;
-                                      field.onChange(raw === "" ? undefined : parseFloat(raw));
-                                    }}
-                                    className="h-12 pl-10 text-lg font-medium border-2 border-orange-300 focus:border-orange-500 rounded-lg"
-                                  />
+                                  <BaseAmountField field={field} />
                                 </div>
                               </FormControl>
                               <FormMessage />
@@ -2708,7 +2753,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                           )}
                         />
                       </div>
-                      
+
                       {/* Additional Charges Section */}
                       <div className="mt-4">
                         <div className="grid grid-cols-2 gap-4 mb-4">
