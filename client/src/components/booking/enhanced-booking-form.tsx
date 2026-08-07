@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { calculateBookingFinalTotal, calculateRemainingBalance } from "@/lib/money";
 import html2pdf from 'html2pdf.js';
 import BookingConfirmationPDF from "./booking-confirmation-pdf";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
@@ -631,14 +632,15 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
 
   const createBookingMutation = useMutation({
     mutationFn: async (data: BookingFormData) => {
-      // Calculate fuel cost (to be deducted)
-      const totalFuelCost = (data.petrolCharges || 0) + (data.dieselCharges || 0) + (data.cngCharges || 0);
-      
-      // Calculate final total amount: base + toll + parking + misc - fuel
+      // Calculate final total amount: base + toll + parking + misc - fuel.
       // NOTE: Third-party driver charges are NOT deducted from the base amount
-      // They are stored separately for revenue calculation
-      const finalAmount = (data.amount || 0) + (data.tollCharges || 0) + (data.parkingCharges || 0) + (data.miscellaneousAmount || 0) - totalFuelCost;
-      
+      // They are stored separately for revenue calculation.
+      // Uses the shared paise-based utility (client/src/lib/money.ts) — the
+      // single source of truth for this formula, also used by the live
+      // Final Total and Remaining Balance summaries below so all three can
+      // never independently drift from each other again.
+      const finalAmount = calculateBookingFinalTotal(data);
+
       // Send data with the calculated final amount
       const bookingData = {
         ...data,
@@ -2676,11 +2678,27 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                               <FormControl>
                                 <div className="relative">
                                   <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                                  <Input 
-                                    type="number" 
+                                  <Input
+                                    type="text"
+                                    inputMode="decimal"
                                     placeholder="Enter final amount"
-                                    value={field.value || 0}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    value={field.value ?? ""}
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      // type="number" has a well-documented React
+                                      // controlled-value reconciliation quirk: React
+                                      // sometimes fails to actually clear/update the
+                                      // DOM on re-render because the browser's own
+                                      // number-input value normalization makes React
+                                      // think nothing changed — this is the root
+                                      // cause of the leading-zero/stuck-value bug
+                                      // confirmed by live testing (see this task's
+                                      // report). text + inputMode="decimal" gives the
+                                      // same numeric keyboard on mobile without that
+                                      // quirk; digits/one-decimal-point only.
+                                      if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return;
+                                      field.onChange(raw === "" ? undefined : parseFloat(raw));
+                                    }}
                                     className="h-12 pl-10 text-lg font-medium border-2 border-orange-300 focus:border-orange-500 rounded-lg"
                                   />
                                 </div>
@@ -2701,11 +2719,11 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                               <FormItem>
                                 <FormLabel className="text-xs text-gray-600">Toll Charges</FormLabel>
                                 <FormControl>
-                                  <Input 
-                                    type="number" 
+                                  <Input
+                                    type="number"
                                     placeholder="0"
-                                    value={field.value || 0}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    value={field.value ?? ""}
+                                    onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                     className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
                                   />
                                 </FormControl>
@@ -2721,11 +2739,11 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                               <FormItem>
                                 <FormLabel className="text-xs text-gray-600">Parking Charges</FormLabel>
                                 <FormControl>
-                                  <Input 
-                                    type="number" 
+                                  <Input
+                                    type="number"
                                     placeholder="0"
-                                    value={field.value || 0}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    value={field.value ?? ""}
+                                    onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                     className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
                                   />
                                 </FormControl>
@@ -2783,8 +2801,8 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                             <Input
                                               type="number"
                                               placeholder="0"
-                                              value={field.value || 0}
-                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              value={field.value ?? ""}
+                                              onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                               className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
                                             />
                                           </FormControl>
@@ -2802,8 +2820,8 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                             <Input
                                               type="number"
                                               placeholder="0"
-                                              value={field.value || 0}
-                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              value={field.value ?? ""}
+                                              onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                               className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
                                             />
                                           </FormControl>
@@ -2821,8 +2839,8 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                             <Input
                                               type="number"
                                               placeholder="0"
-                                              value={field.value || 0}
-                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              value={field.value ?? ""}
+                                              onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                               className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
                                             />
                                           </FormControl>
@@ -2847,8 +2865,8 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                             <Input
                                               type="number"
                                               placeholder="0"
-                                              value={field.value || 0}
-                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              value={field.value ?? ""}
+                                              onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                               className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
                                             />
                                           </FormControl>
@@ -2947,7 +2965,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                         <div className="flex justify-between text-lg font-bold">
                           <span>Final Total:</span>
                           <span className="text-green-600">
-                            ₹{(watchedValues.amount || 0) + (watchedValues.tollCharges || 0) + (watchedValues.parkingCharges || 0) + (watchedValues.miscellaneousAmount || 0) - (watchedValues.petrolCharges || 0) - (watchedValues.dieselCharges || 0) - (watchedValues.cngCharges || 0)}
+                            ₹{calculateBookingFinalTotal(watchedValues)}
                           </span>
                         </div>
                       </div>
@@ -3154,11 +3172,12 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                         <div className="flex justify-between text-base font-semibold border-t pt-3">
                           <span>Remaining Balance:</span>
                           <span className="text-blue-700">
-                            ₹{Math.max(0,
-                              (watchedValues.amount || 0) + (watchedValues.tollCharges || 0) + (watchedValues.parkingCharges || 0) + (watchedValues.miscellaneousAmount || 0)
-                              - (watchedValues.petrolCharges || 0) - (watchedValues.dieselCharges || 0) - (watchedValues.cngCharges || 0)
-                              - (watchedValues.advanceReceived || 0)
-                              - ((watchedValues.redeemPoints && watchedValues.redeemPoints >= minPointsToRedeem) ? watchedValues.redeemPoints * redemptionValuePerPoint : 0)
+                            ₹{calculateRemainingBalance(
+                              watchedValues,
+                              watchedValues.advanceReceived,
+                              (watchedValues.redeemPoints && watchedValues.redeemPoints >= minPointsToRedeem)
+                                ? watchedValues.redeemPoints * redemptionValuePerPoint
+                                : 0
                             )}
                           </span>
                         </div>
