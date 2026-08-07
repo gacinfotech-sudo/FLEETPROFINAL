@@ -84,7 +84,7 @@ export default function Vehicle360Page() {
         <TabsContent value="overview"><OverviewTab vehicle={vehicle} /></TabsContent>
         <TabsContent value="compliance"><ComplianceTab vehicleId={vehicle._id} /></TabsContent>
         <TabsContent value="maintenance"><MaintenanceTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="inspections"><DailyInspectionsTab /></TabsContent>
+        <TabsContent value="inspections"><DailyInspectionsTab vehicleId={vehicle._id} /></TabsContent>
         <TabsContent value="tyres"><TyresTab vehicleId={vehicle._id} /></TabsContent>
         <TabsContent value="battery"><BatteryTab vehicleId={vehicle._id} /></TabsContent>
         <TabsContent value="fuel"><FuelTab vehicleId={vehicle._id} /></TabsContent>

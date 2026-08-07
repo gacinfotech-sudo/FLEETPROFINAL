@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/use-auth";
 import { usePermissions } from "../hooks/use-permissions";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import Sidebar from "../components/layout/sidebar";
 import EnhancedStats from "../components/dashboard/enhanced-stats";
 import EnhancedBookingForm from "../components/booking/enhanced-booking-form";
@@ -1174,6 +1174,9 @@ export default function Dashboard() {
                           <Button size="sm" variant="secondary" className="flex-1" onClick={() => handleViewVehicle(vehicle)}>
                             View Profile
                           </Button>
+                          <Link href={`/vehicles/${vehicle._id || vehicle.id}`} className="flex-1">
+                            <Button size="sm" variant="outline" className="w-full">View 360</Button>
+                          </Link>
                           {canManageFleet() && <>
                             <Button size="sm" variant="outline" className="flex-1" onClick={() => handleEditVehicle(vehicle)}>
                               Edit
@@ -1248,6 +1251,9 @@ export default function Dashboard() {
                                 >
                                   View Profile
                                 </Button>
+                                <Link href={`/vehicles/${vehicle._id || vehicle.id}`}>
+                                  <Button variant="ghost" size="sm">View 360</Button>
+                                </Link>
                                 {canManageFleet() && <>
                                   <Button 
                                     variant="ghost" 

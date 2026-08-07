@@ -105,6 +105,7 @@ import { authenticateDriver, type DriverAuthRequest } from "./middleware/driverA
 import { registerGpsConnectionRoutes } from "./gps/routes/connections";
 import { registerGpsDeviceRoutes } from "./gps/routes/devices";
 import { registerGpsAssignmentRoutes } from "./gps/routes/assignments";
+import { registerGpsVehicleStateRoutes } from "./gps/routes/vehicleState";
 import { registerGpsWebhookRoutes } from "./gps/ingestion/webhookRoute";
 import { registerGpsBillingRoutes } from "./gps/billing/routes";
 import { registerBookingQueuesRoutes } from "./booking/queues";
@@ -117,6 +118,7 @@ import { registerVehicleMaintenanceRoutes } from "./vehicle/maintenance/routes";
 import { registerVehicleFuelRoutes } from "./vehicle/expenses/routes";
 import { registerVehicleFastagRoutes } from "./vehicle/fastag/routes";
 import { registerVehicleIncidentRoutes } from "./vehicle/incidents/routes";
+import { registerVehicleInspectionRoutes } from "./vehicle/inspections/routes";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -311,6 +313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerGpsConnectionRoutes(app);
   registerGpsDeviceRoutes(app);
   registerGpsAssignmentRoutes(app);
+  registerGpsVehicleStateRoutes(app);
   registerGpsWebhookRoutes(app);
   registerGpsBillingRoutes(app);
   registerBookingQueuesRoutes(app);
@@ -322,6 +325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerVehicleFuelRoutes(app);
   registerVehicleFastagRoutes(app);
   registerVehicleIncidentRoutes(app);
+  registerVehicleInspectionRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
@@ -1636,6 +1640,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error reactivating sub-user:", error);
       res.status(500).json({ message: "Failed to reactivate sub-user" });
+    }
+  });
+
+  // Permissions a manager can be granted through this endpoint — the
+  // original 4 defaults plus the Vehicle 360 batch's vehicle.* set (Final
+  // Vehicle 360 Integrator, "Open follow-ups" #3: these were added to
+  // PERMISSIONS/requirePermission but had no way to actually be assigned to
+  // a manager after creation). Deliberately not the full ~80-entry
+  // PERMISSIONS object — expanding this to every module's permissions is
+  // out of scope here.
+  const MANAGER_ASSIGNABLE_PERMISSIONS = new Set<string>([
+    PERMISSIONS.CREATE_BOOKING,
+    PERMISSIONS.VIEW_BOOKINGS,
+    PERMISSIONS.EDIT_BOOKING,
+    PERMISSIONS.GENERATE_INVOICE,
+    PERMISSIONS.VEHICLE_COMPLIANCE_VIEW,
+    PERMISSIONS.VEHICLE_COMPLIANCE_MANAGE,
+    PERMISSIONS.VEHICLE_MAINTENANCE_VIEW,
+    PERMISSIONS.VEHICLE_MAINTENANCE_MANAGE,
+    PERMISSIONS.VEHICLE_EXPENSE_VIEW,
+    PERMISSIONS.VEHICLE_EXPENSE_MANAGE,
+    PERMISSIONS.VEHICLE_FASTAG_VIEW,
+    PERMISSIONS.VEHICLE_FASTAG_MANAGE,
+    PERMISSIONS.VEHICLE_INCIDENTS_VIEW,
+    PERMISSIONS.VEHICLE_INCIDENTS_MANAGE,
+  ]);
+
+  app.patch("/api/users/sub-users/:userId/permissions", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin' && req.user?.role !== 'client') {
+        return res.status(403).json({ message: "Access denied. Only admins and clients can edit manager permissions." });
+      }
+
+      const requested = req.body.permissions;
+      if (!Array.isArray(requested) || !requested.every((p) => typeof p === 'string')) {
+        return res.status(400).json({ message: "permissions must be an array of strings." });
+      }
+      const invalid = requested.filter((p) => !MANAGER_ASSIGNABLE_PERMISSIONS.has(p));
+      if (invalid.length > 0) {
+        return res.status(400).json({ message: `Unknown or non-assignable permission(s): ${invalid.join(', ')}` });
+      }
+
+      const updated = await storage.updateSubUserPermissions(req.params.userId, requested, scopeTenant(req));
+      const { password, ...userResponse } = updated.toObject();
+      res.json(userResponse);
+    } catch (error) {
+      console.error("Error updating sub-user permissions:", error);
+      res.status(500).json({ message: "Failed to update sub-user permissions" });
     }
   });
 
