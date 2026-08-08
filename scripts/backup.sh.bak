@@ -1,0 +1,98 @@
+#!/bin/bash
+
+# FleetPro Backup Script
+# Purpose: Create backups of database and source code
+# Usage: bash scripts/backup.sh
+# Schedule: crontab -e then add: 0 2 * * * /path/to/scripts/backup.sh (2 AM daily)
+
+set -e
+
+TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
+BACKUP_DIR="/backup/fleetpro"
+RETENTION_DAYS=30  # Keep 30 days of backups
+
+# Create backup directory if needed
+mkdir -p "$BACKUP_DIR"
+
+echo "=== FleetPro Backup Started ==="
+echo "Timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
+echo "Backup Directory: $BACKUP_DIR"
+echo ""
+
+# ============================================================
+# DATABASE BACKUP
+# ============================================================
+echo "Backing up MongoDB..."
+
+DB_BACKUP_FILE="$BACKUP_DIR/fleetpro-db-$TIMESTAMP.archive"
+
+mongodump \
+  --uri="mongodb://127.0.0.1:27017/fleetpro" \
+  --archive="$DB_BACKUP_FILE" \
+  --gzip
+
+DB_SIZE=$(du -h "$DB_BACKUP_FILE" | cut -f1)
+echo "✓ Database backup created: $DB_BACKUP_FILE ($DB_SIZE)"
+
+# ============================================================
+# SOURCE CODE BACKUP
+# ============================================================
+echo "Backing up source code..."
+
+SOURCE_BACKUP_FILE="$BACKUP_DIR/fleetpro-source-$TIMESTAMP.tar.gz"
+
+tar -czf "$SOURCE_BACKUP_FILE" \
+  --exclude=node_modules \
+  --exclude=dist \
+  --exclude=.git \
+  --exclude=.env \
+  /Users/pradeep/fleetpro-main-p0-fixed/fleetpro-main
+
+SOURCE_SIZE=$(du -h "$SOURCE_BACKUP_FILE" | cut -f1)
+echo "✓ Source code backup created: $SOURCE_BACKUP_FILE ($SOURCE_SIZE)"
+
+# ============================================================
+# GIT BACKUP (source control)
+# ============================================================
+echo "Backing up Git repository..."
+
+GIT_BACKUP_FILE="$BACKUP_DIR/fleetpro-git-$TIMESTAMP.bundle"
+
+cd /Users/pradeep/fleetpro-main-p0-fixed/fleetpro-main
+git bundle create "$GIT_BACKUP_FILE" --all
+
+GIT_SIZE=$(du -h "$GIT_BACKUP_FILE" | cut -f1)
+echo "✓ Git repository backup created: $GIT_BACKUP_FILE ($GIT_SIZE)"
+
+# ============================================================
+# RETENTION POLICY
+# ============================================================
+echo "Cleaning up old backups (older than $RETENTION_DAYS days)..."
+
+find "$BACKUP_DIR" -type f -mtime +$RETENTION_DAYS -delete
+
+REMAINING=$(ls -1 "$BACKUP_DIR" | wc -l)
+echo "✓ Old backups cleaned. Remaining backups: $REMAINING"
+
+# ============================================================
+# BACKUP SUMMARY
+# ============================================================
+echo ""
+echo "=== Backup Summary ==="
+echo "Database:   $DB_SIZE"
+echo "Source:     $SOURCE_SIZE"
+echo "Git:        $GIT_SIZE"
+echo ""
+echo "All backups stored in: $BACKUP_DIR"
+echo "Retention policy: $RETENTION_DAYS days"
+echo ""
+echo "✓ Backup completed successfully at $(date '+%Y-%m-%d %H:%M:%S')"
+
+# ============================================================
+# OPTIONAL: UPLOAD TO REMOTE STORAGE
+# ============================================================
+# Uncomment if you have cloud storage configured
+# echo "Uploading to cloud storage..."
+# aws s3 sync "$BACKUP_DIR" s3://my-backup-bucket/fleetpro/
+
+exit 0

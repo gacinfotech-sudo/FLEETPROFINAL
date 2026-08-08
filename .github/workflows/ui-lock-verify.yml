@@ -1,0 +1,152 @@
+name: UI Lock Verification
+
+on:
+  pull_request:
+    branches:
+      - main
+      - booking/integration-preview
+      - master
+  push:
+    branches:
+      - main
+      - booking/integration-preview
+      - master
+  workflow_dispatch:
+
+jobs:
+  ui-lock-check:
+    runs-on: ubuntu-latest
+    name: Verify Golden UI Lock
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Check Golden UI Baseline
+        id: check-ui
+        run: |
+          bash scripts/check-ui-lock.sh
+        continue-on-error: true
+
+      - name: Run Full UI Verification
+        id: verify-ui
+        run: |
+          bash scripts/verify-golden-ui.sh
+        continue-on-error: true
+
+      - name: Report UI Lock Status
+        run: |
+          echo "## UI Lock Verification Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.check-ui.outcome }}" = "success" ]; then
+            echo "✅ UI Lock Check: **PASSED**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ UI Lock Check: **FAILED**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ steps.verify-ui.outcome }}" = "success" ]; then
+            echo "✅ Full Verification: **PASSED**" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Full Verification: **WARNINGS**" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Protected Files Checked" >> $GITHUB_STEP_SUMMARY
+          echo "Total protected files: $(jq '.protected_files | keys | length' .ui-lock/golden-ui-hashes.json)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Block if UI Changed
+        if: failure()
+        run: |
+          echo "❌ UI Lock verification failed!"
+          echo ""
+          echo "Protected UI files cannot be modified without explicit approval."
+          echo ""
+          echo "To fix:"
+          echo "1. Run: ./scripts/restore-golden-ui.sh"
+          echo "2. Commit the restored files"
+          echo "3. Push your changes"
+          echo ""
+          echo "For intentional UI redesigns:"
+          echo "1. Request approval from design team"
+          echo "2. Create .ui-lock/.allow-ui-changes token"
+          echo "3. Implement changes and commit"
+          echo "4. Remove token and regenerate baseline"
+          exit 1
+
+  build-check:
+    runs-on: ubuntu-latest
+    name: Verify Build with UI Lock
+    needs: ui-lock-check
+    if: success()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify UI Lock scripts work
+        run: |
+          bash scripts/check-ui-lock.sh
+          bash scripts/verify-golden-ui.sh
+
+      - name: Build project
+        run: npm run build
+
+      - name: Report Build Status
+        if: success()
+        run: |
+          echo "## Build Status" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Build succeeded with UI Lock verified" >> $GITHUB_STEP_SUMMARY
+
+  summary:
+    runs-on: ubuntu-latest
+    name: Summary
+    needs: [ui-lock-check, build-check]
+    if: always()
+
+    steps:
+      - name: Check workflow results
+        run: |
+          if [ "${{ needs.ui-lock-check.result }}" != "success" ]; then
+            echo "❌ UI Lock verification failed"
+            exit 1
+          fi
+          if [ "${{ needs.build-check.result }}" != "success" ]; then
+            echo "❌ Build verification failed"
+            exit 1
+          fi
+          echo "✅ All UI Lock checks passed"
+
+      - name: Add PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ UI Lock verification passed. Protected UI files are intact.'
+            })

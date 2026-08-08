@@ -1,0 +1,39 @@
+# FLEETPRO PROTECTED UI FILES
+# These files define the Golden UI and must not change without explicit approval
+
+# App Shell & Root Layout
+client/src/App.tsx
+client/src/main.tsx
+client/src/index.css
+client/src/vite-env.d.ts
+
+# Layout Components
+client/src/components/layout/sidebar.tsx
+client/src/components/layout/header.tsx
+client/src/components/layout/navigation.tsx
+client/src/components/layout/footer.tsx
+
+# Pages - Core Dashboard
+client/src/pages/dashboard.tsx
+
+# Base UI Components (must maintain consistent API)
+client/src/components/ui/card.tsx
+client/src/components/ui/button.tsx
+client/src/components/ui/input.tsx
+client/src/components/ui/select.tsx
+client/src/components/ui/table.tsx
+client/src/components/ui/dialog.tsx
+client/src/components/ui/tabs.tsx
+client/src/components/ui/badge.tsx
+client/src/components/ui/dropdown-menu.tsx
+
+# Theme & Style Configuration
+client/src/lib/theme.ts
+client/src/lib/colors.ts
+tailwind.config.js
+postcss.config.js
+
+# Router Configuration (visual structure only)
+client/src/vite.ts
+package.json (devDependencies, build config only)
+
