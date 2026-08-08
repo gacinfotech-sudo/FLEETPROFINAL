@@ -32,6 +32,7 @@ import UpcomingBookings from "./upcoming-bookings";
 import BookingQueuesPanel from "@/components/booking-queues/booking-queues-panel";
 import PaymentDues from "./payment-dues";
 import DriverLeavePage from "./driver-leave";
+import TodayOnLeaveStrip from "../components/drivers/leave/today-on-leave-strip";
 import DriverAttendancePage from "./driver-attendance";
 import DriverPerformancePage from "./driver-performance";
 import VehiclePerformancePage from "./vehicle-performance";
@@ -61,7 +62,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Menu, LogOut, Star, Car, Users, UserCheck, Phone, Mail, MessageCircle, Banknote, Plus, User, FileText, Trash2 } from "lucide-react";
 
-type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "booking-queues" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "customers-add" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors" | "rewards-referrals" | "gps-tracking";
+type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "booking-queues" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "customers-add" | "drivers-add" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors" | "rewards-referrals" | "gps-tracking";
 
 // apiRequest() throws Error("<status>: <raw response text>") on a non-2xx
 // response (queryClient.ts:throwIfResNotOk) — without this, a rejected
@@ -161,7 +162,7 @@ export default function Dashboard() {
   // Sync URL with current view on mount with role-based access control
   useEffect(() => {
     const section = params.section as ViewType;
-    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "upcoming-bookings", "booking-queues", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "customers-add", "after-sales", "campaigns", "rewards-referrals", "vendors", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile", "gps-tracking"];
+    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "upcoming-bookings", "booking-queues", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "drivers-add", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "customers-add", "after-sales", "campaigns", "rewards-referrals", "vendors", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile", "gps-tracking"];
     
     // Add "users" section only for admin and client roles
     if (user?.role === 'admin' || user?.role === 'client') {
@@ -170,7 +171,7 @@ export default function Dashboard() {
     
     // Remove restricted sections for manager roles
     if (user?.role === 'manager') {
-      const restrictedSections = ["revenue", "vendor-settlement", "drivers", "driver-leave", "driver-performance", "vehicle-performance", "driver-attendance", "after-sales", "campaigns", "rewards-referrals", "vendors"];
+      const restrictedSections = ["revenue", "vendor-settlement", "drivers", "drivers-add", "driver-leave", "driver-performance", "vehicle-performance", "driver-attendance", "after-sales", "campaigns", "rewards-referrals", "vendors"];
       restrictedSections.forEach(section => {
         const index = allowedSections.indexOf(section);
         if (index > -1) {
@@ -203,6 +204,16 @@ export default function Dashboard() {
       }
     }
   }, [user]);
+
+  // Sidebar "Add Driver": the same Drivers screen with the canonical Add
+  // Driver wizard already open — mirrors the "customers-add" pattern, so
+  // there is exactly one driver-creation flow.
+  useEffect(() => {
+    if (currentView === "drivers-add") {
+      setEditingDriver(null);
+      setShowDriverForm(true);
+    }
+  }, [currentView]);
 
   // Update URL when view changes
   const handleViewChange = (view: ViewType) => {
@@ -795,11 +806,19 @@ export default function Dashboard() {
           </div>
         );
 
+      case "drivers-add":
       case "drivers":
         return (
           <div>
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Driver Management</h1>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleViewChange("driver-attendance")}>
+                  Attendance
+                </Button>
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleViewChange("driver-leave")}>
+                  Leave
+                </Button>
               <Dialog open={showDriverForm} onOpenChange={(open) => {
                 setShowDriverForm(open);
                 if (!open) {
@@ -827,6 +846,13 @@ export default function Dashboard() {
                   />
                 </DialogContent>
               </Dialog>
+              </div>
+            </div>
+
+            {/* Daily operational info first: who is on leave today (same
+                canonical records as the Leave Calendar). */}
+            <div className="mb-4">
+              <TodayOnLeaveStrip maxEntries={4} onViewAll={() => handleViewChange("driver-leave")} actionLabel="View Leave Calendar" />
             </div>
 
             <Card>
@@ -1725,7 +1751,7 @@ export default function Dashboard() {
         return <DriverAttendancePage />;
 
       case "driver-leave":
-        return <DriverLeavePage />;
+        return <DriverLeavePage onOpenDriver={(d) => setViewingDriver(d)} />;
 
       case "driver-performance":
         return <DriverPerformancePage />;

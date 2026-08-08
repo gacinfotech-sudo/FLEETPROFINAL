@@ -38,13 +38,17 @@ const navItems = [
   { id: "inquiries", label: "Inquiries", icon: PhoneIncoming },
   { id: "leads", label: "Leads", icon: GitBranch },
   { id: "followups", label: "Follow-ups", icon: ListChecks },
+  // Every driver-related destination lives inside this ONE group — never
+  // add a driver-* item outside it (that re-creates the scattered-sidebar
+  // problem this grouping removed; see docs/final-ui driver report).
+  { id: "drivers", label: "All Drivers", icon: Users, group: "drivers", restrictedForManagers: true },
+  { id: "drivers-add", label: "Add Driver", icon: UserRoundPlus, group: "drivers", restrictedForManagers: true },
+  { id: "driver-attendance", label: "Attendance", icon: ClipboardCheck, group: "drivers", restrictedForManagers: true },
+  { id: "driver-leave", label: "Leave Calendar", icon: UserX, group: "drivers", restrictedForManagers: true },
+  { id: "driver-performance", label: "Performance", icon: Gauge, group: "drivers", restrictedForManagers: true },
   { id: "fleet", label: "View Fleet", icon: Car },
   { id: "gps-tracking", label: "GPS Tracking", icon: Satellite },
   { id: "vehicle-performance", label: "Vehicle Performance", icon: Wrench, restrictedForManagers: true },
-  { id: "drivers", label: "Manage Drivers", icon: Users, restrictedForManagers: true },
-  { id: "driver-attendance", label: "Driver Attendance", icon: ClipboardCheck, restrictedForManagers: true },
-  { id: "driver-leave", label: "Driver Leave", icon: UserX, restrictedForManagers: true },
-  { id: "driver-performance", label: "Driver Performance", icon: Gauge, restrictedForManagers: true },
   { id: "after-sales", label: "After-Sales", icon: HeartHandshake, restrictedForManagers: true },
   { id: "campaigns", label: "Campaigns", icon: Megaphone, restrictedForManagers: true },
   { id: "rewards-referrals", label: "Rewards & Referrals", icon: Gift, restrictedForManagers: true },
@@ -61,6 +65,7 @@ const navItems = [
 const NAV_GROUPS: Record<string, { label: string; icon: typeof Calendar }> = {
   customers: { label: "Customers", icon: Users2 },
   bookings: { label: "Bookings", icon: Calendar },
+  drivers: { label: "Drivers", icon: Users },
 };
 
 // Identical markup/behavior shared by top-level and grouped items so the
@@ -101,9 +106,11 @@ function NavButton({ item, isActive, onSelect, onToggleSidebar, compact }: {
 
 export default function Sidebar({ currentView, onViewChange, isOpen, onToggle, onSelectCustomer }: SidebarProps) {
   const { logout, user } = useAuth();
-  // Every group starts expanded — Customers and Bookings are the primary
+  // Customers and Bookings start expanded — they are the primary
   // operational functions and must be visible without an extra click.
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  // Drivers starts collapsed to keep the sidebar compact (it has five
+  // children); an active driver child still forces it open below.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set(["drivers"]));
 
   // Filter navigation items based on user role
   const visibleNavItems = navItems.filter(item => {

@@ -8,6 +8,7 @@ import DriverContactsPanel from "./driver-contacts-panel";
 import DriverDocumentsPanel from "./driver-documents-panel";
 import DriverEmploymentHistoryPanel from "./driver-employment-history-panel";
 import DriverLifecyclePanel from "./driver-lifecycle-panel";
+import DriverAttendanceLeavePanel from "./driver-attendance-leave-panel";
 import {
   DEFAULT_LIFECYCLE_STAGE, LIFECYCLE_STAGE_LABELS, lifecycleStageBadgeClass,
   complianceBadgeClass, COMPLIANCE_STATUS_LABELS, documentComplianceStatus,
@@ -81,6 +82,7 @@ export default function Driver360({ driver, onOpenBooking }: Props) {
             <TabsTrigger value="contacts">Contacts</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="employment">Employment</TabsTrigger>
+            <TabsTrigger value="attendance-leave">Attendance &amp; Leave</TabsTrigger>
             <TabsTrigger value="lifecycle">Lifecycle</TabsTrigger>
             <TabsTrigger value="feedback">Feedback</TabsTrigger>
           </TabsList>
@@ -198,6 +200,10 @@ export default function Driver360({ driver, onOpenBooking }: Props) {
 
         <TabsContent value="employment">
           <DriverEmploymentHistoryPanel driverId={driverId} />
+        </TabsContent>
+
+        <TabsContent value="attendance-leave">
+          <DriverAttendanceLeavePanel driverId={driverId} />
         </TabsContent>
 
         <TabsContent value="lifecycle">
