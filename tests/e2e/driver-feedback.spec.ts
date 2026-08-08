@@ -118,7 +118,9 @@ test('driver feedback links Customer, Booking and Driver profiles without unveri
   await expect(customerDashboard.getByText(`Excellent driver assistance ${marker}`, { exact: true }).first()).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await page.locator('nav').getByRole('button', { name: 'Manage Drivers' }).click();
+  // Driver list moved into the consolidated "Drivers" sidebar group.
+  await page.locator('nav').getByRole('button', { name: 'Drivers', exact: true }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Drivers', exact: true }).click();
   const driverRow = page.locator('table tbody tr').filter({ hasText: driver.name }).first();
   await driverRow.getByRole('button', { name: 'View Profile' }).click();
   const driverDialog = page.getByRole('dialog', { name: 'Driver Profile' });

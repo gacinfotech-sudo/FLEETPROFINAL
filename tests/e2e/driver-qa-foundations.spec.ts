@@ -172,6 +172,12 @@ test.describe('Driver QA/Security foundations (Wave 1) — driver-portal route e
     { method: 'GET', path: '/api/driver-portal/me' },
     { method: 'GET', path: '/api/driver-portal/my-duties' },
     { method: 'POST', path: '/api/driver-portal/bookings/:id/accept-duty' },
+    // Reviewed for the driver-lineage reconciliation (driver/navigation-
+    // operations): the vehicle-handover acceptance route from TASK-VEHICLE-
+    // HANDOVER-05 (acceptHandoverHandler, server/driver/handover/
+    // driverPortalRoutes.ts) — driver-session-scoped by design, tenant- and
+    // driver-ownership-checked inside the handler.
+    { method: 'POST', path: '/api/driver-portal/handovers/:id/accept' },
   ];
   // POST /api/driver-auth/login is deliberately NOT in the allow-list above —
   // it's the public, unauthenticated entry point (no driver session exists

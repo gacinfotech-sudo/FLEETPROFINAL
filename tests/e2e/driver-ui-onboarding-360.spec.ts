@@ -148,7 +148,7 @@ test.describe('Driver onboarding wizard + Driver 360 view', () => {
     const existing = await findDriverByName(page, WIZARD_NAME);
 
     if (!existing) {
-      await page.getByRole('button', { name: 'Add Driver' }).click();
+      await page.getByRole('main').getByRole('button', { name: 'Add Driver' }).click();
       await expect(page.getByText('1. Basic Info')).toBeVisible();
 
       await page.getByLabel(/Full Name/i).fill(WIZARD_NAME);
@@ -168,7 +168,7 @@ test.describe('Driver onboarding wizard + Driver 360 view', () => {
       await page.getByLabel(/Aadhar Card Number/i).fill('345678901234');
       await page.getByLabel(/PAN Card Number/i).fill('WXYZA5678K');
 
-      await page.getByRole('button', { name: 'Add Driver', exact: true }).click();
+      await page.getByRole('main').getByRole('button', { name: 'Add Driver', exact: true }).click();
       await expect(page.getByText('Driver created successfully')).toBeVisible({ timeout: 5000 });
     }
 

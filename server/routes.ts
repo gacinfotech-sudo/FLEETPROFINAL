@@ -6911,14 +6911,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Leave dates are CALENDAR days (tenant-local, inclusive). A bare
+  // "YYYY-MM-DD" parsed with new Date() lands on UTC midnight, which made
+  // the LAST day of every leave range fall outside the availability
+  // overlap check (endDate midnight is never > any intra-day booking
+  // start) — the driver showed as assignable on the final day of their own
+  // approved leave. Normalize: start-of-day for startDate, END-of-day for
+  // endDate, both in server-local (tenant office) time.
+  const parseLeaveDay = (value: string, boundary: 'start' | 'end'): Date => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+    if (m) {
+      return boundary === 'start'
+        ? new Date(+m[1], +m[2] - 1, +m[3], 0, 0, 0, 0)
+        : new Date(+m[1], +m[2] - 1, +m[3], 23, 59, 59, 999);
+    }
+    return new Date(value);
+  };
+
   app.post("/api/drivers/:id/leave", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
     try {
       const { startDate, endDate, leaveType, dayPart, reason } = req.body || {};
       if (!startDate || !endDate) {
         return res.status(400).json({ message: "startDate and endDate are required" });
       }
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      const start = parseLeaveDay(startDate, 'start');
+      const end = parseLeaveDay(endDate, 'end');
       if (end < start) {
         return res.status(400).json({ message: "endDate cannot be before startDate" });
       }
@@ -7018,8 +7035,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { startDate, endDate, leaveType, dayPart, reason } = req.body || {};
-      const start = startDate ? new Date(startDate) : leave.startDate;
-      const end = endDate ? new Date(endDate) : leave.endDate;
+      const start = startDate ? parseLeaveDay(startDate, 'start') : leave.startDate;
+      const end = endDate ? parseLeaveDay(endDate, 'end') : leave.endDate;
       if (end < start) {
         return res.status(400).json({ message: "endDate cannot be before startDate" });
       }

@@ -64,7 +64,7 @@ test.describe('Driver Add wizard — blank optional Identity fields (permanent r
 
     await gotoDriversAuthed(page, owner.userId, owner.password);
 
-    await page.getByRole('button', { name: 'Add Driver' }).click();
+    await page.getByRole('main').getByRole('button', { name: 'Add Driver' }).click();
     await expect(page.getByText('Add New Driver')).toBeVisible();
 
     // --- Basic Info ---

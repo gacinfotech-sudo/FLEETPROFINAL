@@ -467,7 +467,7 @@ export default function DriverLeavePage({ onOpenDriver }: { onOpenDriver?: (driv
                 <span className={`w-2 h-2 rounded-full ${s.dot}`} />{s.label}
               </span>
             ))}
-            <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="font-semibold text-gray-400">½</span>Half day</span>
+            <span className="flex items-center gap-1.5 text-xs text-gray-500"><span className="font-semibold text-gray-400">½</span><span>Half day</span></span>
           </div>
         </CardContent>
       </Card>

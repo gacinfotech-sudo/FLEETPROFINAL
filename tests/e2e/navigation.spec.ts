@@ -7,17 +7,20 @@ import { login, trackConsoleErrors } from './helpers';
 // its id was missing from the allowedSections whitelist) — a test that
 // only checks "did navigation happen" without checking "did it STAY"
 // would miss that bug entirely.
-const SIDEBAR_PAGES: { label: string; path: string; expectedText: RegExp }[] = [
+// `group` = the collapsible sidebar group holding the item (must be
+// expanded before the child button exists in the DOM). Driver items moved
+// into the ONE "Drivers" group in the driver-navigation consolidation.
+const SIDEBAR_PAGES: { label: string; path: string; expectedText: RegExp; group?: string }[] = [
   { label: 'Dashboard', path: '/dashboard/dashboard', expectedText: /Live overview of your fleet operations/i },
   { label: 'Live Bookings', path: '/dashboard/live-bookings', expectedText: /Live Bookings/i },
   { label: 'Upcoming Bookings', path: '/dashboard/upcoming-bookings', expectedText: /Upcoming Bookings/i },
   { label: 'Payment Collection', path: '/dashboard/payment-dues', expectedText: /Payment Collection/i },
   { label: 'View Fleet', path: '/dashboard/fleet', expectedText: /Fleet Management/i },
   { label: 'Vehicle Performance', path: '/dashboard/vehicle-performance', expectedText: /Vehicle Performance/i },
-  { label: 'Manage Drivers', path: '/dashboard/drivers', expectedText: /driver/i },
-  { label: 'Driver Attendance', path: '/dashboard/driver-attendance', expectedText: /Driver Attendance/i },
-  { label: 'Driver Leave', path: '/dashboard/driver-leave', expectedText: /Driver Leave/i },
-  { label: 'Driver Performance', path: '/dashboard/driver-performance', expectedText: /Driver Performance/i },
+  { label: 'All Drivers', path: '/dashboard/drivers', expectedText: /driver/i, group: 'Drivers' },
+  { label: 'Attendance', path: '/dashboard/driver-attendance', expectedText: /Driver Attendance/i, group: 'Drivers' },
+  { label: 'Leave Calendar', path: '/dashboard/driver-leave', expectedText: /Driver Leave/i, group: 'Drivers' },
+  { label: 'Performance', path: '/dashboard/driver-performance', expectedText: /Driver Performance/i, group: 'Drivers' },
   { label: 'Booking History', path: '/dashboard/history', expectedText: /history|booking/i },
   { label: 'Revenue Report', path: '/dashboard/revenue', expectedText: /revenue/i },
   { label: 'Vendor Settlement', path: '/dashboard/vendor-settlement', expectedText: /vendor settlement/i },
@@ -29,7 +32,7 @@ const SIDEBAR_PAGES: { label: string; path: string; expectedText: RegExp }[] = [
 ];
 
 test.describe('Sidebar navigation — every page must load and stay loaded', () => {
-  for (const { label, path, expectedText } of SIDEBAR_PAGES) {
+  for (const { label, path, expectedText, group } of SIDEBAR_PAGES) {
     test(`"${label}" navigates to ${path} and does not bounce back`, async ({ page }) => {
       // Login itself legitimately triggers a pre-auth "am I logged in?"
       // check that 401s before a session exists — the browser logs that
@@ -38,7 +41,12 @@ test.describe('Sidebar navigation — every page must load and stay loaded', () 
       await login(page, 'qaclient', 'QaFixed456!');
       const errors = trackConsoleErrors(page);
 
-      await page.locator('nav').getByRole('button', { name: label }).click();
+      const nav = page.locator('nav');
+      const child = nav.getByRole('button', { name: label, exact: true });
+      if (group && !(await child.isVisible().catch(() => false))) {
+        await nav.getByRole('button', { name: group, exact: true }).click();
+      }
+      await child.click();
 
       // The critical assertion: URL must settle on the target path, not
       // silently redirect back to /dashboard/dashboard.

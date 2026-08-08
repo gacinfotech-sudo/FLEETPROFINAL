@@ -87,11 +87,15 @@ test('Driver Leave: request leave for a driver, see it as Pending, approve it, s
   await login(page, 'qaclient', 'QaFixed456!');
   const errors = trackConsoleErrors(page);
 
-  await page.locator('nav').getByRole('button', { name: 'Driver Leave' }).click();
+  // Driver Leave now lives inside the ONE consolidated "Drivers" sidebar
+  // group (driver-navigation consolidation) as "Leave Calendar".
+  const nav = page.locator('nav');
+  await nav.getByRole('button', { name: 'Drivers', exact: true }).click();
+  await nav.getByRole('button', { name: 'Leave Calendar' }).click();
   await expect(page).toHaveURL(/\/dashboard\/driver-leave$/, { timeout: 5000 });
 
-  await page.getByRole('button', { name: 'Request Leave' }).click();
-  const requestDialog = page.getByRole('dialog').filter({ hasText: 'Request Driver Leave' });
+  await page.getByTestId('add-leave-button').click();
+  const requestDialog = page.getByRole('dialog').filter({ hasText: 'Add Driver Leave' });
   await expect(requestDialog).toBeVisible({ timeout: 5000 });
 
   await requestDialog.getByRole('combobox').first().click();
@@ -99,12 +103,14 @@ test('Driver Leave: request leave for a driver, see it as Pending, approve it, s
   const driverName = (await firstOption.textContent())?.trim() || '';
   await firstOption.click();
 
-  // Far-future dates so this never collides with real seeded bookings.
+  // Far-future RANDOM dates: never collides with seeded bookings, and the
+  // rendered date-range text stays unique enough to identify the exact
+  // record in the list view (the calendar rows don't display the reason).
   const start = new Date();
-  start.setDate(start.getDate() + 120);
-  const end = new Date();
-  end.setDate(end.getDate() + 122);
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  start.setDate(start.getDate() + 120 + Math.floor(Math.random() * 2000));
+  const end = new Date(start);
+  end.setDate(end.getDate() + 2);
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
   const dateInputs = requestDialog.locator('input[type="date"]');
   await dateInputs.nth(0).fill(fmt(start));
@@ -118,23 +124,27 @@ test('Driver Leave: request leave for a driver, see it as Pending, approve it, s
   await expect(page.getByText('Leave request created').first()).toBeVisible({ timeout: 10000 });
   await expect(requestDialog).not.toBeVisible({ timeout: 5000 });
 
-  // Find the specific leave row we just created via its unique reason
-  // text. Scoped to the row container (border rounded-lg p-3) rather than
-  // a bare `div` filter — the reason text also lives inside a narrower
-  // nested div that doesn't include the sibling status badge/buttons.
-  const leaveRow = page.locator('.border.rounded-lg.p-3').filter({ hasText: reasonText });
+  // The workspace's List view shows every record; find ours by driver +
+  // the exact rendered date range (same en-IN formatting the page uses).
+  const rangeText = `${start.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })} – ${end.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+  await page.getByRole('button', { name: 'list', exact: true }).click();
+  const leaveRow = page.getByTestId('leave-calendar').locator('button.border').filter({ hasText: driverName }).filter({ hasText: rangeText });
   await expect(leaveRow).toBeVisible({ timeout: 5000 });
   await expect(leaveRow.getByText('Pending')).toBeVisible();
-  await expect(leaveRow.getByText(driverName)).toBeVisible();
 
-  await leaveRow.getByRole('button', { name: 'Approve' }).click();
+  // Approve from the leave-detail dialog.
+  await leaveRow.click();
+  const detailDialog = page.getByRole('dialog').filter({ hasText: 'Leave Details' });
+  await expect(detailDialog).toBeVisible({ timeout: 5000 });
+  await expect(detailDialog.getByText(reasonText)).toBeVisible();
+  await detailDialog.getByRole('button', { name: 'Approve' }).click();
 
   // Far-future dates with a freshly-created leave should never conflict
   // with an existing booking, so this should go straight to Approved
   // rather than opening the conflict-override dialog. If it does open
   // anyway (shared test data changed under us), fail loudly instead of
   // silently overriding — that would mask a real conflict-detection bug.
-  const conflictDialog = page.getByRole('dialog').filter({ hasText: 'Booking conflicts found' });
+  const conflictDialog = page.getByRole('dialog').filter({ hasText: 'Driver leave conflict' });
   await expect(conflictDialog).not.toBeVisible({ timeout: 3000 });
 
   await expect(page.getByText('Leave approved').first()).toBeVisible({ timeout: 10000 });
