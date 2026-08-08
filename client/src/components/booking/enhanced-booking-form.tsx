@@ -188,6 +188,13 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   // "vendor_vehicle"/"outsource" let Step 2 be completed without a
   // resolved company vehicle — see docs/BOOKING_RESOURCE_DEAD_END_AUDIT.md.
   const [resourceMode, setResourceMode] = useState<"own_fleet" | "vendor_vehicle" | "outsource">("own_fleet");
+  // Self-drive booking-time capture (spec §1-§2, §10): deposit stays a
+  // held amount strictly outside fare/advance math; late policy rides to
+  // the SelfDriveTrip record right after creation.
+  const [sdOps, setSdOps] = useState({
+    depositAmount: "", depositMode: "cash", depositReceived: false, depositReference: "",
+    lateGrace: "30", lateRate: "200", lateUnit: "per_hour",
+  });
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
   const [selectedVendorVehicleId, setSelectedVendorVehicleId] = useState<string>("");
   const [selectedVendorDriverId, setSelectedVendorDriverId] = useState<string>("");
@@ -686,6 +693,14 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       const bookingData = {
         ...data,
         amount: finalAmount,
+        // Security deposit is held money, never revenue (Rule A/B): the
+        // amount is snapshotted on the booking for the live cards; the
+        // actual receipt is recorded through the self-drive deposit
+        // endpoint right after creation (chained in onSuccess below).
+        ...(data.bookingType === "self_drive" && Number(sdOps.depositAmount) > 0 ? {
+          securityDepositAmount: Number(sdOps.depositAmount),
+          securityDepositStatus: sdOps.depositReceived ? "collected" : "pending",
+        } : {}),
         // Below the minimum, treat it as "not redeeming" rather than
         // sending a value the backend would just reject — the UI already
         // shows the minimum requirement inline while typing.
@@ -793,6 +808,23 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
 
       setCreatedBooking(result);
       setBookingConfirmed(true);
+      // Self-drive chained setup — best-effort; failures surface as toasts
+      // but never roll back the created booking (staff can redo them from
+      // the workspace's Self-Drive tab).
+      if (result?.bookingType === "self_drive" && (result?._id || result?.id)) {
+        const sdId = result._id || result.id;
+        if (sdOps.depositReceived && Number(sdOps.depositAmount) > 0) {
+          apiRequest("POST", `/api/bookings/${sdId}/self-drive/deposit`, {
+            amount: Number(sdOps.depositAmount), method: sdOps.depositMode,
+            ...(sdOps.depositReference.trim() ? { reference: sdOps.depositReference.trim() } : {}),
+          }).catch((err: any) => toast({ title: "Deposit receipt not recorded", description: String(err?.message || ""), variant: "destructive" }));
+        }
+        if (sdOps.lateGrace !== "30" || sdOps.lateRate !== "200" || sdOps.lateUnit !== "per_hour") {
+          apiRequest("PATCH", `/api/bookings/${sdId}/self-drive/late-policy`, {
+            graceMinutes: Number(sdOps.lateGrace) || 0, rate: Number(sdOps.lateRate) || 0, unit: sdOps.lateUnit,
+          }).catch(() => {});
+        }
+      }
       toast({
         variant: "success",
         title: "Booking created successfully!",
@@ -1689,6 +1721,70 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   )}
                 />
               </div>
+              )}
+
+              {watchedValues.bookingType === "self_drive" && (
+                <div className="mb-8 rounded-lg border border-violet-200 bg-violet-50/50 p-4 space-y-3" data-testid="sd-booking-section">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <h3 className="text-sm font-semibold text-gray-800">Self Drive — Deposit & Late Charges</h3>
+                    <span className="text-sm text-violet-700 font-medium" data-testid="sd-duration-line">
+                      {(() => {
+                        const start = watchedValues.pickupDate ? new Date(`${watchedValues.pickupDate}T${watchedValues.pickupTime || "00:00"}`) : null;
+                        const end = watchedValues.returnDate ? new Date(`${watchedValues.returnDate}T${watchedValues.returnTime || "00:00"}`) : null;
+                        if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return "Duration: —";
+                        const mins = Math.round((end.getTime() - start.getTime()) / 60000);
+                        const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
+                        return `Duration: ${d > 0 ? `${d} Day${d > 1 ? "s" : ""} ` : ""}${h > 0 ? `${h} Hour${h > 1 ? "s" : ""}` : ""}${d === 0 && h === 0 ? `${m} Min` : ""}`.trim();
+                      })()}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div>
+                      <Label className="text-xs">Security Deposit (₹)</Label>
+                      <Input type="number" min="0" value={sdOps.depositAmount} onChange={(e) => setSdOps({ ...sdOps, depositAmount: e.target.value })} data-testid="sd-wizard-deposit" onWheel={(e) => (e.target as HTMLElement).blur()} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Deposit Mode</Label>
+                      <Select value={sdOps.depositMode} onValueChange={(v) => setSdOps({ ...sdOps, depositMode: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cash">Cash</SelectItem><SelectItem value="upi">UPI</SelectItem>
+                          <SelectItem value="card">Card</SelectItem><SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Ref / Txn ID</Label>
+                      <Input value={sdOps.depositReference} onChange={(e) => setSdOps({ ...sdOps, depositReference: e.target.value })} placeholder="optional" />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 pt-5">
+                      <input type="checkbox" checked={sdOps.depositReceived} onChange={(e) => setSdOps({ ...sdOps, depositReceived: e.target.checked })} data-testid="sd-wizard-deposit-received" />
+                      Deposit received
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 sm:max-w-md">
+                    <div>
+                      <Label className="text-xs">Grace (min)</Label>
+                      <Input type="number" min="0" value={sdOps.lateGrace} onChange={(e) => setSdOps({ ...sdOps, lateGrace: e.target.value })} onWheel={(e) => (e.target as HTMLElement).blur()} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Late Rate (₹)</Label>
+                      <Input type="number" min="0" value={sdOps.lateRate} onChange={(e) => setSdOps({ ...sdOps, lateRate: e.target.value })} onWheel={(e) => (e.target as HTMLElement).blur()} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Interval</Label>
+                      <Select value={sdOps.lateUnit} onValueChange={(v) => setSdOps({ ...sdOps, lateUnit: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="per_hour">Per Hour</SelectItem><SelectItem value="per_30min">Per 30 Min</SelectItem>
+                          <SelectItem value="per_day">Per Day</SelectItem><SelectItem value="fixed">Fixed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-gray-500">Deposit is held separately — it never mixes with fare, advance or balance.</p>
+                </div>
               )}
 
               <Separator className="my-8" />

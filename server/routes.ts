@@ -3346,7 +3346,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cleanTag = tag.trim();
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
-
       const actor = { userId: req.userId!, role: req.user?.role || 'client' };
       if (!customer.tags.includes(cleanTag)) {
         customer.tags.push(cleanTag);
@@ -3822,9 +3821,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (typeof requestId !== 'string' || !/^[A-Za-z0-9_-]{8,100}$/.test(requestId)) {
         return res.status(400).json({ message: "A valid requestId is required" });
       }
-      const pageUrl = safeGoogleReviewUrl(reviewPageUrl);
-      if (!pageUrl) return res.status(400).json({ message: "A valid Google review page URL is required" });
-
       const [customer, booking, tenant] = await Promise.all([
         Customer.findOne({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } }),
         Booking.findOne({ _id: bookingId, tenantId: req.tenantId, customerId: req.params.id }),
@@ -3835,6 +3831,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!REVIEW_ELIGIBLE_STATUSES.has(booking.status)) {
         return res.status(400).json({ message: "Google review requests are allowed only after trip completion" });
       }
+      // Multi-tenant review link: an explicit URL wins; otherwise the
+      // tenant's configured Google review page (Settings → Operations).
+      // Never a hardcoded global link.
+      const pageUrl = safeGoogleReviewUrl(reviewPageUrl || (tenant as any)?.operationsSettings?.googleReviewUrl || '');
+      if (!pageUrl) return res.status(400).json({ message: "No Google review page URL — pass one or configure it in Settings → Operations." });
 
       let tracking = await GoogleReviewTracking.findOne({ tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id });
       if (tracking?.reviewReceived) return res.status(409).json({ message: "A received Google review is already confirmed for this booking" });

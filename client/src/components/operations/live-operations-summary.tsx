@@ -18,6 +18,12 @@ export default function LiveOperationsSummary({ onViewAll }: { onViewAll: () => 
     queryKey: ["/api/operations/live-vehicles"],
     refetchInterval: 60000,
   });
+  // Self-drive money KPIs (deposit held / refunds pending) — small bounded
+  // aggregate, refreshed at the same cadence.
+  const { data: sdKpis } = useQuery<{ refundPendingCount: number; refundPendingAmount: number; depositHeld: number; refundedToday: number }>({
+    queryKey: ["/api/operations/self-drive/kpis"],
+    refetchInterval: 60000,
+  });
 
   const urgent = useMemo(() => {
     const cards = data?.cards ?? [];
@@ -26,8 +32,8 @@ export default function LiveOperationsSummary({ onViewAll }: { onViewAll: () => 
       .slice(0, 4);
   }, [data]);
 
-  const s = data?.summary;
-  if (!s || s.vehiclesRunning === 0) return null;
+  const s = data?.summary ?? { vehiclesRunning: 0, selfDrive: 0, withDriver: 0, endingSoon: 0, overdue: 0, needsAttention: 0, balanceDue: 0 };
+  if (s.vehiclesRunning === 0 && !(sdKpis && sdKpis.refundPendingCount > 0)) return null;
 
   return (
     <Card data-testid="dashboard-live-operations">
@@ -45,7 +51,7 @@ export default function LiveOperationsSummary({ onViewAll }: { onViewAll: () => 
         </Button>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-center">
           {[
             { label: "Running", value: s.vehiclesRunning },
             { label: "Self Drive", value: s.selfDrive },
@@ -53,6 +59,10 @@ export default function LiveOperationsSummary({ onViewAll }: { onViewAll: () => 
             { label: "Ending Soon", value: s.endingSoon, warn: s.endingSoon > 0 },
             { label: "Overdue", value: s.overdue, danger: s.overdue > 0 },
             { label: "Balance Due", value: money(s.balanceDue) },
+            ...(sdKpis ? [
+              { label: "Deposit Held", value: money(sdKpis.depositHeld) },
+              { label: "Refunds Pending", value: sdKpis.refundPendingCount > 0 ? `${sdKpis.refundPendingCount} · ${money(sdKpis.refundPendingAmount)}` : "0", danger: sdKpis.refundPendingCount > 0 },
+            ] : []),
           ].map((c: any) => (
             <div key={c.label} className={`rounded-md p-2 min-w-0 ${c.danger ? "bg-red-50" : c.warn ? "bg-amber-50" : "bg-gray-50"}`}>
               <div className={`text-base font-bold truncate ${c.danger ? "text-red-700" : c.warn ? "text-amber-700" : "text-gray-900"}`}>{c.value}</div>

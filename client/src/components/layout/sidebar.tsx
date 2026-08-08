@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Car, BarChart3, Calendar, Users, History, TrendingUp, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks, Building2, ChevronDown, ChevronRight, Gift, ListFilter, Satellite, UserRoundPlus, Users2 } from "lucide-react";
+import { Car, BarChart3, Calendar, Users, History, TrendingUp, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks, Building2, ChevronDown, ChevronRight, Gift, ListFilter, Satellite, UserRoundPlus, Users2 , KeySquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -29,6 +29,7 @@ const navItems = [
   { id: "dashboard", label: "Dashboard", icon: BarChart3 },
   { id: "customers", label: "All Customers", icon: Contact, group: "customers" },
   { id: "customers-add", label: "Add Customer", icon: UserRoundPlus, group: "customers" },
+  { id: "self-drive", label: "Self Drive", icon: KeySquare, group: "customers" },
   { id: "bookings", label: "Add Booking", icon: Calendar, group: "bookings" },
   { id: "live-bookings", label: "Live Bookings", icon: Radio, group: "bookings" },
   { id: "live-operations", label: "Vehicles on Booking", icon: Car, group: "bookings" },

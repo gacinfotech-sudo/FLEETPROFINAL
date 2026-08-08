@@ -59,6 +59,13 @@ export interface LiveVehicleCard {
     turnaroundConflict: boolean; atRisk: boolean;
   } | null;
   paymentDueSoon: boolean;
+  selfDrive: {
+    stage: string;
+    latePolicy: { graceMinutes: number; rate: number; unit: string };
+    lateChargeEstimate: number;
+    fuelOut: number | null;
+    kmOut: number | null;
+  } | null;
 }
 
 interface LiveVehiclesResponse {
@@ -249,10 +256,15 @@ function LiveCard({ card, onExtend, onCollect, onOpen, onAction, onLog, actingId
                   </>
                 ) : "—"}
               </Row>
-              {(card.startOdometer !== null || card.startFuelLevel) && (
-                <div className="flex gap-4 text-xs text-gray-500 pl-6">
-                  {card.startOdometer !== null && <span className="flex items-center gap-1"><Gauge size={12} /> Opening {card.startOdometer.toLocaleString("en-IN")} km</span>}
-                  {card.startFuelLevel && <span className="flex items-center gap-1"><Fuel size={12} /> Fuel {card.startFuelLevel}</span>}
+              {(card.selfDrive?.kmOut !== null || card.selfDrive?.fuelOut !== null || card.startFuelLevel) && (
+                <div className="flex gap-4 text-xs text-gray-500 pl-6 flex-wrap">
+                  {(card.selfDrive?.kmOut ?? card.startOdometer) !== null && <span className="flex items-center gap-1"><Gauge size={12} /> KM Out {(card.selfDrive?.kmOut ?? card.startOdometer)!.toLocaleString("en-IN")}</span>}
+                  {(card.selfDrive?.fuelOut !== null && card.selfDrive?.fuelOut !== undefined) ? <span className="flex items-center gap-1"><Fuel size={12} /> Fuel Out {card.selfDrive.fuelOut}%</span>
+                    : card.startFuelLevel ? <span className="flex items-center gap-1"><Fuel size={12} /> Fuel {card.startFuelLevel}</span> : null}
+                  {card.selfDrive && <span>Late: ₹{card.selfDrive.latePolicy.rate}/{card.selfDrive.latePolicy.unit === "per_hour" ? "hr" : card.selfDrive.latePolicy.unit === "per_30min" ? "30m" : card.selfDrive.latePolicy.unit === "per_day" ? "day" : "fixed"}</span>}
+                  {card.selfDrive && card.selfDrive.lateChargeEstimate > 0 && (
+                    <span className="text-red-600 font-medium">Late charge so far ≈ ₹{card.selfDrive.lateChargeEstimate.toLocaleString("en-IN")}</span>
+                  )}
                 </div>
               )}
             </>
