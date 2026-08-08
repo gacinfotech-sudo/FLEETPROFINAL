@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../hooks/use-auth";
 import { usePermissions } from "../hooks/use-permissions";
-import { useLocation, useParams } from "wouter";
+import { useLocation, useParams, Link } from "wouter";
 import Sidebar from "../components/layout/sidebar";
-import EnhancedStats from "../components/dashboard/enhanced-stats";
+import DashboardOverview from "../components/dashboard/overview";
 import EnhancedBookingForm from "../components/booking/enhanced-booking-form";
 import VehicleForm from "../components/fleet/vehicle-form";
 import VehicleFeedbackProfile from "../components/fleet/vehicle-feedback-profile";
 import DriverForm from "../components/drivers/driver-form";
-import DriverFeedbackProfile from "../components/drivers/driver-feedback-profile";
+import Driver360 from "../components/drivers/driver-360";
 import RevenueReport from "../components/reports/revenue-report";
 import VendorSettlementPage from "./vendor-settlement";
 import BookingHistoryPDF from "../components/reports/booking-history-pdf";
@@ -20,32 +20,30 @@ import RewardReferralSettingsPanel from "../components/settings/reward-referral-
 import OnboardingWizard from "../components/onboarding/onboarding-wizard";
 import ManageExpenses from "./manage-expenses";
 import LiveBookings, { type Bucket as LiveOpsBucket } from "./live-bookings";
+import LiveOperations from "./live-operations";
+import SelfDrivePage from "./self-drive";
+import OperationsAlertStrip from "../components/operations/operations-alert-strip";
+import LiveOperationsSummary from "../components/operations/live-operations-summary";
 import CustomersPage from "./customers";
 import AfterSalesPage from "./after-sales";
 import CampaignsPage from "./campaigns";
 import RewardsReferralsDashboard from "./rewards-referrals-dashboard";
-import ResourceFulfilmentDashboard from "./resource-fulfilment-dashboard";
 import InquiriesPage from "./inquiries";
 import LeadsPage from "./leads";
 import FollowUpsPage from "./followups";
 import VendorsPage from "./vendors";
 import UpcomingBookings from "./upcoming-bookings";
+import BookingQueuesPanel from "@/components/booking-queues/booking-queues-panel";
 import PaymentDues from "./payment-dues";
 import DriverLeavePage from "./driver-leave";
+import TodayOnLeaveStrip from "../components/drivers/leave/today-on-leave-strip";
 import DriverAttendancePage from "./driver-attendance";
 import DriverPerformancePage from "./driver-performance";
 import VehiclePerformancePage from "./vehicle-performance";
+import GpsSettingsPage from "./gps-settings";
 import WhatsAppPanel from "./whatsapp-panel";
 import DailyOperationsPopup from "../components/dashboard/daily-operations-popup";
-import BookingCommunication from "../components/booking/booking-communication";
-import ExtendBookingDialog from "../components/booking/extend-booking-dialog";
-import AssignVendorDialog from "../components/booking/assign-vendor-dialog";
-import ResourceFulfilmentPanel from "../components/booking/resource-fulfilment-panel";
-import PaymentSection from "../components/booking/payment-section";
-import TripCostSummary from "../components/booking/trip-cost-summary";
-import SetDriverPinDialog from "../components/drivers/set-driver-pin-dialog";
-import PipelineStepper from "../components/pipeline/pipeline-stepper";
-import { bookingPipelineInfo } from "../lib/pipelineStages";
+import { useBookingWorkspace } from "@/components/booking/booking-workspace-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -61,7 +59,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Menu, LogOut, Star, Car, Users, UserCheck, Phone, Mail, MessageCircle, Banknote, Plus, User, FileText, Trash2 } from "lucide-react";
 
-type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors" | "rewards-referrals" | "resource-fulfilment";
+type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "live-operations" | "self-drive" | "whatsapp" | "upcoming-bookings" | "booking-queues" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "customers-add" | "drivers-add" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors" | "rewards-referrals" | "gps-tracking";
 
 // apiRequest() throws Error("<status>: <raw response text>") on a non-2xx
 // response (queryClient.ts:throwIfResNotOk) — without this, a rejected
@@ -134,10 +132,8 @@ export default function Dashboard() {
   const [viewingVehicle, setViewingVehicle] = useState<any>(null);
   const [editingDriver, setEditingDriver] = useState<any>(null);
   const [viewingDriver, setViewingDriver] = useState<any>(null);
-  const [viewingBooking, setViewingBooking] = useState<any>(null);
-  const [editingBooking, setEditingBooking] = useState<any>(null);
-  const [showEditBookingForm, setShowEditBookingForm] = useState(false);
-  
+  const { openBooking } = useBookingWorkspace();
+
   // Cancel booking states
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancellingBooking, setCancellingBooking] = useState<any>(null);
@@ -161,7 +157,7 @@ export default function Dashboard() {
   // Sync URL with current view on mount with role-based access control
   useEffect(() => {
     const section = params.section as ViewType;
-    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "upcoming-bookings", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "after-sales", "campaigns", "rewards-referrals", "resource-fulfilment", "vendors", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile"];
+    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "live-operations", "self-drive", "upcoming-bookings", "booking-queues", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "drivers-add", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "customers-add", "after-sales", "campaigns", "rewards-referrals", "vendors", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile", "gps-tracking"];
     
     // Add "users" section only for admin and client roles
     if (user?.role === 'admin' || user?.role === 'client') {
@@ -170,7 +166,7 @@ export default function Dashboard() {
     
     // Remove restricted sections for manager roles
     if (user?.role === 'manager') {
-      const restrictedSections = ["revenue", "vendor-settlement", "drivers", "driver-leave", "driver-performance", "vehicle-performance", "driver-attendance", "after-sales", "campaigns", "rewards-referrals", "resource-fulfilment", "vendors"];
+      const restrictedSections = ["revenue", "vendor-settlement", "drivers", "drivers-add", "driver-leave", "driver-performance", "vehicle-performance", "driver-attendance", "after-sales", "campaigns", "rewards-referrals", "vendors"];
       restrictedSections.forEach(section => {
         const index = allowedSections.indexOf(section);
         if (index > -1) {
@@ -203,6 +199,16 @@ export default function Dashboard() {
       }
     }
   }, [user]);
+
+  // Sidebar "Add Driver": the same Drivers screen with the canonical Add
+  // Driver wizard already open — mirrors the "customers-add" pattern, so
+  // there is exactly one driver-creation flow.
+  useEffect(() => {
+    if (currentView === "drivers-add") {
+      setEditingDriver(null);
+      setShowDriverForm(true);
+    }
+  }, [currentView]);
 
   // Update URL when view changes
   const handleViewChange = (view: ViewType) => {
@@ -333,31 +339,10 @@ export default function Dashboard() {
     },
   });
 
-  const updateBookingMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      return await apiRequest('PUT', `/api/bookings/${id}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings/upcoming'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/upcoming-bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-      setShowEditBookingForm(false);
-      setEditingBooking(null);
-      toast({
-        variant: "success",
-        title: "Booking Updated",
-        description: "Booking details have been successfully updated.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update booking",
-        variant: "destructive",
-      });
-    },
-  });
+  // Generic booking field edits now happen inside the Unified Booking
+  // Workspace (canonical PUT + one shared cache-invalidation helper) — the
+  // old updateBookingMutation that backed the deleted Edit Booking dialog
+  // is gone with it.
 
   const cancelBookingMutation = useMutation({
     mutationFn: async ({ id, cancellationReason }: { id: string; cancellationReason: string }) => {
@@ -404,13 +389,15 @@ export default function Dashboard() {
     setViewingDriver(driver);
   };
 
+  // Both "view" and "edit" open the ONE Unified Booking Workspace over the
+  // canonical record (fetched fresh by id inside the workspace — the stale
+  // row object passed here is only used for its id).
   const handleViewBooking = (booking: any) => {
-    setViewingBooking(booking);
+    openBooking(booking);
   };
 
   const handleEditBooking = (booking: any) => {
-    setEditingBooking(booking);
-    setShowEditBookingForm(true);
+    openBooking(booking);
   };
 
   const handleDeleteVehicle = (id: string) => {
@@ -457,61 +444,10 @@ export default function Dashboard() {
     });
   };
 
-  const { data: upcomingBookings = [] } = useQuery<any[]>({
-    queryKey: ["/api/bookings/upcoming"],
-  });
-
-  // Today/Tomorrow/Future/All Upcoming tabs on the Dashboard Overview's
-  // "Upcoming Bookings" card. Deliberately a separate query from
-  // upcomingBookings above (which stays wired to its existing invalidations
-  // untouched) — see docs/DASHBOARD_SAFE_CHANGE_PLAN.md for why the old
-  // /api/bookings/upcoming source isn't reused here (stale status filter).
-  const [upcomingTab, setUpcomingTab] = useState<"today" | "tomorrow" | "future" | "all">("today");
-  const {
-    data: classifiedUpcoming,
-    isLoading: isUpcomingLoading,
-    isError: isUpcomingError,
-    refetch: refetchUpcoming,
-    dataUpdatedAt: upcomingUpdatedAt,
-  } = useQuery<{ today: any[]; tomorrow: any[]; future: any[]; all: any[]; truncated: boolean }>({
-    queryKey: ["/api/dashboard/upcoming-bookings"],
-  });
-
-  // Live Operations mini-board on the Dashboard Overview. Reuses the
-  // already-existing, already-correct /api/operations/live-bookings
-  // endpoint (same one the standalone Live Bookings page uses) — no new
-  // backend aggregation needed here.
-  const {
-    data: liveOps,
-    isLoading: isLiveOpsLoading,
-    isError: isLiveOpsError,
-    refetch: refetchLiveOps,
-  } = useQuery<Record<string, any[]>>({
-    queryKey: ["/api/operations/live-bookings"],
-  });
-
-  // Finance overview (Today's cash/UPI/bank/card split) — ledger-sourced
-  // (PaymentTransaction, never a raw booking-field sum), role-gated behind
-  // the same canViewRevenue() check the Revenue KPI card already uses.
-  const {
-    data: financeSummary,
-    isLoading: isFinanceLoading,
-    isError: isFinanceError,
-    refetch: refetchFinance,
-  } = useQuery<{ cash: number; upi: number; bank: number; card: number; other: number; total: number }>({
-    queryKey: ["/api/dashboard/finance-summary"],
-    enabled: canViewRevenue(),
-  });
-
-  // Lead/Booking source chart — all-time count per Booking.bookingSource.
-  const {
-    data: leadSources,
-    isLoading: isLeadSourcesLoading,
-    isError: isLeadSourcesError,
-    refetch: refetchLeadSources,
-  } = useQuery<{ source: string; count: number }[]>({
-    queryKey: ["/api/dashboard/lead-sources"],
-  });
+  // All Dashboard-overview data (KPIs, trends, statuses, attention,
+  // upcoming, live ops) now lives in components/dashboard/overview.tsx,
+  // which fetches the aggregated /api/dashboard/overview endpoint itself —
+  // this shell no longer pre-fetches those datasets for every view.
 
   const { data: vehicles = [] } = useQuery<any[]>({
     queryKey: ["/api/vehicles"],
@@ -538,454 +474,15 @@ export default function Dashboard() {
       case "dashboard":
         return (
           <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 lg:mb-6">
-              <h1 className="text-xl lg:text-2xl font-bold text-gray-900">Dashboard Overview</h1>
-              <div className="flex flex-col sm:flex-row gap-2 lg:gap-3">
-                <Button
-                  onClick={() => handleViewChange("bookings")}
-                  className="w-full sm:w-auto h-10 lg:h-11 text-sm lg:text-base transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  Create New Booking
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleViewChange("fleet")}
-                  className="w-full sm:w-auto h-10 lg:h-11 text-sm lg:text-base transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-                >
-                  Manage Fleet
-                </Button>
-              </div>
-            </div>
-            
-            <EnhancedStats />
-            
-            {/* Upcoming Bookings */}
-            <Card>
-              <CardHeader className="pb-4 lg:pb-6">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 lg:gap-4">
-                  <CardTitle className="text-lg sm:text-xl lg:text-2xl">Upcoming Bookings</CardTitle>
-                  {upcomingUpdatedAt > 0 && (
-                    <span className="text-xs text-gray-500">
-                      Last updated {new Date(upcomingUpdatedAt).toLocaleTimeString()}
-                    </span>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {isUpcomingError ? (
-                  <div className="text-center py-10 space-y-3">
-                    <p className="text-sm text-red-600">Couldn't load upcoming bookings.</p>
-                    <Button variant="outline" size="sm" onClick={() => refetchUpcoming()}>Retry</Button>
-                  </div>
-                ) : isUpcomingLoading ? (
-                  <div className="space-y-3">
-                    {[...Array(3)].map((_, i) => (
-                      <div key={i} className="animate-pulse h-16 bg-gray-100 rounded-lg" />
-                    ))}
-                  </div>
-                ) : (
-                  <Tabs value={upcomingTab} onValueChange={(v) => setUpcomingTab(v as typeof upcomingTab)}>
-                    <TabsList>
-                      <TabsTrigger value="today">Today ({classifiedUpcoming?.today.length ?? 0})</TabsTrigger>
-                      <TabsTrigger value="tomorrow">Tomorrow ({classifiedUpcoming?.tomorrow.length ?? 0})</TabsTrigger>
-                      <TabsTrigger value="future">Future ({classifiedUpcoming?.future.length ?? 0})</TabsTrigger>
-                      <TabsTrigger value="all">All Upcoming ({classifiedUpcoming?.all.length ?? 0})</TabsTrigger>
-                    </TabsList>
-
-                    {(["today", "tomorrow", "future", "all"] as const).map((tabKey) => {
-                      const list = classifiedUpcoming?.[tabKey] ?? [];
-                      const emptyMessage =
-                        tabKey === "today" ? "No upcoming bookings for today." :
-                        tabKey === "tomorrow" ? "No upcoming bookings for tomorrow." :
-                        tabKey === "future" ? "No bookings scheduled beyond tomorrow." :
-                        "No upcoming bookings.";
-                      return (
-                        <TabsContent key={tabKey} value={tabKey}>
-                          {list.length === 0 ? (
-                            <div className="text-center text-gray-500 py-12 space-y-3">
-                              <div className="text-base">{emptyMessage}</div>
-                              <Button size="sm" onClick={() => handleViewChange("bookings")}>Create Booking</Button>
-                            </div>
-                          ) : (
-                            <>
-                              {/* Mobile Card View */}
-                              <div className="block sm:hidden space-y-3">
-                                {list.map((booking: any) => {
-                                  const vehicle = booking.vehicleId && typeof booking.vehicleId === "object" ? booking.vehicleId : null;
-                                  const driver = booking.driverId && typeof booking.driverId === "object" ? booking.driverId : null;
-                                  const balanceDue = Math.max(0, (booking.totalAmount || 0) - (booking.advanceReceived || 0));
-                                  return (
-                                    <button
-                                      key={booking._id || booking.id}
-                                      type="button"
-                                      onClick={() => setViewingBooking(booking)}
-                                      className="w-full text-left border rounded-lg p-4 space-y-2 hover:bg-gray-50 transition-colors"
-                                    >
-                                      <div className="flex justify-between items-start">
-                                        <div>
-                                          <div className="font-medium">{booking.customerName}</div>
-                                          <div className="text-sm text-gray-500">{booking.customerPhone}</div>
-                                        </div>
-                                        <Badge variant="default">{booking.status}</Badge>
-                                      </div>
-                                      <div className="text-sm">
-                                        <div><span className="font-medium">Pickup:</span> {new Date(booking.pickupDate).toLocaleDateString()} at {booking.pickupTime} — {booking.pickupLocation || "Not specified"}</div>
-                                        <div><span className="font-medium">Route:</span> {booking.pickupLocation || "Not specified"} to {booking.dropoffLocation || "Not specified"}</div>
-                                        <div><span className="font-medium">Vehicle:</span> {vehicle ? `${vehicle.make || ""} ${vehicle.model || ""}`.trim() : "Not assigned"}</div>
-                                        <div><span className="font-medium">Driver:</span> {driver ? driver.name : (booking.bookingType === "self_drive" ? "Self Drive" : "Not assigned")}</div>
-                                        <div><span className="font-medium">Balance Due:</span> ₹{balanceDue}</div>
-                                      </div>
-                                    </button>
-                                  );
-                                })}
-                              </div>
-
-                              {/* Desktop Table View */}
-                              <div className="hidden sm:block overflow-x-auto">
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow className="bg-gray-50 lg:h-12">
-                                      <TableHead className="font-semibold lg:text-base lg:px-6">Booking</TableHead>
-                                      <TableHead className="font-semibold lg:text-base lg:px-6">Customer</TableHead>
-                                      <TableHead className="font-semibold lg:text-base lg:px-6">Pickup</TableHead>
-                                      <TableHead className="font-semibold lg:text-base lg:px-6">Route</TableHead>
-                                      <TableHead className="font-semibold lg:text-base lg:px-6">Vehicle</TableHead>
-                                      <TableHead className="font-semibold lg:text-base lg:px-6">Driver</TableHead>
-                                      <TableHead className="font-semibold lg:text-base lg:px-6">Status</TableHead>
-                                      <TableHead className="font-semibold lg:text-base lg:px-6">Payment</TableHead>
-                                      <TableHead className="font-semibold lg:text-base lg:px-6">Assignment</TableHead>
-                                      <TableHead className="font-semibold lg:text-base lg:px-6">Actions</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {list.map((booking: any) => {
-                                      const vehicle = booking.vehicleId && typeof booking.vehicleId === "object" ? booking.vehicleId : null;
-                                      const driver = booking.driverId && typeof booking.driverId === "object" ? booking.driverId : null;
-                                      const balanceDue = Math.max(0, (booking.totalAmount || 0) - (booking.advanceReceived || 0));
-                                      const vehicleAssigned = !!vehicle;
-                                      const driverAssigned = booking.bookingType === "self_drive" ? true : !!driver;
-                                      const assignmentLabel = vehicleAssigned && driverAssigned ? "Fully Assigned" : (!vehicleAssigned && !driverAssigned ? "Unassigned" : "Partially Assigned");
-                                      return (
-                                        <TableRow
-                                          key={booking._id || booking.id}
-                                          className="hover:bg-gray-50 lg:h-16 cursor-pointer"
-                                          onClick={() => setViewingBooking(booking)}
-                                        >
-                                          <TableCell className="lg:px-6 lg:py-4 font-medium">{booking.bookingId}</TableCell>
-                                          <TableCell className="lg:px-6 lg:py-4">
-                                            <div className="font-medium lg:text-base">{booking.customerName}</div>
-                                            <div className="text-sm text-gray-500">{booking.customerPhone}</div>
-                                          </TableCell>
-                                          <TableCell className="lg:px-6 lg:py-4">
-                                            <div className="lg:text-base">{new Date(booking.pickupDate).toLocaleDateString()}</div>
-                                            <div className="text-sm text-gray-500">{booking.pickupTime}</div>
-                                          </TableCell>
-                                          <TableCell className="lg:px-6 lg:py-4">
-                                            <div className="font-medium lg:text-base">{booking.pickupLocation || "Not specified"}</div>
-                                            <div className="text-sm text-gray-500">to {booking.dropoffLocation || "Not specified"}</div>
-                                          </TableCell>
-                                          <TableCell className="lg:px-6 lg:py-4">
-                                            {vehicle ? (
-                                              <>
-                                                <div className="font-medium lg:text-base">{vehicle.make} {vehicle.model}</div>
-                                                {vehicle.licensePlate && <div className="text-sm text-gray-500">{vehicle.licensePlate}</div>}
-                                              </>
-                                            ) : <span className="text-gray-400">Not assigned</span>}
-                                          </TableCell>
-                                          <TableCell className="lg:px-6 lg:py-4">
-                                            {driver ? (
-                                              <>
-                                                <div className="font-medium lg:text-base">{driver.name}</div>
-                                                {driver.phone && <div className="text-sm text-gray-500">{driver.phone}</div>}
-                                              </>
-                                            ) : booking.bookingType === "self_drive" ? (
-                                              <span className="text-gray-500">Self Drive</span>
-                                            ) : <span className="text-gray-400">Not assigned</span>}
-                                          </TableCell>
-                                          <TableCell className="lg:px-6 lg:py-4">
-                                            <Badge variant="default" className="lg:text-sm lg:px-3 lg:py-1">{booking.status}</Badge>
-                                          </TableCell>
-                                          <TableCell className="lg:px-6 lg:py-4">
-                                            <div className="font-semibold lg:text-base text-green-600">₹{booking.totalAmount || 0}</div>
-                                            <div className="text-sm text-gray-500">Due ₹{balanceDue}</div>
-                                          </TableCell>
-                                          <TableCell className="lg:px-6 lg:py-4">
-                                            <Badge variant={assignmentLabel === "Fully Assigned" ? "default" : assignmentLabel === "Unassigned" ? "destructive" : "secondary"} className="lg:text-sm lg:px-3 lg:py-1">
-                                              {assignmentLabel}
-                                            </Badge>
-                                          </TableCell>
-                                          <TableCell className="lg:px-6 lg:py-4">
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={(e) => { e.stopPropagation(); setViewingBooking(booking); }}
-                                            >
-                                              View
-                                            </Button>
-                                          </TableCell>
-                                        </TableRow>
-                                      );
-                                    })}
-                                  </TableBody>
-                                </Table>
-                                {tabKey !== "today" && tabKey !== "tomorrow" && classifiedUpcoming?.truncated && (
-                                  <div className="text-center py-4">
-                                    <Button variant="outline" size="sm" onClick={() => handleViewChange("history")}>
-                                      Showing first 200 — View All in Booking History
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                            </>
-                          )}
-                        </TabsContent>
-                      );
-                    })}
-                  </Tabs>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Live Operations */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg sm:text-xl lg:text-2xl">Live Operations</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLiveOpsError ? (
-                  <div className="text-center py-8 space-y-3">
-                    <p className="text-sm text-red-600">Couldn't load live operations.</p>
-                    <Button variant="outline" size="sm" onClick={() => refetchLiveOps()}>Retry</Button>
-                  </div>
-                ) : isLiveOpsLoading ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {[...Array(4)].map((_, i) => <div key={i} className="animate-pulse h-20 bg-gray-100 rounded-lg" />)}
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {([
-                      { key: "startDue", label: "Start Due", emphasis: "neutral" },
-                      { key: "startDelayed", label: "Delayed Pickup", emphasis: "critical" },
-                      { key: "ongoing", label: "Running Trips", emphasis: "neutral" },
-                      { key: "endingSoon", label: "Ending Soon", emphasis: "warn" },
-                      { key: "completionOverdue", label: "Completion Overdue", emphasis: "critical" },
-                      { key: "paymentPending", label: "Payment Pending", emphasis: "warn" },
-                      { key: "unassigned", label: "Unassigned", emphasis: "critical" },
-                    ] as const).map(({ key, label, emphasis }) => {
-                      const count = liveOps?.[key]?.length ?? 0;
-                      const colorClasses =
-                        emphasis === "critical" ? "border-red-200 bg-red-50 hover:bg-red-100" :
-                        emphasis === "warn" ? "border-amber-200 bg-amber-50 hover:bg-amber-100" :
-                        "border-blue-200 bg-blue-50 hover:bg-blue-100";
-                      const textClasses =
-                        emphasis === "critical" ? "text-red-700" :
-                        emphasis === "warn" ? "text-amber-700" :
-                        "text-blue-700";
-                      return (
-                        <button
-                          type="button"
-                          key={key}
-                          onClick={() => goToLiveOpsBucket(key)}
-                          className={`text-left border rounded-lg p-3 lg:p-4 transition-colors ${colorClasses}`}
-                        >
-                          <div className={`text-2xl font-bold ${textClasses}`}>{count}</div>
-                          <div className="text-xs lg:text-sm text-gray-700">{label}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Fleet and Driver Status */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg sm:text-xl">Fleet Status</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-3">
-                    {([
-                      { status: "available", label: "Available", color: "bg-green-50 border-green-200 hover:bg-green-100 text-green-700" },
-                      { status: "on_trip", label: "On Trip", color: "bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-700" },
-                      { status: "maintenance", label: "Maintenance", color: "bg-red-50 border-red-200 hover:bg-red-100 text-red-700" },
-                    ] as const).map(({ status, label, color }) => (
-                      <button
-                        type="button"
-                        key={status}
-                        onClick={() => goToFleetStatus(status)}
-                        className={`text-left border rounded-lg p-3 transition-colors ${color}`}
-                      >
-                        <div className="text-xl font-bold">{vehicles.filter((v: any) => v.status === status).length}</div>
-                        <div className="text-xs text-gray-700">{label}</div>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg sm:text-xl">Driver Status</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-3">
-                    {([
-                      { status: "available", label: "Available", color: "bg-green-50 border-green-200 hover:bg-green-100 text-green-700" },
-                      { status: "on_duty", label: "On Duty", color: "bg-blue-50 border-blue-200 hover:bg-blue-100 text-blue-700" },
-                      { status: "inactive", label: "Inactive", color: "bg-gray-50 border-gray-200 hover:bg-gray-100 text-gray-700" },
-                    ] as const).map(({ status, label, color }) => (
-                      <button
-                        type="button"
-                        key={status}
-                        onClick={() => goToDriverStatus(status)}
-                        className={`text-left border rounded-lg p-3 transition-colors ${color}`}
-                      >
-                        <div className="text-xl font-bold">{drivers.filter((d: any) => d.status === status).length}</div>
-                        <div className="text-xs text-gray-700">{label}</div>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Finance Overview and Lead/Booking Sources */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-              {canViewRevenue() && (
-                <Card
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleViewChange("revenue")}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleViewChange("revenue"); } }}
-                  className="cursor-pointer hover:shadow-lg transition-shadow"
-                >
-                  <CardHeader className="pb-4">
-                    <CardTitle className="text-lg sm:text-xl">Today's Collection</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {isFinanceError ? (
-                      <div className="text-center py-6 space-y-3">
-                        <p className="text-sm text-red-600">Couldn't load today's collection.</p>
-                        <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); refetchFinance(); }}>Retry</Button>
-                      </div>
-                    ) : isFinanceLoading ? (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {[...Array(5)].map((_, i) => <div key={i} className="animate-pulse h-16 bg-gray-100 rounded-lg" />)}
-                      </div>
-                    ) : (
-                      <>
-                        <div className="text-3xl font-bold text-green-700 mb-4">
-                          ₹{(financeSummary?.total ?? 0).toLocaleString('en-IN')}
-                        </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                          {([
-                            { key: "cash", label: "Cash" },
-                            { key: "upi", label: "UPI" },
-                            { key: "bank", label: "Bank" },
-                            { key: "card", label: "Card" },
-                            { key: "other", label: "Other" },
-                          ] as const).map(({ key, label }) => (
-                            <div key={key} className="border rounded-lg p-3 bg-gray-50">
-                              <div className="text-lg font-semibold text-gray-900">₹{(financeSummary?.[key] ?? 0).toLocaleString('en-IN')}</div>
-                              <div className="text-xs text-gray-600">{label}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-lg sm:text-xl">Booking Sources</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLeadSourcesError ? (
-                    <div className="text-center py-6 space-y-3">
-                      <p className="text-sm text-red-600">Couldn't load booking sources.</p>
-                      <Button variant="outline" size="sm" onClick={() => refetchLeadSources()}>Retry</Button>
-                    </div>
-                  ) : isLeadSourcesLoading ? (
-                    <div className="space-y-2">
-                      {[...Array(4)].map((_, i) => <div key={i} className="animate-pulse h-8 bg-gray-100 rounded-lg" />)}
-                    </div>
-                  ) : !leadSources || leadSources.length === 0 ? (
-                    <p className="text-sm text-gray-500 text-center py-6">No bookings yet.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {(() => {
-                        const maxCount = Math.max(...leadSources.map((s) => s.count), 1);
-                        return leadSources.map(({ source, count }) => (
-                          <button
-                            type="button"
-                            key={source}
-                            onClick={() => goToBookingSource(source)}
-                            className="w-full text-left group"
-                          >
-                            <div className="flex justify-between items-center text-sm mb-1">
-                              <span className="text-gray-700 capitalize group-hover:text-blue-700">{source.replace(/_/g, ' ')}</span>
-                              <span className="font-medium text-gray-900">{count}</span>
-                            </div>
-                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-blue-400 group-hover:bg-blue-600 transition-colors rounded-full"
-                                style={{ width: `${Math.max(4, Math.round((count / maxCount) * 100))}%` }}
-                              />
-                            </div>
-                          </button>
-                        ));
-                      })()}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
-              <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleViewChange("bookings")}>
-                <CardContent className="p-4 lg:p-6 text-center">
-                  <div className="w-12 h-12 lg:w-16 lg:h-16 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-3 lg:mb-4">
-                    <span className="text-blue-600 text-xl lg:text-2xl">+</span>
-                  </div>
-                  <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-2">Add Booking</h3>
-                  <p className="text-sm text-gray-600 mb-3 lg:mb-4">Create a new booking for your customers</p>
-                  <Button className="w-full bg-blue-600 hover:bg-blue-700">
-                    Get Started
-                  </Button>
-                </CardContent>
-              </Card>
-              
-              <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleViewChange("fleet")}>
-                <CardContent className="p-4 lg:p-6 text-center">
-                  <div className="w-12 h-12 lg:w-16 lg:h-16 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-3 lg:mb-4">
-                    <span className="text-green-600 text-xl lg:text-2xl">🚗</span>
-                  </div>
-                  <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-2">Manage Fleet</h3>
-                  <p className="text-sm text-gray-600 mb-3 lg:mb-4">Add, edit or view your vehicle fleet</p>
-                  <Button className="w-full bg-green-600 hover:bg-green-700">
-                    View Fleet
-                  </Button>
-                </CardContent>
-              </Card>
-              
-              <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => handleViewChange("revenue")}>
-                <CardContent className="p-4 lg:p-6 text-center">
-                  <div className="w-12 h-12 lg:w-16 lg:h-16 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-3 lg:mb-4">
-                    <span className="text-purple-600 text-xl lg:text-2xl">📊</span>
-                  </div>
-                  <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-2">Revenue Report</h3>
-                  <p className="text-sm text-gray-600 mb-3 lg:mb-4">View detailed revenue analytics</p>
-                  <Button className="w-full bg-purple-600 hover:bg-purple-700">
-                    View Report
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+            <LiveOperationsSummary onViewAll={() => handleViewChange("live-operations")} />
+            <DashboardOverview
+              onNavigate={(view) => handleViewChange(view as ViewType)}
+              onViewBooking={(booking) => openBooking(booking)}
+              onSelectCustomer={handleSelectCustomerFromSearch}
+              onFleetStatusClick={goToFleetStatus}
+              onDriverStatusClick={goToDriverStatus}
+              canViewRevenue={user?.role !== 'manager' && canViewRevenue()}
+            />
           </div>
         );
 
@@ -1174,6 +671,9 @@ export default function Dashboard() {
                           <Button size="sm" variant="secondary" className="flex-1" onClick={() => handleViewVehicle(vehicle)}>
                             View Profile
                           </Button>
+                          <Link href={`/vehicles/${vehicle._id || vehicle.id}`} className="flex-1">
+                            <Button size="sm" variant="outline" className="w-full">View 360</Button>
+                          </Link>
                           {canManageFleet() && <>
                             <Button size="sm" variant="outline" className="flex-1" onClick={() => handleEditVehicle(vehicle)}>
                               Edit
@@ -1248,6 +748,9 @@ export default function Dashboard() {
                                 >
                                   View Profile
                                 </Button>
+                                <Link href={`/vehicles/${vehicle._id || vehicle.id}`}>
+                                  <Button variant="ghost" size="sm">View 360</Button>
+                                </Link>
                                 {canManageFleet() && <>
                                   <Button 
                                     variant="ghost" 
@@ -1282,11 +785,19 @@ export default function Dashboard() {
           </div>
         );
 
+      case "drivers-add":
       case "drivers":
         return (
           <div>
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Driver Management</h1>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleViewChange("driver-attendance")}>
+                  Attendance
+                </Button>
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleViewChange("driver-leave")}>
+                  Leave
+                </Button>
               <Dialog open={showDriverForm} onOpenChange={(open) => {
                 setShowDriverForm(open);
                 if (!open) {
@@ -1301,19 +812,26 @@ export default function Dashboard() {
                     Add Driver
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>{editingDriver ? 'Edit Driver' : 'Add New Driver'}</DialogTitle>
                   </DialogHeader>
-                  <DriverForm 
-                    driver={editingDriver} 
+                  <DriverForm
+                    driver={editingDriver}
                     onSuccess={() => {
                       setShowDriverForm(false);
                       setEditingDriver(null);
-                    }} 
+                    }}
                   />
                 </DialogContent>
               </Dialog>
+              </div>
+            </div>
+
+            {/* Daily operational info first: who is on leave today (same
+                canonical records as the Leave Calendar). */}
+            <div className="mb-4">
+              <TodayOnLeaveStrip maxEntries={4} onViewAll={() => handleViewChange("driver-leave")} actionLabel="View Leave Calendar" />
             </div>
 
             <Card>
@@ -1498,6 +1016,12 @@ export default function Dashboard() {
       case "customers":
         return <CustomersPage onEditBooking={handleEditBooking} onNewBooking={handleConvertLeadToBooking} initialCustomerId={pendingCustomerId} onNavigateToInquiry={handleNavigateToInquiry} onNavigateToLead={handleNavigateToLead} />;
 
+      // Sidebar "Add Customer": the same Customers page with the intake
+      // (Quick Inquiry) dialog already open — new customers enter through
+      // the canonical inquiry funnel, not a separate create form.
+      case "customers-add":
+        return <CustomersPage onEditBooking={handleEditBooking} onNewBooking={handleConvertLeadToBooking} initialCustomerId={pendingCustomerId} onNavigateToInquiry={handleNavigateToInquiry} onNavigateToLead={handleNavigateToLead} initialShowIntake />;
+
       case "after-sales":
         return <AfterSalesPage />;
 
@@ -1506,9 +1030,6 @@ export default function Dashboard() {
 
       case "rewards-referrals":
         return <RewardsReferralsDashboard />;
-
-      case "resource-fulfilment":
-        return <ResourceFulfilmentDashboard />;
 
       case "inquiries":
         return <InquiriesPage initialInquiryId={pendingInquiryId} />;
@@ -2196,8 +1717,17 @@ export default function Dashboard() {
       case "live-bookings":
         return <LiveBookings initialTab={liveOpsInitialTab} />;
 
+      case "self-drive":
+        return <SelfDrivePage />;
+
+      case "live-operations":
+        return <LiveOperations />;
+
       case "upcoming-bookings":
         return <UpcomingBookings />;
+
+      case "booking-queues":
+        return <BookingQueuesPanel />;
 
       case "payment-dues":
         return <PaymentDues />;
@@ -2206,13 +1736,16 @@ export default function Dashboard() {
         return <DriverAttendancePage />;
 
       case "driver-leave":
-        return <DriverLeavePage />;
+        return <DriverLeavePage onOpenDriver={(d) => setViewingDriver(d)} />;
 
       case "driver-performance":
         return <DriverPerformancePage />;
 
       case "vehicle-performance":
         return <VehiclePerformancePage />;
+
+      case "gps-tracking":
+        return <GpsSettingsPage />;
 
       case "whatsapp":
         return <WhatsAppPanel />;
@@ -2531,7 +2064,14 @@ export default function Dashboard() {
             >
               <Menu size={20} />
             </Button>
-            <h1 className="text-xl font-bold text-blue-600">FleetPro</h1>
+            <button
+              type="button"
+              aria-label="Go to Dashboard"
+              onClick={() => handleViewChange("dashboard")}
+              className="text-xl font-bold text-blue-600 cursor-pointer rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            >
+              FleetPro
+            </button>
           </div>
           <Button variant="ghost" size="sm" onClick={handleLogout}>
             <LogOut size={16} />
@@ -2549,438 +2089,25 @@ export default function Dashboard() {
       
       <main className="flex-1 overflow-y-auto lg:ml-0 pt-16 lg:pt-0 transition-all duration-300 ease-in-out">
         <div className="px-3 sm:px-6 lg:px-8 py-4 lg:py-8">
+          {/* Persistent operational alert strip — booking-end reminders,
+              overdue returns, payment due. Renders nothing when no open
+              alerts; never covers the working UI. */}
+          <OperationsAlertStrip
+            onViewAll={() => handleViewChange("live-operations")}
+            onOpenBooking={(id) => openBooking(id)}
+          />
           <div className="animate-in slide-in-from-bottom-2 duration-300">
             {renderContent()}
           </div>
         </div>
       </main>
 
-      {/* View Booking Dialog */}
-      <Dialog open={!!viewingBooking} onOpenChange={() => setViewingBooking(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Booking Details</DialogTitle>
-          </DialogHeader>
-          {viewingBooking && (
-            <div className="space-y-6">
-              {/* Read-only — this dialog's own contextual actions
-                  (AssignVendorDialog/ExtendBookingDialog/PaymentSection/
-                  TripCostSummary/BookingCommunication below) already cover
-                  every status-changing action for a Booking; the stepper
-                  exists to show where this record sits without duplicating
-                  those, not to add a second action surface. */}
-              <PipelineStepper info={bookingPipelineInfo(viewingBooking)} />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Booking ID</Label>
-                  <p className="text-sm text-gray-900">{viewingBooking.bookingId}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Status</Label>
-                  <Badge variant={viewingBooking.status === "confirmed" ? "default" : viewingBooking.status === "completed" ? "secondary" : "destructive"}>
-                    {viewingBooking.status}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Customer Name</Label>
-                  <p className="text-sm text-gray-900">{viewingBooking.customerName}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Customer Phone</Label>
-                  <p className="text-sm text-gray-900">{viewingBooking.customerPhone}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Booking Source</Label>
-                  <p className="text-sm text-gray-900 capitalize">{(viewingBooking.bookingSource || "direct_customer").replace(/_/g, " ")}</p>
-                </div>
-                {viewingBooking.sourceName && (
-                  <div className="md:col-span-2 bg-purple-50 border border-purple-200 rounded-lg p-3">
-                    <Label className="text-sm font-medium text-gray-700">Source Details</Label>
-                    <p className="text-sm text-gray-900 mt-1">
-                      <strong>{viewingBooking.sourceName}</strong>
-                      {viewingBooking.sourceContact ? ` — ${viewingBooking.sourceContact}` : ""}
-                      {viewingBooking.sourceReferenceNumber ? ` (Ref: ${viewingBooking.sourceReferenceNumber})` : ""}
-                    </p>
-                    {(viewingBooking.sourceCommissionType && viewingBooking.sourceCommissionAmount) ? (
-                      <p className="text-sm text-gray-900">
-                        Commission: {viewingBooking.sourceCommissionType === "percentage"
-                          ? `${viewingBooking.sourceCommissionAmount}%`
-                          : `₹${viewingBooking.sourceCommissionAmount}`}
-                      </p>
-                    ) : null}
-                    {viewingBooking.sourceNotes && (
-                      <p className="text-sm text-gray-600 mt-1">{viewingBooking.sourceNotes}</p>
-                    )}
-                  </div>
-                )}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Fulfilment</Label>
-                  <p className="text-sm text-gray-900">
-                    {viewingBooking.fulfilmentType === "vendor" ? (
-                      <>Vendor — {viewingBooking.vendorName || "unnamed"}{viewingBooking.vendorDriverName ? ` (${viewingBooking.vendorDriverName})` : ""}</>
-                    ) : (
-                      "Own Vehicle"
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Pickup Location</Label>
-                  <p className="text-sm text-gray-900">{viewingBooking.pickupLocation || "Not specified"}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Drop-off Location</Label>
-                  <p className="text-sm text-gray-900">{viewingBooking.dropoffLocation || "Not specified"}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Pickup Date & Time</Label>
-                  <p className="text-sm text-gray-900">
-                    {new Date(viewingBooking.pickupDate).toLocaleDateString()} at {viewingBooking.pickupTime}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Return Date & Time</Label>
-                  <p className="text-sm text-gray-900">
-                    {new Date(viewingBooking.returnDate).toLocaleDateString()} at {viewingBooking.returnTime}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Trip Type</Label>
-                  <p className="text-sm text-gray-900">
-                    {viewingBooking.tripType === "round_trip" ? "Round Trip" :
-                     viewingBooking.tripType === "local" ? "Local" :
-                     viewingBooking.tripType === "airport" && viewingBooking.dropoffLocation === "Not Decided Yet" ? "Not Decided Yet" :
-                     viewingBooking.tripType === "airport" ? "Airport" :
-                     viewingBooking.dropoffLocation === "Local" ? "Local" :
-                     viewingBooking.dropoffLocation === "Not Decided Yet" ? "Not Decided Yet" :
-                     viewingBooking.tripType === "one_way" ? "One Way" : "One Way"}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Service Type</Label>
-                  <p className="text-sm text-gray-900">
-                    {viewingBooking.bookingType === "self_drive" ? "Self Drive" : "With Driver"}
-                  </p>
-                </div>
-                {viewingBooking.thirdPartyDriverName && (
-                  <div className="md:col-span-2">
-                    <Label className="text-sm font-medium text-gray-700">Third-party Driver Details</Label>
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-1">
-                      <p className="text-sm text-gray-900">
-                        <strong>Name:</strong> {viewingBooking.thirdPartyDriverName}
-                      </p>
-                      {viewingBooking.thirdPartyDriverPhone && (
-                        <p className="text-sm text-gray-900">
-                          <strong>Phone:</strong> {viewingBooking.thirdPartyDriverPhone}
-                        </p>
-                      )}
-                      {viewingBooking.thirdPartyDriverAddress && (
-                        <p className="text-sm text-gray-900">
-                          <strong>Address:</strong> {viewingBooking.thirdPartyDriverAddress}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Vehicle</Label>
-                  <p className="text-sm text-gray-900">
-                    {(() => {
-                      const vehicle = (vehicles as any[]).find(v => v.id === viewingBooking.vehicleId);
-                      return vehicle ? `${vehicle.make} ${vehicle.model} (${vehicle.registrationNumber})` : "N/A";
-                    })()}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Total Amount</Label>
-                  <p className="text-lg font-semibold text-green-600">₹{viewingBooking.totalAmount || viewingBooking.amount || 0}</p>
-                </div>
-                {viewingBooking.tollCharges && parseFloat(viewingBooking.tollCharges) > 0 && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Toll Charges</Label>
-                    <p className="text-sm text-gray-900">₹{viewingBooking.tollCharges}</p>
-                  </div>
-                )}
-                {viewingBooking.parkingCharges && parseFloat(viewingBooking.parkingCharges) > 0 && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Parking Charges</Label>
-                    <p className="text-sm text-gray-900">₹{viewingBooking.parkingCharges}</p>
-                  </div>
-                )}
-                {viewingBooking.petrolCharges && parseFloat(viewingBooking.petrolCharges) > 0 && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Petrol Charges</Label>
-                    <p className="text-sm text-gray-900">₹{viewingBooking.petrolCharges}</p>
-                  </div>
-                )}
-                {viewingBooking.dieselCharges && parseFloat(viewingBooking.dieselCharges) > 0 && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Diesel Charges</Label>
-                    <p className="text-sm text-gray-900">₹{viewingBooking.dieselCharges}</p>
-                  </div>
-                )}
-                {viewingBooking.cngCharges && parseFloat(viewingBooking.cngCharges) > 0 && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">CNG Charges</Label>
-                    <p className="text-sm text-gray-900">₹{viewingBooking.cngCharges}</p>
-                  </div>
-                )}
-                {viewingBooking.customerDiscussionSummary && (
-                  <div className="md:col-span-2">
-                    <Label className="text-sm font-medium text-gray-700">Customer Discussion Summary</Label>
-                    <p className="text-sm text-gray-900 whitespace-pre-wrap">{viewingBooking.customerDiscussionSummary}</p>
-                  </div>
-                )}
-                {viewingBooking.notes && (
-                  <div className="md:col-span-2">
-                    <Label className="text-sm font-medium text-gray-700">Notes / Instructions</Label>
-                    <p className="text-sm text-gray-900 whitespace-pre-wrap">{viewingBooking.notes}</p>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">Payment</Label>
-                <PaymentSection booking={viewingBooking} />
-              </div>
-
-              {/* Renders nothing for users without trip.profitability.view —
-                  not a permission-gated placeholder, genuinely absent. */}
-              <TripCostSummary booking={viewingBooking} />
-
-              {/* Renders nothing once fulfilment is already resolved and no
-                  sourcing request was ever started — see the component. */}
-              <ResourceFulfilmentPanel booking={viewingBooking} />
-
-              <div className="flex justify-end gap-2">
-                <AssignVendorDialog booking={viewingBooking} />
-                <ExtendBookingDialog booking={viewingBooking} />
-              </div>
-
-              <BookingCommunication booking={viewingBooking} />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Booking Dialog */}
-      <Dialog open={showEditBookingForm} onOpenChange={() => {
-        setShowEditBookingForm(false);
-        setEditingBooking(null);
-      }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Booking Details</DialogTitle>
-          </DialogHeader>
-          {editingBooking && (
-            <div className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-700">Booking ID</Label>
-                <p className="text-sm text-gray-900">{editingBooking.bookingId}</p>
-              </div>
-              
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target as HTMLFormElement);
-                const customerName = formData.get('customerName') as string || '';
-                const baseAmount = parseFloat(formData.get('baseAmount') as string) || 0;
-                const tollCharges = parseFloat(formData.get('tollCharges') as string) || 0;
-                const parkingCharges = parseFloat(formData.get('parkingCharges') as string) || 0;
-                const petrolCharges = parseFloat(formData.get('petrolCharges') as string) || 0;
-                const dieselCharges = parseFloat(formData.get('dieselCharges') as string) || 0;
-                const cngCharges = parseFloat(formData.get('cngCharges') as string) || 0;
-                const thirdPartyDriverCharges = parseFloat(formData.get('thirdPartyDriverCharges') as string) || 0;
-                const thirdPartyDriverName = formData.get('thirdPartyDriverName') as string || '';
-                const thirdPartyDriverPhone = formData.get('thirdPartyDriverPhone') as string || '';
-                const thirdPartyDriverAddress = formData.get('thirdPartyDriverAddress') as string || '';
-                
-                // Calculate total fuel cost and third-party driver charges (both are deductions)
-                const totalFuelCost = petrolCharges + dieselCharges + cngCharges;
-                const totalDeductions = totalFuelCost + thirdPartyDriverCharges;
-                
-                // Calculate final amount (base - toll - parking - fuel - third-party driver)
-                const finalAmount = baseAmount - tollCharges - parkingCharges - totalDeductions;
-                
-                updateBookingMutation.mutate({
-                  id: editingBooking._id || editingBooking.id,
-                  data: {
-                    customerName: customerName,
-                    totalAmount: finalAmount,
-                    tollCharges: tollCharges,
-                    parkingCharges: parkingCharges,
-                    petrolCharges: petrolCharges,
-                    dieselCharges: dieselCharges,
-                    cngCharges: cngCharges,
-                    thirdPartyDriverCharges: thirdPartyDriverCharges,
-                    thirdPartyDriverName: thirdPartyDriverName,
-                    thirdPartyDriverPhone: thirdPartyDriverPhone,
-                    thirdPartyDriverAddress: thirdPartyDriverAddress,
-                  }
-                });
-              }} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <Label htmlFor="customerName">Customer Name</Label>
-                    <Input
-                      id="customerName"
-                      name="customerName"
-                      type="text"
-                      defaultValue={editingBooking.customerName || ""}
-                      placeholder="Enter customer name"
-                      required
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label htmlFor="baseAmount">Base Amount (₹)</Label>
-                    <Input
-                      id="baseAmount"
-                      name="baseAmount"
-                      type="number"
-                      step="0.01"
-                      defaultValue={(() => {
-                        const currentAmount = parseFloat(editingBooking.totalAmount || editingBooking.amount) || 0;
-                        const tollCharges = parseFloat(editingBooking.tollCharges) || 0;
-                        const parkingCharges = parseFloat(editingBooking.parkingCharges) || 0;
-                        const petrolCharges = parseFloat(editingBooking.petrolCharges) || 0;
-                        const dieselCharges = parseFloat(editingBooking.dieselCharges) || 0;
-                        const cngCharges = parseFloat(editingBooking.cngCharges) || 0;
-                        const thirdPartyDriverCharges = parseFloat(editingBooking.thirdPartyDriverCharges) || 0;
-                        const totalFuelCost = petrolCharges + dieselCharges + cngCharges;
-                        const totalDeductions = totalFuelCost + thirdPartyDriverCharges;
-                        return (currentAmount + tollCharges + parkingCharges + totalDeductions).toString();
-                      })()}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="tollCharges">Toll Charges (₹)</Label>
-                    <Input
-                      id="tollCharges"
-                      name="tollCharges"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingBooking.tollCharges || "0"}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="parkingCharges">Parking Charges (₹)</Label>
-                    <Input
-                      id="parkingCharges"
-                      name="parkingCharges"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingBooking.parkingCharges || "0"}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="petrolCharges">Petrol Charges (₹)</Label>
-                    <Input
-                      id="petrolCharges"
-                      name="petrolCharges"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingBooking.petrolCharges || "0"}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="dieselCharges">Diesel Charges (₹)</Label>
-                    <Input
-                      id="dieselCharges"
-                      name="dieselCharges"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingBooking.dieselCharges || "0"}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="cngCharges">CNG Charges (₹)</Label>
-                    <Input
-                      id="cngCharges"
-                      name="cngCharges"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingBooking.cngCharges || "0"}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="thirdPartyDriverCharges">Third Party Driver Charges (₹)</Label>
-                    <Input
-                      id="thirdPartyDriverCharges"
-                      name="thirdPartyDriverCharges"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingBooking.thirdPartyDriverCharges || "0"}
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-                
-                {/* Third Party Driver Details Section */}
-                <div className="border-t pt-4">
-                  <h3 className="font-medium text-gray-900 mb-3">Third Party Driver Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="thirdPartyDriverName">Driver Name</Label>
-                      <Input
-                        id="thirdPartyDriverName"
-                        name="thirdPartyDriverName"
-                        type="text"
-                        defaultValue={editingBooking.thirdPartyDriverName || ""}
-                        placeholder="Enter driver name"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="thirdPartyDriverPhone">Driver Phone</Label>
-                      <Input
-                        id="thirdPartyDriverPhone"
-                        name="thirdPartyDriverPhone"
-                        type="tel"
-                        defaultValue={editingBooking.thirdPartyDriverPhone || ""}
-                        placeholder="Enter phone number"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label htmlFor="thirdPartyDriverAddress">Driver Address</Label>
-                      <Input
-                        id="thirdPartyDriverAddress"
-                        name="thirdPartyDriverAddress"
-                        type="text"
-                        defaultValue={editingBooking.thirdPartyDriverAddress || ""}
-                        placeholder="Enter driver address"
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex gap-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setShowEditBookingForm(false);
-                      setEditingBooking(null);
-                    }}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={updateBookingMutation.isPending}
-                    className="flex-1"
-                  >
-                    {updateBookingMutation.isPending ? "Updating..." : "Update Booking"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* The old View Booking and Edit Booking dialogs are gone: every
+          view/edit action now opens the ONE Unified Booking Workspace
+          (see BookingWorkspaceProvider in App.tsx). The legacy edit
+          dialog in particular recomputed totalAmount client-side with a
+          formula that subtracted charges from the fare — the workspace
+          saves fields as-is and leaves money math to the server. */}
 
       {/* Cancel Booking Confirmation Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
@@ -3070,9 +2197,13 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* View Driver Profile Modal */}
+      {/* View Driver Profile Modal — real Driver 360° view (contacts,
+          documents with compliance/expiry status, employment history,
+          lifecycle stage). See client/src/components/drivers/driver-360.tsx
+          for the dead viewingDriver.age/.licenseType/.licenseExpiry/.notes
+          resolution. */}
       <Dialog open={!!viewingDriver} onOpenChange={() => setViewingDriver(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <Users className="text-blue-600" size={24} />
@@ -3080,152 +2211,13 @@ export default function Dashboard() {
             </DialogTitle>
           </DialogHeader>
           {viewingDriver && (
-            <div className="space-y-6">
-              {/* Header with driver photo and basic info */}
-              <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
-                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 text-2xl">👤</span>
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">{viewingDriver.name}</h2>
-                  <p className="text-gray-600">{viewingDriver.phone}</p>
-                  <Badge
-                    variant={viewingDriver.status === "available" ? "default" :
-                            viewingDriver.status === "on_duty" ? "secondary" : "destructive"}
-                  >
-                    {viewingDriver.status}
-                  </Badge>
-                </div>
-                <div className="ml-auto">
-                  <SetDriverPinDialog driverId={viewingDriver._id || viewingDriver.id} driverName={viewingDriver.name} />
-                </div>
-              </div>
-
-              {/* Main driver details in grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Basic Information */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Basic Information</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Full Name</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.name}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Phone Number</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.phone}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Email</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.email || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Age</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.age || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Experience</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.experience || "Not provided"} years</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Legacy Manual Rating</Label>
-                      <div className="flex items-center">
-                        <span className="text-yellow-500">⭐</span>
-                        <span className="ml-1 text-sm text-gray-900">{viewingDriver.rating ?? "Not rated"}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* License Information */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">License Information</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">License Number</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.licenseNumber || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">License Type</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.licenseType || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">License Expiry</Label>
-                      <p className="text-sm text-gray-900">
-                        {viewingDriver.licenseExpiry ? new Date(viewingDriver.licenseExpiry).toLocaleDateString() : "Not provided"}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Current Status</Label>
-                      <Badge 
-                        variant={viewingDriver.status === "available" ? "default" : 
-                                viewingDriver.status === "on_duty" ? "secondary" : "destructive"}
-                      >
-                        {viewingDriver.status}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Additional Personal Details */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Personal Details</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Permanent Address</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.permanentAddress || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Current Address</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.currentAddress || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Marital Status</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.maritalStatus || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Date of Joining</Label>
-                      <p className="text-sm text-gray-900">
-                        {viewingDriver.dateOfJoining ? new Date(viewingDriver.dateOfJoining).toLocaleDateString() : "Not provided"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Government Documents */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Government Documents</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">Aadhar Number</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.aadharNumber || "Not provided"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-700">PAN Number</Label>
-                      <p className="text-sm text-gray-900">{viewingDriver.panNumber || "Not provided"}</p>
-                    </div>
-
-                  </div>
-                </div>
-              </div>
-
-              {/* Additional notes or comments if any */}
-              {viewingDriver.notes && (
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Additional Notes</h3>
-                  <p className="text-sm text-gray-900 bg-gray-50 p-3 rounded-lg">{viewingDriver.notes}</p>
-                </div>
-              )}
-
-              <DriverFeedbackProfile
-                driverId={viewingDriver._id || viewingDriver.id}
-                onOpenBooking={(booking) => { setViewingDriver(null); handleViewBooking(booking); }}
-              />
-            </div>
+            <Driver360
+              driver={viewingDriver}
+              onOpenBooking={(booking) => { setViewingDriver(null); handleViewBooking(booking); }}
+            />
           )}
           <DialogFooter>
-            <Button 
+            <Button
               variant="outline"
               onClick={() => setViewingDriver(null)}
             >

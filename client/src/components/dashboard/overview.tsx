@@ -276,8 +276,12 @@ export default function DashboardOverview({ onNavigate, onViewBooking, onSelectC
             <AreaChart data={trend} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={CHART.revenue} stopOpacity={0.18} />
+                  <stop offset="0%" stopColor={CHART.revenue} stopOpacity={0.25} />
                   <stop offset="100%" stopColor={CHART.revenue} stopOpacity={0.02} />
+                </linearGradient>
+                <linearGradient id="colFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={CHART.collections} stopOpacity={0.25} />
+                  <stop offset="100%" stopColor={CHART.collections} stopOpacity={0.02} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -285,7 +289,7 @@ export default function DashboardOverview({ onNavigate, onViewBooking, onSelectC
               <YAxis tickFormatter={(v) => inrCompact(v)} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} width={52} />
               <Tooltip content={<ChartTooltip money />} labelFormatter={shortDay} />
               <Area type="monotone" dataKey="revenue" name="Revenue" stroke={CHART.revenue} strokeWidth={2} fill="url(#revFill)" dot={false} activeDot={{ r: 4 }} />
-              <Area type="monotone" dataKey="collections" name="Collections" stroke={CHART.collections} strokeWidth={2} fill="none" dot={false} activeDot={{ r: 4 }} />
+              <Area type="monotone" dataKey="collections" name="Collections" stroke={CHART.collections} strokeWidth={2} fill="url(#colFill)" dot={false} activeDot={{ r: 4 }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
