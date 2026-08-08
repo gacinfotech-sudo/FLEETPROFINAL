@@ -3786,3 +3786,168 @@ VehicleTypeSchema.index({ tenantId: 1, seatingCapacity: 1 });
 VehicleTypeSchema.index({ tenantId: 1, vehicleModel: 1 });
 
 export const VehicleType = mongoose.model<IVehicleType>('VehicleType', VehicleTypeSchema);
+
+// ============================================================================
+// CANONICAL ITINERARY ENTITY (WAVE 1 - DATA FOUNDATIONS)
+// ============================================================================
+// One itinerary per booking, versioned, never silently overwritten.
+// Single source of truth for trip plan, used by:
+// - Booking 360 (read-only)
+// - Customer 360 (notification)
+// - Driver briefing (auto-generated)
+// - Vendor duty slip (auto-extracted)
+// - Invoice (auto-populated)
+// - WhatsApp templates (auto-substituted)
+// - GPS tracking (auto-associated)
+// - Timeline (auto-logged)
+
+export interface IItinerary extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  bookingId: mongoose.Types.ObjectId;
+  // Version tracking: Draft → Discussed → Approved → Final
+  // Prevents silent overwrites of agreed itinerary
+  status: 'draft' | 'discussed' | 'approved' | 'final' | 'archived';
+  // Core trip info
+  title: string;
+  tripStartDate: Date; // First day of trip
+  tripEndDate: Date;   // Last day of trip
+  reportingTime?: string; // e.g., "09:00 AM"
+  totalDays: number;
+  // Pickup and drop info
+  pickupLocation: string;
+  pickupTime?: string;
+  dropLocation?: string;
+  dropTime?: string;
+  // Day-wise stops and itinerary
+  dayWisePlan: {
+    day: number;
+    date: Date;
+    location?: string;
+    places?: string[];      // Places/stops on this day
+    hotel?: string;         // Hotel name if staying overnight
+    flightDetails?: string; // Flight info if applicable
+    trainDetails?: string;  // Train info if applicable
+    reportingTime?: string;
+    approximateTimings?: string; // e.g., "3 hours sightseeing, 2 hours lunch"
+    description?: string;
+  }[];
+  // Passenger & service details
+  passengerCount?: number;
+  passengerNames?: string[];
+  specialInstructions?: string;
+  seniorCitizenNotes?: string;
+  // Services included/excluded (for customer clarity)
+  includedServices?: string[];
+  excludedServices?: string[];
+  // Extra policies
+  extraKmPolicy?: string;   // e.g., "₹15 per extra km"
+  extraHourPolicy?: string; // e.g., "₹100 per extra hour"
+  // Responsibility assignments
+  tollResponsibility?: 'customer' | 'driver' | 'company';
+  parkingResponsibility?: 'customer' | 'driver' | 'company';
+  nightHaltResponsibility?: 'customer' | 'driver' | 'company';
+  // Driver allowance
+  driverAllowance?: number;
+  driverAllowanceDetails?: string;
+  // Amount to collect from customer
+  amountToCollect?: number;
+  collectionMode?: 'cash' | 'upi' | 'card' | 'bank_transfer';
+  // Approval & versioning
+  approvalHistory?: {
+    status: 'draft' | 'discussed' | 'approved' | 'final';
+    approvedBy?: { userId: string; userName: string };
+    approvedAt?: Date;
+    reason?: string;
+  }[];
+  // Version history - keep record of changes
+  previousVersions?: {
+    status: string;
+    data: any; // Complete previous state
+    changedAt: Date;
+    changedBy?: { userId: string; userName: string };
+    reason?: string;
+  }[];
+  // Internal notes (not shown to customer)
+  internalNotes?: string;
+  // Audit
+  createdBy?: { userId: string; userName: string };
+  updatedBy?: { userId: string; userName: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const ItinerarySchema = new Schema<IItinerary>(
+  {
+    tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+    bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true, unique: false },
+    status: { type: String, enum: ['draft', 'discussed', 'approved', 'final', 'archived'], default: 'draft' },
+    title: { type: String, required: true },
+    tripStartDate: { type: Date, required: true },
+    tripEndDate: { type: Date, required: true },
+    reportingTime: { type: String },
+    totalDays: { type: Number, required: true },
+    pickupLocation: { type: String, required: true },
+    pickupTime: { type: String },
+    dropLocation: { type: String },
+    dropTime: { type: String },
+    dayWisePlan: [{
+      day: { type: Number, required: true },
+      date: { type: Date, required: true },
+      location: { type: String },
+      places: [{ type: String }],
+      hotel: { type: String },
+      flightDetails: { type: String },
+      trainDetails: { type: String },
+      reportingTime: { type: String },
+      approximateTimings: { type: String },
+      description: { type: String },
+      _id: false,
+    }],
+    passengerCount: { type: Number },
+    passengerNames: [{ type: String }],
+    specialInstructions: { type: String },
+    seniorCitizenNotes: { type: String },
+    includedServices: [{ type: String }],
+    excludedServices: [{ type: String }],
+    extraKmPolicy: { type: String },
+    extraHourPolicy: { type: String },
+    tollResponsibility: { type: String, enum: ['customer', 'driver', 'company'] },
+    parkingResponsibility: { type: String, enum: ['customer', 'driver', 'company'] },
+    nightHaltResponsibility: { type: String, enum: ['customer', 'driver', 'company'] },
+    driverAllowance: { type: Number },
+    driverAllowanceDetails: { type: String },
+    amountToCollect: { type: Number },
+    collectionMode: { type: String, enum: ['cash', 'upi', 'card', 'bank_transfer'] },
+    approvalHistory: [{
+      status: { type: String, enum: ['draft', 'discussed', 'approved', 'final'], required: true },
+      approvedBy: { userId: { type: String }, userName: { type: String }, _id: false },
+      approvedAt: { type: Date },
+      reason: { type: String },
+      _id: false,
+    }],
+    previousVersions: [{
+      status: { type: String },
+      data: { type: Schema.Types.Mixed },
+      changedAt: { type: Date, required: true },
+      changedBy: { userId: { type: String }, userName: { type: String }, _id: false },
+      reason: { type: String },
+      _id: false,
+    }],
+    internalNotes: { type: String },
+    createdBy: { userId: { type: String }, userName: { type: String }, _id: false },
+    updatedBy: { userId: { type: String }, userName: { type: String }, _id: false },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { timestamps: false }
+);
+
+ItinerarySchema.index({ tenantId: 1, bookingId: 1 });
+ItinerarySchema.index({ tenantId: 1, status: 1, updatedAt: -1 });
+ItinerarySchema.index({ bookingId: 1, status: 1 });
+ItinerarySchema.pre('save', function (next) {
+  (this as any).updatedAt = new Date();
+  next();
+});
+
+export const Itinerary = mongoose.model<IItinerary>('Itinerary', ItinerarySchema);

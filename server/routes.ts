@@ -3264,6 +3264,248 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // CANONICAL ITINERARY ROUTES (WAVE 1 - DATA FOUNDATIONS)
+  // ============================================================================
+  // One itinerary per booking, versioned, never silently overwritten.
+  // Single source of truth for trip plan.
+
+  // Create itinerary for a booking
+  app.post("/api/bookings/:id/itinerary", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+      const {
+        title,
+        tripStartDate,
+        tripEndDate,
+        reportingTime,
+        pickupLocation,
+        pickupTime,
+        dropLocation,
+        dropTime,
+        dayWisePlan,
+        passengerCount,
+        passengerNames,
+        specialInstructions,
+        seniorCitizenNotes,
+        includedServices,
+        excludedServices,
+        extraKmPolicy,
+        extraHourPolicy,
+        tollResponsibility,
+        parkingResponsibility,
+        nightHaltResponsibility,
+        driverAllowance,
+        driverAllowanceDetails,
+        amountToCollect,
+        collectionMode,
+        internalNotes,
+      } = req.body;
+
+      if (!title || !tripStartDate || !tripEndDate || !pickupLocation || !dayWisePlan?.length) {
+        return res.status(400).json({ message: "Missing required itinerary fields" });
+      }
+
+      const { createItinerary } = await import("../services/itineraryService");
+
+      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const itinerary = await createItinerary({
+        tenantId: req.tenantId!,
+        bookingId: booking._id,
+        title,
+        tripStartDate: new Date(tripStartDate),
+        tripEndDate: new Date(tripEndDate),
+        reportingTime,
+        pickupLocation,
+        pickupTime,
+        dropLocation,
+        dropTime,
+        dayWisePlan,
+        passengerCount,
+        passengerNames,
+        specialInstructions,
+        seniorCitizenNotes,
+        includedServices,
+        excludedServices,
+        extraKmPolicy,
+        extraHourPolicy,
+        tollResponsibility,
+        parkingResponsibility,
+        nightHaltResponsibility,
+        driverAllowance,
+        driverAllowanceDetails,
+        amountToCollect,
+        collectionMode,
+        internalNotes,
+        createdBy: { userId: req.userId!, userName: req.user?.name || 'Unknown' },
+      });
+
+      res.json(itinerary);
+    } catch (error: any) {
+      console.error("Create itinerary error:", error?.message);
+      res.status(500).json({ message: error?.message || "Failed to create itinerary" });
+    }
+  });
+
+  // Get itinerary for a booking
+  app.get("/api/bookings/:id/itinerary", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+      const { getItinerary } = await import("../services/itineraryService");
+
+      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const itinerary = await getItinerary(req.tenantId!, booking._id);
+
+      if (!itinerary) {
+        return res.status(404).json({ message: "No itinerary found for this booking" });
+      }
+
+      res.json(itinerary);
+    } catch (error: any) {
+      console.error("Get itinerary error:", error?.message);
+      res.status(500).json({ message: "Failed to get itinerary" });
+    }
+  });
+
+  // Update itinerary (with version tracking)
+  app.put("/api/bookings/:id/itinerary", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+      const updates = req.body;
+
+      const { updateItinerary } = await import("../services/itineraryService");
+
+      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      updates.updatedBy = { userId: req.userId!, userName: req.user?.name || 'Unknown' };
+
+      const itinerary = await updateItinerary(req.tenantId!, booking._id, updates);
+
+      res.json(itinerary);
+    } catch (error: any) {
+      console.error("Update itinerary error:", error?.message);
+      res.status(500).json({ message: error?.message || "Failed to update itinerary" });
+    }
+  });
+
+  // Approve/transition itinerary status
+  app.post("/api/bookings/:id/itinerary/approve", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+      const { status, reason } = req.body;
+
+      if (!['discussed', 'approved', 'final'].includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      const { approveItinerary } = await import("../services/itineraryService");
+
+      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const itinerary = await approveItinerary(
+        req.tenantId!,
+        booking._id,
+        status as 'discussed' | 'approved' | 'final',
+        { userId: req.userId!, userName: req.user?.name || 'Unknown' }
+      );
+
+      res.json(itinerary);
+    } catch (error: any) {
+      console.error("Approve itinerary error:", error?.message);
+      res.status(500).json({ message: error?.message || "Failed to approve itinerary" });
+    }
+  });
+
+  // Get itinerary version history
+  app.get("/api/bookings/:id/itinerary/versions", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+      const { getItineraryVersions } = await import("../services/itineraryService");
+
+      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const versions = await getItineraryVersions(req.tenantId!, booking._id);
+
+      res.json(versions);
+    } catch (error: any) {
+      console.error("Get itinerary versions error:", error?.message);
+      res.status(500).json({ message: "Failed to get itinerary versions" });
+    }
+  });
+
+  // Get formatted itinerary for customer
+  app.get("/api/bookings/:id/itinerary/customer-view", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+      const { getItinerary, formatItineraryForCustomer } = await import("../services/itineraryService");
+
+      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const itinerary = await getItinerary(req.tenantId!, booking._id);
+
+      if (!itinerary) {
+        return res.status(404).json({ message: "No itinerary found for this booking" });
+      }
+
+      const formatted = formatItineraryForCustomer(itinerary);
+      res.json(formatted);
+    } catch (error: any) {
+      console.error("Get itinerary customer view error:", error?.message);
+      res.status(500).json({ message: "Failed to get itinerary" });
+    }
+  });
+
+  // Get formatted itinerary for driver
+  app.get("/api/bookings/:id/itinerary/driver-view", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+      const { getItinerary, formatItineraryForDriver } = await import("../services/itineraryService");
+
+      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const itinerary = await getItinerary(req.tenantId!, booking._id);
+
+      if (!itinerary) {
+        return res.status(404).json({ message: "No itinerary found for this booking" });
+      }
+
+      const formatted = formatItineraryForDriver(itinerary, booking.customerName, booking.customerPhone);
+      res.json(formatted);
+    } catch (error: any) {
+      console.error("Get itinerary driver view error:", error?.message);
+      res.status(500).json({ message: "Failed to get itinerary" });
+    }
+  });
+
+  // Archive itinerary
+  app.post("/api/bookings/:id/itinerary/archive", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+      const { reason } = req.body;
+
+      const { archiveItinerary } = await import("../services/itineraryService");
+
+      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const itinerary = await archiveItinerary(req.tenantId!, booking._id, reason);
+
+      res.json(itinerary);
+    } catch (error: any) {
+      console.error("Archive itinerary error:", error?.message);
+      res.status(500).json({ message: error?.message || "Failed to archive itinerary" });
+    }
+  });
+
   // Customer Database (CRM Phase 1) — list, quick lookup for the booking
   // form's customer-selection summary, and the full Customer Dashboard.
   app.get("/api/customers", authenticateUser, requireTenant, async (req: AuthRequest, res) => {

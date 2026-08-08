@@ -209,3 +209,93 @@ export async function computeCustomerTimeline(tenantId: string, customerId: stri
     .filter((e) => e.date)
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
+
+/**
+ * WAVE 1: Compute booking timeline including itinerary events
+ * Canonical itinerary events are now included in booking operations
+ */
+export async function computeBookingTimeline(tenantId: string, bookingId: string): Promise<TimelineEvent[]> {
+  const { Booking, OperationsActivity, Itinerary } = await import('../models/index');
+
+  const booking = await Booking.findOne({ tenantId, bookingId });
+
+  if (!booking) {
+    return [];
+  }
+
+  const [activities, itinerary] = await Promise.all([
+    OperationsActivity.find({ tenantId, bookingId: booking._id }).sort({ at: -1 }),
+    Itinerary.findOne({ tenantId, bookingId: booking._id }),
+  ]);
+
+  const events: TimelineEvent[] = [];
+
+  // Booking creation
+  events.push({
+    type: 'booking_created',
+    date: booking.createdAt,
+    description: `Booking ${booking.bookingId} created: ${booking.pickupLocation} → ${booking.dropoffLocation || '-'}`,
+    bookingId: booking.bookingId,
+    employee: booking.createdBy?.userId,
+  });
+
+  // Booking status changes
+  for (const h of booking.statusHistory || []) {
+    events.push({
+      type: 'booking_status',
+      date: h.changedAt,
+      bookingId: booking.bookingId,
+      description: `Status: ${h.fromStatus || '?'} → ${h.toStatus}${h.reason ? ` (${h.reason})` : ''}`,
+      employee: h.changedBy?.userId,
+    });
+  }
+
+  // Itinerary events (WAVE 1)
+  if (itinerary) {
+    events.push({
+      type: 'itinerary_created',
+      date: itinerary.createdAt,
+      description: `Itinerary created: "${itinerary.title}" (${itinerary.totalDays} days)`,
+      bookingId: booking.bookingId,
+      employee: itinerary.createdBy?.userId,
+    });
+
+    // Itinerary status changes
+    for (const approval of itinerary.approvalHistory || []) {
+      events.push({
+        type: 'itinerary_status',
+        date: approval.approvedAt || itinerary.createdAt,
+        description: `Itinerary status: ${approval.status}${approval.reason ? ` (${approval.reason})` : ''}`,
+        bookingId: booking.bookingId,
+        employee: approval.approvedBy?.userId,
+      });
+    }
+
+    // Itinerary version changes
+    for (const version of itinerary.previousVersions || []) {
+      events.push({
+        type: 'itinerary_updated',
+        date: version.changedAt,
+        description: `Itinerary updated: ${version.reason || 'Modified'}`,
+        bookingId: booking.bookingId,
+        employee: version.changedBy?.userId,
+      });
+    }
+  }
+
+  // Operations activity (calls, notes, WhatsApp, etc.)
+  for (const activity of activities || []) {
+    const actionLabel = activity.action.replace(/_/g, ' ');
+    events.push({
+      type: 'operations_activity',
+      date: activity.at,
+      description: `${actionLabel}${activity.note ? `: ${activity.note}` : ''}`,
+      bookingId: booking.bookingId,
+      employee: activity.userId,
+    });
+  }
+
+  return events
+    .filter((e) => e.date)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
