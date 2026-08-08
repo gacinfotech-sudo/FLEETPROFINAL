@@ -79,9 +79,11 @@ export function stagesFor(policy: OperationsPolicy, mode: 'self_drive' | 'with_d
   return mode === 'self_drive' ? policy.selfDriveStages : policy.withDriverStages;
 }
 
+// Escalation mapping (spec §12/§46): T-3h/T-2h informational, T-90m an
+// attention-level nudge, T-60m and closer a strong (popup-worthy) urgent.
 export function priorityForStage(minutesBefore: number): 'info' | 'attention' | 'urgent' {
   if (minutesBefore >= 120) return 'info';
-  if (minutesBefore > 30) return 'attention';
+  if (minutesBefore > 60) return 'attention';
   return 'urgent';
 }
 

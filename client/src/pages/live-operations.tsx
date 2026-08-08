@@ -96,6 +96,19 @@ export function humanizeMinutes(mins: number) {
   return `${h}h ${m}m`;
 }
 
+// apiRequest throws Error("<status>: <rawBody>") on non-2xx — recover the
+// server's human message for toasts instead of showing raw JSON.
+export function apiErrorMessage(err: any): string {
+  const match = /^(\d+):\s*([\s\S]*)$/.exec(err?.message || "");
+  if (match) {
+    try {
+      const body = JSON.parse(match[2]);
+      if (body?.message) return body.message;
+    } catch { /* not JSON */ }
+  }
+  return err?.message || "Request failed";
+}
+
 function waLink(phone?: string | null) {
   const digits = (phone || "").replace(/\D/g, "");
   if (!digits) return null;
@@ -325,7 +338,6 @@ export default function LiveOperations({ initialTab }: { initialTab?: OpsTab } =
       const res = action === "start_return"
         ? await apiRequest("POST", `/api/bookings/${card.id}/status`, { status: "return_pending" })
         : await apiRequest("POST", `/api/bookings/${card.id}/complete`, {});
-      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || "Action failed");
       return res.json();
     },
     onSuccess: (_d, { action, card }) => {
@@ -335,7 +347,7 @@ export default function LiveOperations({ initialTab }: { initialTab?: OpsTab } =
       });
       invalidate();
     },
-    onError: (err: any) => toast({ title: "Action failed", description: err?.message, variant: "destructive" }),
+    onError: (err: any) => toast({ title: "Action failed", description: apiErrorMessage(err), variant: "destructive" }),
     onSettled: () => setActingId(null),
   });
 
@@ -391,9 +403,9 @@ export default function LiveOperations({ initialTab }: { initialTab?: OpsTab } =
           <button
             key={chip.label}
             onClick={() => chip.tab && setActiveTab(chip.tab)}
-            className={`rounded-lg border p-2.5 text-left transition-colors ${chip.danger ? "border-red-200 bg-red-50" : "border-gray-200 bg-white hover:bg-gray-50"}`}
+            className={`rounded-lg border p-2.5 text-left transition-colors min-w-0 ${chip.danger ? "border-red-200 bg-red-50" : "border-gray-200 bg-white hover:bg-gray-50"}`}
           >
-            <div className={`text-lg font-bold ${chip.danger ? "text-red-700" : "text-gray-900"}`}>{chip.value}</div>
+            <div className={`text-lg font-bold truncate ${chip.danger ? "text-red-700" : "text-gray-900"}`}>{chip.value}</div>
             <div className="text-[11px] text-gray-500 leading-tight">{chip.label}</div>
           </button>
         ))}

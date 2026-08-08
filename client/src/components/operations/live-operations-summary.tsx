@@ -32,8 +32,13 @@ export default function LiveOperationsSummary({ onViewAll }: { onViewAll: () => 
   return (
     <Card data-testid="dashboard-live-operations">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        {/* Titled "Vehicles on Booking", NOT "Live Operations" — the classic
+            dashboard already has a "Live Operations" section (routes to
+            live-bookings) and ui-shell-redesign.spec.ts asserts on that
+            exact title; two cards with the same name would be ambiguous for
+            users and tests alike. */}
         <CardTitle className="text-base flex items-center gap-2">
-          <Radio size={16} className="text-emerald-600" /> Live Operations
+          <Radio size={16} className="text-emerald-600" /> Vehicles on Booking
         </CardTitle>
         <Button variant="ghost" size="sm" onClick={onViewAll} data-testid="live-ops-view-all">
           View All <ArrowRight size={14} className="ml-1" />
@@ -49,8 +54,8 @@ export default function LiveOperationsSummary({ onViewAll }: { onViewAll: () => 
             { label: "Overdue", value: s.overdue, danger: s.overdue > 0 },
             { label: "Balance Due", value: money(s.balanceDue) },
           ].map((c: any) => (
-            <div key={c.label} className={`rounded-md p-2 ${c.danger ? "bg-red-50" : c.warn ? "bg-amber-50" : "bg-gray-50"}`}>
-              <div className={`text-base font-bold ${c.danger ? "text-red-700" : c.warn ? "text-amber-700" : "text-gray-900"}`}>{c.value}</div>
+            <div key={c.label} className={`rounded-md p-2 min-w-0 ${c.danger ? "bg-red-50" : c.warn ? "bg-amber-50" : "bg-gray-50"}`}>
+              <div className={`text-base font-bold truncate ${c.danger ? "text-red-700" : c.warn ? "text-amber-700" : "text-gray-900"}`}>{c.value}</div>
               <div className="text-[10px] text-gray-500 leading-tight">{c.label}</div>
             </div>
           ))}
