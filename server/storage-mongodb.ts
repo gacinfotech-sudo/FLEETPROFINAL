@@ -891,6 +891,11 @@ export class MongoDBStorage implements IStorage {
       const result = await Booking.updateMany(
         {
           status: 'confirmed',
+          // A self-drive vehicle is physically with the customer until the
+          // return workflow records it back — the scheduled end passing must
+          // never auto-complete the booking or free the vehicle. It surfaces
+          // as RETURN DUE / OVERDUE in Live Operations instead.
+          bookingType: { $ne: 'self_drive' },
           returnDate: { $lt: now }
         },
         { status: 'completed' }

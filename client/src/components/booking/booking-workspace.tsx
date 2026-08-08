@@ -58,6 +58,7 @@ import ResourceFulfilmentPanel from "./resource-fulfilment-panel";
 import AssignVendorDialog from "./assign-vendor-dialog";
 import ExtendBookingDialog from "./extend-booking-dialog";
 import BookingCommunication from "./booking-communication";
+import SelfDrivePanel from "./self-drive-panel";
 import PipelineStepper from "../pipeline/pipeline-stepper";
 import { bookingPipelineInfo } from "../../lib/pipelineStages";
 
@@ -383,6 +384,7 @@ export default function BookingWorkspace({ bookingId, initialFocus, onClose }: B
                   <TabsTrigger value="allocation">Allocation</TabsTrigger>
                   <TabsTrigger value="payments">Pricing &amp; Payments</TabsTrigger>
                   <TabsTrigger value="followup">Follow-up &amp; Notes</TabsTrigger>
+                  {booking.bookingType === "self_drive" && <TabsTrigger value="selfdrive" data-testid="tab-selfdrive">Self-Drive</TabsTrigger>}
                   <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 </TabsList>
 
@@ -615,6 +617,13 @@ export default function BookingWorkspace({ bookingId, initialFocus, onClose }: B
                 </TabsContent>
 
                 {/* ================= TIMELINE ================= */}
+                {/* ================= SELF-DRIVE ================= */}
+                {booking.bookingType === "self_drive" && (
+                  <TabsContent value="selfdrive" className="pt-4">
+                    <SelfDrivePanel bookingId={bookingId} editable={!isTerminal(status)} />
+                  </TabsContent>
+                )}
+
                 <TabsContent value="timeline" className="pt-4">
                   {timeline.length === 0 ? (
                     <p className="text-sm text-gray-500">No recorded events yet.</p>

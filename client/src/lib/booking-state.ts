@@ -20,6 +20,7 @@ export type WorkspaceSection =
   | "allocation"
   | "payments"
   | "followup"
+  | "selfdrive"
   | "timeline";
 
 const TERMINAL_STATUSES = new Set(["closed", "cancelled", "no_show"]);
