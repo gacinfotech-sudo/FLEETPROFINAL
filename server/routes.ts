@@ -115,6 +115,7 @@ import { registerDriverDomainRoutes } from "./driver/domain/routes";
 import { registerDriverDocumentModule } from "./driver/documents/index";
 import { registerVehicleHandoverRoutes } from "./driver/handover/index";
 import { registerDriverOperationsRoutes } from "./driver/operations/index";
+import { registerSelfDriveRoutes } from "./booking/self-drive/index";
 import { acceptHandoverHandler, getPendingHandoversForDriverPortal } from "./driver/handover/driverPortalRoutes";
 import { registerVehicleDocumentRoutes } from "./vehicle/documents/routes";
 import { registerVehicleMaintenanceRoutes } from "./vehicle/maintenance/routes";
@@ -326,6 +327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerDriverDocumentModule(app);
   registerVehicleHandoverRoutes(app);
   registerDriverOperationsRoutes(app);
+  registerSelfDriveRoutes(app);
   registerVehicleDocumentRoutes(app);
   registerVehicleMaintenanceRoutes(app);
   registerVehicleFuelRoutes(app);
