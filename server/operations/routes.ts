@@ -200,6 +200,14 @@ export function registerOperationsRoutes(app: Express): void {
           s.googleReviewUrl = url;
         }
         if (typeof operationsSettings.reviewTemplate === 'string') s.reviewTemplate = operationsSettings.reviewTemplate.slice(0, 2000);
+        if (operationsSettings.sdTemplates && typeof operationsSettings.sdTemplates === 'object') {
+          const allowed = ['handover_details', 'return_reminder', 'overdue_reminder', 'extension_payment_request', 'refund_confirmation'];
+          const tpl: Record<string, string> = {};
+          for (const k of allowed) {
+            if (typeof operationsSettings.sdTemplates[k] === 'string') tpl[k] = operationsSettings.sdTemplates[k].slice(0, 2000);
+          }
+          s.sdTemplates = tpl;
+        }
         const cleanStages = (stages: any) => Array.isArray(stages) ? stages
           .filter((st: any) => Number.isFinite(Number(st?.minutesBefore)))
           .slice(0, 12)
@@ -266,6 +274,54 @@ export function registerOperationsRoutes(app: Express): void {
     } catch (error: any) {
       console.error('Self-drive refunds queue error:', error?.message || error);
       res.status(500).json({ message: 'Failed to load refund queue' });
+    }
+  });
+
+  // Self Drive report (spec §45) — bounded period aggregates for the hub's
+  // Reports tab; numbers derive from canonical bookings + trips only.
+  app.get('/api/operations/self-drive/report', authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_BOOKINGS), async (req: AuthRequest, res) => {
+    try {
+      const tenantId = req.tenantId!;
+      const days = Math.max(1, Math.min(365, Number(req.query.days) || 30));
+      const since = new Date(Date.now() - days * 24 * 3600 * 1000);
+      const [bookings, trips] = await Promise.all([
+        Booking.find({ tenantId, bookingType: 'self_drive', createdAt: { $gte: since } })
+          .select('totalAmount advanceReceived status extensionHistory securityDepositAmount createdAt scheduledEndDateTime')
+          .limit(2000).lean() as any,
+        SelfDriveTrip.find({ tenantId, updatedAt: { $gte: since } })
+          .select('deposit refund returnRecord latePolicy').limit(2000).lean() as any,
+      ]);
+      const revenue = bookings.reduce((s2: number, b: any) => s2 + (b.totalAmount || 0), 0);
+      const received = bookings.reduce((s2: number, b: any) => s2 + (b.advanceReceived || 0), 0);
+      const extensionRevenue = bookings.reduce((s2: number, b: any) =>
+        s2 + (Array.isArray(b.extensionHistory) ? b.extensionHistory.filter((e: any) => new Date(e.createdAt) >= since).reduce((x: number, e: any) => x + (e.extensionTotal || 0), 0) : 0), 0);
+      const deductionsByKind: Record<string, number> = {};
+      let lateCharges = 0, refundsCompleted = 0, refundsCompletedAmount = 0, depositsCollected = 0;
+      for (const t of trips) {
+        if (t.deposit?.amount) depositsCollected += t.deposit.amount;
+        if (t.refund) {
+          for (const d of t.refund.deductions || []) {
+            if (d.waived) continue;
+            deductionsByKind[d.kind] = (deductionsByKind[d.kind] || 0) + d.amount;
+            if (d.kind === 'late') lateCharges += d.amount;
+          }
+          if (['refunded', 'closed'].includes(t.refund.status)) {
+            refundsCompleted += 1;
+            refundsCompletedAmount += (t.refund.transactions || []).reduce((x: number, tr: any) => x + tr.amount, 0);
+          }
+        }
+      }
+      res.json({
+        periodDays: days, since: since.toISOString(),
+        bookings: bookings.length, revenue, received,
+        extensionRevenue, depositsCollected,
+        lateCharges, deductionsByKind,
+        refundsCompleted, refundsCompletedAmount,
+        returnsCompleted: trips.filter((t: any) => t.returnRecord).length,
+      });
+    } catch (error: any) {
+      console.error('Self-drive report error:', error?.message || error);
+      res.status(500).json({ message: 'Failed to build self-drive report' });
     }
   });
 

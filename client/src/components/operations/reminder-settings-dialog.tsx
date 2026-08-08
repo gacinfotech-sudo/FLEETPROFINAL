@@ -88,6 +88,9 @@ export default function ReminderSettingsDialog({ open, onOpenChange }: {
   const [graceMinutes, setGraceMinutes] = useState("15");
   const [turnaround, setTurnaround] = useState("60");
   const [waPhone, setWaPhone] = useState("");
+  const [realertMinutes, setRealertMinutes] = useState("30");
+  const [reviewUrl, setReviewUrl] = useState("");
+  const [sdTemplates, setSdTemplates] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -97,6 +100,9 @@ export default function ReminderSettingsDialog({ open, onOpenChange }: {
       setGraceMinutes(String(data.policy.graceMinutes));
       setTurnaround(String(data.policy.turnaroundBufferMinutes));
       setWaPhone(data.policy.whatsappInternalPhone || "");
+      setRealertMinutes(String((data.policy as any).overdueRealertMinutes ?? 30));
+      setReviewUrl((data.policy as any).googleReviewUrl || "");
+      setSdTemplates(((data as any).raw?.sdTemplates as Record<string, string>) || {});
     }
   }, [data]);
 
@@ -108,6 +114,9 @@ export default function ReminderSettingsDialog({ open, onOpenChange }: {
           graceMinutes: Number(graceMinutes),
           turnaroundBufferMinutes: Number(turnaround),
           whatsappInternalPhone: waPhone,
+          overdueRealertMinutes: Number(realertMinutes),
+          googleReviewUrl: reviewUrl.trim(),
+          sdTemplates,
           selfDriveStages,
           withDriverStages,
         },
@@ -144,11 +153,45 @@ export default function ReminderSettingsDialog({ open, onOpenChange }: {
               <Label htmlFor="turnaround">Turnaround buffer (minutes)</Label>
               <Input id="turnaround" type="number" min="0" value={turnaround} onChange={(e) => setTurnaround(e.target.value)} />
             </div>
-            <div className="space-y-1.5 col-span-2">
+            <div className="space-y-1.5">
               <Label htmlFor="wa-phone">Internal WhatsApp number (staff reminders)</Label>
               <Input id="wa-phone" value={waPhone} onChange={(e) => setWaPhone(e.target.value)} placeholder="98xxxxxxxx" />
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="realert">Overdue re-alert (minutes after acknowledge)</Label>
+              <Input id="realert" type="number" min="5" value={realertMinutes} onChange={(e) => setRealertMinutes(e.target.value)} />
+            </div>
+            <div className="space-y-1.5 col-span-2">
+              <Label htmlFor="review-url">Google review link (this company's page — used by review requests)</Label>
+              <Input id="review-url" type="url" value={reviewUrl} onChange={(e) => setReviewUrl(e.target.value)} placeholder="https://g.page/r/.../review" data-testid="settings-review-url" />
+            </div>
           </div>
+
+          <details className="rounded-md border border-gray-200 p-3">
+            <summary className="text-sm font-semibold cursor-pointer">Customer WhatsApp templates (Self Drive)</summary>
+            <p className="text-[11px] text-gray-500 mt-1 mb-2">
+              Placeholders: {"{{customerName}} {{vehicle}} {{bookingCode}} {{endTime}} {{balance}} {{refundAmount}} {{kmOut}} {{fuelOut}} {{companyName}}"} — leave blank for the built-in default.
+            </p>
+            <div className="space-y-2">
+              {[
+                ["handover_details", "Handover Details"],
+                ["return_reminder", "Return Reminder"],
+                ["overdue_reminder", "Overdue Reminder"],
+                ["extension_payment_request", "Extension Payment Request"],
+                ["refund_confirmation", "Refund Confirmation"],
+              ].map(([key, label]) => (
+                <div key={key} className="space-y-1">
+                  <Label className="text-xs">{label}</Label>
+                  <textarea
+                    className="w-full text-xs rounded-md border border-gray-200 p-2 min-h-[48px]"
+                    value={sdTemplates[key] || ""}
+                    onChange={(e) => setSdTemplates({ ...sdTemplates, [key]: e.target.value })}
+                    placeholder="(default template)"
+                  />
+                </div>
+              ))}
+            </div>
+          </details>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={save} disabled={saving} data-testid="save-reminder-settings">{saving ? "Saving…" : "Save"}</Button>

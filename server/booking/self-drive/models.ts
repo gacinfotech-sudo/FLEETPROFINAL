@@ -99,6 +99,18 @@ export interface ISelfDriveTrip extends Document {
     notes?: string;
   };
 
+  // Inspection photos (handover/return) — stored on disk under
+  // uploads/self-drive/<bookingId>/, served only through the authenticated,
+  // tenant-checked photo route (never express.static — see routes.ts's
+  // uploads P0 note).
+  photos?: {
+    phase: 'handover' | 'return';
+    fileName: string;
+    originalName?: string;
+    uploadedAt: Date;
+    uploadedBy: string;
+  }[];
+
   // Refund settlement — created automatically at vehicle return whenever a
   // deposit was held (Rule C). Deposit money only; NEVER mixes with the
   // rental ledger. Closes only at refund balance ₹0 (or an authorized
@@ -198,6 +210,19 @@ const SelfDriveTripSchema = new Schema<ISelfDriveTrip>(
         },
         { _id: false },
       ),
+      default: undefined,
+    },
+    photos: {
+      type: [new Schema(
+        {
+          phase: { type: String, enum: ['handover', 'return'], required: true },
+          fileName: { type: String, required: true },
+          originalName: { type: String },
+          uploadedAt: { type: Date, required: true },
+          uploadedBy: { type: String, required: true },
+        },
+        { _id: false },
+      )],
       default: undefined,
     },
     refund: {

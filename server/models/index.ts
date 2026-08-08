@@ -53,6 +53,9 @@ export interface ITenant extends Document {
     // post-closure review request (multi-tenant: never one global link).
     googleReviewUrl?: string;
     reviewTemplate?: string;
+    // Customer-facing self-drive WhatsApp templates ({{placeholder}} based);
+    // absent keys fall back to built-in defaults in self-drive/routes.ts.
+    sdTemplates?: Record<string, string>;
   };
   createdAt: Date;
 }
@@ -540,6 +543,7 @@ const TenantSchema = new Schema<ITenant>({
       overdueRealertMinutes: { type: Number },
       googleReviewUrl: { type: String },
       reviewTemplate: { type: String },
+      sdTemplates: { type: Schema.Types.Mixed },
     },
     default: undefined,
     _id: false,

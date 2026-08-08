@@ -24,7 +24,7 @@ const SLA_BADGE: Record<string, string> = {
   critical: "bg-red-100 text-red-800",
 };
 
-type SdTab = "active" | "upcoming" | "overdue" | "returned" | "refund_pending" | "refund_completed";
+type SdTab = "active" | "upcoming" | "overdue" | "returned" | "refund_pending" | "refund_completed" | "reports";
 
 const TABS: { key: SdTab; label: string }[] = [
   { key: "active", label: "Active Self Drive" },
@@ -33,6 +33,7 @@ const TABS: { key: SdTab; label: string }[] = [
   { key: "returned", label: "Returned" },
   { key: "refund_pending", label: "Refund Pending" },
   { key: "refund_completed", label: "Refund Completed" },
+  { key: "reports", label: "Reports" },
 ];
 
 function agoLabel(hours: number): string {
@@ -62,6 +63,11 @@ export default function SelfDrivePage() {
   const { data: upcoming } = useQuery<any>({
     queryKey: ["/api/operations/live-bookings?startingWindow=tomorrow&endingWindow=today"],
     enabled: tab === "upcoming",
+  });
+  const [reportDays, setReportDays] = useState(30);
+  const { data: report } = useQuery<any>({
+    queryKey: [`/api/operations/self-drive/report?days=${reportDays}`],
+    enabled: tab === "reports",
   });
 
   const sdCards = useMemo(() => (live?.cards ?? []).filter((c) => c.serviceMode === "self_drive"), [live]);
@@ -253,6 +259,59 @@ export default function SelfDrivePage() {
               </Table>
             </div>
           )
+        )}
+        {tab === "reports" && (
+          <div className="space-y-4" data-testid="sd-reports">
+            <div className="flex items-center gap-2">
+              {[7, 30, 90].map((d) => (
+                <Button key={d} size="sm" variant={reportDays === d ? "default" : "outline"} onClick={() => setReportDays(d)}>Last {d} days</Button>
+              ))}
+              {report && (
+                <Button size="sm" variant="outline" className="ml-auto" onClick={() => {
+                  const rows = [
+                    ["Metric", "Value"],
+                    ["Period (days)", report.periodDays], ["Bookings", report.bookings], ["Revenue", report.revenue],
+                    ["Received", report.received], ["Extension Revenue", report.extensionRevenue],
+                    ["Deposits Collected", report.depositsCollected], ["Late Charges", report.lateCharges],
+                    ["Refunds Completed", report.refundsCompleted], ["Refunded Amount", report.refundsCompletedAmount],
+                    ["Returns Completed", report.returnsCompleted],
+                    ...Object.entries(report.deductionsByKind || {}).map(([k, v]) => [`Deduction: ${k}`, v]),
+                  ].map((r) => r.join(",")).join("\n");
+                  const a = document.createElement("a");
+                  a.href = URL.createObjectURL(new Blob([rows], { type: "text/csv" }));
+                  a.download = `self-drive-report-${reportDays}d.csv`;
+                  a.click(); URL.revokeObjectURL(a.href);
+                }}><Download size={14} className="mr-1" />CSV</Button>
+              )}
+            </div>
+            {report ? (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {[
+                    ["Bookings", report.bookings], ["Revenue", money(report.revenue)], ["Extension Revenue", money(report.extensionRevenue)],
+                    ["Deposits Collected", money(report.depositsCollected)], ["Late Charges", money(report.lateCharges)],
+                    ["Returns Completed", report.returnsCompleted], ["Refunds Completed", report.refundsCompleted],
+                    ["Refunded Amount", money(report.refundsCompletedAmount)], ["Received", money(report.received)],
+                  ].map(([label, value]: any) => (
+                    <div key={label} className="rounded-lg border border-gray-200 p-2.5">
+                      <div className="text-base font-bold truncate">{value}</div>
+                      <div className="text-[11px] text-gray-500">{label}</div>
+                    </div>
+                  ))}
+                </div>
+                {Object.keys(report.deductionsByKind || {}).length > 0 && (
+                  <div>
+                    <p className="text-sm font-semibold mb-1.5">Deductions by type</p>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.entries(report.deductionsByKind).map(([k, v]: any) => (
+                        <Badge key={k} variant="outline" className="capitalize">{k}: {money(v)}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : <Empty />}
+          </div>
         )}
         {tab === "returned" && renderRefundTable(refundRows([...(openRefunds?.rows ?? []), ...(closedRefunds?.rows ?? [])]), true)}
         {tab === "refund_pending" && renderRefundTable(refundRows(openRefunds?.rows), true)}
