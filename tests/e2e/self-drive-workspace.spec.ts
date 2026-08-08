@@ -91,7 +91,9 @@ test.describe('Self-drive lifecycle — deposit → handover → return → sett
     // Return.
     res = await page.request.post(`${base}/return`, { headers: H, data: { odometerReading: 12350, fuelLevel: 40, damageNoted: 'Scratch on left door' } });
     expect(res.status()).toBe(201);
-    expect((await res.json()).stage).toBe('returned');
+    // With a deposit held, a completed return auto-opens the refund case
+    // (Rule C) — the stage advances straight to refund_pending.
+    expect((await res.json()).stage).toBe('refund_pending');
 
     // Settlement: ₹5000 deposit − ₹1800 charges = ₹3200 refund, no balance due.
     res = await page.request.post(`${base}/settlement`, {

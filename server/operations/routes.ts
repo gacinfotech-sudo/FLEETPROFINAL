@@ -6,6 +6,7 @@ import type { Express } from 'express';
 import { authenticateUser, requireTenant, type AuthRequest } from '../middleware/auth';
 import { requirePermission, PERMISSIONS } from '../middleware/permissions';
 import { Tenant, OperationsAlert, OperationsActivity, Booking } from '../models/index';
+import { SelfDriveTrip, computeRefund } from '../booking/self-drive/models';
 import { buildLiveVehicles } from './liveVehicles';
 import { sweepTenant } from './reminderEngine';
 import { resolvePolicy, DEFAULT_SELF_DRIVE_STAGES, DEFAULT_WITH_DRIVER_STAGES } from './policy';
@@ -190,6 +191,15 @@ export function registerOperationsRoutes(app: Express): void {
         if (operationsSettings.notifyOwner !== undefined) s.notifyOwner = !!operationsSettings.notifyOwner;
         if (operationsSettings.notifyAssignedUser !== undefined) s.notifyAssignedUser = !!operationsSettings.notifyAssignedUser;
         if (typeof operationsSettings.whatsappInternalPhone === 'string') s.whatsappInternalPhone = operationsSettings.whatsappInternalPhone.trim();
+        if (operationsSettings.overdueRealertMinutes !== undefined) s.overdueRealertMinutes = num(operationsSettings.overdueRealertMinutes, 5, 1440);
+        if (typeof operationsSettings.googleReviewUrl === 'string') {
+          const url = operationsSettings.googleReviewUrl.trim();
+          if (url && !/^https?:\/\//i.test(url)) {
+            return res.status(400).json({ message: 'Google review link must be an http(s) URL' });
+          }
+          s.googleReviewUrl = url;
+        }
+        if (typeof operationsSettings.reviewTemplate === 'string') s.reviewTemplate = operationsSettings.reviewTemplate.slice(0, 2000);
         const cleanStages = (stages: any) => Array.isArray(stages) ? stages
           .filter((st: any) => Number.isFinite(Number(st?.minutesBefore)))
           .slice(0, 12)
@@ -211,6 +221,82 @@ export function registerOperationsRoutes(app: Express): void {
     } catch (error: any) {
       console.error('Update operations settings error:', error?.message || error);
       res.status(500).json({ message: 'Failed to update operations settings' });
+    }
+  });
+
+  // Self Drive refund queue (spec §30) — tenant-wide, bounded, SLA-aged.
+  app.get('/api/operations/self-drive/refunds', authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_BOOKINGS), async (req: AuthRequest, res) => {
+    try {
+      const status = typeof req.query.status === 'string' ? req.query.status : 'open';
+      const query: any = { tenantId: req.tenantId, refund: { $exists: true } };
+      if (status === 'open') query['refund.status'] = { $in: ['pending', 'partially_refunded'] };
+      else if (status === 'closed') query['refund.status'] = { $in: ['refunded', 'forfeited', 'closed'] };
+      const trips: any[] = await SelfDriveTrip.find(query)
+        .sort({ 'refund.pendingSince': 1 })
+        .limit(500)
+        .populate({
+          path: 'bookingId',
+          select: 'bookingId customerName customerPhone customerId vehicleId scheduledEndDateTime status',
+          populate: { path: 'vehicleId', select: 'make vehicleModel licensePlate' },
+        })
+        .lean();
+      const now = Date.now();
+      const rows = trips.map((t) => {
+        const booking: any = t.bookingId && typeof t.bookingId === 'object' ? t.bookingId : null;
+        const vehicle: any = booking?.vehicleId && typeof booking.vehicleId === 'object' ? booking.vehicleId : null;
+        const comp = computeRefund(t.refund);
+        const hoursPending = (now - new Date(t.refund.pendingSince).getTime()) / 3600000;
+        return {
+          bookingId: booking ? String(booking._id) : String(t.bookingId),
+          bookingCode: booking?.bookingId || null,
+          customerId: booking?.customerId ? String(booking.customerId) : null,
+          customerName: booking?.customerName || null,
+          customerPhone: booking?.customerPhone || null,
+          vehicle: vehicle ? { make: vehicle.make, model: vehicle.vehicleModel, registrationNumber: vehicle.licensePlate } : null,
+          returnedAt: t.returnRecord?.conductedAt || null,
+          refundStatus: t.refund.status,
+          pendingSince: t.refund.pendingSince,
+          hoursPending: Math.round(hoursPending * 10) / 10,
+          slaLevel: hoursPending >= 48 ? 'critical' : hoursPending >= 24 ? 'urgent' : hoursPending >= 6 ? 'attention' : 'normal',
+          deductions: t.refund.deductions,
+          ...comp,
+        };
+      });
+      res.json({ generatedAt: new Date().toISOString(), rows });
+    } catch (error: any) {
+      console.error('Self-drive refunds queue error:', error?.message || error);
+      res.status(500).json({ message: 'Failed to load refund queue' });
+    }
+  });
+
+  // Self Drive dashboard KPIs (spec §29) — bounded aggregates, no history scans.
+  app.get('/api/operations/self-drive/kpis', authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_BOOKINGS), async (req: AuthRequest, res) => {
+    try {
+      const tenantId = req.tenantId!;
+      const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+      const [openRefundTrips, refundedTodayTrips, activeDepositTrips] = await Promise.all([
+        SelfDriveTrip.find({ tenantId, 'refund.status': { $in: ['pending', 'partially_refunded'] } }).select('refund').limit(1000).lean(),
+        SelfDriveTrip.find({ tenantId, 'refund.transactions.at': { $gte: startOfDay } }).select('refund').limit(1000).lean(),
+        // Deposits currently held: collected, trip not yet settled/closed.
+        SelfDriveTrip.find({ tenantId, 'deposit.amount': { $gt: 0 }, $or: [{ refund: { $exists: false } }, { 'refund.status': { $in: ['pending', 'partially_refunded'] } }], settlement: { $exists: false } }).select('deposit refund').limit(1000).lean(),
+      ]);
+      const refundPendingAmount = openRefundTrips.reduce((sum: number, t: any) => sum + computeRefund(t.refund).balance, 0);
+      const refundedToday = refundedTodayTrips.reduce((sum: number, t: any) =>
+        sum + (t.refund?.transactions || []).filter((x: any) => new Date(x.at) >= startOfDay).reduce((s: number, x: any) => s + x.amount, 0), 0);
+      const depositHeld = activeDepositTrips.reduce((sum: number, t: any) => {
+        const deposit = t.deposit?.amount || 0;
+        const refunded = (t.refund?.transactions || []).reduce((s: number, x: any) => s + x.amount, 0);
+        return sum + Math.max(0, deposit - refunded);
+      }, 0);
+      res.json({
+        refundPendingCount: openRefundTrips.length,
+        refundPendingAmount,
+        refundedToday,
+        depositHeld,
+      });
+    } catch (error: any) {
+      console.error('Self-drive KPIs error:', error?.message || error);
+      res.status(500).json({ message: 'Failed to load self-drive KPIs' });
     }
   });
 

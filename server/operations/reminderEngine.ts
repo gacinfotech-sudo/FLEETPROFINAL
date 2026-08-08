@@ -13,6 +13,7 @@
 
 import mongoose from 'mongoose';
 import { Booking, Tenant, OperationsAlert, WhatsAppMessage } from '../models/index';
+import { SelfDriveTrip, computeRefund } from '../booking/self-drive/models';
 import { whatsappProvider } from '../whatsapp/index';
 import { normalizeIndianPhone } from '../whatsapp/phone';
 import {
@@ -78,7 +79,7 @@ interface AlertSeed {
   tenantId: string;
   bookingId: string;
   dedupeKey: string;
-  kind: 'ending_soon' | 'return_due' | 'overdue' | 'payment_due' | 'end_time_pending' | 'turnaround_conflict';
+  kind: 'ending_soon' | 'return_due' | 'overdue' | 'payment_due' | 'end_time_pending' | 'turnaround_conflict' | 'refund_pending';
   stageKey?: string;
   serviceMode: 'self_drive' | 'with_driver';
   priority: 'info' | 'attention' | 'urgent' | 'critical';
@@ -163,7 +164,13 @@ async function sendReminderWhatsApp(opts: {
   }
 
   try {
-    const result = await whatsappProvider.sendText(tenantId, recipientPhone, text);
+    // A wedged provider (e.g. a WhatsApp session stuck mid-init) must never
+    // stall the sweep — bound every send attempt.
+    const result = await Promise.race([
+      whatsappProvider.sendText(tenantId, recipientPhone, text),
+      new Promise<{ providerMessageId: null; status: 'failed'; error: string }>((resolve) =>
+        setTimeout(() => resolve({ providerMessageId: null, status: 'failed', error: 'Send timed out after 15s' }), 15000)),
+    ]);
     if (result.status === 'sent') {
       msgDoc.status = 'sent';
       msgDoc.providerMessageId = result.providerMessageId || undefined;
@@ -187,7 +194,7 @@ async function sendReminderWhatsApp(opts: {
 
 // ---------- reconciliation of open alerts ----------
 
-async function reconcileOpenAlerts(tenantId: string, cardsById: Map<string, LiveVehicleCard>, now: Date): Promise<void> {
+async function reconcileOpenAlerts(tenantId: string, cardsById: Map<string, LiveVehicleCard>, now: Date, policy?: OperationsPolicy): Promise<void> {
   const open: any[] = await OperationsAlert.find({ tenantId, status: { $in: ['active', 'acknowledged', 'snoozed'] } });
   if (open.length === 0) return;
 
@@ -203,6 +210,10 @@ async function reconcileOpenAlerts(tenantId: string, cardsById: Map<string, Live
   }
 
   for (const alert of open) {
+    // Refund alerts outlive the live-vehicle view by design (the vehicle is
+    // back; the money isn't) — their lifecycle is reconciled against the
+    // refund case in sweepRefunds, never against live cards.
+    if (alert.kind === 'refund_pending') continue;
     const card = cardsById.get(String(alert.bookingId));
     if (!card) {
       const st = statuses.get(String(alert.bookingId));
@@ -240,8 +251,94 @@ async function reconcileOpenAlerts(tenantId: string, cardsById: Map<string, Live
       alert.status = 'active';
       alert.snoozedUntil = undefined;
       await alert.save();
+      continue;
+    }
+    // OVERDUE re-arm (spec: acknowledge pauses, never dismisses — while the
+    // vehicle is still out past its end, the alert must come back). The
+    // bumped realertCount re-keys the client popup's seen-set so it pops
+    // again rather than staying silently 'active'.
+    if (
+      alert.kind === 'overdue' && alert.status === 'acknowledged' && policy &&
+      alert.acknowledgedAt && (now.getTime() - new Date(alert.acknowledgedAt).getTime()) >= policy.overdueRealertMinutes * 60000
+    ) {
+      alert.status = 'active';
+      alert.realertCount = (alert.realertCount || 0) + 1;
+      await alert.save();
     }
   }
+}
+
+// ---------- refund-pending sweep (spec §13-§15, §39) ----------
+
+// SLA buckets: <6h normal, 6-24h attention, >24h urgent, >48h critical.
+function refundSlaBucket(hours: number): { key: string; priority: 'info' | 'attention' | 'urgent' | 'critical' } {
+  if (hours >= 48) return { key: '48h', priority: 'critical' };
+  if (hours >= 24) return { key: '24h', priority: 'urgent' };
+  if (hours >= 6) return { key: '6h', priority: 'attention' };
+  return { key: 'new', priority: 'info' };
+}
+
+async function sweepRefunds(tenantId: string, policy: OperationsPolicy, now: Date): Promise<number> {
+  let created = 0;
+  const openTrips: any[] = await SelfDriveTrip.find({
+    tenantId,
+    'refund.status': { $in: ['pending', 'partially_refunded'] },
+  })
+    .sort({ 'refund.pendingSince': 1 })
+    .limit(500)
+    .populate('bookingId', 'bookingId customerName customerPhone')
+    .lean();
+
+  const openBookingIds = new Set(openTrips.map((t) => String((t.bookingId as any)?._id ?? t.bookingId)));
+
+  // Resolve refund alerts whose case is settled/closed — and lower-bucket
+  // alerts superseded by an escalation (one live alert per case).
+  const openAlerts: any[] = await OperationsAlert.find({
+    tenantId, kind: 'refund_pending', status: { $in: ['active', 'acknowledged', 'snoozed'] },
+  });
+  const desiredKeyByBooking = new Map<string, string>();
+  for (const t of openTrips) {
+    const bid = String((t.bookingId as any)?._id ?? t.bookingId);
+    const hours = (now.getTime() - new Date(t.refund.pendingSince).getTime()) / 3600000;
+    desiredKeyByBooking.set(bid, refundSlaBucket(hours).key);
+  }
+  for (const alert of openAlerts) {
+    const bid = String(alert.bookingId);
+    if (!openBookingIds.has(bid)) {
+      alert.status = 'resolved';
+      alert.resolvedAt = now;
+      alert.resolvedReason = 'paid';
+      await alert.save();
+      continue;
+    }
+    const desired = desiredKeyByBooking.get(bid);
+    if (desired && alert.stageKey && alert.stageKey !== `refund-${desired}`) {
+      alert.status = 'resolved';
+      alert.resolvedAt = now;
+      alert.resolvedReason = 'superseded';
+      await alert.save();
+    }
+  }
+
+  for (const t of openTrips) {
+    const booking: any = t.bookingId && typeof t.bookingId === 'object' ? t.bookingId : null;
+    const bid = String(booking?._id ?? t.bookingId);
+    const comp = computeRefund(t.refund);
+    if (comp.balance <= 0) continue; // fully paid, waiting on close — no nag
+    const hours = (now.getTime() - new Date(t.refund.pendingSince).getTime()) / 3600000;
+    const bucket = refundSlaBucket(hours);
+    const pendingLabel = hours >= 48 ? `${Math.floor(hours / 24)} days` : hours >= 1 ? `${Math.floor(hours)}h` : `${Math.round(hours * 60)} min`;
+    const alert = await createAlertIfNew({
+      tenantId, bookingId: bid,
+      dedupeKey: `${tenantId}:${bid}:refund:${bucket.key}`,
+      kind: 'refund_pending', stageKey: `refund-${bucket.key}`, serviceMode: 'self_drive',
+      priority: bucket.priority,
+      title: `REFUND PENDING ₹${comp.balance.toLocaleString('en-IN')} — ${booking?.bookingId || 'booking'}`,
+      body: `${booking?.customerName || 'Customer'} is waiting for the security-deposit refund (deposit ₹${comp.depositAmount.toLocaleString('en-IN')}, deductions ₹${comp.totalDeduction.toLocaleString('en-IN')}, refunded ₹${comp.refunded.toLocaleString('en-IN')}). Pending ${pendingLabel}.`,
+    });
+    if (alert) { created++; await alert.save(); }
+  }
+  return created;
 }
 
 // ---------- per-tenant sweep ----------
@@ -253,12 +350,13 @@ export async function sweepTenant(tenantId: string, now: Date = new Date()): Pro
   const view = await buildLiveVehicles(tenantId, now);
   const cardsById = new Map(view.cards.map((c) => [c.id, c]));
 
-  await reconcileOpenAlerts(tenantId, cardsById, now);
+  await reconcileOpenAlerts(tenantId, cardsById, now, policy);
 
   let created = 0;
   for (const card of view.cards) {
     created += await sweepCard(tenantId, card, policy, now);
   }
+  created += await sweepRefunds(tenantId, policy, now);
   return { created };
 }
 
@@ -414,9 +512,13 @@ export async function runReminderSweep(now: Date = new Date()): Promise<{ tenant
   try {
     // Only tenants that actually have active trips — bounded by the
     // {tenantId, status, scheduledEndDateTime} index, never a full scan.
-    const tenantIds: mongoose.Types.ObjectId[] = await Booking.distinct('tenantId', {
+    const tripTenants: mongoose.Types.ObjectId[] = await Booking.distinct('tenantId', {
       status: { $in: ACTIVE_TRIP_STATUSES as unknown as string[] },
     });
+    const refundTenants: mongoose.Types.ObjectId[] = await SelfDriveTrip.distinct('tenantId', {
+      'refund.status': { $in: ['pending', 'partially_refunded'] },
+    });
+    const tenantIds = Array.from(new Map([...tripTenants, ...refundTenants].map((t) => [String(t), t])).values());
     let created = 0;
     for (const tid of tenantIds) {
       try {

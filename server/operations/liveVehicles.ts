@@ -5,6 +5,7 @@
 // live-booking records exist anywhere — this module only reads.
 
 import { Booking, Tenant } from '../models/index';
+import { SelfDriveTrip, DEFAULT_LATE_POLICY, computeLateCharge, deriveStage } from '../booking/self-drive/models';
 import {
   resolvePolicy, serviceModeOf, stagesFor, formatInTenantTz, minutesBetween,
   type OperationsPolicy,
@@ -69,6 +70,16 @@ export interface LiveVehicleCard {
   extensionCount: number;
   nextBooking: NextBookingImpact | null;
   paymentDueSoon: boolean;
+  // Self-drive operational extras (null for with-driver cards).
+  selfDrive: {
+    stage: string;
+    latePolicy: { graceMinutes: number; rate: number; unit: string };
+    // Live "if returned now" late-charge estimate once past grace —
+    // display-only, never auto-charged.
+    lateChargeEstimate: number;
+    fuelOut: number | null;
+    kmOut: number | null;
+  } | null;
 }
 
 export interface LiveVehiclesResult {
@@ -102,7 +113,7 @@ export function runtimeStatusOf(booking: any, policy: OperationsPolicy, now: Dat
   return 'RUNNING';
 }
 
-function toCard(booking: any, policy: OperationsPolicy, now: Date, nextByVehicle: Map<string, any>): LiveVehicleCard {
+function toCard(booking: any, policy: OperationsPolicy, now: Date, nextByVehicle: Map<string, any>, tripByBooking?: Map<string, any>): LiveVehicleCard {
   const mode = serviceModeOf(booking);
   const vehicle = booking.vehicleId && typeof booking.vehicleId === 'object' ? booking.vehicleId : null;
   const driver = booking.driverId && typeof booking.driverId === 'object' ? booking.driverId : null;
@@ -174,6 +185,19 @@ function toCard(booking: any, policy: OperationsPolicy, now: Date, nextByVehicle
     extensionCount: Array.isArray(booking.extensionHistory) ? booking.extensionHistory.length : 0,
     nextBooking,
     paymentDueSoon: balance > 0 && remaining !== null && remaining <= 60,
+    selfDrive: (() => {
+      if (mode !== 'self_drive') return null;
+      const trip = tripByBooking?.get(String(booking._id)) ?? null;
+      const latePolicy = trip?.latePolicy ?? DEFAULT_LATE_POLICY;
+      const late = computeLateCharge(validEnd, now, trip?.latePolicy);
+      return {
+        stage: deriveStage(trip),
+        latePolicy,
+        lateChargeEstimate: late.amount,
+        fuelOut: trip?.handover?.fuelLevel ?? null,
+        kmOut: trip?.handover?.odometerReading ?? booking.startOdometer ?? null,
+      };
+    })(),
   };
 }
 
@@ -217,7 +241,16 @@ export async function buildLiveVehicles(tenantId: string, now: Date = new Date()
     }
   }
 
-  const cards = bookings.map((b) => toCard(b, policy, now, nextByVehicle));
+  // Self-drive lifecycle records for the on-screen bookings (late policy,
+  // handover readings, stage) — one bounded query, joined in memory.
+  const sdIds = bookings.filter((b) => (b.bookingType === 'self_drive')).map((b) => b._id);
+  const tripByBooking = new Map<string, any>();
+  if (sdIds.length > 0) {
+    const trips: any[] = await SelfDriveTrip.find({ tenantId, bookingId: { $in: sdIds } }).lean();
+    for (const t of trips) tripByBooking.set(String(t.bookingId), t);
+  }
+
+  const cards = bookings.map((b) => toCard(b, policy, now, nextByVehicle, tripByBooking));
   const summary = {
     vehiclesRunning: cards.length,
     selfDrive: cards.filter((c) => c.serviceMode === 'self_drive').length,

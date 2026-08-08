@@ -46,6 +46,13 @@ export interface ITenant extends Document {
     selfDriveStages?: { minutesBefore: number; enabled: boolean; whatsappInternal?: boolean; whatsappCustomer?: boolean }[];
     withDriverStages?: { minutesBefore: number; enabled: boolean; whatsappInternal?: boolean; whatsappDriver?: boolean }[];
     whatsappInternalPhone?: string;   // staff/ops number for internal reminders (falls back to tenant.phone)
+    // How long after staff acknowledge an OVERDUE alert before it re-arms
+    // (still overdue = still a problem; ack pauses, never dismisses).
+    overdueRealertMinutes?: number;
+    // Tenant's own Google review page + optional message template for the
+    // post-closure review request (multi-tenant: never one global link).
+    googleReviewUrl?: string;
+    reviewTemplate?: string;
   };
   createdAt: Date;
 }
@@ -282,7 +289,7 @@ export interface IBooking extends Document {
   // revenue/balance"). All optional: with-driver bookings and every booking
   // created before this feature simply don't have them.
   securityDepositAmount?: number;
-  securityDepositStatus?: 'pending' | 'collected' | 'refunded' | 'forfeited';
+  securityDepositStatus?: 'pending' | 'collected' | 'refund_pending' | 'partially_refunded' | 'refunded' | 'forfeited';
   startFuelLevel?: string; // opening fuel/SOC as recorded at handover, e.g. "3/4", "82%"
   rescheduleHistory?: {
     oldPickupDate: Date;
@@ -530,6 +537,9 @@ const TenantSchema = new Schema<ITenant>({
         _id: false,
       }],
       whatsappInternalPhone: { type: String },
+      overdueRealertMinutes: { type: Number },
+      googleReviewUrl: { type: String },
+      reviewTemplate: { type: String },
     },
     default: undefined,
     _id: false,
@@ -721,7 +731,7 @@ const BookingSchema = new Schema<IBooking>({
   startOdometer: { type: Number },
   endOdometer: { type: Number },
   securityDepositAmount: { type: Number },
-  securityDepositStatus: { type: String, enum: ['pending', 'collected', 'refunded', 'forfeited'] },
+  securityDepositStatus: { type: String, enum: ['pending', 'collected', 'refund_pending', 'partially_refunded', 'refunded', 'forfeited'] },
   startFuelLevel: { type: String },
   rescheduleHistory: [{
     oldPickupDate: { type: Date },
@@ -3629,7 +3639,7 @@ export interface IOperationsAlert extends Document {
   tenantId: mongoose.Types.ObjectId;
   bookingId: mongoose.Types.ObjectId;
   dedupeKey: string;
-  kind: 'ending_soon' | 'return_due' | 'overdue' | 'payment_due' | 'end_time_pending' | 'turnaround_conflict';
+  kind: 'ending_soon' | 'return_due' | 'overdue' | 'payment_due' | 'end_time_pending' | 'turnaround_conflict' | 'refund_pending';
   stageKey?: string; // e.g. 't-180', 't-60', 'end', 'overdue'
   serviceMode: 'self_drive' | 'with_driver';
   priority: 'info' | 'attention' | 'urgent' | 'critical';
@@ -3640,6 +3650,9 @@ export interface IOperationsAlert extends Document {
   endAtSnapshot?: Date;
   status: 'active' | 'acknowledged' | 'snoozed' | 'resolved';
   snoozedUntil?: Date;
+  // Bumped each time a still-overdue acknowledged alert re-arms — the client
+  // popup keys its "seen" set on (id, realertCount) so re-arming re-pops.
+  realertCount?: number;
   acknowledgedBy?: { userId: string; name?: string };
   acknowledgedAt?: Date;
   resolvedAt?: Date;
@@ -3657,7 +3670,7 @@ const OperationsAlertSchema = new Schema<IOperationsAlert>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
   bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
   dedupeKey: { type: String, required: true },
-  kind: { type: String, enum: ['ending_soon', 'return_due', 'overdue', 'payment_due', 'end_time_pending', 'turnaround_conflict'], required: true },
+  kind: { type: String, enum: ['ending_soon', 'return_due', 'overdue', 'payment_due', 'end_time_pending', 'turnaround_conflict', 'refund_pending'], required: true },
   stageKey: { type: String },
   serviceMode: { type: String, enum: ['self_drive', 'with_driver'], required: true },
   priority: { type: String, enum: ['info', 'attention', 'urgent', 'critical'], required: true },
@@ -3666,6 +3679,7 @@ const OperationsAlertSchema = new Schema<IOperationsAlert>({
   endAtSnapshot: { type: Date },
   status: { type: String, enum: ['active', 'acknowledged', 'snoozed', 'resolved'], default: 'active' },
   snoozedUntil: { type: Date },
+  realertCount: { type: Number, default: 0 },
   acknowledgedBy: { userId: { type: String }, name: { type: String } },
   acknowledgedAt: { type: Date },
   resolvedAt: { type: Date },

@@ -77,11 +77,15 @@ export default function OperationsAlertStrip({ onViewAll, onOpenBooking }: {
   // alert; one at a time; never re-pops after acknowledge (server state).
   useEffect(() => {
     if (popupAlert) return;
+    // Seen-key includes realertCount: when the engine re-arms a
+    // still-overdue acknowledged alert it bumps realertCount, so the same
+    // alert legitimately pops again (ack pauses, never dismisses).
+    const seenKey = (a: OperationsAlertRow) => `${a._id}:${(a as any).realertCount || 0}`;
     const candidate = unacked.find(
-      (a) => (a.priority === "critical" || a.priority === "urgent") && !seenRef.current.has(a._id)
+      (a) => (a.priority === "critical" || a.priority === "urgent") && !seenRef.current.has(seenKey(a))
     );
     if (candidate) {
-      seenRef.current.add(candidate._id);
+      seenRef.current.add(seenKey(candidate));
       setPopupAlert(candidate);
     }
   }, [unacked, popupAlert]);

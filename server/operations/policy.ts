@@ -14,6 +14,9 @@ export interface OperationsPolicy {
   timezone: string;
   graceMinutes: number;
   turnaroundBufferMinutes: number;
+  overdueRealertMinutes: number;
+  googleReviewUrl?: string;
+  reviewTemplate?: string;
   notifyOwner: boolean;
   notifyAssignedUser: boolean;
   selfDriveStages: ReminderStage[];
@@ -65,6 +68,9 @@ export function resolvePolicy(tenant: any): OperationsPolicy {
     selfDriveStages: normalizeStages(s.selfDriveStages, DEFAULT_SELF_DRIVE_STAGES),
     withDriverStages: normalizeStages(s.withDriverStages, DEFAULT_WITH_DRIVER_STAGES),
     whatsappInternalPhone: s.whatsappInternalPhone || tenant?.phone || undefined,
+    overdueRealertMinutes: Number.isFinite(s.overdueRealertMinutes) ? Math.max(5, Math.min(24 * 60, s.overdueRealertMinutes)) : 30,
+    googleReviewUrl: typeof s.googleReviewUrl === 'string' && s.googleReviewUrl ? s.googleReviewUrl : undefined,
+    reviewTemplate: typeof s.reviewTemplate === 'string' && s.reviewTemplate ? s.reviewTemplate : undefined,
   };
 }
 

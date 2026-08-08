@@ -27,6 +27,7 @@ import CustomerInvoices from "./customer-invoices";
 import CustomerDrivers from "./customer-drivers";
 import CustomerVehicles from "./customer-vehicles";
 import CustomerGoogleReviews from "./customer-google-reviews";
+import CustomerSelfDrive from "./customer-self-drive";
 
 const CUSTOMER_TYPES = ['individual', 'corporate', 'vip', 'self_drive', 'religious_traveller', 'airport', 'outstation'];
 
@@ -720,6 +721,8 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
           )}
         </CardContent>
       </Card>
+
+      <CustomerSelfDrive customerId={customerId} tags={customer.tags || []} />
 
       <CustomerGoogleReviews customerId={customerId} bookings={rows} />
 
