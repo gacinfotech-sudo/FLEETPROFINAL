@@ -442,3 +442,14 @@ suites green on the identical commit during candidate verification.
 - :5050 restarted (new PID 38578, plain tsx — restart again by exact PID after future server changes). :5098 candidate server stopped; worktree `unified-booking-workspace` kept for rollback (rollback = reset branch to `7c9cef4`).
 - Verified on :5050: unified-booking-workspace 5/5, ui-shell-redesign, booking-queues-findability, booking-actions, dashboard-upcoming (KPI) — all green. Known env failure only: dashboard-upcoming "classify A–F" cannot find a free vehicle slot for tomorrow (stale zero-width booking BK1786168438787B9K1 blocks 2026-08-09; shared-DB data drift, not code).
 - INCIDENT: found a second dev server from `fleetpro-worktrees/fleetpro-final-canonical` (started 11:07:57 from a VS Code terminal) sharing :5050 via SO_REUSEPORT with the trunk server — split-brain CSRF/session failures for all :5050 users. Stopped by exact PID 41074. :5050 belongs to fleetpro-main per PREVIEW-RUNTIME.json; other sessions must use their own ports.
+- 2026-08-08: LAN fix — booking form crashed on http://<LAN-IP>:5050 because `crypto.randomUUID()` only exists in secure contexts (localhost/https). Added `safeRandomUUID()` in `client/src/lib/utils.ts`; replaced unguarded calls in enhanced-booking-form.tsx, payment-section.tsx, customer-dashboard.tsx. Client-only change, vite dev picked it up — no server restart.
+
+---
+
+## 2026-08-08 — Live Operations refinement pass promoted to :5050 (merge `40624fc`)
+
+- On top of the initial Live Operations integration (`f5be531`, see LIVE-OPERATIONS-INTEGRATION-REPORT.md): merged `da73337` from `operations/live-booking-control`.
+- Changes: urgent-alert popup is now a NON-modal fixed corner card (the modal Dialog intercepted clicks in unrelated suites and violated the "never block work" rule); `priorityForStage` maps T-60 and closer → urgent (strong popup stage), T-90 → attention; dashboard summary card retitled **"Vehicles on Booking"** (the classic overview keeps the exact title "Live Operations" that ui-shell-redesign.spec.ts asserts on); stat chips truncate so ₹ totals can't overflow at 375px; operations toasts surface server messages via `apiErrorMessage`.
+- :5050 restarted PID-targeted (verified single listener, cwd fleetpro-main, new PID in `.server-5050.pid`).
+- Verified on :5050 post-restart: `live-operations.spec.ts` 5/5, `self-drive-workspace.spec.ts` 4/4, `ui-shell-redesign.spec.ts` 12/12 — 21/21.
+- Pre-existing failures unchanged (reproduced on unmodified trunk): availability-engine "buffer opt-in" (vehicles.filter crash on error payload), advance-payment spec, dashboard-live-ops-fleet-status spec.
