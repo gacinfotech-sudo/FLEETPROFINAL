@@ -570,7 +570,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/logout", authenticateUser, async (req: AuthRequest, res) => {
     try {
-      await storage.updateUserSession(req.user.id, null);
+      // Log out THIS device's session only — the user's other logged-in
+      // devices (multi-device sessions) stay logged in.
+      const currentSessionId = (req.session as any)?.userId;
+      if (currentSessionId) {
+        await storage.removeUserSession(req.user.id, currentSessionId);
+      } else {
+        await storage.updateUserSession(req.user.id, null);
+      }
       req.session.destroy((err) => {
         if (err) {
           return res.status(500).json({ message: "Logout failed" });
@@ -2597,6 +2604,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (!bookingData.resourceFulfilmentStatus) {
         bookingData.resourceFulfilmentStatus = bookingData.vehicleId ? 'own_fleet_assigned' : 'not_started';
+      }
+
+      // An initial advance can never exceed the booking's own total —
+      // overpayments/extra collections go through the payment ledger
+      // afterwards, where they are auditable, not through create.
+      if ((bookingData.advanceReceived || 0) > bookingData.totalAmount) {
+        return res.status(400).json({
+          message: `Advance received (₹${bookingData.advanceReceived}) cannot exceed the total amount (₹${bookingData.totalAmount}).`,
+          code: "ADVANCE_EXCEEDS_TOTAL",
+        });
       }
 
       // Service-mode gate: a tenant configured as Self-Drive-only or

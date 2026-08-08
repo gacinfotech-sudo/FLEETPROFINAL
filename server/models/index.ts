@@ -67,6 +67,17 @@ export interface IUser extends Document {
     ip?: string;
     loginTime?: Date;
   };
+  // Multi-device sessions: each login gets its own entry (capped, LRU),
+  // so logging in on a second system no longer evicts the first one's
+  // session mid-work (this was surfacing as a random 401 "Invalid
+  // session" on POST /api/bookings from the other device). The legacy
+  // single `sessionId` field above is still written (latest login) for
+  // backward compatibility with anything still reading it.
+  activeSessions?: {
+    sessionId: string;
+    deviceInfo?: { userAgent?: string; ip?: string; loginTime?: Date };
+    createdAt?: Date;
+  }[];
   lastLogin?: Date;
   lastLoginIP?: string;
   lastLoginUserAgent?: string;
@@ -539,6 +550,15 @@ const UserSchema = new Schema<IUser>({
     ip: { type: String },
     loginTime: { type: Date }
   },
+  activeSessions: [{
+    sessionId: { type: String },
+    deviceInfo: {
+      userAgent: { type: String },
+      ip: { type: String },
+      loginTime: { type: Date }
+    },
+    createdAt: { type: Date, default: Date.now }
+  }],
   lastLogin: { type: Date },
   lastLoginIP: { type: String },
   lastLoginUserAgent: { type: String },
@@ -1772,6 +1792,7 @@ export const Referral = mongoose.model<IReferral>('Referral', ReferralSchema);
 
 // Create indexes for better performance
 UserSchema.index({ sessionId: 1 });
+UserSchema.index({ 'activeSessions.sessionId': 1 });
 VehicleSchema.index({ tenantId: 1, status: 1 });
 // Vehicle 360 (TASK-VEHICLE-DOMAIN-01) — real duplicate-registration
 // protection, mirroring VendorVehicle's normalizedRegistrationNumber index.

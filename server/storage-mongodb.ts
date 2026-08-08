@@ -9,6 +9,7 @@ export interface IStorage {
   // Auth methods
   getUserByCredentials(userId: string, password: string): Promise<IUser | undefined>;
   updateUserSession(id: string, sessionId: string | null, deviceInfo?: any): Promise<void>;
+  removeUserSession(id: string, sessionId: string): Promise<void>;
   getUserBySessionId(sessionId: string): Promise<IUser | undefined>;
   getUserSession(id: string): Promise<{ sessionId: string; deviceInfo?: any } | undefined>;
   resetUserPassword(id: string, newPassword: string): Promise<void>;
@@ -169,18 +170,45 @@ export class MongoDBStorage implements IStorage {
 
   async updateUserSession(id: string, sessionId: string | null, deviceInfo?: any): Promise<void> {
     try {
-      const updateData: any = { 
-        sessionId,
-        lastLogin: sessionId ? new Date() : undefined 
-      };
-      
-      if (deviceInfo) {
-        updateData.deviceInfo = deviceInfo;
+      if (sessionId === null) {
+        // Clear ALL sessions (password reset / deactivation paths).
+        await User.findByIdAndUpdate(id, { sessionId: null, activeSessions: [] });
+        return;
       }
-      
+      // Multi-device: append this login's session (cap 5, oldest evicted)
+      // instead of overwriting — a second system logging in must not kill
+      // the first system's session mid-booking. Legacy `sessionId` still
+      // tracks the latest login for backward compatibility.
+      const updateData: any = {
+        $set: { sessionId, lastLogin: new Date() },
+        $push: {
+          activeSessions: {
+            $each: [{ sessionId, deviceInfo, createdAt: new Date() }],
+            $slice: -5,
+          },
+        },
+      };
+      if (deviceInfo) {
+        updateData.$set.deviceInfo = deviceInfo;
+      }
       await User.findByIdAndUpdate(id, updateData);
     } catch (error) {
       console.error('Error updating user session:', error);
+      throw error;
+    }
+  }
+
+  // Logout for ONE device only: remove that session entry, leave the
+  // user's other devices logged in. Clears the legacy field too when it
+  // pointed at the session being removed.
+  async removeUserSession(id: string, sessionId: string): Promise<void> {
+    try {
+      await User.findByIdAndUpdate(id, {
+        $pull: { activeSessions: { sessionId } },
+      });
+      await User.updateOne({ _id: id, sessionId }, { $set: { sessionId: null } });
+    } catch (error) {
+      console.error('Error removing user session:', error);
       throw error;
     }
   }
@@ -203,7 +231,9 @@ export class MongoDBStorage implements IStorage {
 
   async getUserBySessionId(sessionId: string): Promise<IUser | undefined> {
     try {
-      const user = await User.findOne({ sessionId }).populate('tenantId') || undefined;
+      const user = await User.findOne({
+        $or: [{ sessionId }, { 'activeSessions.sessionId': sessionId }],
+      }).populate('tenantId') || undefined;
 
       if (user) {
         console.log('User loaded by sessionId:', {
@@ -235,7 +265,7 @@ export class MongoDBStorage implements IStorage {
       await User.findByIdAndUpdate(id, { 
         password: hashedPassword,
         mustResetPassword: false,
-        sessionId: null // Clear session to force re-login
+        sessionId: null, activeSessions: [] // Clear session to force re-login
       });
     } catch (error) {
       console.error('Error resetting user password:', error);
@@ -249,7 +279,7 @@ export class MongoDBStorage implements IStorage {
       await User.findByIdAndUpdate(userId, { 
         password: hashedPassword,
         mustResetPassword: true,
-        sessionId: null // Clear session to force re-login
+        sessionId: null, activeSessions: [] // Clear session to force re-login
       });
     } catch (error) {
       console.error('Error admin resetting password:', error);
@@ -1234,7 +1264,7 @@ export class MongoDBStorage implements IStorage {
         query,
         {
           isActive: false,
-          sessionId: null // Clear session to force logout
+          sessionId: null, activeSessions: [] // Clear session to force logout
         }
       );
       if (!result) {
