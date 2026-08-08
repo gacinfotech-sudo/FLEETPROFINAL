@@ -152,9 +152,11 @@ test('Dashboard Upcoming Bookings: Today/Tomorrow/Future/All Upcoming classify b
   await upcomingCard.getByRole('button', { name: /today \(/i }).click();
   await expect(upcomingCard.getByText(`Acceptance A ${marker}`)).toBeVisible();
 
-  // Clicking a row opens the existing "Booking Details" dialog (no duplicate detail UI).
+  // Clicking a row opens the ONE Unified Booking Workspace (no duplicate detail UI).
   await upcomingCard.getByText(`Acceptance A ${marker}`).click();
-  await expect(page.getByRole('dialog').filter({ hasText: 'Booking Details' })).toBeVisible();
+  const workspace = page.getByRole('dialog').filter({ has: page.getByRole('tab', { name: 'Allocation' }) });
+  await expect(workspace).toBeVisible();
+  await expect(workspace.getByText(`Acceptance A ${marker}`).first()).toBeVisible();
 
   // "View All" routes to the full Upcoming Bookings page, where the
   // beyond-limit records (C and D) are actually reachable.

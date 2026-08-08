@@ -223,6 +223,10 @@ export async function transitionBooking(
   }
 
   booking.status = toStatus;
+  // Every real status change is booking activity — keeps the Most Recent
+  // queue and Last Activity columns truthful without any client help.
+  (booking as any).lastActivityAt = new Date();
+  (booking as any).updatedAt = new Date();
   (booking as any).statusHistory = (booking as any).statusHistory || [];
   (booking as any).statusHistory.push({
     fromStatus,

@@ -23,10 +23,14 @@ test('Extend Booking: open a booking, add extension charges, submit, and see the
   let opened = false;
   for (let i = 0; i < rowCount && !opened; i++) {
     await rows.nth(i).getByRole('button', { name: 'View' }).click();
-    const detailDialog = page.getByRole('dialog').filter({ hasText: 'Booking Details' });
+    // View opens the Unified Booking Workspace; Extend lives in its
+    // Allocation tab (alongside vendor assignment).
+    const detailDialog = page.getByRole('dialog').filter({ has: page.getByRole('tab', { name: 'Allocation' }) });
     await expect(detailDialog).toBeVisible({ timeout: 5000 });
+    await detailDialog.getByRole('tab', { name: 'Allocation' }).click();
 
-    const extendButton = page.getByRole('button', { name: 'Extend Booking' });
+    const extendButton = detailDialog.getByRole('button', { name: 'Extend Booking' });
+    await expect(extendButton).toBeVisible({ timeout: 5000 });
     if (await extendButton.isEnabled()) {
       await extendButton.click();
       opened = true;

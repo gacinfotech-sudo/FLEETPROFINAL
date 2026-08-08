@@ -19,6 +19,7 @@ import CustomerReferralPanel from "./customer-referral-panel";
 import CustomerMessageCenter from "./customer-message-center";
 import CustomerRequirements from "./customer-requirements";
 import PreviousBookingReuse from "@/components/booking-queues/previous-booking-reuse";
+import { useBookingWorkspace } from "@/components/booking/booking-workspace-context";
 import CustomerDuplicateReview from "./customer-duplicate-review";
 import CustomerPaymentReceipt from "./customer-payment-receipt";
 import CustomerInvoices from "./customer-invoices";
@@ -141,7 +142,7 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
   // response) hits the same server-side idempotency check instead of
   // creating a second PaymentTransaction — see server/services/paymentLedger.ts.
   const [paymentIdempotencyKey, setPaymentIdempotencyKey] = useState<string>("");
-  const [viewingBooking, setViewingBooking] = useState<any>(null);
+  const { openBooking } = useBookingWorkspace();
   const [invoiceRequestBookingId, setInvoiceRequestBookingId] = useState<string | null>(null);
   const [paymentForm, setPaymentForm] = useState({ amount: "", paymentType: "advance", paymentMode: "cash", transactionReference: "", receivedBy: "", notes: "" });
 
@@ -223,7 +224,7 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
   const totalDue = financial?.totalPendingDue || 0;
   const latestGoogleReview = googleReviews[0];
   const googleReviewByBooking = new Map(googleReviews.filter((review: any) => review.bookingId).map((review: any) => [review.bookingId._id || review.bookingId, review]));
-  const viewingGoogleReview = viewingBooking ? googleReviewByBooking.get(viewingBooking._id) as any : undefined;
+
 
   return (
     <div className="space-y-6">
@@ -521,7 +522,7 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
                       setPaymentForm({ amount: String(due), paymentType: currentBooking.advanceReceived ? 'final_payment' : 'advance', paymentMode: 'cash', transactionReference: '', receivedBy: '', notes: '' });
                     }}><IndianRupee className="h-4 w-4 mr-1" /> Record Payment</Button>
                   )}
-                  <Button size="sm" variant="outline" onClick={() => setViewingBooking(currentBooking)}><Eye className="h-4 w-4 mr-1" /> Full Details</Button>
+                  <Button size="sm" variant="outline" onClick={() => openBooking(currentBooking._id)}><Eye className="h-4 w-4 mr-1" /> Full Details</Button>
                 </div>
               </div>
             </div>
@@ -568,7 +569,7 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
                   const googleReview = googleReviewByBooking.get(b._id) as any;
                   return (
                     <TableRow key={b._id}>
-                      <TableCell className="font-medium">{b.bookingId}</TableCell>
+                      <TableCell className="font-medium"><button type="button" className="text-blue-700 hover:underline font-mono text-xs" onClick={() => openBooking(b._id)}>{b.bookingId}</button></TableCell>
                       <TableCell>{b.pickupLocation} → {b.dropoffLocation || "-"}</TableCell>
                       <TableCell>{new Date(b.pickupDate).toLocaleDateString('en-IN')}</TableCell>
                       <TableCell>
@@ -595,7 +596,7 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
                       <TableCell>
                         <div className="flex gap-1">
                           {!['cancelled', 'no_show'].includes(b.status) && <Button size="sm" variant="ghost" aria-label={`Create Invoice for ${b.bookingId}`} onClick={() => setInvoiceRequestBookingId(b._id)}><ReceiptText className="h-4 w-4" /></Button>}
-                          <Button size="sm" variant="ghost" aria-label={`View ${b.bookingId}`} onClick={() => setViewingBooking(b)}><Eye className="h-4 w-4" /></Button>
+                          <Button size="sm" variant="ghost" aria-label={`View ${b.bookingId}`} onClick={() => openBooking(b._id)}><Eye className="h-4 w-4" /></Button>
                           {onNewBooking && (
                             <Button
                               size="sm" variant="ghost" aria-label={`Use ${b.bookingId} as template`}
@@ -623,60 +624,8 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
         )}
       </div>
 
-      <Dialog open={!!viewingBooking} onOpenChange={(open) => !open && setViewingBooking(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Complete Booking Details — {viewingBooking?.bookingId}</DialogTitle></DialogHeader>
-          {viewingBooking && (
-            <div className="space-y-5">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <div><Label className="text-xs text-gray-500">Status</Label><p className="capitalize font-medium">{viewingBooking.status?.replace(/_/g, ' ')}</p></div>
-                <div><Label className="text-xs text-gray-500">Booking Type</Label><p className="capitalize font-medium">{viewingBooking.bookingType?.replace(/_/g, ' ')}</p></div>
-                <div><Label className="text-xs text-gray-500">Source</Label><p className="capitalize font-medium">{viewingBooking.bookingSource?.replace(/_/g, ' ') || 'Direct customer'}</p></div>
-                <div><Label className="text-xs text-gray-500">Fulfilment</Label><p className="capitalize font-medium">{viewingBooking.fulfilmentType || 'Own fleet'}</p></div>
-                <div><Label className="text-xs text-gray-500">Google Review</Label><p className="font-medium">{viewingGoogleReview?.reviewReceived ? `${viewingGoogleReview.reviewRating || '-'}★ received` : viewingGoogleReview?.reviewRequested ? 'Requested · pending' : 'Not requested'}</p></div>
-                <div className="col-span-2"><Label className="text-xs text-gray-500">Route</Label><p className="font-medium">{viewingBooking.pickupLocation} → {viewingBooking.dropoffLocation || '-'}</p></div>
-                <div><Label className="text-xs text-gray-500">Pickup</Label><p className="font-medium">{new Date(viewingBooking.pickupDate).toLocaleDateString('en-IN')} {viewingBooking.pickupTime || ''}</p></div>
-                <div><Label className="text-xs text-gray-500">Return</Label><p className="font-medium">{viewingBooking.returnDate ? new Date(viewingBooking.returnDate).toLocaleDateString('en-IN') : '-'} {viewingBooking.returnTime || ''}</p></div>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-3">
-                <div className="rounded-lg border p-4">
-                  <p className="font-semibold flex items-center gap-2 mb-2"><UserRound className="h-4 w-4" /> Driver Service</p>
-                  <p>{viewingBooking.driverId?.name || viewingBooking.thirdPartyDriverName || viewingBooking.vendorDriverName || 'Not assigned'}</p>
-                  <p className="text-sm text-gray-500">{viewingBooking.driverId?.phone || viewingBooking.thirdPartyDriverPhone || viewingBooking.vendorDriverPhone || '-'}</p>
-                </div>
-                <div className="rounded-lg border p-4">
-                  <p className="font-semibold flex items-center gap-2 mb-2"><Car className="h-4 w-4" /> Vehicle Service</p>
-                  <p>{[viewingBooking.vehicleId?.make, viewingBooking.vehicleId?.vehicleModel].filter(Boolean).join(' ') || viewingBooking.vendorVehicleDetails || 'Not assigned'}</p>
-                  <p className="text-sm text-gray-500">{viewingBooking.vehicleId?.licensePlate || '-'}</p>
-                </div>
-              </div>
-
-              <div className="rounded-lg border p-4">
-                <p className="font-semibold flex items-center gap-2 mb-3"><ReceiptText className="h-4 w-4" /> Financial Summary</p>
-                <div className="grid grid-cols-3 gap-3 text-sm">
-                  <div><Label className="text-xs text-gray-500">Total</Label><p className="font-semibold">{fmtMoney(viewingBooking.totalAmount)}</p></div>
-                  <div><Label className="text-xs text-gray-500">Paid</Label><p className="font-semibold text-green-700">{fmtMoney(viewingBooking.advanceReceived)}</p></div>
-                  <div><Label className="text-xs text-gray-500">Due</Label><p className="font-semibold text-red-700">{fmtMoney(Math.max(0, viewingBooking.totalAmount - (viewingBooking.advanceReceived || 0)))}</p></div>
-                </div>
-              </div>
-
-              {(viewingBooking.notes || viewingBooking.customerDiscussionSummary) && (
-                <div className="rounded-lg border p-4 text-sm">
-                  <p className="font-semibold mb-2">Notes & Customer Discussion</p>
-                  <p className="whitespace-pre-wrap text-gray-700">{viewingBooking.customerDiscussionSummary || viewingBooking.notes}</p>
-                </div>
-              )}
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setViewingBooking(null)}>Close</Button>
-                {!['cancelled', 'no_show'].includes(viewingBooking.status) && <Button variant="outline" onClick={() => { const bookingId = viewingBooking._id; setViewingBooking(null); setInvoiceRequestBookingId(bookingId); }}><ReceiptText className="h-4 w-4 mr-1" /> Create Invoice</Button>}
-                {onEditBooking && <Button onClick={() => { const booking = viewingBooking; setViewingBooking(null); onEditBooking(booking); }}><Pencil className="h-4 w-4 mr-1" /> Edit Booking</Button>}
-              </DialogFooter>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* The per-customer booking-details dialog was removed — Customer 360
+          bookings now open the ONE Unified Booking Workspace (§29). */}
 
       <Dialog open={!!payingBooking} onOpenChange={(open) => !open && setPayingBooking(null)}>
         <DialogContent>

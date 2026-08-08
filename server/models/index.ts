@@ -23,6 +23,13 @@ export interface ITenant extends Document {
     drivers: number;
     managers: number;
   };
+  // Which service modes this tenant operates. Both default to true so every
+  // existing tenant (field absent) keeps today's behavior. Disabling a mode
+  // only blocks NEW bookings of that mode — history stays readable.
+  serviceModes?: {
+    selfDrive: boolean;
+    withDriver: boolean;
+  };
   createdAt: Date;
 }
 
@@ -460,6 +467,10 @@ const TenantSchema = new Schema<ITenant>({
     vehicles: { type: Number, default: 6 }, // Starter plan default
     drivers: { type: Number, default: 3 },  // Starter plan default
     managers: { type: Number, default: 1 }  // Starter plan default
+  },
+  serviceModes: {
+    selfDrive: { type: Boolean, default: true },
+    withDriver: { type: Boolean, default: true }
   },
   createdAt: { type: Date, default: Date.now }
 });

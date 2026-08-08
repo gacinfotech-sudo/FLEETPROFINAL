@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Phone, MessageCircle } from "lucide-react";
+import { Phone, MessageCircle, IndianRupee } from "lucide-react";
+import { useBookingWorkspace } from "@/components/booking/booking-workspace-context";
 
 function fmtMoney(n?: number) {
   if (n === undefined || n === null) return "-";
@@ -11,6 +12,7 @@ function fmtMoney(n?: number) {
 }
 
 export default function PaymentDues() {
+  const { openBooking } = useBookingWorkspace();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["/api/operations/payment-dues"],
     refetchInterval: 60000,
@@ -57,8 +59,12 @@ export default function PaymentDues() {
               </TableHeader>
               <TableBody>
                 {rows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-mono text-xs">{r.bookingId}</TableCell>
+                  <TableRow key={r.id} className="cursor-pointer hover:bg-gray-50" onClick={() => openBooking(r.id, { focus: "payments" })}>
+                    <TableCell className="font-mono text-xs">
+                      <button type="button" className="text-blue-700 hover:underline" onClick={(e) => { e.stopPropagation(); openBooking(r.id, { focus: "payments" }); }}>
+                        {r.bookingId}
+                      </button>
+                    </TableCell>
                     <TableCell>{r.customerName}</TableCell>
                     <TableCell>{r.pickupDate ? new Date(r.pickupDate).toLocaleDateString("en-IN") : "-"}</TableCell>
                     <TableCell>{fmtMoney(r.totalAmount)}</TableCell>
@@ -68,8 +74,12 @@ export default function PaymentDues() {
                       {r.daysOverdue > 0 ? <Badge variant="destructive">{r.daysOverdue}d overdue</Badge> : <Badge variant="outline">upcoming</Badge>}
                     </TableCell>
                     <TableCell><Badge variant="secondary">{r.status.replace(/_/g, " ")}</Badge></TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
+                        {/* Collect: opens the same workspace focused on the Payment section (§54) */}
+                        <Button variant="outline" size="sm" className="h-7" onClick={() => openBooking(r.id, { focus: "payments" })}>
+                          <IndianRupee className="w-3.5 h-3.5 mr-1" /> Collect
+                        </Button>
                         <a href={`tel:${r.customerPhone}`}>
                           <Button variant="ghost" size="icon"><Phone className="w-4 h-4" /></Button>
                         </a>

@@ -617,6 +617,32 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
     enabled: EXTERNAL_SOURCE_TYPES.has(watchedValues.bookingSource) || resourceMode === "vendor_vehicle",
   });
 
+  // Tenant service-mode configuration: a Self-Drive-only or With-Driver-only
+  // tenant never sees the other mode's selector; the form silently opens in
+  // its single enabled mode. Until the query resolves, both stay available
+  // (same as a both-modes tenant), so nothing flashes or blocks.
+  const { data: tenantServiceModes } = useQuery<{ selfDrive: boolean; withDriver: boolean }>({
+    queryKey: ["/api/tenant/service-modes"],
+    queryFn: async () => {
+      const res = await fetch("/api/tenant/service-modes", { credentials: "include" });
+      if (!res.ok) return { selfDrive: true, withDriver: true };
+      return res.json();
+    },
+  });
+  const selfDriveEnabled = tenantServiceModes?.selfDrive !== false;
+  const withDriverEnabled = tenantServiceModes?.withDriver !== false;
+  const singleServiceMode: "self_drive" | "with_driver" | null =
+    selfDriveEnabled !== withDriverEnabled
+      ? (selfDriveEnabled ? "self_drive" : "with_driver")
+      : null;
+  useEffect(() => {
+    if (singleServiceMode && form.getValues("bookingType") !== singleServiceMode) {
+      form.setValue("bookingType", singleServiceMode);
+      handleBookingTypeChange(singleServiceMode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [singleServiceMode]);
+
   // Fetch business profile for logo
   const { data: businessProfile } = useQuery({
     queryKey: ['/api/auth/business-profile-for-documents'],
@@ -969,14 +995,37 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
     }
   };
 
-  // Reset selection when booking type changes
+  // Reset selection when booking type changes. Switching modes must never
+  // silently carry the other mode's allocation into the submit payload
+  // (e.g. serviceMode=self_drive + a stale chauffeur driverId), so any
+  // incompatible unsaved selection is cleared here, with a toast so the
+  // removal is visible rather than silent.
   const handleBookingTypeChange = (newBookingType: "self_drive" | "with_driver") => {
     setSelectedVehicleId("");
     setSelectedPricingType("");
     form.setValue("vehicleId", "");
     form.setValue("pricingType", "day");
     form.setValue("amount", 0);
+    if (newBookingType === "self_drive" && form.getValues("driverId")) {
+      form.setValue("driverId", "");
+      toast({
+        title: "Driver selection removed",
+        description: "Self Drive bookings don't have a chauffeur, so the previously selected driver was cleared.",
+      });
+    }
+    if (newBookingType === "self_drive") setSelectedVendorDriverId("");
   };
+
+  // The mode cards wrap their RadioGroupItem, and Radix bubbles a synthetic
+  // `click` from each item's hidden form input whenever its checked state
+  // changes — including on UNcheck. A card-level onClick that re-submits its
+  // own mode therefore fires for the OLD mode's uncheck too, and the two
+  // writers ping-pong until the wrong value wins (the "can't switch back to
+  // Self Drive" bug). Only treat clicks as user intent when they did NOT
+  // originate from the radio primitive itself (Radix already reports those
+  // through onValueChange).
+  const isDirectCardClick = (e: React.MouseEvent) =>
+    !(e.target as HTMLElement).closest('button[role="radio"], input');
 
   const stepConfig = [
     { number: 1, title: "Trip Details", icon: MapPin, color: "bg-blue-500" },
@@ -1513,7 +1562,17 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
               <p className="text-green-100 text-xs sm:text-sm">Choose from our available fleet</p>
             </CardHeader>
             <CardContent className="p-4 sm:p-8">
-              {/* Service Type Selection */}
+              {/* Service Type Selection — hidden entirely for a tenant that
+                  operates only one mode (spec: no dead selector, open the
+                  single enabled workflow directly). */}
+              {singleServiceMode ? (
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">Service Type</h3>
+                  <Badge variant="outline" data-testid="single-service-mode">
+                    {singleServiceMode === "self_drive" ? "Self Drive" : "With Driver"}
+                  </Badge>
+                </div>
+              ) : (
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Service Type</h3>
                 <FormField
@@ -1531,7 +1590,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                           className="grid grid-cols-1 md:grid-cols-2 gap-4"
                         >
                           <div
-                            onClick={() => {
+                            onClick={(e) => {
+                              if (!isDirectCardClick(e)) return;
+                              if (field.value === "self_drive") return;
                               field.onChange("self_drive");
                               handleBookingTypeChange("self_drive");
                             }}
@@ -1550,7 +1611,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                             </div>
                           </div>
                           <div
-                            onClick={() => {
+                            onClick={(e) => {
+                              if (!isDirectCardClick(e)) return;
+                              if (field.value === "with_driver") return;
                               field.onChange("with_driver");
                               handleBookingTypeChange("with_driver");
                             }}
@@ -1575,6 +1638,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   )}
                 />
               </div>
+              )}
 
               <Separator className="my-8" />
 
