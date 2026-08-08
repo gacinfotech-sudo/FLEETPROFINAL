@@ -21,13 +21,37 @@ export async function login(page: Page, userId: string, password: string) {
     await onboardingHeading.locator('..').getByRole('button').click();
   }
 
-  // Dismissing onboarding flips showOnboarding to false, which immediately
-  // mounts DailyOperationsPopup — a once-per-day Dialog gated on a
-  // localStorage key that's always empty in a fresh test browser context,
-  // so it opens on effectively every test run and blocks clicks the same way.
-  const dailyPopupTitle = page.getByText("Today's Operations");
-  if (await dailyPopupTitle.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await page.getByRole('button', { name: 'Dismiss for Today' }).click();
+  // Two more dialogs can appear over the dashboard, in ANY order and at any
+  // moment after mount, each with an overlay that intercepts clicks meant
+  // for the other:
+  //  - DailyOperationsPopup ("Today's Operations") — once-per-day, always
+  //    opens in a fresh test browser context (empty localStorage).
+  //  - The Live Operations alert popup (operations-alert-strip.tsx) — pops
+  //    whenever the alerts query resolves with an unseen urgent/critical
+  //    alert, i.e. it can mount BETWEEN a visibility check on the daily
+  //    popup and the click that dismisses it. Acknowledging is what a real
+  //    user does, persists server-side, and never re-pops (§13/§49); it
+  //    shows one alert at a time and may re-open for the next unseen one.
+  // So: one unified bounded loop, always clearing the ops popup first, and
+  // treating an intercepted daily-popup click as "loop again", never as a
+  // login failure.
+  for (let i = 0; i < 10; i++) {
+    const opsPopup = page.getByTestId('operations-alert-popup');
+    if (await opsPopup.isVisible().catch(() => false)) {
+      await page.getByTestId('popup-acknowledge').click({ timeout: 2000 }).catch(() => {});
+      await opsPopup.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+      continue;
+    }
+    const dailyPopupTitle = page.getByText("Today's Operations");
+    if (await dailyPopupTitle.isVisible().catch(() => false)) {
+      const clicked = await page.getByRole('button', { name: 'Dismiss for Today' })
+        .click({ timeout: 2000 }).then(() => true, () => false);
+      if (clicked) continue; // re-check: the ops popup may pop next
+    }
+    if (i >= 2) break;
+    // Early iterations: give late-mounting dialogs a beat to appear before
+    // concluding the dashboard is clear.
+    await page.waitForTimeout(1000);
   }
 }
 
