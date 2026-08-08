@@ -1,3 +1,4 @@
+import { safeRandomUUID } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -229,7 +230,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   // regenerated whenever the form is deliberately reset to start a
   // genuinely new booking. See server/routes.ts's POST /api/bookings
   // duplicate-request guard.
-  const bookingIdempotencyKeyRef = useRef<string>(crypto.randomUUID());
+  const bookingIdempotencyKeyRef = useRef<string>(safeRandomUUID());
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -342,7 +343,20 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
 
   const resumeDraft = () => {
     if (!pendingDraft) return;
-    form.reset({ ...form.getValues(), ...pendingDraft.formData });
+    const { __resourceMode, ...draftFormData } = pendingDraft.formData || {};
+    form.reset({ ...form.getValues(), ...draftFormData });
+    // Re-sync the selection state that lives OUTSIDE react-hook-form and is
+    // therefore not covered by form.reset(): the Vehicle step's gate,
+    // pricing UI, and the submit payload's resource-mode branch all read
+    // these. Without this, a resumed draft looked complete but submitted an
+    // own-fleet booking with no vehicle (always a server 400) whenever the
+    // draft was saved on a Vendor/Outsource path — resourceMode silently
+    // reset to "own_fleet".
+    if (__resourceMode === "own_fleet" || __resourceMode === "vendor_vehicle" || __resourceMode === "outsource") {
+      setResourceMode(__resourceMode);
+    }
+    if (draftFormData.vehicleId) setSelectedVehicleId(draftFormData.vehicleId);
+    if (draftFormData.pricingType) setSelectedPricingType(draftFormData.pricingType);
     setStep(pendingDraft.step);
     setPendingDraft(null);
   };
@@ -361,11 +375,14 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
     if (!form.formState.isDirty) return;
     if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
     draftSaveTimer.current = setTimeout(() => {
-      apiRequest("PUT", "/api/booking-drafts/mine", { step, formData: watchedValues }).catch(() => {});
+      // __resourceMode rides inside formData (Mixed on the server) so the
+      // resume path can restore the fulfilment mode — it is stripped back
+      // out before form.reset() in resumeDraft().
+      apiRequest("PUT", "/api/booking-drafts/mine", { step, formData: { ...watchedValues, __resourceMode: resourceMode } }).catch(() => {});
     }, 1200);
     return () => { if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedValues, step, draftChecked, pendingDraft, bookingConfirmed]);
+  }, [watchedValues, step, resourceMode, draftChecked, pendingDraft, bookingConfirmed]);
 
   // Fetch available vehicles.
   // P0 FIX (flexible-fulfilment initiative): this used to omit
@@ -790,6 +807,12 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       // conflict reason instead of a generic "please try again" that
       // gives staff no idea what to do differently.
       let description = "Please try again.";
+      // apiRequest surfaces a 401 as a bare "Session expired" (this app is
+      // single-session-per-user: logging in from another window/device ends
+      // this one) — say that instead of a "try again" that cannot succeed.
+      if (err?.message === "Session expired") {
+        description = "This login was opened somewhere else, so this session ended. Log in again — your booking is saved as a draft.";
+      }
       const match = /^(\d+):\s*([\s\S]*)$/.exec(err?.message || "");
       if (match) {
         try {
@@ -929,6 +952,34 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   };
 
   const onSubmit = async (data: BookingFormData) => {
+    // A resumed draft restores form fields and step, but resourceMode is
+    // component state that used to reset to its "own_fleet" default — that
+    // combination (own fleet, no vehicle) reaches Confirm and is then
+    // always rejected server-side (VEHICLE_OR_ASSIGNMENT_PENDING_REQUIRED).
+    // Catch it before the doomed request and route the user to the Vehicle
+    // step with a real instruction instead of a generic failure.
+    if (resourceMode === "own_fleet" && !data.vehicleId) {
+      toast({
+        title: "Select a vehicle first",
+        description: "Choose a vehicle from your fleet, or switch to Vendor Vehicle / Outsource on the Vehicle step to continue without one.",
+        variant: "destructive",
+      });
+      setStep(2);
+      return;
+    }
+    // An advance larger than the booking's own final total is an entry
+    // mistake (extra collections belong in the ledger later, not here) —
+    // catch it before submit so the money state can never start invalid.
+    const finalTotal = (data.amount || 0) + (data.tollCharges || 0) + (data.parkingCharges || 0) + (data.miscellaneousAmount || 0)
+      - (data.petrolCharges || 0) - (data.dieselCharges || 0) - (data.cngCharges || 0);
+    if ((data.advanceReceived || 0) > finalTotal) {
+      toast({
+        title: "Advance exceeds total amount",
+        description: `Advance Received (₹${data.advanceReceived}) cannot be more than the final total (₹${finalTotal}). Please correct the amounts.`,
+        variant: "destructive",
+      });
+      return;
+    }
     await createBookingMutation.mutateAsync(data);
   };
 
@@ -2273,6 +2324,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                               <Input
                                 type="number" min={0} placeholder="0"
                                 value={field.value ?? ""}
+                                onWheel={(e) => (e.target as HTMLElement).blur()}
                                 onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
                                 className="h-11 border-2 border-gray-200 rounded-lg"
                               />
@@ -2496,7 +2548,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                       variant="outline"
                       onClick={() => {
                         form.reset();
-                        bookingIdempotencyKeyRef.current = crypto.randomUUID();
+                        bookingIdempotencyKeyRef.current = safeRandomUUID();
                         setStep(1);
                         setSelectedVehicleId("");
                         setSelectedPricingType("");
@@ -2703,9 +2755,10 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                     <Input 
                                       type="number" 
                                       placeholder="Enter total kilometers"
-                                      value={field.value || 0}
+                                      value={field.value ? field.value : ""}
+                                      onWheel={(e) => (e.target as HTMLElement).blur()}
                                       onChange={(e) => {
-                                        const km = parseFloat(e.target.value) || 0;
+                                        const km = e.target.value === "" ? 0 : parseFloat(e.target.value) || 0;
                                         field.onChange(km);
                                         // Auto-calculate base amount when kilometers change
                                         const rate = selectedVehicle?.pricePerKm || 0;
@@ -2759,8 +2812,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                   <Input
                                     type="number"
                                     placeholder="Enter final amount"
-                                    value={field.value || 0}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    value={field.value ? field.value : ""}
+                                    onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                    onWheel={(e) => (e.target as HTMLElement).blur()}
                                     className="h-12 pl-10 text-lg font-medium border-2 border-orange-300 focus:border-orange-500 rounded-lg"
                                   />
                                 </div>
@@ -2784,8 +2838,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                   <Input 
                                     type="number" 
                                     placeholder="0"
-                                    value={field.value || 0}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    value={field.value ? field.value : ""}
+                                    onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                    onWheel={(e) => (e.target as HTMLElement).blur()}
                                     className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
                                   />
                                 </FormControl>
@@ -2804,8 +2859,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                   <Input 
                                     type="number" 
                                     placeholder="0"
-                                    value={field.value || 0}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    value={field.value ? field.value : ""}
+                                    onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                    onWheel={(e) => (e.target as HTMLElement).blur()}
                                     className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
                                   />
                                 </FormControl>
@@ -2863,8 +2919,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                             <Input
                                               type="number"
                                               placeholder="0"
-                                              value={field.value || 0}
-                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              value={field.value ? field.value : ""}
+                                              onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                              onWheel={(e) => (e.target as HTMLElement).blur()}
                                               className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
                                             />
                                           </FormControl>
@@ -2882,8 +2939,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                             <Input
                                               type="number"
                                               placeholder="0"
-                                              value={field.value || 0}
-                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              value={field.value ? field.value : ""}
+                                              onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                              onWheel={(e) => (e.target as HTMLElement).blur()}
                                               className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
                                             />
                                           </FormControl>
@@ -2901,8 +2959,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                             <Input
                                               type="number"
                                               placeholder="0"
-                                              value={field.value || 0}
-                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              value={field.value ? field.value : ""}
+                                              onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                              onWheel={(e) => (e.target as HTMLElement).blur()}
                                               className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
                                             />
                                           </FormControl>
@@ -2927,8 +2986,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                             <Input
                                               type="number"
                                               placeholder="0"
-                                              value={field.value || 0}
-                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              value={field.value ? field.value : ""}
+                                              onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                              onWheel={(e) => (e.target as HTMLElement).blur()}
                                               className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
                                             />
                                           </FormControl>
@@ -3055,6 +3115,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                   <Input
                                     type="number" min={0} placeholder="0"
                                     value={field.value ?? ""}
+                                    onWheel={(e) => (e.target as HTMLElement).blur()}
                                     onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                     className="h-10 text-sm border border-gray-300 focus:border-blue-500 rounded"
                                   />
@@ -3073,6 +3134,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                   <Input
                                     type="number" min={0} placeholder="0"
                                     value={field.value ?? ""}
+                                    onWheel={(e) => (e.target as HTMLElement).blur()}
                                     onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                     className="h-10 text-sm border border-gray-300 focus:border-blue-500 rounded"
                                   />
@@ -3165,6 +3227,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                   <Input
                                     type="number" min={0} placeholder="0"
                                     value={field.value ?? ""}
+                                    onWheel={(e) => (e.target as HTMLElement).blur()}
                                     onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                     className="h-10 text-sm border border-gray-300 focus:border-blue-500 rounded"
                                   />
@@ -3282,7 +3345,26 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   return (
     <div className="max-w-5xl mx-auto p-2 sm:p-4">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8" key={`booking-form-${step}`}>
+        <form
+          onSubmit={form.handleSubmit(onSubmit, (errors) => {
+            // Zod failures on Confirm used to be completely silent — the
+            // button just did nothing (e.g. amount stays 0 because the
+            // selected vehicle has no rate configured). Name the first
+            // failing fields so staff know what to fix instead of
+            // re-clicking a dead button.
+            const details = Object.entries(errors)
+              .slice(0, 3)
+              .map(([field, err]: [string, any]) => err?.message || field)
+              .join('; ');
+            toast({
+              title: "Booking is missing required details",
+              description: details || "Check the highlighted fields and try again.",
+              variant: "destructive",
+            });
+          })}
+          className="space-y-8"
+          key={`booking-form-${step}`}
+        >
           {renderProgressBar()}
           {renderStep()}
         </form>
@@ -3426,7 +3508,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                 variant="outline"
                 onClick={() => {
                   form.reset();
-                  bookingIdempotencyKeyRef.current = crypto.randomUUID();
+                  bookingIdempotencyKeyRef.current = safeRandomUUID();
                   setStep(1);
                   setSelectedVehicleId("");
                   setSelectedPricingType("");

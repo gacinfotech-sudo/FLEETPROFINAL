@@ -1,3 +1,4 @@
+import { safeRandomUUID } from "@/lib/utils";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -518,7 +519,7 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
                     <Button size="sm" onClick={() => {
                       const due = Math.max(0, currentBooking.totalAmount - (currentBooking.advanceReceived || 0));
                       setPayingBooking(currentBooking);
-                      setPaymentIdempotencyKey(crypto.randomUUID());
+                      setPaymentIdempotencyKey(safeRandomUUID());
                       setPaymentForm({ amount: String(due), paymentType: currentBooking.advanceReceived ? 'final_payment' : 'advance', paymentMode: 'cash', transactionReference: '', receivedBy: '', notes: '' });
                     }}><IndianRupee className="h-4 w-4 mr-1" /> Record Payment</Button>
                   )}
@@ -581,7 +582,7 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
                       <TableCell>
                         {due > 0 ? (
                           <button
-                            onClick={() => { setPayingBooking(b); setPaymentIdempotencyKey(crypto.randomUUID()); setPaymentForm({ amount: String(due), paymentType: b.advanceReceived ? 'final_payment' : 'advance', paymentMode: 'cash', transactionReference: '', receivedBy: '', notes: '' }); }}
+                            onClick={() => { setPayingBooking(b); setPaymentIdempotencyKey(safeRandomUUID()); setPaymentForm({ amount: String(due), paymentType: b.advanceReceived ? 'final_payment' : 'advance', paymentMode: 'cash', transactionReference: '', receivedBy: '', notes: '' }); }}
                             className="flex items-center gap-1 text-red-600 hover:underline font-medium"
                             title="Tap to record a payment"
                           >
@@ -640,7 +641,7 @@ export default function CustomerDashboard({ customerId, onEditBooking, onNewBook
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Amount</Label>
-              <Input type="number" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
+              <Input type="number" value={paymentForm.amount} onWheel={(e) => (e.target as HTMLElement).blur()} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
             </div>
             <div>
               <Label>Payment Type</Label>

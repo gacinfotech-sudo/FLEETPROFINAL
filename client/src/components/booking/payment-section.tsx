@@ -1,3 +1,4 @@
+import { safeRandomUUID } from "@/lib/utils";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -138,7 +139,7 @@ export default function PaymentSection({ booking }: Props) {
           <Badge variant={booking.paymentStatus === 'paid' ? 'default' : booking.paymentStatus === 'refunded' ? 'destructive' : 'secondary'} className="capitalize">
             {booking.paymentStatus || 'pending'}
           </Badge>
-          <Button size="sm" variant="outline" onClick={() => { setShowAddPayment(true); setIdempotencyKey(crypto.randomUUID()); }}>
+          <Button size="sm" variant="outline" onClick={() => { setShowAddPayment(true); setIdempotencyKey(safeRandomUUID()); }}>
             <Plus className="w-3.5 h-3.5 mr-1" />
             Add Payment
           </Button>
@@ -182,7 +183,7 @@ export default function PaymentSection({ booking }: Props) {
               <Label>Amount (₹)</Label>
               <div className="relative">
                 <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input type="number" min={0} className="pl-9" value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+                <Input type="number" min={0} className="pl-9" value={form.amount} onWheel={(e) => (e.target as HTMLElement).blur()} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
