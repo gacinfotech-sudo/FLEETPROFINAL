@@ -2168,6 +2168,157 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ============================================================================
+  // WAVE 2: CUSTOMER & BOOKING 360 ROUTES
+  // ============================================================================
+  // Complete customer & booking operational command centres
+
+  // Get Customer 360 - complete customer relationship view
+  app.get("/api/customers/:id/360", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: customerId } = req.params;
+
+      if (!mongoose.isValidObjectId(customerId)) {
+        return res.status(400).json({ message: "Invalid customer ID" });
+      }
+
+      const { getCustomer360 } = await import("../services/customer360Service");
+
+      const customer360 = await getCustomer360(req.tenantId!, new mongoose.Types.ObjectId(customerId));
+
+      if (!customer360) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      res.json(customer360);
+    } catch (error: any) {
+      console.error("Get Customer 360 error:", error?.message);
+      res.status(500).json({ message: "Failed to get customer 360" });
+    }
+  });
+
+  // Get Customer 360 KPI summary
+  app.get("/api/customers/:id/360/kpis", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: customerId } = req.params;
+
+      if (!mongoose.isValidObjectId(customerId)) {
+        return res.status(400).json({ message: "Invalid customer ID" });
+      }
+
+      const { getCustomer360KPISummary } = await import("../services/customer360Service");
+
+      const kpis = await getCustomer360KPISummary(req.tenantId!, new mongoose.Types.ObjectId(customerId));
+
+      if (!kpis) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      res.json(kpis);
+    } catch (error: any) {
+      console.error("Get Customer KPI error:", error?.message);
+      res.status(500).json({ message: "Failed to get customer KPIs" });
+    }
+  });
+
+  // Get Customer 360 quick actions
+  app.get("/api/customers/:id/360/actions", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: customerId } = req.params;
+
+      if (!mongoose.isValidObjectId(customerId)) {
+        return res.status(400).json({ message: "Invalid customer ID" });
+      }
+
+      const { getCustomer360, getCustomer360QuickActions } = await import("../services/customer360Service");
+
+      const customer360 = await getCustomer360(req.tenantId!, new mongoose.Types.ObjectId(customerId));
+
+      if (!customer360) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      const actions = getCustomer360QuickActions(customer360);
+      res.json(actions);
+    } catch (error: any) {
+      console.error("Get Customer 360 actions error:", error?.message);
+      res.status(500).json({ message: "Failed to get customer actions" });
+    }
+  });
+
+  // Get Booking 360 - complete booking operational view
+  app.get("/api/bookings/:id/360", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+
+      if (!mongoose.isValidObjectId(bookingId)) {
+        return res.status(400).json({ message: "Invalid booking ID" });
+      }
+
+      const { getBooking360 } = await import("../services/booking360Service");
+
+      const booking360 = await getBooking360(req.tenantId!, new mongoose.Types.ObjectId(bookingId));
+
+      if (!booking360) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      res.json(booking360);
+    } catch (error: any) {
+      console.error("Get Booking 360 error:", error?.message);
+      res.status(500).json({ message: "Failed to get booking 360" });
+    }
+  });
+
+  // Get Booking 360 KPI summary
+  app.get("/api/bookings/:id/360/kpis", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+
+      if (!mongoose.isValidObjectId(bookingId)) {
+        return res.status(400).json({ message: "Invalid booking ID" });
+      }
+
+      const { getBooking360KPISummary } = await import("../services/booking360Service");
+
+      const kpis = await getBooking360KPISummary(req.tenantId!, new mongoose.Types.ObjectId(bookingId));
+
+      if (!kpis) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      res.json(kpis);
+    } catch (error: any) {
+      console.error("Get Booking KPI error:", error?.message);
+      res.status(500).json({ message: "Failed to get booking KPIs" });
+    }
+  });
+
+  // Get Booking 360 quick actions
+  app.get("/api/bookings/:id/360/actions", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+
+      if (!mongoose.isValidObjectId(bookingId)) {
+        return res.status(400).json({ message: "Invalid booking ID" });
+      }
+
+      const { getBooking360, getBooking360QuickActions } = await import("../services/booking360Service");
+
+      const booking360 = await getBooking360(req.tenantId!, new mongoose.Types.ObjectId(bookingId));
+
+      if (!booking360) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      const actions = getBooking360QuickActions(booking360);
+      res.json(actions);
+    } catch (error: any) {
+      console.error("Get Booking 360 actions error:", error?.message);
+      res.status(500).json({ message: "Failed to get booking actions" });
+    }
+  });
+
+  // ============================================================================
   // WAVE 3: DRIVER 360 ROUTES
   // ============================================================================
   // Complete driver operational command centre
