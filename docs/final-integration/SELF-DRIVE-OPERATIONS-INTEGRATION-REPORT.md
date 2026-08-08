@@ -85,3 +85,34 @@ customer-facing template editor UI (§25 quick actions exist via templates;
 stage-level customer/driver toggles shipped with Live Operations), reports
 beyond the CSV export (§45), global-search facet for refund status (§44 —
 customer/phone/booking search works in the hub).
+
+## Addendum — extras pass (2026-08-09 ~00:15 IST, merged f9f6f01/ef077ce)
+
+Shipped the previously-deferred items:
+- **Inspection photos** (§4/§6): multipart upload per handover/return phase
+  (JPEG/PNG/WebP ≤8MB, ≤7/set) under uploads/self-drive/<bookingId>/,
+  served only via an authenticated, tenant-checked, traversal-proof route;
+  thumbnails in the workspace panel.
+- **Customer WhatsApp quick actions** (§25): handover details / return
+  reminder / overdue reminder / extension payment request / refund
+  confirmation, with tenant-overridable {{placeholder}} templates
+  (operationsSettings.sdTemplates, editable in Reminder Settings), honest
+  delivery status and unique ledger idempotency keys per send.
+- **Reports** (§45): /api/operations/self-drive/report?days= + Reports tab
+  in the Self Drive hub (KPI tiles, deductions-by-kind, CSV export).
+- Settings dialog grew Google review link, overdue re-alert minutes, and
+  the template editor.
+
+Verified on :5050 after merge + restart: self-drive-extras 3/3,
+refund-lifecycle 5/5 (extras also 3/3 and full self-drive set 12/12 on the
+worktree preview first).
+
+Integrator fixes en route:
+- Restored `client/src/components/dashboard/enhanced-stats.tsx` — the
+  premium-dashboard merge (8dc9497) imported it but the file was never
+  committed on any branch, which broke the entire dashboard bundle on
+  :5050 (vite pre-transform error). Restored from the md5-identical copy
+  in three older worktrees.
+- Known remaining tsc debt NOT from this work: revenue-report.tsx prop
+  mismatches (KPICardsGrid CardDataProps / chart `data` props) — the
+  revenue session's own call-site WIP, left to that session.
