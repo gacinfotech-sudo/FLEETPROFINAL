@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { Booking, DriverLeave, BookingDraft } from '../models/index';
+import { isEligibleForAssignment } from '../driver/domain/eligibility';
 
 // Bookings store the calendar date and the clock time as SEPARATE fields
 // (pickupDate is always midnight; the real time-of-day lives in the
@@ -136,6 +137,10 @@ export interface LeaveConflict {
   startDate: Date;
   endDate: Date;
   leaveType: string;
+  // 'full' | 'first_half' | 'second_half' — a half-day leave still blocks
+  // assignment for the whole day (bookings have no half-day granularity),
+  // but the UI must be able to say WHICH half so ops can decide overrides.
+  dayPart: string;
 }
 
 export async function findDriverLeaveConflicts(
@@ -152,6 +157,7 @@ export async function findDriverLeaveConflicts(
     startDate: l.startDate,
     endDate: l.endDate,
     leaveType: l.leaveType,
+    dayPart: l.dayPart || 'full',
   }));
 }
 
@@ -159,6 +165,9 @@ export interface DriverAvailabilityResult {
   available: boolean;
   bookingConflicts: ConflictingBooking[];
   leaveConflicts: LeaveConflict[];
+  // TASK-DRIVER-DOMAIN-02: set only when `available: false` was decided by
+  // the lifecycle-eligibility gate below, not a scheduling conflict.
+  eligibilityReason?: string;
 }
 
 // start/end MUST be full date+time instants (use combineDateTime) — see
@@ -167,6 +176,10 @@ export interface DriverAvailabilityResult {
 export async function checkDriverAvailability(
   tenantId: string, driverId: string, start: Date, end: Date, excludeBookingId?: string, session?: mongoose.ClientSession
 ): Promise<DriverAvailabilityResult> {
+  const eligibility = await isEligibleForAssignment(tenantId, driverId);
+  if (!eligibility.eligible) {
+    return { available: false, bookingConflicts: [], leaveConflicts: [], eligibilityReason: eligibility.reason };
+  }
   const [bookingConflicts, leaveConflicts] = await Promise.all([
     findDriverConflicts(tenantId, driverId, start, end, excludeBookingId, session),
     findDriverLeaveConflicts(tenantId, driverId, start, end, session),

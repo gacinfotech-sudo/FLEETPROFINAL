@@ -1076,6 +1076,10 @@ export interface IDriverLeave extends Document {
   startDate: Date;
   endDate: Date;
   leaveType: 'paid' | 'unpaid' | 'medical' | 'emergency' | 'weekly_off' | 'comp_off' | 'other';
+  // Half-day support: which part of the day the leave covers. Blocks
+  // assignment for the whole day either way (bookings have no half-day
+  // granularity) — this drives display + ops override decisions only.
+  dayPart: 'full' | 'first_half' | 'second_half';
   reason?: string;
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   requestedBy: { userId: string; role: string };
@@ -1095,6 +1099,7 @@ const DriverLeaveSchema = new Schema<IDriverLeave>({
     enum: ['paid', 'unpaid', 'medical', 'emergency', 'weekly_off', 'comp_off', 'other'],
     default: 'unpaid'
   },
+  dayPart: { type: String, enum: ['full', 'first_half', 'second_half'], default: 'full' },
   reason: { type: String },
   status: { type: String, enum: ['pending', 'approved', 'rejected', 'cancelled'], default: 'pending' },
   requestedBy: {

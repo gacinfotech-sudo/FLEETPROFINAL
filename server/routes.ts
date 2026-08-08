@@ -114,6 +114,7 @@ import { registerBookingQueuesRoutes } from "./booking/queues";
 import { registerDriverDomainRoutes } from "./driver/domain/routes";
 import { registerDriverDocumentModule } from "./driver/documents/index";
 import { registerVehicleHandoverRoutes } from "./driver/handover/index";
+import { registerDriverOperationsRoutes } from "./driver/operations/index";
 import { acceptHandoverHandler, getPendingHandoversForDriverPortal } from "./driver/handover/driverPortalRoutes";
 import { registerVehicleDocumentRoutes } from "./vehicle/documents/routes";
 import { registerVehicleMaintenanceRoutes } from "./vehicle/maintenance/routes";
@@ -324,6 +325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerDriverDomainRoutes(app);
   registerDriverDocumentModule(app);
   registerVehicleHandoverRoutes(app);
+  registerDriverOperationsRoutes(app);
   registerVehicleDocumentRoutes(app);
   registerVehicleMaintenanceRoutes(app);
   registerVehicleFuelRoutes(app);
@@ -6872,7 +6874,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         let status = attendance?.status || 'not_scheduled';
         if (leave && !attendance) {
-          status = leave.leaveType === 'paid' ? 'paid_leave' : leave.leaveType === 'weekly_off' ? 'weekly_off' : 'unpaid_leave';
+          status = (leave.dayPart && leave.dayPart !== 'full') ? 'half_day'
+            : leave.leaveType === 'paid' ? 'paid_leave' : leave.leaveType === 'weekly_off' ? 'weekly_off' : 'unpaid_leave';
         }
 
         return {
@@ -6884,6 +6887,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lateDurationMinutes: attendance?.lateDurationMinutes || null,
           onLeave: !!leave,
           leaveType: leave?.leaveType || null,
+          leaveDayPart: leave?.dayPart || null,
           currentBooking: todaysBooking ? { id: todaysBooking._id, bookingId: todaysBooking.bookingId, status: todaysBooking.status, customerName: todaysBooking.customerName } : null,
         };
       });
@@ -6909,7 +6913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/drivers/:id/leave", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
     try {
-      const { startDate, endDate, leaveType, reason } = req.body || {};
+      const { startDate, endDate, leaveType, dayPart, reason } = req.body || {};
       if (!startDate || !endDate) {
         return res.status(400).json({ message: "startDate and endDate are required" });
       }
@@ -6928,6 +6932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: start,
         endDate: end,
         leaveType: leaveType || 'unpaid',
+        dayPart: dayPart || 'full',
         reason,
         status: 'pending',
         requestedBy: { userId: req.userId!, role: req.user?.role || 'client' },
@@ -6994,6 +6999,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(leave);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to reject leave" });
+    }
+  });
+
+  // Edit a leave request. Pending leave is freely editable; approved leave
+  // only until it has started (rewriting history would corrupt the
+  // attendance/availability audit trail). Dates/type edits on approved
+  // leave re-run the booking-conflict check like approval does.
+  app.patch("/api/driver-leaves/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+    try {
+      const leave: any = await DriverLeave.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!leave) return res.status(404).json({ message: "Leave request not found" });
+      if (leave.status === 'rejected' || leave.status === 'cancelled') {
+        return res.status(400).json({ message: `A ${leave.status} leave request cannot be edited.` });
+      }
+      if (leave.status === 'approved' && new Date(leave.startDate) <= new Date()) {
+        return res.status(400).json({ message: "Leave that has already started cannot be edited — cancel it instead." });
+      }
+
+      const { startDate, endDate, leaveType, dayPart, reason } = req.body || {};
+      const start = startDate ? new Date(startDate) : leave.startDate;
+      const end = endDate ? new Date(endDate) : leave.endDate;
+      if (end < start) {
+        return res.status(400).json({ message: "endDate cannot be before startDate" });
+      }
+
+      if (leave.status === 'approved' && (startDate || endDate)) {
+        const { override } = req.body || {};
+        const avail = await checkDriverAvailability(req.tenantId!, leave.driverId.toString(), start, end);
+        if (avail.bookingConflicts.length > 0 && !override) {
+          return res.status(409).json({
+            message: "This driver has confirmed bookings during the new leave period.",
+            code: "LEAVE_BOOKING_CONFLICT",
+            conflicts: avail.bookingConflicts,
+          });
+        }
+        leave.conflictingBookings = avail.bookingConflicts.map((c) => c.bookingId);
+      }
+
+      leave.startDate = start;
+      leave.endDate = end;
+      if (leaveType) leave.leaveType = leaveType;
+      if (dayPart) leave.dayPart = dayPart;
+      if (reason !== undefined) leave.reason = reason;
+      await leave.save();
+      res.json(leave);
+    } catch (error: any) {
+      console.error('Edit leave error:', error?.message || error);
+      res.status(500).json({ message: "Failed to edit leave request" });
+    }
+  });
+
+  // Cancel a leave request (pending or approved). Soft state change, never
+  // a delete — the record stays for the audit/history views, and the
+  // availability engine only honours status 'approved', so cancelling
+  // automatically frees the driver for assignment again.
+  app.post("/api/driver-leaves/:id/cancel", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+    try {
+      const leave: any = await DriverLeave.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!leave) return res.status(404).json({ message: "Leave request not found" });
+      if (leave.status !== 'pending' && leave.status !== 'approved') {
+        return res.status(400).json({ message: `This leave request is already ${leave.status}.` });
+      }
+      leave.status = 'cancelled';
+      leave.approvedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      if (req.body?.approvalNote) leave.approvalNote = req.body.approvalNote;
+      await leave.save();
+      res.json(leave);
+    } catch (error: any) {
+      console.error('Cancel leave error:', error?.message || error);
+      res.status(500).json({ message: "Failed to cancel leave request" });
     }
   });
 
