@@ -4,8 +4,30 @@
 // (same populated-vehicle/driver shape) so the frontend's row rendering can
 // stay one shared component across every queue tab.
 
-import { BookingLike, QueueBookingRow, AttentionReason } from './types';
+import { BookingLike, QueueBookingRow, AttentionReason, AllocationSummary } from './types';
 import { resolveTravelDateStatus, resolveLastActivityAt, resolveFollowUpAt } from './resolvers';
+
+// The precise allocation state behind the old contradictory
+// "Driver Assigned + Unallocated" display: driver and vehicle are
+// independent axes; vendor fulfilment satisfies both; self-drive needs no
+// driver. Derived fresh from canonical resource facts on every read —
+// never stored, so it can never drift the way resourceFulfilmentStatus
+// could.
+export function deriveAllocationSummary(b: BookingLike): AllocationSummary {
+  const selfDrive = b?.bookingType === 'self_drive';
+  const vendorFulfilled = !!(b?.fulfilmentType === 'vendor' || b?.vendorName || b?.vendorVehicleId || b?.fulfilmentVendorId);
+  const vehicleAssigned = vendorFulfilled || !!b?.vehicleId;
+  const driverAssigned = vendorFulfilled || selfDrive || !!b?.driverId;
+
+  let label: string;
+  if (vendorFulfilled) label = b?.vendorName ? `Vendor — ${b.vendorName}` : 'Vendor Fulfilled';
+  else if (driverAssigned && vehicleAssigned) label = 'Allocated';
+  else if (driverAssigned) label = 'Driver Assigned · Vehicle Pending';
+  else if (vehicleAssigned) label = 'Vehicle Assigned · Driver Pending';
+  else label = 'Allocation Pending';
+
+  return { driverAssigned, vehicleAssigned, vendorFulfilled, selfDrive, complete: driverAssigned && vehicleAssigned, label };
+}
 
 export function summarizeBooking(b: BookingLike, reasons?: AttentionReason[]): QueueBookingRow {
   const vehicle = b.vehicleId && typeof b.vehicleId === 'object' ? b.vehicleId : null;
@@ -32,6 +54,7 @@ export function summarizeBooking(b: BookingLike, reasons?: AttentionReason[]): Q
     totalAmount: b.totalAmount,
     vehicle: vehicle ? { id: vehicle._id?.toString?.() || String(vehicle._id), make: vehicle.make, model: vehicle.vehicleModel, licensePlate: vehicle.licensePlate } : null,
     driver: driver ? { id: driver._id?.toString?.() || String(driver._id), name: driver.name, phone: driver.phone } : null,
+    allocation: deriveAllocationSummary(b),
     ...(reasons ? { reasons } : {}),
   };
 }

@@ -142,10 +142,11 @@ test('Dashboard Upcoming Bookings: Today/Tomorrow/Future/All Upcoming classify b
   await expect(page.getByRole('table').getByText(`Acceptance D ${marker}`)).toBeVisible();
   await expect(page.getByText(`Acceptance E ${marker}`)).toHaveCount(0);
 
-  // Clicking a row opens the existing "Booking Details" dialog (no duplicate detail UI).
+  // Clicking a row opens the ONE Unified Booking Workspace (no duplicate detail UI).
   await page.getByRole('table').getByText(`Acceptance C ${marker}`).click();
-  await expect(page.getByRole('dialog').filter({ hasText: 'Booking Details' })).toBeVisible();
-  await expect(page.getByRole('dialog').filter({ hasText: 'Booking Details' }).getByText(`Acceptance C ${marker}`)).toBeVisible();
+  const workspace = page.getByRole('dialog').filter({ has: page.getByRole('tab', { name: 'Allocation' }) });
+  await expect(workspace).toBeVisible();
+  await expect(workspace.getByText(`Acceptance C ${marker}`).first()).toBeVisible();
 });
 
 test('Dashboard KPI cards: Total Bookings and Total Vehicles cards navigate to their existing views', async ({ page }) => {

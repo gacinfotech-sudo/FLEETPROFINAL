@@ -128,7 +128,7 @@ test('driver feedback links Customer, Booking and Driver profiles without unveri
   const openBooking = relatedBookingRow.getByRole('button', { name: 'Open Booking' });
   await expect(openBooking).toBeEnabled();
   await openBooking.click();
-  const bookingDialog = page.getByRole('dialog', { name: 'Booking Details' });
+  const bookingDialog = page.getByRole('dialog').filter({ has: page.getByRole('tab', { name: 'Allocation' }) });
   await expect(bookingDialog.getByText(booking.bookingId, { exact: true })).toBeVisible();
 
   // The feedback-time driver link is historical evidence. Reassigning the

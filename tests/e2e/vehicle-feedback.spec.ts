@@ -145,7 +145,7 @@ test('vehicle feedback links Customer, Booking and Fleet profiles with odometer-
   await expect(vehicleDialog.getByText(`Vehicle feedback ${marker}`, { exact: true }).first()).toBeVisible();
   const relatedBookingRow = vehicleDialog.getByRole('row').filter({ hasText: booking.bookingId });
   await relatedBookingRow.getByRole('button', { name: 'Open Booking' }).click();
-  const bookingDialog = page.getByRole('dialog', { name: 'Booking Details' });
+  const bookingDialog = page.getByRole('dialog').filter({ has: page.getByRole('tab', { name: 'Allocation' }) });
   await expect(bookingDialog.getByText(booking.bookingId, { exact: true })).toBeVisible();
   await bookingDialog.getByRole('button', { name: 'Close' }).click();
   await expect(bookingDialog).toBeHidden();

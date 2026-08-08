@@ -6,6 +6,17 @@
 
 export type AttentionReason = "unallocated" | "date_pending" | "follow_up_due";
 
+// Mirrors server/booking/queues/types.ts's AllocationSummary — precise
+// two-axis allocation truth, derived server-side.
+export interface AllocationSummary {
+  driverAssigned: boolean;
+  vehicleAssigned: boolean;
+  vendorFulfilled: boolean;
+  selfDrive: boolean;
+  complete: boolean;
+  label: string;
+}
+
 export interface QueueBookingRow {
   id: string;
   bookingId: string;
@@ -26,6 +37,7 @@ export interface QueueBookingRow {
   totalAmount?: number;
   vehicle: { id: string; make?: string; model?: string; licensePlate?: string } | null;
   driver: { id: string; name?: string; phone?: string } | null;
+  allocation?: AllocationSummary;
   reasons?: AttentionReason[];
 }
 

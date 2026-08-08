@@ -2412,7 +2412,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const booking = await storage.getBooking(req.params.id, req.tenantId!);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
-      res.json(booking);
+      // The Unified Booking Workspace renders its lifecycle actions off
+      // this list so the client never needs its own copy of the state
+      // machine's transition table — one status engine, served with the
+      // record it governs.
+      const plain: any = typeof (booking as any).toObject === 'function' ? (booking as any).toObject() : booking;
+      res.json({ ...plain, allowedNextStatuses: getAllowedNextStatuses((booking as any).status) });
     } catch (error) {
       console.error('Get booking by id error:', error);
       res.status(500).json({ message: "Failed to fetch booking" });
@@ -2820,9 +2825,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // after the fact (an edit changing it would defeat the point).
       delete bookingData.idempotencyKey;
 
+      // Empty string means "clear this field" for the reference/date fields
+      // the Unified Booking Workspace can unset (Clear driver/vehicle →
+      // allocation pending; Mark Follow-up Done). Zod's z.string().optional()
+      // accepts '', but Mongoose can't cast '' to ObjectId/Date — map to
+      // null here, once, for every caller.
+      for (const clearable of ['driverId', 'vehicleId', 'followUpAt'] as const) {
+        if ((bookingData as any)[clearable] === '') (bookingData as any)[clearable] = null;
+      }
+
       const existing = await storage.getBooking(id, scopeTenant(req));
       if (!existing) {
         return res.status(404).json({ message: "Booking not found" });
+      }
+
+      // Derived-state repair (root cause of the visible "Driver Assigned +
+      // Unallocated" contradiction): resourceFulfilmentStatus was only ever
+      // computed at create time, so a booking created without a vehicle kept
+      // 'not_started' forever — even after a vehicle was assigned through
+      // this edit route. Recompute it atomically with the assignment itself,
+      // but ONLY across the not_started ⇄ own_fleet_assigned pair; vendor/
+      // outsourcing states belong to their own flows and are never touched
+      // here.
+      const existingFulfilment = (existing as any).resourceFulfilmentStatus || 'not_started';
+      if (bookingData.vehicleId !== undefined && bookingData.resourceFulfilmentStatus === undefined) {
+        if (bookingData.vehicleId && existingFulfilment === 'not_started') {
+          bookingData.resourceFulfilmentStatus = 'own_fleet_assigned';
+        } else if (bookingData.vehicleId === null && existingFulfilment === 'own_fleet_assigned') {
+          bookingData.resourceFulfilmentStatus = 'not_started';
+        }
       }
 
       const touchesFinancials = FINANCIAL_FIELDS.some((f) => (bookingData as any)[f] !== undefined);
@@ -2846,17 +2877,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           bookingData.pickupDate || existing.pickupDate,
           bookingData.pickupTime ?? existing.pickupTime
         );
-        const rangeEnd = combineDateTime(
+        const hasReturnInfo = !!(bookingData.returnDate || existing.returnDate || bookingData.returnTime !== undefined || existing.returnTime);
+        let rangeEnd = combineDateTime(
           bookingData.returnDate || existing.returnDate || bookingData.pickupDate || existing.pickupDate,
           bookingData.returnTime ?? existing.returnTime ?? bookingData.pickupTime ?? existing.pickupTime
         );
+        if (rangeEnd <= rangeStart && !hasReturnInfo) {
+          // No return date/time exists anywhere (e.g. the queue's compact
+          // Set Date action supplying only pickup date+time): don't reject
+          // a legitimately open-ended same-day booking over a zero-width
+          // window. Validate/conflict-check against end-of-day instead —
+          // nothing is persisted from this value.
+          rangeEnd = new Date(rangeStart);
+          rangeEnd.setHours(23, 59, 59, 999);
+        }
         if (rangeEnd <= rangeStart) {
           return res.status(400).json({ message: "Return date/time must be after pickup date/time." });
         }
 
         const conflicts: any = {};
-        const effectiveVehicleId = bookingData.vehicleId ?? (existing as any).vehicleId;
-        const effectiveDriverId = bookingData.driverId ?? (existing as any).driverId;
+        // `!== undefined` (not ??): null means "being cleared in this
+        // request" — a resource being removed must not be availability-
+        // checked as if it were still assigned.
+        const effectiveVehicleId = bookingData.vehicleId !== undefined ? bookingData.vehicleId : (existing as any).vehicleId;
+        const effectiveDriverId = bookingData.driverId !== undefined ? bookingData.driverId : (existing as any).driverId;
         if (effectiveVehicleId) {
           const rows = await findVehicleConflicts(req.tenantId!, refId(effectiveVehicleId), rangeStart, rangeEnd, id);
           if (rows.length) conflicts.vehicle = rows;
@@ -2904,6 +2948,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
+
+      // Server-derived "last touched" signal — the Most Recent queue and
+      // every Last Activity column read this. Never accepted from the
+      // client (see bookingCertaintySchema.ts), always stamped here.
+      bookingData.lastActivityAt = new Date();
+      bookingData.updatedAt = new Date();
 
       const booking = await storage.updateBooking(id, bookingData, scopeTenant(req));
 
@@ -6329,6 +6379,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (newPickupTime !== undefined) booking.pickupTime = newPickupTime;
       if (newReturnDate !== undefined) booking.returnDate = new Date(newReturnDate);
       if (newReturnTime !== undefined) booking.returnTime = newReturnTime;
+      booking.lastActivityAt = new Date();
+      booking.updatedAt = new Date();
 
       await booking.save();
       res.json(booking);

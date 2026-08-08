@@ -2,11 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, Inbox } from "lucide-react";
+import { useBookingWorkspace } from "@/components/booking/booking-workspace-context";
 
 /** Consumes the EXISTING, already-live `GET /api/bookings` endpoint —
  * filtered client-side by vehicleId (IBooking.vehicleId, no new booking
  * model per this batch's explicit scope boundary). */
 export function BookingsTripsTab({ vehicleId }: { vehicleId: string }) {
+  const { openBooking } = useBookingWorkspace();
   const { data, isLoading } = useQuery<any[]>({ queryKey: ["/api/bookings"], retry: false });
   const bookings = (data ?? [])
     .filter((b) => (b.vehicleId?._id ?? b.vehicleId) === vehicleId)
@@ -21,7 +23,7 @@ export function BookingsTripsTab({ vehicleId }: { vehicleId: string }) {
   return (
     <div className="space-y-2">
       {bookings.map((b) => (
-        <Card key={b._id}>
+        <Card key={b._id} className="cursor-pointer hover:bg-gray-50" onClick={() => openBooking(b._id)}>
           <CardContent className="py-3 flex items-center justify-between">
             <div>
               <div className="text-sm font-medium">{b.bookingId} · {b.customerName}</div>

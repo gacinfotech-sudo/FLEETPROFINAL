@@ -4,6 +4,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
+import { BookingWorkspaceProvider } from "@/components/booking/booking-workspace-context";
 import { OfflineNotification } from "@/components/offline-notification";
 import LandingPage from "./pages/landing";
 import LoginPage from "./pages/login";
@@ -101,7 +102,12 @@ function AuthenticatedApp() {
 function Router() {
   return (
     <AuthProvider>
-      <AuthenticatedApp />
+      {/* One provider for the ONE Unified Booking Workspace — every booking
+          surface (queues, upcoming, live, history, Customer 360, dashboard,
+          search, Vehicle 360) opens the same canonical editor through it. */}
+      <BookingWorkspaceProvider>
+        <AuthenticatedApp />
+      </BookingWorkspaceProvider>
     </AuthProvider>
   );
 }

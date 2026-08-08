@@ -207,10 +207,13 @@ test.describe('Booking Source / Fulfilment vendor linking', () => {
     let opened = false;
     for (let i = 0; i < rowCount && !opened; i++) {
       await rows.nth(i).getByRole('button', { name: 'View' }).click();
-      const detailDialog = page.getByRole('dialog').filter({ hasText: 'Booking Details' });
+      // View opens the Unified Booking Workspace; vendor assignment lives
+      // in its Allocation tab.
+      const detailDialog = page.getByRole('dialog').filter({ has: page.getByRole('tab', { name: 'Allocation' }) });
       await expect(detailDialog).toBeVisible({ timeout: 5000 });
+      await detailDialog.getByRole('tab', { name: 'Allocation' }).click();
 
-      const assignButton = page.getByRole('button', { name: /Assign Vendor|Reassign Vendor/ });
+      const assignButton = detailDialog.getByRole('button', { name: /Assign Vendor|Reassign Vendor/ });
       if (await assignButton.isEnabled()) {
         await assignButton.click();
         opened = true;

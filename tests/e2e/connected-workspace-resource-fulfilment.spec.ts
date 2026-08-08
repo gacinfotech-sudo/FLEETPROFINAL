@@ -52,13 +52,14 @@ test('UI: Booking detail view shows the pipeline stage and Resource Fulfilment p
   await expect(row).toBeVisible({ timeout: 15000 });
   await row.getByRole('button', { name: 'View' }).click();
 
-  const detailDialog = page.getByRole('dialog').filter({ hasText: 'Booking Details' });
+  const detailDialog = page.getByRole('dialog').filter({ has: page.getByRole('tab', { name: 'Allocation' }) });
   await expect(detailDialog).toBeVisible({ timeout: 5000 });
 
-  // Pipeline stage (existing) and Resource Fulfilment (this initiative)
-  // both visible in the same view — the workspace is genuinely connected,
+  // Pipeline stage (Overview) and Resource Fulfilment (Allocation tab)
+  // live in the SAME Unified Booking Workspace — genuinely connected,
   // not two separate screens staff have to reconcile manually.
   await expect(detailDialog.getByText('Confirmed', { exact: false }).first()).toBeVisible();
+  await detailDialog.getByRole('tab', { name: 'Allocation' }).click();
   await expect(detailDialog.getByText('Resource Fulfilment — Vendor Sourcing')).toBeVisible();
   await expect(detailDialog.locator('#sourcing-start')).toBeVisible();
 

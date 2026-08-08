@@ -60,6 +60,20 @@ export const UNRESOLVED_RESOURCE_STATUSES = new Set([
 // Reason tags a booking can carry in the de-duplicated Needs Attention queue.
 export type AttentionReason = 'unallocated' | 'date_pending' | 'follow_up_due';
 
+// Two-axis allocation truth, derived server-side from canonical resource
+// facts (driverId/vehicleId/vendor fulfilment/bookingType) so no client
+// can render the old contradictory "Status: Driver Assigned + Flag:
+// Unallocated" combination again. `label` is the precise human summary
+// ("Driver Assigned · Vehicle Pending", "Vendor — <name>", ...).
+export interface AllocationSummary {
+  driverAssigned: boolean;
+  vehicleAssigned: boolean;
+  vendorFulfilled: boolean;
+  selfDrive: boolean;
+  complete: boolean;
+  label: string;
+}
+
 export interface QueueBookingRow {
   id: string;
   bookingId: string;
@@ -80,5 +94,6 @@ export interface QueueBookingRow {
   totalAmount?: number;
   vehicle: { id: string; make?: string; model?: string; licensePlate?: string } | null;
   driver: { id: string; name?: string; phone?: string } | null;
+  allocation: AllocationSummary;
   reasons?: AttentionReason[];
 }
