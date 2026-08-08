@@ -38,14 +38,7 @@ import VehiclePerformancePage from "./vehicle-performance";
 import GpsSettingsPage from "./gps-settings";
 import WhatsAppPanel from "./whatsapp-panel";
 import DailyOperationsPopup from "../components/dashboard/daily-operations-popup";
-import BookingCommunication from "../components/booking/booking-communication";
-import ExtendBookingDialog from "../components/booking/extend-booking-dialog";
-import AssignVendorDialog from "../components/booking/assign-vendor-dialog";
-import ResourceFulfilmentPanel from "../components/booking/resource-fulfilment-panel";
-import PaymentSection from "../components/booking/payment-section";
-import TripCostSummary from "../components/booking/trip-cost-summary";
-import PipelineStepper from "../components/pipeline/pipeline-stepper";
-import { bookingPipelineInfo } from "../lib/pipelineStages";
+import { useBookingWorkspace } from "@/components/booking/booking-workspace-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -134,10 +127,8 @@ export default function Dashboard() {
   const [viewingVehicle, setViewingVehicle] = useState<any>(null);
   const [editingDriver, setEditingDriver] = useState<any>(null);
   const [viewingDriver, setViewingDriver] = useState<any>(null);
-  const [viewingBooking, setViewingBooking] = useState<any>(null);
-  const [editingBooking, setEditingBooking] = useState<any>(null);
-  const [showEditBookingForm, setShowEditBookingForm] = useState(false);
-  
+  const { openBooking } = useBookingWorkspace();
+
   // Cancel booking states
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancellingBooking, setCancellingBooking] = useState<any>(null);
@@ -333,31 +324,10 @@ export default function Dashboard() {
     },
   });
 
-  const updateBookingMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      return await apiRequest('PUT', `/api/bookings/${id}`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings/upcoming'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/upcoming-bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
-      setShowEditBookingForm(false);
-      setEditingBooking(null);
-      toast({
-        variant: "success",
-        title: "Booking Updated",
-        description: "Booking details have been successfully updated.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update booking",
-        variant: "destructive",
-      });
-    },
-  });
+  // Generic booking field edits now happen inside the Unified Booking
+  // Workspace (canonical PUT + one shared cache-invalidation helper) — the
+  // old updateBookingMutation that backed the deleted Edit Booking dialog
+  // is gone with it.
 
   const cancelBookingMutation = useMutation({
     mutationFn: async ({ id, cancellationReason }: { id: string; cancellationReason: string }) => {
@@ -404,13 +374,15 @@ export default function Dashboard() {
     setViewingDriver(driver);
   };
 
+  // Both "view" and "edit" open the ONE Unified Booking Workspace over the
+  // canonical record (fetched fresh by id inside the workspace — the stale
+  // row object passed here is only used for its id).
   const handleViewBooking = (booking: any) => {
-    setViewingBooking(booking);
+    openBooking(booking);
   };
 
   const handleEditBooking = (booking: any) => {
-    setEditingBooking(booking);
-    setShowEditBookingForm(true);
+    openBooking(booking);
   };
 
   const handleDeleteVehicle = (id: string) => {
@@ -488,7 +460,7 @@ export default function Dashboard() {
         return (
           <DashboardOverview
             onNavigate={(view) => handleViewChange(view as ViewType)}
-            onViewBooking={(booking) => setViewingBooking(booking)}
+            onViewBooking={(booking) => openBooking(booking)}
             onSelectCustomer={handleSelectCustomerFromSearch}
             onFleetStatusClick={goToFleetStatus}
             onDriverStatusClick={goToDriverStatus}
@@ -1716,7 +1688,7 @@ export default function Dashboard() {
         return <UpcomingBookings />;
 
       case "booking-queues":
-        return <BookingQueuesPanel onRowClick={(row) => handleEditBooking(row)} />;
+        return <BookingQueuesPanel />;
 
       case "payment-dues":
         return <PaymentDues />;
@@ -2084,432 +2056,12 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* View Booking Dialog */}
-      <Dialog open={!!viewingBooking} onOpenChange={() => setViewingBooking(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Booking Details</DialogTitle>
-          </DialogHeader>
-          {viewingBooking && (
-            <div className="space-y-6">
-              {/* Read-only — this dialog's own contextual actions
-                  (AssignVendorDialog/ExtendBookingDialog/PaymentSection/
-                  TripCostSummary/BookingCommunication below) already cover
-                  every status-changing action for a Booking; the stepper
-                  exists to show where this record sits without duplicating
-                  those, not to add a second action surface. */}
-              <PipelineStepper info={bookingPipelineInfo(viewingBooking)} />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Booking ID</Label>
-                  <p className="text-sm text-gray-900">{viewingBooking.bookingId}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Status</Label>
-                  <Badge variant={viewingBooking.status === "confirmed" ? "default" : viewingBooking.status === "completed" ? "secondary" : "destructive"}>
-                    {viewingBooking.status}
-                  </Badge>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Customer Name</Label>
-                  <p className="text-sm text-gray-900">{viewingBooking.customerName}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Customer Phone</Label>
-                  <p className="text-sm text-gray-900">{viewingBooking.customerPhone}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Booking Source</Label>
-                  <p className="text-sm text-gray-900 capitalize">{(viewingBooking.bookingSource || "direct_customer").replace(/_/g, " ")}</p>
-                </div>
-                {viewingBooking.sourceName && (
-                  <div className="md:col-span-2 bg-purple-50 border border-purple-200 rounded-lg p-3">
-                    <Label className="text-sm font-medium text-gray-700">Source Details</Label>
-                    <p className="text-sm text-gray-900 mt-1">
-                      <strong>{viewingBooking.sourceName}</strong>
-                      {viewingBooking.sourceContact ? ` — ${viewingBooking.sourceContact}` : ""}
-                      {viewingBooking.sourceReferenceNumber ? ` (Ref: ${viewingBooking.sourceReferenceNumber})` : ""}
-                    </p>
-                    {(viewingBooking.sourceCommissionType && viewingBooking.sourceCommissionAmount) ? (
-                      <p className="text-sm text-gray-900">
-                        Commission: {viewingBooking.sourceCommissionType === "percentage"
-                          ? `${viewingBooking.sourceCommissionAmount}%`
-                          : `₹${viewingBooking.sourceCommissionAmount}`}
-                      </p>
-                    ) : null}
-                    {viewingBooking.sourceNotes && (
-                      <p className="text-sm text-gray-600 mt-1">{viewingBooking.sourceNotes}</p>
-                    )}
-                  </div>
-                )}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Fulfilment</Label>
-                  <p className="text-sm text-gray-900">
-                    {viewingBooking.fulfilmentType === "vendor" ? (
-                      <>Vendor — {viewingBooking.vendorName || "unnamed"}{viewingBooking.vendorDriverName ? ` (${viewingBooking.vendorDriverName})` : ""}</>
-                    ) : (
-                      "Own Vehicle"
-                    )}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Pickup Location</Label>
-                  <p className="text-sm text-gray-900">{viewingBooking.pickupLocation || "Not specified"}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Drop-off Location</Label>
-                  <p className="text-sm text-gray-900">{viewingBooking.dropoffLocation || "Not specified"}</p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Pickup Date & Time</Label>
-                  <p className="text-sm text-gray-900">
-                    {new Date(viewingBooking.pickupDate).toLocaleDateString()} at {viewingBooking.pickupTime}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Return Date & Time</Label>
-                  <p className="text-sm text-gray-900">
-                    {new Date(viewingBooking.returnDate).toLocaleDateString()} at {viewingBooking.returnTime}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Trip Type</Label>
-                  <p className="text-sm text-gray-900">
-                    {viewingBooking.tripType === "round_trip" ? "Round Trip" :
-                     viewingBooking.tripType === "local" ? "Local" :
-                     viewingBooking.tripType === "airport" && viewingBooking.dropoffLocation === "Not Decided Yet" ? "Not Decided Yet" :
-                     viewingBooking.tripType === "airport" ? "Airport" :
-                     viewingBooking.dropoffLocation === "Local" ? "Local" :
-                     viewingBooking.dropoffLocation === "Not Decided Yet" ? "Not Decided Yet" :
-                     viewingBooking.tripType === "one_way" ? "One Way" : "One Way"}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Service Type</Label>
-                  <p className="text-sm text-gray-900">
-                    {viewingBooking.bookingType === "self_drive" ? "Self Drive" : "With Driver"}
-                  </p>
-                </div>
-                {viewingBooking.thirdPartyDriverName && (
-                  <div className="md:col-span-2">
-                    <Label className="text-sm font-medium text-gray-700">Third-party Driver Details</Label>
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-1">
-                      <p className="text-sm text-gray-900">
-                        <strong>Name:</strong> {viewingBooking.thirdPartyDriverName}
-                      </p>
-                      {viewingBooking.thirdPartyDriverPhone && (
-                        <p className="text-sm text-gray-900">
-                          <strong>Phone:</strong> {viewingBooking.thirdPartyDriverPhone}
-                        </p>
-                      )}
-                      {viewingBooking.thirdPartyDriverAddress && (
-                        <p className="text-sm text-gray-900">
-                          <strong>Address:</strong> {viewingBooking.thirdPartyDriverAddress}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Vehicle</Label>
-                  <p className="text-sm text-gray-900">
-                    {(() => {
-                      const vehicle = (vehicles as any[]).find(v => v.id === viewingBooking.vehicleId);
-                      return vehicle ? `${vehicle.make} ${vehicle.model} (${vehicle.registrationNumber})` : "N/A";
-                    })()}
-                  </p>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Total Amount</Label>
-                  <p className="text-lg font-semibold text-green-600">₹{viewingBooking.totalAmount || viewingBooking.amount || 0}</p>
-                </div>
-                {viewingBooking.tollCharges && parseFloat(viewingBooking.tollCharges) > 0 && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Toll Charges</Label>
-                    <p className="text-sm text-gray-900">₹{viewingBooking.tollCharges}</p>
-                  </div>
-                )}
-                {viewingBooking.parkingCharges && parseFloat(viewingBooking.parkingCharges) > 0 && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Parking Charges</Label>
-                    <p className="text-sm text-gray-900">₹{viewingBooking.parkingCharges}</p>
-                  </div>
-                )}
-                {viewingBooking.petrolCharges && parseFloat(viewingBooking.petrolCharges) > 0 && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Petrol Charges</Label>
-                    <p className="text-sm text-gray-900">₹{viewingBooking.petrolCharges}</p>
-                  </div>
-                )}
-                {viewingBooking.dieselCharges && parseFloat(viewingBooking.dieselCharges) > 0 && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Diesel Charges</Label>
-                    <p className="text-sm text-gray-900">₹{viewingBooking.dieselCharges}</p>
-                  </div>
-                )}
-                {viewingBooking.cngCharges && parseFloat(viewingBooking.cngCharges) > 0 && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">CNG Charges</Label>
-                    <p className="text-sm text-gray-900">₹{viewingBooking.cngCharges}</p>
-                  </div>
-                )}
-                {viewingBooking.customerDiscussionSummary && (
-                  <div className="md:col-span-2">
-                    <Label className="text-sm font-medium text-gray-700">Customer Discussion Summary</Label>
-                    <p className="text-sm text-gray-900 whitespace-pre-wrap">{viewingBooking.customerDiscussionSummary}</p>
-                  </div>
-                )}
-                {viewingBooking.notes && (
-                  <div className="md:col-span-2">
-                    <Label className="text-sm font-medium text-gray-700">Notes / Instructions</Label>
-                    <p className="text-sm text-gray-900 whitespace-pre-wrap">{viewingBooking.notes}</p>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">Payment</Label>
-                <PaymentSection booking={viewingBooking} />
-              </div>
-
-              {/* Renders nothing for users without trip.profitability.view —
-                  not a permission-gated placeholder, genuinely absent. */}
-              <TripCostSummary booking={viewingBooking} />
-
-              {/* Renders nothing once fulfilment is already resolved and no
-                  sourcing request was ever started — see the component. */}
-              <ResourceFulfilmentPanel booking={viewingBooking} />
-
-              <div className="flex justify-end gap-2">
-                <AssignVendorDialog booking={viewingBooking} />
-                <ExtendBookingDialog booking={viewingBooking} />
-              </div>
-
-              <BookingCommunication booking={viewingBooking} />
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Booking Dialog */}
-      <Dialog open={showEditBookingForm} onOpenChange={() => {
-        setShowEditBookingForm(false);
-        setEditingBooking(null);
-      }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Booking Details</DialogTitle>
-          </DialogHeader>
-          {editingBooking && (
-            <div className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-700">Booking ID</Label>
-                <p className="text-sm text-gray-900">{editingBooking.bookingId}</p>
-              </div>
-              
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const formData = new FormData(e.target as HTMLFormElement);
-                const customerName = formData.get('customerName') as string || '';
-                const baseAmount = parseFloat(formData.get('baseAmount') as string) || 0;
-                const tollCharges = parseFloat(formData.get('tollCharges') as string) || 0;
-                const parkingCharges = parseFloat(formData.get('parkingCharges') as string) || 0;
-                const petrolCharges = parseFloat(formData.get('petrolCharges') as string) || 0;
-                const dieselCharges = parseFloat(formData.get('dieselCharges') as string) || 0;
-                const cngCharges = parseFloat(formData.get('cngCharges') as string) || 0;
-                const thirdPartyDriverCharges = parseFloat(formData.get('thirdPartyDriverCharges') as string) || 0;
-                const thirdPartyDriverName = formData.get('thirdPartyDriverName') as string || '';
-                const thirdPartyDriverPhone = formData.get('thirdPartyDriverPhone') as string || '';
-                const thirdPartyDriverAddress = formData.get('thirdPartyDriverAddress') as string || '';
-                
-                // Calculate total fuel cost and third-party driver charges (both are deductions)
-                const totalFuelCost = petrolCharges + dieselCharges + cngCharges;
-                const totalDeductions = totalFuelCost + thirdPartyDriverCharges;
-                
-                // Calculate final amount (base - toll - parking - fuel - third-party driver)
-                const finalAmount = baseAmount - tollCharges - parkingCharges - totalDeductions;
-                
-                updateBookingMutation.mutate({
-                  id: editingBooking._id || editingBooking.id,
-                  data: {
-                    customerName: customerName,
-                    totalAmount: finalAmount,
-                    tollCharges: tollCharges,
-                    parkingCharges: parkingCharges,
-                    petrolCharges: petrolCharges,
-                    dieselCharges: dieselCharges,
-                    cngCharges: cngCharges,
-                    thirdPartyDriverCharges: thirdPartyDriverCharges,
-                    thirdPartyDriverName: thirdPartyDriverName,
-                    thirdPartyDriverPhone: thirdPartyDriverPhone,
-                    thirdPartyDriverAddress: thirdPartyDriverAddress,
-                  }
-                });
-              }} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <Label htmlFor="customerName">Customer Name</Label>
-                    <Input
-                      id="customerName"
-                      name="customerName"
-                      type="text"
-                      defaultValue={editingBooking.customerName || ""}
-                      placeholder="Enter customer name"
-                      required
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label htmlFor="baseAmount">Base Amount (₹)</Label>
-                    <Input
-                      id="baseAmount"
-                      name="baseAmount"
-                      type="number"
-                      step="0.01"
-                      defaultValue={(() => {
-                        const currentAmount = parseFloat(editingBooking.totalAmount || editingBooking.amount) || 0;
-                        const tollCharges = parseFloat(editingBooking.tollCharges) || 0;
-                        const parkingCharges = parseFloat(editingBooking.parkingCharges) || 0;
-                        const petrolCharges = parseFloat(editingBooking.petrolCharges) || 0;
-                        const dieselCharges = parseFloat(editingBooking.dieselCharges) || 0;
-                        const cngCharges = parseFloat(editingBooking.cngCharges) || 0;
-                        const thirdPartyDriverCharges = parseFloat(editingBooking.thirdPartyDriverCharges) || 0;
-                        const totalFuelCost = petrolCharges + dieselCharges + cngCharges;
-                        const totalDeductions = totalFuelCost + thirdPartyDriverCharges;
-                        return (currentAmount + tollCharges + parkingCharges + totalDeductions).toString();
-                      })()}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="tollCharges">Toll Charges (₹)</Label>
-                    <Input
-                      id="tollCharges"
-                      name="tollCharges"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingBooking.tollCharges || "0"}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="parkingCharges">Parking Charges (₹)</Label>
-                    <Input
-                      id="parkingCharges"
-                      name="parkingCharges"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingBooking.parkingCharges || "0"}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="petrolCharges">Petrol Charges (₹)</Label>
-                    <Input
-                      id="petrolCharges"
-                      name="petrolCharges"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingBooking.petrolCharges || "0"}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="dieselCharges">Diesel Charges (₹)</Label>
-                    <Input
-                      id="dieselCharges"
-                      name="dieselCharges"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingBooking.dieselCharges || "0"}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="cngCharges">CNG Charges (₹)</Label>
-                    <Input
-                      id="cngCharges"
-                      name="cngCharges"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingBooking.cngCharges || "0"}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="thirdPartyDriverCharges">Third Party Driver Charges (₹)</Label>
-                    <Input
-                      id="thirdPartyDriverCharges"
-                      name="thirdPartyDriverCharges"
-                      type="number"
-                      step="0.01"
-                      defaultValue={editingBooking.thirdPartyDriverCharges || "0"}
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-                
-                {/* Third Party Driver Details Section */}
-                <div className="border-t pt-4">
-                  <h3 className="font-medium text-gray-900 mb-3">Third Party Driver Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="thirdPartyDriverName">Driver Name</Label>
-                      <Input
-                        id="thirdPartyDriverName"
-                        name="thirdPartyDriverName"
-                        type="text"
-                        defaultValue={editingBooking.thirdPartyDriverName || ""}
-                        placeholder="Enter driver name"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="thirdPartyDriverPhone">Driver Phone</Label>
-                      <Input
-                        id="thirdPartyDriverPhone"
-                        name="thirdPartyDriverPhone"
-                        type="tel"
-                        defaultValue={editingBooking.thirdPartyDriverPhone || ""}
-                        placeholder="Enter phone number"
-                      />
-                    </div>
-                    <div className="md:col-span-2">
-                      <Label htmlFor="thirdPartyDriverAddress">Driver Address</Label>
-                      <Input
-                        id="thirdPartyDriverAddress"
-                        name="thirdPartyDriverAddress"
-                        type="text"
-                        defaultValue={editingBooking.thirdPartyDriverAddress || ""}
-                        placeholder="Enter driver address"
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex gap-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setShowEditBookingForm(false);
-                      setEditingBooking(null);
-                    }}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={updateBookingMutation.isPending}
-                    className="flex-1"
-                  >
-                    {updateBookingMutation.isPending ? "Updating..." : "Update Booking"}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* The old View Booking and Edit Booking dialogs are gone: every
+          view/edit action now opens the ONE Unified Booking Workspace
+          (see BookingWorkspaceProvider in App.tsx). The legacy edit
+          dialog in particular recomputed totalAmount client-side with a
+          formula that subtracted charges from the fare — the workspace
+          saves fields as-is and leaves money math to the server. */}
 
       {/* Cancel Booking Confirmation Dialog */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Phone, MessageCircle, RefreshCw, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useBookingWorkspace } from "@/components/booking/booking-workspace-context";
 
 export type Bucket = "startDue" | "startDelayed" | "startingSoon" | "ongoing" | "endingSoon" | "completionOverdue" | "paymentPending" | "completedToday" | "delayed" | "unassigned" | "cancelled";
 
@@ -38,6 +39,7 @@ function formatMoney(n?: number) {
 
 export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {}) {
   const { toast } = useToast();
+  const { openBooking } = useBookingWorkspace();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Bucket>(initialTab || "startDue");
   const [startingWindow, setStartingWindow] = useState("today");
@@ -173,8 +175,12 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
                       {rows.map((b) => {
                         const nextAction = nextActionFor(b.status);
                         return (
-                          <TableRow key={b.id}>
-                            <TableCell className="font-mono text-xs">{b.bookingId}</TableCell>
+                          <TableRow key={b.id} className="cursor-pointer hover:bg-gray-50" onClick={() => openBooking(b.id)}>
+                            <TableCell className="font-mono text-xs">
+                              <button type="button" className="text-blue-700 hover:underline" onClick={(e) => { e.stopPropagation(); openBooking(b.id); }}>
+                                {b.bookingId}
+                              </button>
+                            </TableCell>
                             <TableCell>{b.customerName}</TableCell>
                             <TableCell>{fmtDate(b.pickupDate)} {b.pickupTime || ""}</TableCell>
                             <TableCell className="text-sm">
@@ -202,8 +208,9 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
                                 {b.flags?.advancePaymentPending && <span className="flex items-center text-xs text-red-600"><AlertTriangle className="w-3 h-3 mr-1" />Payment due</span>}
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-1 flex-wrap">
+                                <Button size="sm" variant="outline" className="h-7" onClick={() => openBooking(b.id)}>Open</Button>
                                 <a href={`tel:${b.customerPhone}`} title="Call customer">
                                   <Button variant="ghost" size="icon"><Phone className="w-4 h-4" /></Button>
                                 </a>

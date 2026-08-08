@@ -31,8 +31,11 @@ async function openBookingDetail(page: Page, customerName: string) {
   const row = page.locator('table tbody tr').filter({ hasText: customerName }).first();
   await expect(row).toBeVisible({ timeout: 30000 });
   await row.getByRole('button', { name: 'View' }).click();
-  const detailDialog = page.getByRole('dialog').filter({ hasText: 'Booking Details' });
+  // View opens the Unified Booking Workspace; the Resource Fulfilment
+  // panel lives in its Allocation tab.
+  const detailDialog = page.getByRole('dialog').filter({ has: page.getByRole('tab', { name: 'Allocation' }) });
   await expect(detailDialog).toBeVisible({ timeout: 5000 });
+  await detailDialog.getByRole('tab', { name: 'Allocation' }).click();
   return detailDialog;
 }
 

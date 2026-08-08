@@ -171,15 +171,21 @@ test.describe('Booking date-certainty — pure logic (no server required)', () =
 
     const suspiciousLines = lines.filter((line) => {
       const isKnownSafeUiMinBound = line.includes('min={watchedValues.pickupDate ||');
-      return !isKnownSafeUiMinBound;
+      // Vehicle 360's summary header COMPARES pickupDate against now to
+      // count upcoming bookings — a read, never an assignment into
+      // pickupDate. Reviewed safe during the unified-booking-workspace
+      // integration (the vehicle-360 task added it without updating this
+      // guard).
+      const isKnownSafeComparison = line.includes('new Date(b.pickupDate) >= new Date()');
+      return !isKnownSafeUiMinBound && !isKnownSafeComparison;
     });
     expect(suspiciousLines, `Unreviewed pickupDate + new Date() match(es):\n${suspiciousLines.join('\n')}`).toEqual([]);
 
-    // Also fails loudly if the two known, reviewed UI matches ever
-    // disappear without this test being updated — keeps this a real
-    // regression guard (proving the grep itself still works) rather than
-    // a check that silently passes on zero matches for the wrong reason.
-    expect(lines.length).toBe(2);
+    // Also fails loudly if the known, reviewed matches ever disappear
+    // without this test being updated — keeps this a real regression
+    // guard (proving the grep itself still works) rather than a check
+    // that silently passes on zero matches for the wrong reason.
+    expect(lines.length).toBe(3);
   });
 });
 
@@ -297,11 +303,6 @@ test.describe('Booking date-certainty — live integration (requires the Integra
   test('API: tripType round-trips through a real create + fetch for every allowed value', async ({ page }) => {
     await login(page, 'qaclient', 'QaFixed456!');
     const csrf = await getCsrfToken(page);
-    const vehiclesRes = await page.request.get('/api/vehicles');
-    const vehiclesBody = await vehiclesRes.json();
-    expect(Array.isArray(vehiclesBody), `GET /api/vehicles did not return an array: ${JSON.stringify(vehiclesBody)}`).toBeTruthy();
-    const vehicle = vehiclesBody.find((v: any) => v.status === 'available') || vehiclesBody[0];
-
     for (const tripType of ['one_way', 'round_trip', 'local', 'airport']) {
       const day = farFutureDate(3500 + ['one_way', 'round_trip', 'local', 'airport'].indexOf(tripType) * 50);
       const res = await page.request.post('/api/bookings', {
@@ -311,7 +312,13 @@ test.describe('Booking date-certainty — live integration (requires the Integra
           bookingType: 'self_drive', tripType,
           pickupLocation: 'Indore', dropoffLocation: 'Ujjain',
           pickupDate: day, pickupTime: '10:00', returnDate: day, returnTime: '18:00',
-          vehicleId: vehicle._id,
+          // No vehicle — tripType round-tripping is independent of
+          // allocation, and grabbing an arbitrary tenant vehicle made this
+          // test fail whenever another suite left that vehicle on
+          // SAFETY_HOLD (exactly what happened; the safety gate correctly
+          // rejected the create). Uses the same flexible-fulfilment escape
+          // hatch as the queue suites.
+          resourceAssignmentPending: true,
           amount: 1000, pricingType: 'day',
         },
       });
