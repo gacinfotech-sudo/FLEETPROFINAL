@@ -209,6 +209,11 @@ export const mongoBookingSchema = z.object({
   actualEndDateTime: z.string().optional(),
   startOdometer: z.number().min(0).optional(),
   endOdometer: z.number().min(0).optional(),
+  // Self Drive operational fields (Live Operations) — deposit is held
+  // money, tracked apart from totalAmount/advanceReceived by design.
+  securityDepositAmount: z.number().min(0).optional(),
+  securityDepositStatus: z.enum(['pending', 'collected', 'refunded', 'forfeited']).optional(),
+  startFuelLevel: z.string().max(20).optional(),
   bookingSource: z.enum(['direct_customer', 'walk_in', 'phone_call', 'whatsapp', 'website', 'google_business_profile',
     'google_ads', 'facebook', 'instagram', 'hotel', 'corporate_client', 'travel_agent', 'vendor_partner',
     'referral', 'online_travel_platform', 'repeat_customer', 'other']).default('direct_customer'),

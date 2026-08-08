@@ -30,6 +30,37 @@ const OCCUPYING_STATUSES = [
   'trip_started', 'ongoing', 'extended', 'return_pending',
 ];
 
+// A trip that is physically underway does NOT release its vehicle/driver
+// just because the scheduled end time passed (Live Operations spec §20-22):
+// until the return/completion workflow moves the booking forward, an
+// overdue active trip conflicts with ANY window — its real end is unknown
+// and in the future. Without this, a customer running late made the
+// vehicle silently double-bookable the moment the clock passed the old end.
+const PHYSICALLY_OUT_STATUSES = ['trip_started', 'ongoing', 'extended', 'return_pending'];
+
+function occupancyWindowClause(queryStart: Date, queryEnd: Date): any {
+  const now = new Date();
+  // The open-ended clause only guards windows starting within the next
+  // 24h — an overdue-by-an-hour trip must block a booking starting this
+  // evening, but not one three weeks out (the vehicle will long be back;
+  // if it somehow isn't, the same check re-runs at that booking's own
+  // assignment/dispatch gates).
+  if (queryStart.getTime() > now.getTime() + 24 * 3600_000) {
+    return {
+      scheduledStartDateTime: { $lt: queryEnd },
+      scheduledEndDateTime: { $gt: queryStart },
+    };
+  }
+  return {
+    $or: [
+      { scheduledStartDateTime: { $lt: queryEnd }, scheduledEndDateTime: { $gt: queryStart } },
+      // Overdue, still out: scheduled end already passed but no return
+      // recorded — treat as open-ended occupancy.
+      { status: { $in: PHYSICALLY_OUT_STATUSES }, scheduledEndDateTime: { $lte: now } },
+    ],
+  };
+}
+
 export interface ConflictingBooking {
   id: string;
   bookingId: string;
@@ -99,8 +130,7 @@ export async function findVehicleConflicts(
   const query: any = {
     tenantId, vehicleId,
     status: { $in: OCCUPYING_STATUSES },
-    scheduledStartDateTime: { $lt: queryEnd },
-    scheduledEndDateTime: { $gt: queryStart },
+    ...occupancyWindowClause(queryStart, queryEnd),
   };
   if (excludeBookingId) query._id = { $ne: excludeBookingId };
   const rows = await Booking.find(query).session(session ?? null);
@@ -114,8 +144,7 @@ export async function findDriverConflicts(
   const query: any = {
     tenantId, driverId,
     status: { $in: OCCUPYING_STATUSES },
-    scheduledStartDateTime: { $lt: queryEnd },
-    scheduledEndDateTime: { $gt: queryStart },
+    ...occupancyWindowClause(queryStart, queryEnd),
   };
   if (excludeBookingId) query._id = { $ne: excludeBookingId };
   const rows = await Booking.find(query).session(session ?? null);

@@ -20,6 +20,9 @@ import RewardReferralSettingsPanel from "../components/settings/reward-referral-
 import OnboardingWizard from "../components/onboarding/onboarding-wizard";
 import ManageExpenses from "./manage-expenses";
 import LiveBookings, { type Bucket as LiveOpsBucket } from "./live-bookings";
+import LiveOperations from "./live-operations";
+import OperationsAlertStrip from "../components/operations/operations-alert-strip";
+import LiveOperationsSummary from "../components/operations/live-operations-summary";
 import CustomersPage from "./customers";
 import AfterSalesPage from "./after-sales";
 import CampaignsPage from "./campaigns";
@@ -55,7 +58,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Menu, LogOut, Star, Car, Users, UserCheck, Phone, Mail, MessageCircle, Banknote, Plus, User, FileText, Trash2 } from "lucide-react";
 
-type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "whatsapp" | "upcoming-bookings" | "booking-queues" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "customers-add" | "drivers-add" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors" | "rewards-referrals" | "gps-tracking";
+type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "live-operations" | "whatsapp" | "upcoming-bookings" | "booking-queues" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "customers-add" | "drivers-add" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors" | "rewards-referrals" | "gps-tracking";
 
 // apiRequest() throws Error("<status>: <raw response text>") on a non-2xx
 // response (queryClient.ts:throwIfResNotOk) — without this, a rejected
@@ -153,7 +156,7 @@ export default function Dashboard() {
   // Sync URL with current view on mount with role-based access control
   useEffect(() => {
     const section = params.section as ViewType;
-    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "upcoming-bookings", "booking-queues", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "drivers-add", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "customers-add", "after-sales", "campaigns", "rewards-referrals", "vendors", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile", "gps-tracking"];
+    const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "live-operations", "upcoming-bookings", "booking-queues", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "drivers-add", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "customers-add", "after-sales", "campaigns", "rewards-referrals", "vendors", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile", "gps-tracking"];
     
     // Add "users" section only for admin and client roles
     if (user?.role === 'admin' || user?.role === 'client') {
@@ -469,14 +472,17 @@ export default function Dashboard() {
     switch (currentView) {
       case "dashboard":
         return (
-          <DashboardOverview
-            onNavigate={(view) => handleViewChange(view as ViewType)}
-            onViewBooking={(booking) => openBooking(booking)}
-            onSelectCustomer={handleSelectCustomerFromSearch}
-            onFleetStatusClick={goToFleetStatus}
-            onDriverStatusClick={goToDriverStatus}
-            canViewRevenue={user?.role !== 'manager' && canViewRevenue()}
-          />
+          <div className="space-y-6">
+            <LiveOperationsSummary onViewAll={() => handleViewChange("live-operations")} />
+            <DashboardOverview
+              onNavigate={(view) => handleViewChange(view as ViewType)}
+              onViewBooking={(booking) => openBooking(booking)}
+              onSelectCustomer={handleSelectCustomerFromSearch}
+              onFleetStatusClick={goToFleetStatus}
+              onDriverStatusClick={goToDriverStatus}
+              canViewRevenue={user?.role !== 'manager' && canViewRevenue()}
+            />
+          </div>
         );
 
       case "bookings": {
@@ -1710,6 +1716,9 @@ export default function Dashboard() {
       case "live-bookings":
         return <LiveBookings initialTab={liveOpsInitialTab} />;
 
+      case "live-operations":
+        return <LiveOperations />;
+
       case "upcoming-bookings":
         return <UpcomingBookings />;
 
@@ -2076,6 +2085,13 @@ export default function Dashboard() {
       
       <main className="flex-1 overflow-y-auto lg:ml-0 pt-16 lg:pt-0 transition-all duration-300 ease-in-out">
         <div className="px-3 sm:px-6 lg:px-8 py-4 lg:py-8">
+          {/* Persistent operational alert strip — booking-end reminders,
+              overdue returns, payment due. Renders nothing when no open
+              alerts; never covers the working UI. */}
+          <OperationsAlertStrip
+            onViewAll={() => handleViewChange("live-operations")}
+            onOpenBooking={(id) => openBooking(id)}
+          />
           <div className="animate-in slide-in-from-bottom-2 duration-300">
             {renderContent()}
           </div>

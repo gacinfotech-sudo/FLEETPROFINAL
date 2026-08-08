@@ -31,6 +31,7 @@ const navItems = [
   { id: "customers-add", label: "Add Customer", icon: UserRoundPlus, group: "customers" },
   { id: "bookings", label: "Add Booking", icon: Calendar, group: "bookings" },
   { id: "live-bookings", label: "Live Bookings", icon: Radio, group: "bookings" },
+  { id: "live-operations", label: "Vehicles on Booking", icon: Car, group: "bookings" },
   { id: "upcoming-bookings", label: "Upcoming Bookings", icon: CalendarClock, group: "bookings" },
   { id: "booking-queues", label: "Booking Queues", icon: ListFilter, group: "bookings" },
   { id: "payment-dues", label: "Payment Collection", icon: Wallet, group: "bookings" },

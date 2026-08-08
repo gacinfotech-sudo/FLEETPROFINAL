@@ -56,6 +56,8 @@ import {
   type BookingStatus,
 } from "./services/bookingStateMachine";
 import { buildLiveOperations } from "./services/liveOperations";
+import { registerOperationsRoutes } from "./operations/routes";
+import { resweepBooking } from "./operations/reminderEngine";
 import { buildUpcomingBookings, classifyUpcomingBookings } from "./services/upcomingBookings";
 import { buildPaymentDues } from "./services/paymentDues";
 import { whatsappProvider } from "./whatsapp/index";
@@ -332,6 +334,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerVehicleFastagRoutes(app);
   registerVehicleIncidentRoutes(app);
   registerVehicleInspectionRoutes(app);
+  // Live Operations — Vehicles on Booking view + Booking End Reminder
+  // engine surface. A VIEW/alert layer over canonical Booking records,
+  // never a second booking store.
+  registerOperationsRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
@@ -6808,6 +6814,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await booking.save();
+
+      // Reminder schedule follows the new end time atomically with the
+      // extension: stale time-anchored alerts resolve as 'superseded' and
+      // fresh stages derive from the new scheduledEndDateTime (spec §32).
+      // Best-effort — a reminder-engine hiccup must not fail the extension.
+      resweepBooking(req.tenantId!, booking._id.toString())
+        .catch((err) => console.error('Extension reminder resweep failed:', err?.message || err));
 
       // Auto-send updated confirmation/duty details — best-effort, must
       // not fail the extension itself if WhatsApp is down.

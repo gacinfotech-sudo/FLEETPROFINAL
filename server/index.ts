@@ -41,6 +41,7 @@ import connectDB from "./connectDB";
 import { storage } from "./storage-mongodb";
 import mongoose from "mongoose";
 import { startGpsPollingScheduler, stopGpsPollingScheduler } from "./gps/ingestion/pollingScheduler";
+import { startOperationsReminderScheduler, stopOperationsReminderScheduler } from "./operations/reminderEngine";
 
 const app = express();
 // Trust only the known number of reverse-proxy hops. `true` trusts arbitrary
@@ -207,6 +208,16 @@ app.use((req, res, next) => {
   mongoose.connection.on('connected', () => startGpsPollingScheduler());
   mongoose.connection.on('disconnected', () => stopGpsPollingScheduler());
 
+  // Booking End Reminder sweep (Live Operations) — persistent server-side
+  // engine: every run re-derives due reminders from canonical Booking times,
+  // so restarts lose nothing and a closed browser changes nothing (spec §48,
+  // §58). Same guarded-single-interval pattern as the schedulers above.
+  if (mongoose.connection.readyState === 1) {
+    startOperationsReminderScheduler();
+  }
+  mongoose.connection.on('connected', () => startOperationsReminderScheduler());
+  mongoose.connection.on('disconnected', () => stopOperationsReminderScheduler());
+
   // NOTE: this in-process interval only runs once per Node process. If this
   // app is ever deployed with multiple instances/replicas, move this sweep
   // to a dedicated cron/worker process or use a distributed lock (e.g. a
@@ -217,12 +228,14 @@ app.use((req, res, next) => {
   process.on('SIGINT', () => {
     clearInterval(backgroundJobInterval);
     stopGpsPollingScheduler();
+    stopOperationsReminderScheduler();
     process.exit(0);
   });
 
   process.on('SIGTERM', () => {
     clearInterval(backgroundJobInterval);
     stopGpsPollingScheduler();
+    stopOperationsReminderScheduler();
     process.exit(0);
   });
 })();

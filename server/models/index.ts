@@ -30,6 +30,23 @@ export interface ITenant extends Document {
     selfDrive: boolean;
     withDriver: boolean;
   };
+  // IANA timezone all operational reminder times are computed/displayed in
+  // (spec: never browser-local). Absent means Asia/Kolkata — every existing
+  // tenant is an Indian operator, so the default changes nothing.
+  timezone?: string;
+  // Booking End Reminder policy (Operations → Booking End Reminders).
+  // Absent = built-in defaults (see server/operations/policy.ts). Stages are
+  // minutes-before-scheduled-end; a stage the tenant disabled simply never
+  // fires — the engine only ever escalates the most imminent enabled stage.
+  operationsSettings?: {
+    graceMinutes?: number;            // past end before OVERDUE (default 15)
+    turnaroundBufferMinutes?: number; // self-drive clean/fuel/inspect buffer (default 60)
+    notifyOwner?: boolean;
+    notifyAssignedUser?: boolean;
+    selfDriveStages?: { minutesBefore: number; enabled: boolean; whatsappInternal?: boolean; whatsappCustomer?: boolean }[];
+    withDriverStages?: { minutesBefore: number; enabled: boolean; whatsappInternal?: boolean; whatsappDriver?: boolean }[];
+    whatsappInternalPhone?: string;   // staff/ops number for internal reminders (falls back to tenant.phone)
+  };
   createdAt: Date;
 }
 
@@ -248,6 +265,14 @@ export interface IBooking extends Document {
   actualEndDateTime?: Date;
   startOdometer?: number;
   endOdometer?: number;
+  // Self Drive operational fields (Live Operations). Deposit is held money,
+  // NEVER revenue — kept strictly outside totalAmount/advanceReceived so it
+  // can never leak into balance math (spec: "never mix deposit into
+  // revenue/balance"). All optional: with-driver bookings and every booking
+  // created before this feature simply don't have them.
+  securityDepositAmount?: number;
+  securityDepositStatus?: 'pending' | 'collected' | 'refunded' | 'forfeited';
+  startFuelLevel?: string; // opening fuel/SOC as recorded at handover, e.g. "3/4", "82%"
   rescheduleHistory?: {
     oldPickupDate: Date;
     oldPickupTime?: string;
@@ -472,6 +497,32 @@ const TenantSchema = new Schema<ITenant>({
     selfDrive: { type: Boolean, default: true },
     withDriver: { type: Boolean, default: true }
   },
+  timezone: { type: String },
+  operationsSettings: {
+    type: {
+      graceMinutes: { type: Number },
+      turnaroundBufferMinutes: { type: Number },
+      notifyOwner: { type: Boolean },
+      notifyAssignedUser: { type: Boolean },
+      selfDriveStages: [{
+        minutesBefore: { type: Number, required: true },
+        enabled: { type: Boolean, default: true },
+        whatsappInternal: { type: Boolean, default: false },
+        whatsappCustomer: { type: Boolean, default: false },
+        _id: false,
+      }],
+      withDriverStages: [{
+        minutesBefore: { type: Number, required: true },
+        enabled: { type: Boolean, default: true },
+        whatsappInternal: { type: Boolean, default: false },
+        whatsappDriver: { type: Boolean, default: false },
+        _id: false,
+      }],
+      whatsappInternalPhone: { type: String },
+    },
+    default: undefined,
+    _id: false,
+  },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -649,6 +700,9 @@ const BookingSchema = new Schema<IBooking>({
   actualEndDateTime: { type: Date },
   startOdometer: { type: Number },
   endOdometer: { type: Number },
+  securityDepositAmount: { type: Number },
+  securityDepositStatus: { type: String, enum: ['pending', 'collected', 'refunded', 'forfeited'] },
+  startFuelLevel: { type: String },
   rescheduleHistory: [{
     oldPickupDate: { type: Date },
     oldPickupTime: { type: String },
@@ -964,7 +1018,9 @@ export interface IWhatsAppMessage extends Document {
   // ledger/audit trail rather than a second WhatsApp log.
   vendorId?: mongoose.Types.ObjectId;
   sourcingRequestId?: mongoose.Types.ObjectId;
-  recipientType: 'customer' | 'driver' | 'vendor';
+  // 'staff' — internal operations reminders (Booking End Reminder engine);
+  // additive so existing customer/driver/vendor flows are untouched.
+  recipientType: 'customer' | 'driver' | 'vendor' | 'staff';
   recipientPhone: string;
   messageType: string;
   content: string;
@@ -987,7 +1043,7 @@ const WhatsAppMessageSchema = new Schema<IWhatsAppMessage>({
   quotationId: { type: Schema.Types.ObjectId, ref: 'Quotation' },
   vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor' },
   sourcingRequestId: { type: Schema.Types.ObjectId, ref: 'VendorSourcingRequest' },
-  recipientType: { type: String, enum: ['customer', 'driver', 'vendor'], required: true },
+  recipientType: { type: String, enum: ['customer', 'driver', 'vendor', 'staff'], required: true },
   recipientPhone: { type: String, required: true },
   messageType: { type: String, required: true },
   content: { type: String, required: true },
@@ -1741,6 +1797,11 @@ BookingSchema.index({ tenantId: 1, vehicleId: 1, status: 1, scheduledStartDateTi
 // not cover; without this, every reconciliation call scans the vehicle's
 // full booking history.
 BookingSchema.index({ tenantId: 1, vehicleId: 1, actualStartDateTime: 1, actualEndDateTime: 1 });
+// Backs the Booking End Reminder sweep and the Live Operations view — both
+// are bounded queries on (tenant, active status, scheduled end), never a
+// full-table poll (spec §66). The existing {tenantId, status} index can't
+// serve the end-time range efficiently once booking history grows.
+BookingSchema.index({ tenantId: 1, status: 1, scheduledEndDateTime: 1 });
 ExpenseSchema.index({ tenantId: 1, date: 1 });
 ExpenseSchema.index({ tenantId: 1, vehicleId: 1 });
 // Backs the Trip Cost Summary's per-booking expense lookup.
@@ -3531,3 +3592,111 @@ export const WhatsAppMessage = mongoose.model<IWhatsAppMessage>('WhatsAppMessage
 export const PaymentTransaction = mongoose.model<IPaymentTransaction>('PaymentTransaction', PaymentTransactionSchema);
 export const DriverLeave = mongoose.model<IDriverLeave>('DriverLeave', DriverLeaveSchema);
 export const DriverAttendance = mongoose.model<IDriverAttendance>('DriverAttendance', DriverAttendanceSchema);
+
+// ============================================================
+// LIVE OPERATIONS — Booking End Reminder engine (operations/*)
+// ============================================================
+// OperationsAlert is a NOTIFICATION/ALERT record derived from the canonical
+// Booking — never a second source of truth for booking state. The engine
+// (server/operations/reminderEngine.ts) creates one row per
+// (booking, kind/stage, end-time snapshot) via the unique dedupeKey, so a
+// retried or restarted sweep can never double-fire the same reminder
+// (spec §59 idempotency). When a booking's scheduled end moves (extension),
+// open alerts carrying the old endAtSnapshot are resolved as 'superseded'
+// and the next sweep re-derives fresh ones from the new end time.
+export interface IOperationsAlert extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  bookingId: mongoose.Types.ObjectId;
+  dedupeKey: string;
+  kind: 'ending_soon' | 'return_due' | 'overdue' | 'payment_due' | 'end_time_pending' | 'turnaround_conflict';
+  stageKey?: string; // e.g. 't-180', 't-60', 'end', 'overdue'
+  serviceMode: 'self_drive' | 'with_driver';
+  priority: 'info' | 'attention' | 'urgent' | 'critical';
+  title: string;
+  body: string;
+  // Snapshot of Booking.scheduledEndDateTime when the alert was created —
+  // the supersede detector after an extension.
+  endAtSnapshot?: Date;
+  status: 'active' | 'acknowledged' | 'snoozed' | 'resolved';
+  snoozedUntil?: Date;
+  acknowledgedBy?: { userId: string; name?: string };
+  acknowledgedAt?: Date;
+  resolvedAt?: Date;
+  resolvedReason?: 'completed' | 'cancelled' | 'superseded' | 'paid' | 'manual' | 'end_time_set';
+  // Who was contacted / what was done, attributed (spec §42-43, §65).
+  contactLog: { at: Date; userId: string; userName?: string; action: string; note?: string }[];
+  // WhatsApp delivery attempts for this alert — honest status only, a
+  // provider failure is recorded as FAILED, never faked as sent (spec §60).
+  whatsapp: { target: 'internal' | 'customer' | 'driver'; status: 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED'; error?: string; sentAt?: Date }[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const OperationsAlertSchema = new Schema<IOperationsAlert>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
+  dedupeKey: { type: String, required: true },
+  kind: { type: String, enum: ['ending_soon', 'return_due', 'overdue', 'payment_due', 'end_time_pending', 'turnaround_conflict'], required: true },
+  stageKey: { type: String },
+  serviceMode: { type: String, enum: ['self_drive', 'with_driver'], required: true },
+  priority: { type: String, enum: ['info', 'attention', 'urgent', 'critical'], required: true },
+  title: { type: String, required: true },
+  body: { type: String, required: true },
+  endAtSnapshot: { type: Date },
+  status: { type: String, enum: ['active', 'acknowledged', 'snoozed', 'resolved'], default: 'active' },
+  snoozedUntil: { type: Date },
+  acknowledgedBy: { userId: { type: String }, name: { type: String } },
+  acknowledgedAt: { type: Date },
+  resolvedAt: { type: Date },
+  resolvedReason: { type: String, enum: ['completed', 'cancelled', 'superseded', 'paid', 'manual', 'end_time_set'] },
+  contactLog: [{
+    at: { type: Date, required: true },
+    userId: { type: String, required: true },
+    userName: { type: String },
+    action: { type: String, required: true },
+    note: { type: String },
+    _id: false,
+  }],
+  whatsapp: [{
+    target: { type: String, enum: ['internal', 'customer', 'driver'], required: true },
+    status: { type: String, enum: ['PENDING', 'SENT', 'FAILED', 'SKIPPED'], required: true },
+    error: { type: String },
+    sentAt: { type: Date },
+    _id: false,
+  }],
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+OperationsAlertSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+OperationsAlertSchema.index({ dedupeKey: 1 }, { unique: true });
+OperationsAlertSchema.index({ tenantId: 1, status: 1, priority: 1, createdAt: -1 });
+OperationsAlertSchema.index({ tenantId: 1, bookingId: 1, status: 1 });
+
+export const OperationsAlert = mongoose.model<IOperationsAlert>('OperationsAlert', OperationsAlertSchema);
+
+// Operational activity timeline per booking — "who called the customer,
+// when, what came of it" (spec §42-44). Attribution is mandatory; this is
+// an append-only audit trail, separate from booking.statusHistory (which
+// records lifecycle transitions, not contact attempts/notes).
+export interface IOperationsActivity extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  bookingId: mongoose.Types.ObjectId;
+  userId: string;
+  userName?: string;
+  action: 'called_customer' | 'called_driver' | 'whatsapp_customer' | 'whatsapp_driver' | 'note' | 'return_confirmed' | 'extension_discussed' | 'collection_assigned';
+  note?: string;
+  at: Date;
+}
+
+const OperationsActivitySchema = new Schema<IOperationsActivity>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
+  userId: { type: String, required: true },
+  userName: { type: String },
+  action: { type: String, enum: ['called_customer', 'called_driver', 'whatsapp_customer', 'whatsapp_driver', 'note', 'return_confirmed', 'extension_discussed', 'collection_assigned'], required: true },
+  note: { type: String },
+  at: { type: Date, default: Date.now },
+});
+OperationsActivitySchema.index({ tenantId: 1, bookingId: 1, at: -1 });
+
+export const OperationsActivity = mongoose.model<IOperationsActivity>('OperationsActivity', OperationsActivitySchema);
