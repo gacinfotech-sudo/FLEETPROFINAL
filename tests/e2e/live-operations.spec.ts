@@ -25,7 +25,11 @@ import { Tenant, User } from '../../server/models/index';
 // shared physical MongoDB across worktrees makes the shared 'qaclient'
 // fixture flaky under concurrency).
 
-test.describe.configure({ mode: 'serial' });
+// 60s per test: login() legitimately spends time acknowledging urgent-alert
+// popups left by earlier tests in this same serial suite before it can
+// interact — at the default 30s the LAST tests intermittently timed out on
+// their very first request.
+test.describe.configure({ mode: 'serial', timeout: 60000 });
 
 const RUN = Date.now();
 let ownerUserId: string;
@@ -196,6 +200,13 @@ test('Self Drive: live card with deposit, T-30 reminder fires once, acknowledge 
   expect(alertsFor(alerts, sd.id, 'ending_soon')).toHaveLength(0);
   const superseded = alertsFor(await resolvedAlerts(page), sd.id, 'ending_soon');
   expect(superseded.some((a: any) => a.resolvedReason === 'superseded')).toBe(true);
+
+  // Cleanup: don't leave a live card + open alerts for the rest of the
+  // suite — later tests' logins would spend their budget acknowledging
+  // this booking's popups.
+  await toStatus(page, token, sd.id, 'return_pending');
+  await post(page, token, `/api/bookings/${sd.id}/complete`, {});
+  await sweep(page, token);
 });
 
 test('Self Drive overdue: vehicle is never auto-freed, critical alert cannot be snoozed, return workflow releases it', async ({ page }) => {
