@@ -7809,6 +7809,206 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // WAVE 4-12: 360° UNIFIED COMMAND CENTER ROUTES
+  // ============================================================================
+
+  // Import 360 services
+  const { getVehicle360, getVehicle360KPISummary, getVehicle360QuickActions } = await import("./services/vehicle360Service");
+  const { getVendor360, getVendor360KPISummary, getVendor360QuickActions } = await import("./services/vendor360Service");
+  const { getExpense360 } = await import("./services/expense360Service");
+  const { getInvoice360 } = await import("./services/invoice360Service");
+  const { getUser360, getUserRBACConfig, getAllRoles, getUser360QuickActions, checkPermission } = await import("./services/user360Service");
+  const { getGPSUnifiedDashboard, getVehicleTrack } = await import("./services/gpsUnifiedService");
+  const { getPaymentTimeline, getCustomerPaymentStatus } = await import("./services/paymentTimelineService");
+  const { unifiedSearch, getAnalyticsDashboard } = await import("./services/unifiedSearchService");
+
+  // WAVE 4: Vehicle 360 Routes
+  app.get("/api/vehicles/:id/360", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const vehicle360 = await getVehicle360(req.tenantId!, new mongoose.Types.ObjectId(req.params.id));
+      if (!vehicle360) return res.status(404).json({ message: "Vehicle not found" });
+      res.json(vehicle360);
+    } catch (error: any) {
+      console.error('Vehicle 360 error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch vehicle 360 data" });
+    }
+  });
+
+  app.get("/api/vehicles/:id/360/kpis", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const kpis = await getVehicle360KPISummary(req.tenantId!, new mongoose.Types.ObjectId(req.params.id));
+      if (!kpis) return res.status(404).json({ message: "Vehicle not found" });
+      res.json(kpis);
+    } catch (error: any) {
+      console.error('Vehicle 360 KPIs error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch vehicle KPIs" });
+    }
+  });
+
+  app.get("/api/vehicles/:id/360/actions", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const vehicle360 = await getVehicle360(req.tenantId!, new mongoose.Types.ObjectId(req.params.id));
+      if (!vehicle360) return res.status(404).json({ message: "Vehicle not found" });
+      const actions = getVehicle360QuickActions(vehicle360);
+      res.json(actions);
+    } catch (error: any) {
+      console.error('Vehicle 360 actions error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch vehicle actions" });
+    }
+  });
+
+  // WAVE 5: Vendor 360 Routes
+  app.get("/api/vendors/:id/360", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const vendor360 = await getVendor360(req.tenantId!, new mongoose.Types.ObjectId(req.params.id));
+      if (!vendor360) return res.status(404).json({ message: "Vendor not found" });
+      res.json(vendor360);
+    } catch (error: any) {
+      console.error('Vendor 360 error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch vendor 360 data" });
+    }
+  });
+
+  app.get("/api/vendors/:id/360/kpis", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const kpis = await getVendor360KPISummary(req.tenantId!, new mongoose.Types.ObjectId(req.params.id));
+      if (!kpis) return res.status(404).json({ message: "Vendor not found" });
+      res.json(kpis);
+    } catch (error: any) {
+      console.error('Vendor 360 KPIs error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch vendor KPIs" });
+    }
+  });
+
+  // WAVE 6: Expense 360 Routes
+  app.get("/api/expenses/360", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+      const expense360 = await getExpense360(req.tenantId!, startDate, endDate);
+      res.json(expense360);
+    } catch (error: any) {
+      console.error('Expense 360 error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch expense 360 data" });
+    }
+  });
+
+  // WAVE 8: Invoice 360 Routes
+  app.get("/api/invoices/360", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+      const invoice360 = await getInvoice360(req.tenantId!, startDate, endDate);
+      res.json(invoice360);
+    } catch (error: any) {
+      console.error('Invoice 360 error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch invoice 360 data" });
+    }
+  });
+
+  // WAVE 7: User/RBAC 360 Routes
+  app.get("/api/users/:id/360", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const user360 = await getUser360(req.tenantId!, new mongoose.Types.ObjectId(req.params.id));
+      if (!user360) return res.status(404).json({ message: "User not found" });
+      res.json(user360);
+    } catch (error: any) {
+      console.error('User 360 error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch user 360 data" });
+    }
+  });
+
+  app.get("/api/rbac/roles", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const roles = getAllRoles();
+      res.json(roles);
+    } catch (error: any) {
+      console.error('RBAC roles error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch roles" });
+    }
+  });
+
+  app.get("/api/rbac/role/:roleId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const role = await getUserRBACConfig(req.params.roleId);
+      res.json(role);
+    } catch (error: any) {
+      console.error('RBAC role error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch role config" });
+    }
+  });
+
+  // WAVE 10: GPS Unified Command Routes
+  app.get("/api/gps/dashboard", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const gpsDashboard = await getGPSUnifiedDashboard(req.tenantId!);
+      res.json(gpsDashboard);
+    } catch (error: any) {
+      console.error('GPS dashboard error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch GPS dashboard" });
+    }
+  });
+
+  app.get("/api/vehicles/:id/track", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const hoursBack = parseInt(req.query.hours as string) || 24;
+      const track = await getVehicleTrack(req.tenantId!, new mongoose.Types.ObjectId(req.params.id), hoursBack);
+      res.json(track);
+    } catch (error: any) {
+      console.error('Vehicle track error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch vehicle track" });
+    }
+  });
+
+  // WAVE 11: Payment Timeline Routes
+  app.get("/api/payments/timeline", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+      const timeline = await getPaymentTimeline(req.tenantId!, startDate, endDate);
+      res.json(timeline);
+    } catch (error: any) {
+      console.error('Payment timeline error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch payment timeline" });
+    }
+  });
+
+  app.get("/api/customers/:id/payments", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const paymentStatus = await getCustomerPaymentStatus(req.tenantId!, new mongoose.Types.ObjectId(req.params.id));
+      res.json(paymentStatus);
+    } catch (error: any) {
+      console.error('Customer payment status error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch customer payment status" });
+    }
+  });
+
+  // WAVE 12: Unified Search & Analytics Routes
+  app.get("/api/search", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query || query.length < 2) {
+        return res.status(400).json({ message: "Query too short" });
+      }
+      const results = await unifiedSearch(req.tenantId!, query);
+      res.json(results);
+    } catch (error: any) {
+      console.error('Search error:', error?.message);
+      res.status(500).json({ message: "Search failed" });
+    }
+  });
+
+  app.get("/api/analytics/dashboard", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const analytics = await getAnalyticsDashboard(req.tenantId!);
+      res.json(analytics);
+    } catch (error: any) {
+      console.error('Analytics dashboard error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch analytics" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
