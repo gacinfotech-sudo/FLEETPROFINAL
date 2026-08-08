@@ -75,6 +75,7 @@ export default function SelfDrivePanel({ bookingId, editable }: { bookingId: str
   const [lateForm, setLateForm] = useState<{ graceMinutes: string; rate: string; unit: string } | null>(null);
   const [refundOpen, setRefundOpen] = useState(false);
   const [reviewSending, setReviewSending] = useState(false);
+  const [waSending, setWaSending] = useState<string | null>(null);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: [tripKey] });
@@ -191,6 +192,37 @@ export default function SelfDrivePanel({ bookingId, editable }: { bookingId: str
   };
 
   const refundComp = trip.refund?.computation;
+
+  const sendWhatsApp = async (type: string) => {
+    setWaSending(type);
+    try {
+      const res = await apiRequest("POST", `${tripKey}/whatsapp`, { type });
+      const body = await res.json();
+      if (body?.message?.status === "sent") {
+        toast({ title: "WhatsApp sent", description: body.message.content?.slice(0, 120) });
+      } else {
+        toast({ title: "WhatsApp NOT delivered", description: body?.message?.error || "Provider reported failure — message recorded as failed.", variant: "destructive" });
+      }
+    } catch (err: any) {
+      toast({ title: "WhatsApp send failed", description: String(err?.message || ""), variant: "destructive" });
+    } finally {
+      setWaSending(null);
+    }
+  };
+
+  const uploadPhotos = async (phase: "handover" | "return", files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const fd = new FormData();
+    fd.append("phase", phase);
+    Array.from(files).slice(0, 7).forEach((f) => fd.append("photos", f));
+    try {
+      await apiRequest("POST", `${tripKey}/photos`, fd);
+      toast({ title: `${files.length} photo${files.length > 1 ? "s" : ""} attached` });
+      invalidate();
+    } catch (err: any) {
+      toast({ title: "Photo upload failed", description: String(err?.message || ""), variant: "destructive" });
+    }
+  };
 
   return (
     <div className="space-y-5" data-testid="self-drive-panel">
@@ -450,6 +482,57 @@ export default function SelfDrivePanel({ bookingId, editable }: { bookingId: str
         ) : (
           <p className="text-sm text-gray-500">Opens automatically after the vehicle return.</p>
         )}
+      </div>
+
+      {/* Customer WhatsApp quick actions (spec §25) */}
+      <div className="border rounded-lg p-4 space-y-2">
+        <p className="font-medium text-sm flex items-center gap-1.5"><MessageCircle size={14} className="text-emerald-600" /> WhatsApp Customer</p>
+        <div className="flex flex-wrap gap-1.5">
+          {([
+            ["handover_details", "Handover Details", !!trip.handover],
+            ["return_reminder", "Return Reminder", !trip.returnRecord],
+            ["overdue_reminder", "Overdue Reminder", !trip.returnRecord],
+            ["extension_payment_request", "Extension Payment", true],
+            ["refund_confirmation", "Refund Confirmation", !!trip.refund && (trip.refund.computation?.refunded || 0) > 0],
+          ] as [string, string, boolean][]).filter(([, , show]) => show).map(([type, label]) => (
+            <Button key={type} size="sm" variant="outline" disabled={waSending === type} data-testid={`sd-wa-${type}`}
+              onClick={() => sendWhatsApp(type)}>
+              {waSending === type ? "Sending…" : label}
+            </Button>
+          ))}
+        </div>
+        <p className="text-[11px] text-gray-500">Uses your tenant templates (Reminder Settings). Delivery status is recorded honestly — failures show here.</p>
+      </div>
+
+      {/* Inspection photos (spec §4/§6) */}
+      <div className="border rounded-lg p-4 space-y-3">
+        <p className="font-medium text-sm">Inspection Photos</p>
+        {(["handover", "return"] as const).map((phase) => {
+          const phasePhotos = (trip.photos || []).filter((ph: any) => ph.phase === phase);
+          return (
+            <div key={phase} className="space-y-1.5">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <span className="text-xs font-medium text-gray-600 capitalize">{phase === "handover" ? "Vehicle Out" : "Vehicle Return"} ({phasePhotos.length})</span>
+                {editable && (
+                  <label className="text-xs text-blue-700 cursor-pointer hover:underline">
+                    + Add photos
+                    <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" data-testid={`sd-photos-${phase}`}
+                      onChange={(e) => uploadPhotos(phase, e.target.files)} />
+                  </label>
+                )}
+              </div>
+              {phasePhotos.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {phasePhotos.map((ph: any) => (
+                    <a key={ph.fileName} href={`${tripKey}/photos/${ph.fileName}`} target="_blank" rel="noreferrer">
+                      <img src={`${tripKey}/photos/${ph.fileName}`} alt={ph.originalName || phase} className="h-16 w-16 object-cover rounded-md border border-gray-200" loading="lazy" />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Post-closure review request (spec §24) */}

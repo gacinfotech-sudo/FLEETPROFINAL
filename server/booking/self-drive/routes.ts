@@ -7,10 +7,15 @@
 import type { Express, NextFunction, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import mongoose from 'mongoose';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import { z } from 'zod';
 import { authenticateUser, requireTenant, type AuthRequest } from '../../middleware/auth';
 import { PERMISSIONS, requirePermission } from '../../middleware/permissions';
-import { Booking } from '../../models/index';
+import { Booking, Tenant, WhatsAppMessage } from '../../models/index';
+import { whatsappProvider } from '../../whatsapp/index';
+import { normalizeIndianPhone } from '../../whatsapp/phone';
 import {
   SelfDriveTrip, DEPOSIT_METHODS, LATE_CHARGE_UNITS, DEDUCTION_KINDS, REFUND_MODES,
   DEFAULT_LATE_POLICY, deriveStage, computeRefund, computeLateCharge,
@@ -90,6 +95,61 @@ function safeAsync(handler: (req: AuthRequest, res: Response) => Promise<unknown
   };
 }
 
+// ---------- inspection photo storage (spec §4/§6 attachments) ----------
+// Disk layout uploads/self-drive/<bookingId>/<random>.<ext>; served ONLY via
+// the authenticated, tenant-checked GET below (the uploads/ P0 in routes.ts:
+// never express.static for tenant data).
+const SD_PHOTO_DIR = path.resolve('uploads/self-drive');
+const sdPhotoStorage = multer.diskStorage({
+  destination: (req, _file, cb) => {
+    const dir = path.join(SD_PHOTO_DIR, String((req as AuthRequest).params.id));
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' }[file.mimetype] || '.jpg';
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${ext}`);
+  },
+});
+const sdPhotoUpload = multer({
+  storage: sdPhotoStorage,
+  limits: { fileSize: 8 * 1024 * 1024, files: 7 },
+  fileFilter: (_req, file, cb) => {
+    if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPEG/PNG/WebP images are allowed'));
+  },
+});
+
+// ---------- customer WhatsApp quick actions (spec §25, §63-64) ----------
+// Default templates; each is tenant-overridable via
+// operationsSettings.sdTemplates.<key> with {{placeholder}} substitution.
+// Customer-facing text NEVER includes internal notes; balance appears only
+// where the customer owes it.
+const SD_WA_TYPES = ['handover_details', 'return_reminder', 'overdue_reminder', 'extension_payment_request', 'refund_confirmation'] as const;
+type SdWaType = (typeof SD_WA_TYPES)[number];
+
+const SD_WA_DEFAULTS: Record<SdWaType, string> = {
+  handover_details:
+    'Hello {{customerName}}, your self-drive vehicle {{vehicle}} (booking {{bookingCode}}) has been handed over. ' +
+    'KM out: {{kmOut}}, fuel: {{fuelOut}}%. Expected return: {{endTime}}. Drive safe! — {{companyName}}',
+  return_reminder:
+    'Hello {{customerName}}, a reminder that your self-drive booking {{bookingCode}} ({{vehicle}}) is scheduled to end at {{endTime}}. ' +
+    'Reply here or call us if you need an extension. — {{companyName}}',
+  overdue_reminder:
+    'Hello {{customerName}}, your self-drive booking {{bookingCode}} ({{vehicle}}) was due back at {{endTime}}. ' +
+    'Please return the vehicle or contact us immediately to extend. Late charges apply as per policy. — {{companyName}}',
+  extension_payment_request:
+    'Hello {{customerName}}, your booking {{bookingCode}} has been extended to {{endTime}}. ' +
+    'Pending amount: ₹{{balance}}. Kindly complete the payment. — {{companyName}}',
+  refund_confirmation:
+    'Hello {{customerName}}, your security-deposit refund of ₹{{refundAmount}} for booking {{bookingCode}} has been processed. ' +
+    'Thank you for choosing {{companyName}}!',
+};
+
+function fillTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{\{(\w+)\}\}/g, (_m, key) => (vars[key] ?? ''));
+}
+
 async function loadSelfDriveBooking(req: AuthRequest, res: Response): Promise<{ bookingObjectId: mongoose.Types.ObjectId; tenantId: string; booking: any } | null> {
   const tenantId = req.tenantId;
   if (!tenantId) {
@@ -131,6 +191,7 @@ export function publicSelfDriveTrip(trip: ISelfDriveTrip | null, booking?: { sch
     returnRecord: trip?.returnRecord ?? null,
     settlement: trip?.settlement ?? null,
     refund: trip?.refund ? { ...(trip.refund as any).toObject?.() ?? trip.refund, computation: computeRefund(trip.refund) } : null,
+    photos: trip?.photos ?? [],
     lateCharge,
     updatedAt: trip?.updatedAt ?? null,
   };
@@ -658,6 +719,153 @@ export function registerSelfDriveRoutes(app: Express): void {
       await trip.save();
       await syncBookingDeposit(ctx.tenantId, ctx.bookingObjectId, { securityDepositStatus: 'forfeited' });
       res.json(publicSelfDriveTrip(trip, ctx.booking));
+    }),
+  );
+
+  // ---------- inspection photos (spec §4/§6) ----------
+
+  app.post(
+    '/api/bookings/:id/self-drive/photos',
+    selfDriveRateLimit,
+    authenticateUser,
+    requireTenant,
+    requirePermission(PERMISSIONS.EDIT_BOOKING),
+    (req: AuthRequest, res: Response, next: NextFunction) => {
+      sdPhotoUpload.array('photos', 7)(req as any, res as any, (err: any) => {
+        if (err) return res.status(400).json({ message: err.message || 'Photo upload failed' });
+        next();
+      });
+    },
+    safeAsync(async (req, res) => {
+      const ctx = await loadSelfDriveBooking(req, res);
+      if (!ctx) return;
+      const phase = req.body?.phase === 'return' ? 'return' : 'handover';
+      const files = (req as any).files as Express.Multer.File[] | undefined;
+      if (!files || files.length === 0) {
+        return res.status(400).json({ message: 'Attach at least one photo (field name: photos).' });
+      }
+      const entries = files.map((f) => ({
+        phase, fileName: f.filename, originalName: f.originalname?.slice(0, 200),
+        uploadedAt: new Date(), uploadedBy: req.userId!,
+      }));
+      const trip = await SelfDriveTrip.findOneAndUpdate(
+        { tenantId: ctx.tenantId, bookingId: ctx.bookingObjectId },
+        { $push: { photos: { $each: entries } } },
+        { new: true, upsert: true, setDefaultsOnInsert: true },
+      );
+      res.status(201).json({ photos: trip?.photos ?? [], added: entries.length });
+    }),
+  );
+
+  app.get(
+    '/api/bookings/:id/self-drive/photos',
+    authenticateUser,
+    requireTenant,
+    requirePermission(PERMISSIONS.VIEW_BOOKINGS),
+    safeAsync(async (req, res) => {
+      const ctx = await loadSelfDriveBooking(req, res);
+      if (!ctx) return;
+      const trip = await SelfDriveTrip.findOne({ tenantId: ctx.tenantId, bookingId: ctx.bookingObjectId }).select('photos').lean();
+      res.json({ photos: trip?.photos ?? [] });
+    }),
+  );
+
+  // Streams one photo after the tenant check — filename is validated against
+  // the trip's own records AND path-contained, so no traversal and no
+  // cross-tenant reads are possible.
+  app.get(
+    '/api/bookings/:id/self-drive/photos/:fileName',
+    authenticateUser,
+    requireTenant,
+    requirePermission(PERMISSIONS.VIEW_BOOKINGS),
+    safeAsync(async (req, res) => {
+      const ctx = await loadSelfDriveBooking(req, res);
+      if (!ctx) return;
+      const trip = await SelfDriveTrip.findOne({ tenantId: ctx.tenantId, bookingId: ctx.bookingObjectId }).select('photos').lean();
+      const entry = (trip?.photos ?? []).find((p: any) => p.fileName === req.params.fileName);
+      if (!entry) return res.status(404).json({ message: 'Photo not found.' });
+      const filePath = path.join(SD_PHOTO_DIR, String(ctx.bookingObjectId), entry.fileName);
+      if (!filePath.startsWith(SD_PHOTO_DIR) || !fs.existsSync(filePath)) {
+        return res.status(404).json({ message: 'Photo not found.' });
+      }
+      res.sendFile(filePath);
+    }),
+  );
+
+  // ---------- customer WhatsApp quick actions (spec §25) ----------
+
+  app.post(
+    '/api/bookings/:id/self-drive/whatsapp',
+    selfDriveRateLimit,
+    authenticateUser,
+    requireTenant,
+    requirePermission(PERMISSIONS.EDIT_BOOKING),
+    safeAsync(async (req, res) => {
+      const ctx = await loadSelfDriveBooking(req, res);
+      if (!ctx) return;
+      const type = req.body?.type as SdWaType;
+      if (!SD_WA_TYPES.includes(type)) {
+        return res.status(400).json({ message: `type must be one of: ${SD_WA_TYPES.join(', ')}` });
+      }
+      const [booking, trip, tenant] = await Promise.all([
+        Booking.findOne({ _id: ctx.bookingObjectId, tenantId: ctx.tenantId }).lean() as any,
+        SelfDriveTrip.findOne({ tenantId: ctx.tenantId, bookingId: ctx.bookingObjectId }).lean() as any,
+        Tenant.findById(ctx.tenantId).lean() as any,
+      ]);
+      const recipientPhone = normalizeIndianPhone(booking?.customerPhone || '');
+      if (!recipientPhone) return res.status(400).json({ message: 'Customer phone number is invalid.' });
+
+      const comp = trip?.refund ? computeRefund(trip.refund) : null;
+      const endAt = booking?.scheduledEndDateTime ? new Date(booking.scheduledEndDateTime) : null;
+      const vars: Record<string, string> = {
+        customerName: booking?.customerName || 'Customer',
+        bookingCode: booking?.bookingId || '',
+        vehicle: booking?.vehicleId ? 'your booked vehicle' : 'your booked vehicle',
+        endTime: endAt ? new Intl.DateTimeFormat('en-IN', { timeZone: (tenant as any)?.timezone || 'Asia/Kolkata', day: '2-digit', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true }).format(endAt) : 'the scheduled time',
+        balance: String(Math.max(0, (booking?.totalAmount || 0) - (booking?.advanceReceived || 0))),
+        refundAmount: String(comp?.refunded ?? 0),
+        kmOut: trip?.handover?.odometerReading != null ? String(trip.handover.odometerReading) : '—',
+        fuelOut: trip?.handover?.fuelLevel != null ? String(trip.handover.fuelLevel) : '—',
+        companyName: (tenant as any)?.businessName || (tenant as any)?.name || 'our team',
+      };
+      // Populate the vehicle label properly when assigned.
+      if (booking?.vehicleId) {
+        const v: any = await Booking.db.model('Vehicle').findById(booking.vehicleId).select('make vehicleModel licensePlate').lean();
+        if (v) vars.vehicle = `${[v.make, v.vehicleModel].filter(Boolean).join(' ')}${v.licensePlate ? ` (${v.licensePlate})` : ''}`;
+      }
+
+      const custom = (tenant as any)?.operationsSettings?.sdTemplates?.[type];
+      const text = fillTemplate(typeof custom === 'string' && custom.trim() ? custom : SD_WA_DEFAULTS[type], vars);
+
+      const messageDoc = await WhatsAppMessage.create({
+        tenantId: ctx.tenantId, bookingId: ctx.bookingObjectId, customerId: booking?.customerId,
+        recipientType: 'customer', recipientPhone, messageType: `self_drive_${type}`,
+        content: text, provider: whatsappProvider.kind, status: 'queued', attemptCount: 1,
+        // Manual quick actions are legitimately repeatable (staff may nudge
+        // twice) — the key is unique per send, it exists to satisfy the
+        // ledger contract, not to dedupe.
+        idempotencyKey: `sdwa_${ctx.bookingObjectId}_${type}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+      });
+      try {
+        // Bounded like the sweep sends — a wedged provider must not hang the request.
+        const result = await Promise.race([
+          whatsappProvider.sendText(ctx.tenantId, recipientPhone, text),
+          new Promise<{ providerMessageId: null; status: 'failed'; error: string }>((resolve) =>
+            setTimeout(() => resolve({ providerMessageId: null, status: 'failed', error: 'Send timed out after 15s' }), 15000)),
+        ]);
+        messageDoc.status = result.status === 'sent' ? 'sent' : 'failed';
+        messageDoc.providerMessageId = result.providerMessageId || undefined;
+        messageDoc.error = (result as any).error || undefined;
+        if (result.status === 'sent') messageDoc.sentAt = new Date();
+        await messageDoc.save();
+      } catch (err: any) {
+        messageDoc.status = 'failed';
+        messageDoc.error = err?.message || 'Send threw';
+        await messageDoc.save().catch(() => {});
+      }
+      // Honest status, never faked: 201 either way, delivery state in body.
+      res.status(201).json({ message: { status: messageDoc.status, error: messageDoc.error ?? null, content: text } });
     }),
   );
 }
