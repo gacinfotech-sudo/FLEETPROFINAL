@@ -2167,6 +2167,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // WAVE 3: DRIVER 360 ROUTES
+  // ============================================================================
+  // Complete driver operational command centre
+
+  // Get Driver 360 - complete driver operational view
+  app.get("/api/drivers/:id/360", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: driverId } = req.params;
+
+      if (!mongoose.isValidObjectId(driverId)) {
+        return res.status(400).json({ message: "Invalid driver ID" });
+      }
+
+      const { getDriver360 } = await import("../services/driver360Service");
+
+      const driver360 = await getDriver360(req.tenantId!, new mongoose.Types.ObjectId(driverId));
+
+      if (!driver360) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      res.json(driver360);
+    } catch (error: any) {
+      console.error("Get Driver 360 error:", error?.message);
+      res.status(500).json({ message: "Failed to get driver 360" });
+    }
+  });
+
+  // Get Driver 360 KPI summary
+  app.get("/api/drivers/:id/360/kpis", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: driverId } = req.params;
+
+      if (!mongoose.isValidObjectId(driverId)) {
+        return res.status(400).json({ message: "Invalid driver ID" });
+      }
+
+      const { getDriver360KPISummary } = await import("../services/driver360Service");
+
+      const kpis = await getDriver360KPISummary(req.tenantId!, new mongoose.Types.ObjectId(driverId));
+
+      if (!kpis) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      res.json(kpis);
+    } catch (error: any) {
+      console.error("Get Driver KPI error:", error?.message);
+      res.status(500).json({ message: "Failed to get driver KPIs" });
+    }
+  });
+
+  // Get Driver 360 quick actions
+  app.get("/api/drivers/:id/360/actions", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: driverId } = req.params;
+
+      if (!mongoose.isValidObjectId(driverId)) {
+        return res.status(400).json({ message: "Invalid driver ID" });
+      }
+
+      const { getDriver360, getDriver360QuickActions } = await import("../services/driver360Service");
+
+      const driver360 = await getDriver360(req.tenantId!, new mongoose.Types.ObjectId(driverId));
+
+      if (!driver360) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      const actions = getDriver360QuickActions(driver360);
+      res.json(actions);
+    } catch (error: any) {
+      console.error("Get Driver 360 actions error:", error?.message);
+      res.status(500).json({ message: "Failed to get driver actions" });
+    }
+  });
+
   // Booking Routes
   // Enabled service modes for the CURRENT tenant — drives which of the
   // Self Drive / With Driver selectors the booking UI shows at all.
