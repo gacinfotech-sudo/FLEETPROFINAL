@@ -21,8 +21,32 @@ Integrator/demo-only rollback point, not a second user-facing preview.
 
 ## ✅ LIVE — READY FOR USER TEST
 
-- Nothing added to this list by this session — items below are the closest candidates but
-  none have a full live smoke test performed by this session on the actual `:5050` preview.
+- **[Added by Dispatcher session, 2026-08-07 ~22:56 IST] TASK-VEHICLE-SAFETY-ELIGIBILITY —
+  SAFETY_HOLD now enforced in the real booking-allocation path.** Closes the previously
+  documented gap where `deriveBookingEligibility`/`ownFleetEligibility` computed a
+  SAFETY_HOLD signal with no live caller. Built in isolated worktree
+  `vehicle-safety-eligibility` (branched from trunk `89a0454`), merged into
+  `booking/integration-preview` as `eab3581` directly by this session (not by the worktree
+  worker) using a scoped `git stash push -- <2 files>` / merge / `git stash pop` sequence
+  to avoid disturbing another live session's uncommitted SA-01 session-stability fix —
+  verified byte-for-byte identical before/after the round-trip (only cosmetic git
+  blob-hash/line-number diff noise, zero content difference). `npm run check` 0 errors on
+  the full merged trunk. Independently re-ran the full 10-test suite
+  (`tests/e2e/vehicle-safety-eligibility.spec.ts`) against a throwaway candidate on `:5150`
+  built from the exact merged commit — **10/10 pass** (eligible-vehicle assignment,
+  SAFETY_HOLD exclusion from availability list + UI picker, direct-API rejection on
+  create/reassign, stale-allocation recheck at final confirmation, Allocation-Pending
+  booking capture remaining unblocked, tenant isolation, manager-permission enforcement,
+  legitimate SAFETY_HOLD clearance, Trip Start gate, active-trip safety-review flagging).
+  Then restarted the actual canonical `:5050` process by exact PID (73884 → 1612, ~7s
+  downtime, health-checked before/after, real login smoke test 200 OK) so this is now
+  live on the real canonical preview, not just a candidate. SA-01 remains uncommitted and
+  untouched on `:5050`'s working tree throughout. Full report:
+  `.claude/tasks/reports/TASK-VEHICLE-SAFETY-ELIGIBILITY-report.md` (in the
+  `vehicle-safety-eligibility` worktree).
+
+- Nothing else added to this list by this session — items below are the closest candidates
+  but none have a full live smoke test performed by this session on `:5050` itself.
 
 - **[Added by Driver Lifecycle dispatcher session]** Booking Experience initiative
   (Domain-02 certainty model / date-certainty selector, Resource-03 composition,
@@ -293,6 +317,32 @@ concurrent sessions and a decision (which port is canonical) that belongs to the
 something to guess at. Flagging for whoever consolidates next, same as the two prior
 sessions did for each other.
 
+## Appended by the `:5100` Integrator session, 2026-08-07 ~17:00 IST
+
+**`money-rootcause` reverted from `:5100`** (commit `61453da`, a revert commit, not a
+history rewrite) — two more independent test runs against the live server added no
+counter-evidence to the ~15:05 entry's confirmed ~40%-reproducing digit-concatenation
+defect, only more environment-timeout noise (load average 38.73, 110 concurrent
+processes, same figure the original QA report cited). Move to 🛠 **REPAIRING** wherever
+this task is tracked; not currently live anywhere.
+
+**`:5100` and `:5051` consolidated into `:5100`** (commit `47d8f31`) — resolves the "two
+duplicate reconciliations" notice below. Diffed first: only 11 of 41 nominally-overlapping
+files actually differed, confirming both were the same reconciliation done twice, not a
+real design fork. `:5100` gains `:5051`'s real fixes (the `reusePort`/`ENOTSUP` LAN-crash
+root cause, gzip compression); in exchange, this closes a real gap `:5051` had — its
+`callService.ts` had regressed to the pre-fix check-then-act webhook-handling pattern,
+missing the `TASK-TELEPHONY-WEBHOOK-DEDUPE-FIX` this doc already tracks as integrated
+elsewhere. `:5051` itself was not touched (not this session's worktree to modify) — still
+missing that dedupe fix as of this writing.
+
+**Still a three-way split, now down to two axes instead of three**: `:5100` now has
+telephony/RBAC/performance/UI-responsive/booking(+code)/LAN-safety, all in one place.
+`:5050` (this doc's stated canonical) separately has Driver+GPS work that `:5100` lacks,
+per the entry above. Reconciling those two remaining lines is a bigger, riskier merge
+(more shared-file surface) — flagging for the next session/the user to decide priority on,
+not attempting unprompted per the same judgment the two prior sessions already applied here.
+
 ## Known P0/P1 items this session did NOT independently chase down
 
 Per the directive's own priority list (runtime/DB/security first, then booking/money/
@@ -303,3 +353,92 @@ malformed monetary display, booking short public code. Several `money-*` worktre
 (`money-qa`, `money-rootcause`, `qa-money-booking-03`) exist and are presumably targeting
 exactly these — not yet audited by this session (see `PENDING-LIVE-INTEGRATION.md`'s
 "not yet audited" list).
+
+## Appended by the Final-UI Redesign session (Integrator role), 2026-08-08 ~00:20 IST
+
+**✅ LIVE on `:5050` — Final UI stabilization + premium Dashboard redesign
+(`d321b87`, fast-forward from `3fb3ed1`).** Full detail:
+`docs/final-ui/FLEETPRO-UI-STABILIZATION-REPORT.md`. Summary: app-shell layout tokens;
+sidebar search overflow root-cause fixed (w-full + own mx-*); FleetPro logo (sidebar +
+mobile header) now a labeled button navigating to Dashboard; mandated nav order
+Dashboard → Customers (All Customers / Add Customer) → Bookings; Dashboard rebuilt as
+`components/dashboard/overview.tsx` with real-data charts (Revenue/Collections trend
+7/30/90d, Booking Activity, Fleet/Driver donuts), Attention Required, compact
+record-limited widgets (3–4 rows + View All), honest GPS state, per-widget
+loading/empty/error isolation; new aggregated `GET /api/dashboard/overview`; dead
+components removed (`layout/header`, `layout/navbar`, `dashboard/stats-cards`,
+`dashboard/enhanced-stats`). Verified ON `:5050` post-promotion: 12/12
+`ui-shell-redesign.spec.ts` (logo nav, nav order, search geometry, record limits,
+View All routing, no horizontal overflow at 375/768/1366/1920); nav/app-shell/customer
+suites green on the identical commit during candidate verification.
+
+- Promotion mechanics: concurrent-session WIP in this worktree (auth.ts, routes.ts
+  `GET /api/bookings/:id`, storage, closure docs) was stashed → ff-merge → popped back
+  intact; `:5050` given a PID-targeted restart (old 14349 was non-watch `tsx` and could
+  not pick up server-side changes). Nothing was discarded; untracked files untouched.
+- Note for other sessions: sidebar nav tests must click **"All Customers"** (the old
+  top-level "Customers" is now a collapsible group header); "Payment Collection Due"
+  label is now "Payment Collection" (same id/route). Already updated across
+  `tests/e2e/` on this branch.
+
+## 2026-08-08 — Service-mode switch fix + Tenant Service Modes (session: service-modes)
+
+- **Fixed the Self Drive ⇄ With Driver switch bug** in `enhanced-booking-form.tsx`
+  (Step 2). Root cause: each mode card's `div onClick` re-submits its own mode, and
+  Radix RadioGroup's hidden form-bubble input dispatches a `click` when an item
+  UNchecks — that bubbled to the old mode's card, which wrote the old value back
+  (value ping-pong; "With Driver" always won). Card clicks now ignore events
+  originating from radio primitives. Switching also clears a stale chauffeur
+  `driverId` when moving to Self Drive (with a visible toast), so the old mode's
+  allocation can never ride along in the submit payload.
+- **Tenant Service Modes (canonical `bookingType` reused as serviceMode):**
+  `Tenant.serviceModes {selfDrive, withDriver}` (additive; absent = both = today's
+  behavior). New: `GET /api/tenant/service-modes` (tenant-scoped),
+  `GET/PATCH /api/admin/tenants/:id/service-modes` (super admin; at least one mode
+  must stay enabled), Service Modes card in the admin Plan Management modal, and a
+  create-time gate in `POST /api/bookings` (403 `SERVICE_MODE_DISABLED`; history
+  untouched). Single-mode tenants see no mode selector — the form opens directly in
+  the enabled mode with a static badge.
+- Verified ON `:5050`: new `tests/e2e/service-mode-switch.spec.ts` (10× both
+  directions + card-click switching) and `tests/e2e/tenant-service-modes.spec.ts`
+  (§113–§116) — 6/6 green; `booking-wizard-review-required` green.
+  `booking-fulfilment-mode-ui` "Quick Add Vendor" failure is PRE-EXISTING (fails on
+  clean tree too).
+- Process note: found `:5050` down mid-session (old PID gone); restarted from
+  `fleetpro-main` as PID-targeted background process (new PID logged in
+  /tmp/fleetpro-5050.log). Server-side routes/model changes required this restart.
+- Note for other sessions: qaclient is single-session — concurrent logins bounce
+  each other; the new specs re-login once if bounced mid-test.
+
+---
+
+## 2026-08-08 — Unified Booking Workspace candidate ready (NOT yet promoted)
+
+- Branch `booking/unified-workspace` (worktree `fleetpro-worktrees/unified-booking-workspace`), commits `5062bb3` → `316847b` → `b5628bf`, base `3fb3ed1`.
+- Candidate preview: **http://localhost:5098** (own dev server/PID; :5050 untouched).
+- ONE Unified Booking Workspace now backs Booking Queues / Upcoming / Live / History / Customer 360 / Payment Dues / Vehicle 360 bookings; legacy dashboard View/Edit booking dialogs deleted (the edit dialog had a charge-subtraction money formula).
+- Server: resourceFulfilmentStatus recomputed on PUT (fixes "Driver Assigned + Unallocated"), allowedNextStatuses on GET /api/bookings/:id, lastActivityAt stamping, ''→null clears.
+- Tests: tests/e2e/unified-booking-workspace.spec.ts 5/5; zero regressions vs :5050 baseline; several dialog-based suites updated to workspace selectors.
+- MERGE NOTE for whoever promotes: base predates the final-UI redesign `d321b87` — reconcile dashboard.tsx + ui-shell-redesign.spec.ts when merging into `booking/integration-preview`.
+- Full report: `docs/final-closure/UNIFIED-BOOKING-WORKSPACE.md` (on the candidate branch).
+
+---
+
+## 2026-08-08 — Driver navigation consolidation + Leave Calendar promoted to :5050
+
+- Canonical commit: `33fa352` (`booking/integration-preview`, fast-forward of `driver/navigation-operations`).
+- ONE expandable "Drivers" sidebar group (All Drivers / Add Driver / Attendance / Leave Calendar / Performance); scattered Manage Drivers / Driver Attendance / Driver Leave / Driver Performance entries removed. Nav tests must expand the "Drivers" group first and click the NEW child labels.
+- Driver Leave rebuilt as a calendar workspace (Today on Leave, Upcoming, Month/Week/List, day detail, add/edit/cancel, booking-conflict override). Leave endDate end-of-day bug fixed (last day of a range now actually blocks availability).
+- `server/driver/operations` (incidents/challans/training/suspension) mounted for the first time; lifecycle-eligibility gate restored in `checkDriverAvailability`.
+- :5050 tsx server restarted PID-targeted (old PID 38578 → new PID in `.server-5050.pid`). Verified live: `driver-navigation-leave.spec.ts` 8/8 against :5050.
+- Full report: `docs/final-ui/DRIVER-NAVIGATION-LEAVE-CALENDAR.md`. Rollback: reset to `d0e9469` + restart.
+
+---
+
+## 2026-08-08 — Unified Booking Workspace PROMOTED to canonical :5050
+
+- Merge commit `d0e9469` on `booking/integration-preview` (fleetpro-main). Pre-merge checkpoint `81158a2` committed the live-but-uncommitted tenant service-modes + SA-01 + GET /api/bookings/:id work.
+- Conflicts resolved: routes.ts (GET-by-id keeps allowedNextStatuses), dashboard.tsx (kept final-UI DashboardOverview, onViewBooking → Unified Booking Workspace), dashboard-upcoming spec (redesign structure + workspace selectors).
+- :5050 restarted (new PID 38578, plain tsx — restart again by exact PID after future server changes). :5098 candidate server stopped; worktree `unified-booking-workspace` kept for rollback (rollback = reset branch to `7c9cef4`).
+- Verified on :5050: unified-booking-workspace 5/5, ui-shell-redesign, booking-queues-findability, booking-actions, dashboard-upcoming (KPI) — all green. Known env failure only: dashboard-upcoming "classify A–F" cannot find a free vehicle slot for tomorrow (stale zero-width booking BK1786168438787B9K1 blocks 2026-08-09; shared-DB data drift, not code).
+- INCIDENT: found a second dev server from `fleetpro-worktrees/fleetpro-final-canonical` (started 11:07:57 from a VS Code terminal) sharing :5050 via SO_REUSEPORT with the trunk server — split-brain CSRF/session failures for all :5050 users. Stopped by exact PID 41074. :5050 belongs to fleetpro-main per PREVIEW-RUNTIME.json; other sessions must use their own ports.

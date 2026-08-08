@@ -3,7 +3,7 @@
 Date: 2026-08-08
 Branch: `booking/unified-workspace`
 Worktree: `fleetpro-worktrees/unified-booking-workspace`
-Canonical commit: `316847b` (on top of `5062bb3` carry-commit, base `3fb3ed1` = `booking/integration-preview` HEAD)
+Canonical commit: `d0e9469` (merge into `booking/integration-preview`; feature commits `5062bb3` → `316847b` → `b5628bf`, base `3fb3ed1`)
 
 FINAL PRODUCT RULE delivered: **ONE booking. ONE workspace. ONE status engine.
 ONE financial engine. ONE resource engine. MANY connected views.**
@@ -244,14 +244,21 @@ Regression (candidate vs untouched baseline on :5050):
 
 ## LIVE URL
 
-Candidate preview: **http://localhost:5098** (dev server running from
-`fleetpro-worktrees/unified-booking-workspace`, own PID/port per repo
-process-safety rules). The existing `booking/integration-preview` runtime on
-:5050 was left untouched for comparison. To make :5098 the ONE canonical
-preview lineage: merge `booking/unified-workspace` into
-`booking/integration-preview` after committing/reconciling fleetpro-main's
-remaining uncommitted LAN/doc changes (the server-file portion is already
-carried here, so the merge is docs-only conflict risk).
+**PROMOTED 2026-08-08**: merged into `booking/integration-preview` as
+`d0e9469` (conflict resolutions: routes.ts kept allowedNextStatuses;
+dashboard.tsx kept the final-UI redesign's DashboardOverview with
+onViewBooking → openBooking; dashboard-upcoming spec merged both sides).
+Pre-merge commit `81158a2` recorded the live-but-uncommitted tenant
+service-modes + SA-01 + GET-by-id work found in the trunk tree. The ONE
+canonical preview is **http://localhost:5050** (fleetpro-main). The :5098
+candidate server was stopped; the worktree/branch remain for rollback.
+
+Promotion incident: a duplicate dev server from
+`fleetpro-worktrees/fleetpro-final-canonical` (older lineage) bound :5050
+via SO_REUSEPORT alongside the trunk server, splitting traffic between two
+code versions (intermittent Invalid session/CSRF failures). Stopped by
+exact PID (41074) per the repo process-safety rule; :5050 is single-server
+again. If that session needs its server, it should use its own port.
 
 ## KNOWN LIMITATIONS
 
