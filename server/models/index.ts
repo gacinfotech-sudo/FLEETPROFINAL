@@ -3721,3 +3721,50 @@ const OperationsActivitySchema = new Schema<IOperationsActivity>({
 OperationsActivitySchema.index({ tenantId: 1, bookingId: 1, at: -1 });
 
 export const OperationsActivity = mongoose.model<IOperationsActivity>('OperationsActivity', OperationsActivitySchema);
+
+// Vehicle Type Master — centralized catalog of vehicle types available for inquiry requirements
+// Separate from actual Fleet vehicles; customers may request types not currently owned
+export interface IVehicleType extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  category: string;
+  vehicleModel: string;
+  seatingCapacity: number;
+  luggageCapacity?: number;
+  acStatus: 'ac' | 'non_ac' | 'both';
+  transmission?: 'manual' | 'automatic' | 'both';
+  fuelType?: 'petrol' | 'diesel' | 'hybrid' | 'electric' | 'cng';
+  luxuryLevel?: 'economy' | 'standard' | 'premium' | 'luxury';
+  description?: string;
+  displayName: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const VehicleTypeSchema = new Schema<IVehicleType>(
+  {
+    tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+    category: { type: String, required: true },
+    vehicleModel: { type: String, required: true },
+    seatingCapacity: { type: Number, required: true },
+    luggageCapacity: { type: Number },
+    acStatus: { type: String, enum: ['ac', 'non_ac', 'both'], default: 'ac' },
+    transmission: { type: String, enum: ['manual', 'automatic', 'both'] },
+    fuelType: { type: String, enum: ['petrol', 'diesel', 'hybrid', 'electric', 'cng'] },
+    luxuryLevel: { type: String, enum: ['economy', 'standard', 'premium', 'luxury'] },
+    description: { type: String },
+    displayName: { type: String, required: true },
+    sortOrder: { type: Number, default: 0 },
+    isActive: { type: Boolean, default: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { timestamps: false }
+);
+
+VehicleTypeSchema.index({ tenantId: 1, isActive: 1, sortOrder: 1 });
+VehicleTypeSchema.index({ tenantId: 1, seatingCapacity: 1 });
+VehicleTypeSchema.index({ tenantId: 1, vehicleModel: 1 });
+
+export const VehicleType = mongoose.model<IVehicleType>('VehicleType', VehicleTypeSchema);

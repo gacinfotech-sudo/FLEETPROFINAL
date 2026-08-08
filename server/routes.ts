@@ -63,7 +63,7 @@ import { buildPaymentDues } from "./services/paymentDues";
 import { whatsappProvider } from "./whatsapp/index";
 import { buildMessage, type MessageType } from "./whatsapp/templates";
 import { normalizeIndianPhone } from "./whatsapp/phone";
-import { WhatsAppMessage, Booking } from "./models/index";
+import { WhatsAppMessage, Booking, VehicleType } from "./models/index";
 import { sendBookingMessage } from "./whatsapp/sendBookingMessage";
 import { buildCustomerTemplatePreviews, CUSTOMER_TEMPLATE_KEYS, type CustomerTemplateKey } from "./whatsapp/customerTemplates";
 import { findVehicleConflicts, checkDriverAvailability, combineDateTime } from "./services/availability";
@@ -1953,6 +1953,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(vehicles);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch available vehicles" });
+    }
+  });
+
+  // Vehicle Type Master Routes
+  app.get("/api/vehicle-types", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { search, minSeating, maxSeating } = req.query;
+      const query: Record<string, any> = { tenantId: req.tenantId, isActive: true };
+
+      if (search) {
+        const searchTerm = String(search).toLowerCase();
+        query.$or = [
+          { displayName: { $regex: searchTerm, $options: 'i' } },
+          { model: { $regex: searchTerm, $options: 'i' } },
+          { category: { $regex: searchTerm, $options: 'i' } },
+        ];
+      }
+
+      if (minSeating) {
+        query.seatingCapacity = { $gte: parseInt(String(minSeating)) };
+      }
+      if (maxSeating) {
+        if (!query.seatingCapacity) query.seatingCapacity = {};
+        query.seatingCapacity.$lte = parseInt(String(maxSeating));
+      }
+
+      const types = await VehicleType.find(query).sort({ sortOrder: 1 });
+      res.json(types);
+    } catch (error: any) {
+      console.error('Get vehicle types error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch vehicle types" });
+    }
+  });
+
+  app.get("/api/vehicle-types/by-seating/:seating", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const seating = parseInt(req.params.seating);
+      if (isNaN(seating) || seating < 1) {
+        return res.status(400).json({ message: "Invalid seating capacity" });
+      }
+
+      const types = await VehicleType.find({
+        tenantId: req.tenantId,
+        isActive: true,
+        seatingCapacity: { $gte: seating },
+      }).sort({ seatingCapacity: 1, sortOrder: 1 });
+
+      res.json(types);
+    } catch (error: any) {
+      console.error('Get vehicle types by seating error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch vehicle types" });
     }
   });
 
