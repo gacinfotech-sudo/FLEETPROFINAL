@@ -54,6 +54,26 @@ export default function PlanManagementModal({ tenant, isOpen, onClose }: PlanMan
     enabled: isOpen && !!tenant,
   });
 
+  // Enabled service modes (Self Drive / With Driver) for this tenant
+  const { data: serviceModes } = useQuery<{ selfDrive: boolean; withDriver: boolean }>({
+    queryKey: [`/api/admin/tenants/${tenant?._id || tenant?.id}/service-modes`],
+    enabled: isOpen && !!tenant,
+  });
+
+  const updateServiceModesMutation = useMutation({
+    mutationFn: async (data: { selfDrive: boolean; withDriver: boolean }) => {
+      const response = await apiRequest("PATCH", `/api/admin/tenants/${tenant._id || tenant.id}/service-modes`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/admin/tenants/${tenant._id || tenant.id}/service-modes`] });
+      toast({ title: "Service modes updated" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update service modes", variant: "destructive" });
+    },
+  });
+
   const form = useForm<PlanFormData>({
     resolver: zodResolver(planSchema),
     defaultValues: {
@@ -204,6 +224,48 @@ export default function PlanManagementModal({ tenant, isOpen, onClose }: PlanMan
               </CardContent>
             </Card>
           )}
+
+          {/* Service Modes — which operating workflows this tenant runs.
+              Disabling a mode blocks new bookings of that mode only;
+              history stays readable. At least one must stay enabled. */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Service Modes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {([
+                  { key: 'withDriver' as const, label: 'With Driver', desc: 'Chauffeur-driven bookings' },
+                  { key: 'selfDrive' as const, label: 'Self Drive', desc: 'Customer-driven rentals' },
+                ]).map(({ key, label, desc }) => (
+                  <label key={key} className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      data-testid={`service-mode-${key}`}
+                      checked={serviceModes?.[key] !== false}
+                      onChange={(e) => {
+                        const next = {
+                          selfDrive: serviceModes?.selfDrive !== false,
+                          withDriver: serviceModes?.withDriver !== false,
+                          [key]: e.target.checked,
+                        };
+                        if (!next.selfDrive && !next.withDriver) {
+                          toast({ title: "Not allowed", description: "At least one service mode must remain enabled.", variant: "destructive" });
+                          return;
+                        }
+                        updateServiceModesMutation.mutate(next);
+                      }}
+                    />
+                    <div>
+                      <p className="font-medium">{label}</p>
+                      <p className="text-sm text-gray-500">{desc}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Plan Management Form */}
           <Card>

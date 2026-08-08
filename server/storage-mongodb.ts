@@ -90,6 +90,7 @@ export interface IStorage {
 
   // Subscription Plan Management
   updateTenantPlan(tenantId: string, plan: string, limits: { vehicles: number; drivers: number; managers: number; }): Promise<ITenant | undefined>;
+  updateTenantServiceModes(tenantId: string, serviceModes: { selfDrive: boolean; withDriver: boolean; }): Promise<ITenant | undefined>;
   getTenantLimits(tenantId: string): Promise<{ vehicles: number; drivers: number; managers: number; } | null>;
   checkVehicleLimit(tenantId: string): Promise<{ current: number; limit: number; canAdd: boolean; }>;
   checkDriverLimit(tenantId: string): Promise<{ current: number; limit: number; canAdd: boolean; }>;
@@ -215,8 +216,16 @@ export class MongoDBStorage implements IStorage {
 
       return user;
     } catch (error) {
+      // SA-01 root cause: this previously swallowed every error (including a
+      // transient MongoDB disconnect/reconnect blip — this app's session
+      // store is Mongo-backed) and returned undefined, which
+      // authenticateUser() cannot distinguish from "no such session" — so a
+      // transient DB hiccup permanently destroyed a perfectly valid session
+      // and force-logged-out the user. Re-throw so the caller can tell
+      // "lookup failed" (retryable) apart from "not found" (destroy the
+      // session) instead of collapsing both into the same undefined.
       console.error('Error getting user by session ID:', error);
-      return undefined;
+      throw error;
     }
   }
 
@@ -1387,6 +1396,21 @@ export class MongoDBStorage implements IStorage {
   }
 
   // Subscription Plan Management Methods
+  async updateTenantServiceModes(tenantId: string, serviceModes: { selfDrive: boolean; withDriver: boolean; }): Promise<ITenant | undefined> {
+    try {
+      const objectId = new mongoose.Types.ObjectId(tenantId);
+      const updatedTenant = await Tenant.findByIdAndUpdate(
+        objectId,
+        { $set: { serviceModes } },
+        { new: true }
+      );
+      return updatedTenant || undefined;
+    } catch (error) {
+      console.error('Error updating tenant service modes:', error);
+      return undefined;
+    }
+  }
+
   async updateTenantPlan(tenantId: string, plan: string, limits: { vehicles: number; drivers: number; managers: number; }): Promise<ITenant | undefined> {
     try {
       const objectId = new mongoose.Types.ObjectId(tenantId);

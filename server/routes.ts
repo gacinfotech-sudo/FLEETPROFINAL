@@ -1504,6 +1504,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Which service modes (Self Drive / With Driver) a tenant operates.
+  // Absent field = both enabled, so pre-existing tenants are unaffected.
+  app.get("/api/admin/tenants/:tenantId/service-modes", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const tenant = await storage.getTenant(req.params.tenantId);
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
+      res.json({
+        selfDrive: tenant.serviceModes?.selfDrive !== false,
+        withDriver: tenant.serviceModes?.withDriver !== false,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch service modes" });
+    }
+  });
+
+  app.patch("/api/admin/tenants/:tenantId/service-modes", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { selfDrive, withDriver } = req.body;
+      if (typeof selfDrive !== 'boolean' || typeof withDriver !== 'boolean') {
+        return res.status(400).json({ message: "selfDrive and withDriver must be booleans" });
+      }
+      if (!selfDrive && !withDriver) {
+        return res.status(400).json({ message: "At least one service mode must remain enabled" });
+      }
+      const tenant = await storage.updateTenantServiceModes(req.params.tenantId, { selfDrive, withDriver });
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
+      res.json({ message: "Service modes updated", serviceModes: tenant.serviceModes });
+    } catch (error) {
+      console.error('Error updating tenant service modes:', error);
+      res.status(500).json({ message: "Failed to update service modes" });
+    }
+  });
+
   // Check current usage vs limits for a tenant
   app.get("/api/admin/tenants/:tenantId/usage", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
     try {
@@ -2067,6 +2100,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Booking Routes
+  // Enabled service modes for the CURRENT tenant — drives which of the
+  // Self Drive / With Driver selectors the booking UI shows at all.
+  app.get("/api/tenant/service-modes", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const tenant = await storage.getTenant(String(req.tenantId));
+      res.json({
+        selfDrive: tenant?.serviceModes?.selfDrive !== false,
+        withDriver: tenant?.serviceModes?.withDriver !== false,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch service modes" });
+    }
+  });
+
   app.get("/api/bookings", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const bookings = await storage.getBookingsByTenant(req.tenantId!);
@@ -2403,6 +2450,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Single booking by id — genuinely missing until now (found via DEF-001
+  // final retest: every other single-booking need is a sub-resource,
+  // e.g. /api/bookings/:id/payments, so a bare fetch-by-id was never
+  // built). Registered after every literal /api/bookings/<word> route
+  // above (upcoming) so this :id wildcard can't shadow them — Express
+  // matches in registration order. storage.getBooking() already exists
+  // and is already tenant-scoped + ObjectId-validated; this just exposes it.
+  app.get("/api/bookings/:id", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const booking = await storage.getBooking(req.params.id, req.tenantId!);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+      res.json(booking);
+    } catch (error) {
+      console.error('Get booking by id error:', error);
+      res.status(500).json({ message: "Failed to fetch booking" });
+    }
+  });
+
   // Booking wizard draft persistence — one slot per (tenant, user). Purely
   // additive: the Add Booking form works exactly as before if a caller never
   // touches these routes. Scoped to authenticateUser + requireTenant only
@@ -2517,6 +2582,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (!bookingData.resourceFulfilmentStatus) {
         bookingData.resourceFulfilmentStatus = bookingData.vehicleId ? 'own_fleet_assigned' : 'not_started';
+      }
+
+      // Service-mode gate: a tenant configured as Self-Drive-only or
+      // With-Driver-only must not accept NEW bookings in the disabled mode
+      // (hidden UI alone is not enforcement). Existing bookings/history are
+      // untouched — this runs only on create.
+      if (bookingData.bookingType === 'self_drive' || bookingData.bookingType === 'with_driver') {
+        const tenant = await storage.getTenant(String(req.tenantId));
+        const modeEnabled = bookingData.bookingType === 'self_drive'
+          ? tenant?.serviceModes?.selfDrive !== false
+          : tenant?.serviceModes?.withDriver !== false;
+        if (!modeEnabled) {
+          return res.status(403).json({
+            message: `${bookingData.bookingType === 'self_drive' ? 'Self Drive' : 'With Driver'} bookings are not enabled for this account.`,
+            code: "SERVICE_MODE_DISABLED",
+          });
+        }
       }
 
       // Duplicate-request guard (pipeline audit finding: this route had no
