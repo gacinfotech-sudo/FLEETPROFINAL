@@ -7,20 +7,20 @@
     "purpose": "Detect unintended UI changes"
   },
   "protected_files": {
-    "client/src/App.tsx": { "sha256": "41e9426556878d3a1785ad6dc93bcabf49884104042fcd76aece5faf2a016059", "size":  4411 },
-    "client/src/main.tsx": { "sha256": "f99abbb728ee0e7fca013ad36239ef653e6c89814877c6bb29f9bac0645f7e2c", "size":  2500 },
-    "client/src/index.css": { "sha256": "3f007af3476a9cf6035f699ff249bb36398f65fb384f5c0f5fb95f5446464063", "size":  3909 },
-    "client/src/components/layout/sidebar.tsx": { "sha256": "0ad24f48c0f8724b9852325a77422c31f75a11171d698e111546e25fc9d26119", "size":  12891 },
-    "client/src/pages/dashboard.tsx": { "sha256": "e801af17e44dbd33649e2e29223b37369447212767e5cf03e0a720589bb79141", "size":  113209 },
-    "client/src/components/ui/card.tsx": { "sha256": "69afcf9c8e58ca6c3acf43c5b1ec9186bb6c88952f0ff49345dd2666f93d5480", "size":  1858 },
-    "client/src/components/ui/button.tsx": { "sha256": "415ccc47cf69a2a87db699cc6da7f1fdcb799a1f40dab3a6220d91ac8da8abbe", "size":  1901 },
-    "client/src/components/ui/input.tsx": { "sha256": "b326e2af874b14aa2ac18096ddbec512c6258f3fafc20ba6c8262818d48e6a5b", "size":  791 },
-    "client/src/components/ui/select.tsx": { "sha256": "79888d8afa95a5eb89cf0395e3e5a64d9c30264ea802d2bf3f6e52d8850d6304", "size":  5742 },
-    "client/src/components/ui/table.tsx": { "sha256": "1da243956282c040db49d5718d2f0093a705fbbdfa3a25f51c1a31a069c45093", "size":  2765 },
-    "client/src/components/ui/dialog.tsx": { "sha256": "bd52b5f3cce04e443743ff69e87a9517e5f639bb33e0fe885ef1c8f0e06aae52", "size":  4914 },
-    "client/src/components/ui/tabs.tsx": { "sha256": "d9958fd005db42bcca4f2c12ede63500e74f1a9bd82ddc3a6bf6fcb369706f07", "size":  1883 },
-    "client/src/components/ui/badge.tsx": { "sha256": "db977d821af56ae3fb7952182d9c0a076a10c75c38bc2d2b000827e720423d32", "size":  1128 },
-    "client/src/components/ui/dropdown-menu.tsx": { "sha256": "aca10633792d03bb541e09ea106b5e1f3de429b69b3cade5ccfb7dca20289424", "size":  7609 },
-    "postcss.config.js": { "sha256": "190c877db466995bf1482f4a16abd06e04a89ede3119341e2a86ff96e1737b27", "size":  80 }
+    "client/src/App.tsx": { "sha256": "41e9426556878d3a1785ad6dc93bcabf49884104042fcd76aece5faf2a016059", "size": 4411 },
+    "client/src/main.tsx": { "sha256": "f99abbb728ee0e7fca013ad36239ef653e6c89814877c6bb29f9bac0645f7e2c", "size": 2500 },
+    "client/src/index.css": { "sha256": "3f007af3476a9cf6035f699ff249bb36398f65fb384f5c0f5fb95f5446464063", "size": 3909 },
+    "client/src/components/layout/sidebar.tsx": { "sha256": "0ad24f48c0f8724b9852325a77422c31f75a11171d698e111546e25fc9d26119", "size": 12891 },
+    "client/src/pages/dashboard.tsx": { "sha256": "e801af17e44dbd33649e2e29223b37369447212767e5cf03e0a720589bb79141", "size": 113209 },
+    "client/src/components/ui/card.tsx": { "sha256": "69afcf9c8e58ca6c3acf43c5b1ec9186bb6c88952f0ff49345dd2666f93d5480", "size": 1858 },
+    "client/src/components/ui/button.tsx": { "sha256": "415ccc47cf69a2a87db699cc6da7f1fdcb799a1f40dab3a6220d91ac8da8abbe", "size": 1901 },
+    "client/src/components/ui/input.tsx": { "sha256": "b326e2af874b14aa2ac18096ddbec512c6258f3fafc20ba6c8262818d48e6a5b", "size": 791 },
+    "client/src/components/ui/select.tsx": { "sha256": "79888d8afa95a5eb89cf0395e3e5a64d9c30264ea802d2bf3f6e52d8850d6304", "size": 5742 },
+    "client/src/components/ui/table.tsx": { "sha256": "1da243956282c040db49d5718d2f0093a705fbbdfa3a25f51c1a31a069c45093", "size": 2765 },
+    "client/src/components/ui/dialog.tsx": { "sha256": "bd52b5f3cce04e443743ff69e87a9517e5f639bb33e0fe885ef1c8f0e06aae52", "size": 4914 },
+    "client/src/components/ui/tabs.tsx": { "sha256": "d9958fd005db42bcca4f2c12ede63500e74f1a9bd82ddc3a6bf6fcb369706f07", "size": 1883 },
+    "client/src/components/ui/badge.tsx": { "sha256": "db977d821af56ae3fb7952182d9c0a076a10c75c38bc2d2b000827e720423d32", "size": 1128 },
+    "client/src/components/ui/dropdown-menu.tsx": { "sha256": "aca10633792d03bb541e09ea106b5e1f3de429b69b3cade5ccfb7dca20289424", "size": 7609 },
+    "postcss.config.js": { "sha256": "190c877db466995bf1482f4a16abd06e04a89ede3119341e2a86ff96e1737b27", "size": 80 }
   }
 }
