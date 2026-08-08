@@ -174,11 +174,38 @@ data.
 
 ## CANONICAL COMMIT
 
-(left blank — Dispatcher fills in after landing)
+`3fb3ed1` — "Merge Add Driver 400 permanent fix (task/driver-add-400-fix)" on
+`booking/integration-preview`. Landed via `git stash push -- <3 files>` /
+merge / `git stash pop`, scoped to the two unrelated uncommitted changes
+present on trunk at merge time (SA-01 session-stability fix in
+`auth.ts`/`storage-mongodb.ts`, and an unrelated `GET /api/bookings/:id`
+addition in `routes.ts`) — both verified byte-for-byte identical
+before/after the round-trip, neither touched or absorbed by this commit.
+
+Pre-promotion, this session also found and fixed unrelated collateral
+damage: the fix-development agent's own test-cleanup pass ran a broad
+`pkill -f "tsx server/index.ts"`, which took down the live canonical
+`:5050` process (confirmed down via direct health check, ~15 min before
+this commit landed) in addition to the `manual-test-preview` instance it
+noticed and reported. Restarted `:5050` by exact PID before doing anything
+else, verified healthy and already serving real traffic, then proceeded
+with the merge above.
 
 ## LIVE URL
 
-(left blank — Dispatcher fills in after landing)
+`http://127.0.0.1:5050/dashboard/drivers` — verified via a real, direct API
+reproduction of the exact original bug report against this canonical
+instance post-restart: `POST /api/drivers` with `licenseNumber: ""` and
+`email: ""` (both blank, matching the screenshot) → `HTTP 200`, real driver
+document created (`_id: 6a76261be0cd7001299a3c63`), not the reported 400.
+Also independently re-ran both new E2E specs (19/19 pass, including the
+Section 20/28 permanent regression scenario and the Section 21
+edit-after-creation flow) against a throwaway candidate on `:5160` built
+from this exact commit before promoting — not merely trusting the
+fix-development agent's own report.
+
+Fix-status lifecycle: REPRODUCED → ROOT_CAUSE_CONFIRMED → FIX_IN_WORKTREE →
+TARGETED_TEST_PASS → INTEGRATED → CANONICAL_RUNTIME_RETEST_PASS → **CLOSED**.
 
 ## ROLLBACK
 

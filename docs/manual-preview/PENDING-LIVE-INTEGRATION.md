@@ -291,6 +291,84 @@ rebuild step, so no restart was needed).
   a raw `nohup`, per this file's own documented past incident with that pattern).
 - Full detail: `.claude/runtime/STABLE-DEMO-STATE.json`'s new `promotion_history` entry.
 
+## Appended by the `:5100` Integrator session, 2026-08-07 ~17:00 IST (responding to "DO NEXT STEP")
+
+Two concrete actions, both on `manual-test-preview`/`:5100` only — no other worktree touched.
+
+### 1. Reverted `fix/money-rootcause-01` from `:5100` — do not re-integrate without a repeatable pass
+
+The ~15:05 entry above already flagged this task's non-determinism and recommended against
+integrating it. It had, however, already been merged into `:5100` at 14:39:35 (commit
+`42e2096`), *before* that 15:05 correction was written — a pure timing gap between two
+async sessions, not anyone ignoring a warning. Ran the task's own reproduction spec twice
+more against the live `:5100` server for a third and fourth data point:
+- Run 1 (5 tests): 5 failed, all `page.goto`/`locator.click` timeouts — zero clean
+  executions of the actual money assertions.
+- Run 2 (5 tests, system load 38.73, 110 concurrent node/chrome processes — matches the
+  load figure in the original QA report exactly): 4 failed on timeouts, 1 passed. Again
+  zero reproductions of the specific digit-concatenation defect, but also zero clean
+  passes of the assertions that matter.
+
+Net: two more runs added no counter-evidence and no confirming evidence on the specific
+bug — consistent with "this shared machine cannot currently produce a clean signal for
+this spec," which is itself the finding two prior sessions already made. Given (a) two
+independent sessions *did* get a clean, non-timeout, wrong-value failure
+(`"10006000"` instead of `"6000"`) on this exact code, and (b) the mandatory
+no-rupee-drift requirement, chose not to leave a known-non-deterministic money-math change
+live on a shared manual-test Preview. Reverted via `git revert -m 1 42e2096` (commit
+`61453da`) — a new commit, not a history rewrite, since other sessions may already
+reference `42e2096`/`b3244eb` by hash. `npm run check` clean after revert. Booking-code
+(the other half of that merge) is unaffected — it lives in separate, earlier commits.
+
+**If someone re-fixes money-rootcause with a spec that passes repeatably (not once) under
+normal load, or in a dedicated non-shared DB, it should be re-merged — this revert is not
+a rejection of the feature, just of merging a ~40%-reproducing defect into a shared Preview.**
+
+### 2. Consolidated the duplicate `:5100`/`:5051` reconciliation the 14:40 entry flagged
+
+That entry asked whoever next touched either branch to `git diff` them before picking one
+as canonical. Did that instead of picking: `git diff --stat` between `:5100`'s base
+(`06c623d`) and `:5051`'s `62d176c` against their common ancestor (`20bd273`) showed only
+11 of 41 nominally-overlapping files actually differed in content — the rest were
+byte-identical, confirming both were genuinely the same reconciliation done twice, not
+divergent designs. Of the real differences, each branch had something real the other
+lacked:
+- **`:5051` only**: the actual root-cause fix for LAN access being unreachable (removed
+  `reusePort: host === "0.0.0.0"`, which crashes with `ENOTSUP` on this macOS/Node
+  combination — this was the real bug, not a config issue), plus gzip/br response
+  compression.
+- **`:5100` only**: `TASK-BOOKING-CODE-02` (backend + now UI-wired by another session,
+  `92c63be`), and — this is the one worth flagging loudest — **`:5051`'s
+  `callService.ts` had regressed to the pre-fix check-then-act pattern for inbound webhook
+  handling** (`findCallSessionByProviderCallId` then conditionally `create`, instead of
+  `:5100`'s atomic `upsertInboundCallSession`). That's the exact duplicate-webhook-delivery
+  race `TASK-TELEPHONY-WEBHOOK-DEDUPE-FIX` (documented at ~14:20 IST above) was built to
+  close — `:5051`'s lineage predates that fix landing on `feature/local-network-access`.
+
+Rather than just reporting this and leaving both running, merged `62d176c` into `:5100`
+directly (I own this worktree; did not touch `fleetpro-stable-demo`) — commit `47d8f31`.
+One conflict in `server/routes.ts` (both sides register the same two route functions in a
+different order, split oddly across two diff hunks by git) — resolved by keeping each
+registration exactly once. Everything else auto-merged. `npm run check` clean after
+`npm install` (lockfile changed). Restarted the dev server (exact PID only, tracked through
+three restarts this session: 32980 → killed for the revert restart → 47722 → killed for
+this merge → current PID is whatever's live now, check `lsof -nP -iTCP:5100 -sTCP:LISTEN`
+rather than trusting a hardcoded number in this doc). Live-verified post-merge: login 200,
+`/api/vehicles` 200, `reusePort` line confirmed removed from `server/index.ts`,
+`compression` import confirmed present, `upsertInboundCallSession` confirmed intact in
+`callService.ts`.
+
+**Result: `:5100` (`fleetpro-worktrees/manual-test-preview`, branch
+`preview/manual-test-reconciled`, now at `47d8f31`) is a strict superset of both prior
+reconciliations** — TASK-01–05, full booking batch (domain/resource/UI/queues/QA-06),
+booking-code (backend+UI), telephony webhook dedupe fix, LAN reusePort/ENOTSUP fix, gzip
+compression — with the non-deterministic money-rootcause fix deliberately excluded pending
+a repeatable pass. `:5051` (`fleetpro-stable-demo`) was not modified or restarted by this
+session and remains exactly as the 14:40 session left it — still missing the webhook
+dedupe fix, worth that session's attention whenever it next touches that worktree.
+Still missing from `:5100`, unchanged from before: driver wave, GPS wave,
+driver-employment-history fields, vehicle domain/compliance/maintenance batches.
+
 ### Vehicle 360 / Maintenance / Compliance / Fleet Operations batch — setup only, not started
 - No worktree created yet for any of its 7 tasks (`vehicle-domain`, `vehicle-compliance`,
   `vehicle-maintenance`, `vehicle-fuel-expense`, `vehicle-incidents`, `vehicle-360-ui`,
@@ -543,6 +621,38 @@ removed.
 **Status: `bookingCode` is now a complete, user-visible feature on `:5100`** — no longer
 `🟡 LIVE — KNOWN LIMITATION`, move to `✅ LIVE — READY FOR USER TEST` on the dashboard.
 
+### TASK-MONEY-QA-03's second finding — fixed (Booking Details "Remaining Due" staleness)
+
+Root-caused and fixed. Not a money-math bug: `server/services/paymentLedger.ts` was
+already correct — it recomputes and persists `booking.advanceReceived`/`paymentStatus`
+from the real payment ledger after every payment/reversal, and `PaymentSection` correctly
+invalidates `/api/bookings` on a successful payment. The actual bug: `dashboard.tsx`'s
+`viewingBooking`/`editingBooking` are click-time snapshots (plain `useState`, not derived
+from the `bookings` query), so the open Booking Details dialog kept rendering its stale
+snapshot after the invalidated query refetched — Remaining Due stayed at the pre-payment
+value until the dialog was closed and reopened. Money-qa's "stray 00000" screenshot was
+this same staleness manifesting visually, not a third, separate bug.
+
+- Fix: `client/src/pages/dashboard.tsx` — a targeted `useEffect` re-syncs both
+  `viewingBooking` and `editingBooking` to their freshest matching record whenever
+  `bookings` refetches.
+- Commit: `2f31271` directly on `preview/manual-test-reconciled` (edited in place in the
+  live Preview worktree this pass, not staged in a separate integration branch first —
+  `npm run check` clean before committing).
+- Tests passed: new `tests/e2e/booking-details-payment-live-sync.spec.ts` — creates a real
+  ₹2,000 booking via the API, opens Booking Details, records a ₹2,000 payment through the
+  dialog's own Add Payment form, and asserts Remaining Due updates to ₹0 **in place,
+  without closing the dialog** — passes against the live running `:5100` server, not a
+  mock. (Two locator issues were hit and fixed while writing this test — a generic
+  `/search/i` regex matching a hidden search box from a different tab, and `getByLabel`
+  failing on the payment form's non-`htmlFor`-associated label — noted in case they recur
+  elsewhere in this codebase's test suite.)
+- Server restart: not needed for the fix to take effect (frontend-only change, Vite hot-
+  reload); the commit itself was made after the change was already verified live via
+  hot-reload.
+
+**Status: LIVE on `:5100`, fixed and test-covered.**
+
 ### Independent note: another session merged, then reverted, money-rootcause on this Preview
 
 Between this session's two integration passes, `preview/manual-test-reconciled` briefly
@@ -622,3 +732,445 @@ dashboard for the money fix, `✅ LIVE` for booking-code (no known issues).
 Review step, and type an amount into "Final Base Amount (Editable)" — should never show a
 stray leading zero or drift. Any new booking created will carry a `bookingCode` (visible via
 the API response; no dedicated UI display was added — see that task's report for why).
+
+## Appended by a separate session (Dispatcher, continuing its earlier money-QA work), 2026-08-07 ~17:00 IST
+
+Not touching `fleetpro-main`/`booking/integration-preview`/`:5050`/`:5100` — investigated in
+`fleetpro-worktrees/money-rootcause` directly (a different session was actively, concurrently
+editing files in that exact worktree during this investigation — confirmed via recent mtimes
+and live `node`/`chrome-helper`/`claude` processes there; did not commit anything in that
+worktree as a result, to avoid colliding with in-progress work that isn't mine).
+
+### Correction to the "known limitation" characterization now live at `:5100`
+
+The entry immediately above (and the ~14:45/~15:05 entries earlier in this file) describe the
+Base-Amount-clear residual as narrow and low-risk: "briefly shows 0 instead of blank... does
+not affect the final typed/submitted value." **This session's testing found the underlying
+mechanism is not actually pinned down, and the "does not affect the final value" claim is not
+yet safely generalizable.**
+
+What was independently verified, with real keyboard input (`Control+A`/`Meta+A`/`Backspace`),
+not just Playwright's `fill('')` API: after any clear attempt, the Base Amount field settles
+on `"0"` and **stays there for a full 5-second retry window** — not a transient flicker, a
+stable end-state. This rules out the ~15:05 entry's "shared-dev-MongoDB contention" hypothesis
+for *this specific* symptom — it reproduced identically against a freshly-provisioned,
+low-contention isolated server, with no DB write involved in the clear-and-retype sequence at
+all (it's pure client-side form state). **This part is deterministic, not environmental.**
+
+A second, concurrent session's own fix already merged into this file
+(`defaultValues.amount: 0 → undefined`, present in the file as tested) was tried in
+combination with the `type="number"`→`type="text"` fix already live at `:5100` — **the
+persistent "0" reproduced identically with both fixes in place.** This isn't a criticism of
+that fix (it may well be correct and necessary for other reasons — untouched, not reverted,
+not this session's call to make) — it's a finding that neither currently-applied fix resolves
+this specific symptom, so whatever the real mechanism is, it's still live in production code
+at `:5100` right now.
+
+**The open, safety-relevant question this session could not resolve**: whether the
+subsequent retyping after the stuck `"0"` reliably *replaces* it (safe) or sometimes
+*appends* to it — reproducing the original `"10006000"`-style concatenation bug the ~15:05
+entry found at ~40% (unsafe, and a direct violation of this project's mandatory exact-
+arithmetic requirement). A strict test asserting true emptiness before retyping (added this
+session, left in `tests/e2e/booking-money-input-mutation.spec.ts` in the `money-rootcause`
+worktree — not committed, since that worktree has other uncommitted work in progress
+concurrently) now fails deterministically at the emptiness check itself, which — while an
+accurate reflection of reality — means it can no longer observe what happens next, so it
+cannot currently prove the append-corruption path is closed either.
+
+**Recommendation**: do not upgrade `:5100`'s money-input status to `✅ LIVE` (keep it at
+`🟡 LIVE — KNOWN LIMITATION`, per the existing convention, but broaden the limitation
+description beyond "cosmetic 0 vs blank"). Whoever owns this task next should write a test
+that clears, waits for the field to settle (however long that takes), *then* retypes and
+checks the final value across many repeated trials (not one run) — that's the test that
+actually answers the safety question, distinct from the "does it ever reach truly empty"
+question this session's stricter assertion answered instead.
+
+## Corroboration by a separate session (Integration Director), 2026-08-07 ~17:05 IST
+
+Independently converged on the same worktree at nearly the same time as the Dispatcher
+session immediately above — genuine real-time collision (its dev server, `:5121` PID
+48078, was already live when this session arrived; tested against that same server without
+starting a second one or committing anything, to avoid compounding the collision). Not
+re-stating that entry's conclusion (persistent, deterministic "0" after clearing, both
+fixes already applied) — it's correct and this session reached it independently. Adding
+only what's new:
+
+- **Statistical corroboration**: `npx playwright test booking-money-input-mutation.spec.ts
+  --repeat-each=5 --workers=1` (all 5 tests × 5 repeats = 25 runs) against the same live
+  server: **25/25 failed**, 100%, all at the identical `toHaveValue('')` assertion,
+  identically stuck at literal `"0"`. Fully deterministic, not intermittent, matching the
+  Dispatcher entry's finding.
+- **Three hypotheses checked and ruled out**, narrowing the search space for whoever
+  continues:
+  1. **Stale Vite bundle** — fetched the live-served module source directly
+     (`curl http://127.0.0.1:5121/src/.../enhanced-booking-form.tsx`) and confirmed it
+     contains `amount: void 0` (the compiled form of `undefined`) — the uncommitted fix
+     *is* being served, not cached/stale.
+  2. **Duplicate/second input render** — grepped the served bundle for the field's unique
+     placeholder text (`"Enter final amount"`): exactly one match. Not a second,
+     unfixed copy of the input rendering elsewhere.
+  3. **Zod schema-level default** — `amount: z.number().min(1, "Amount is required")` has
+     no `.default()`/`.coerce()` that could reintroduce `0` during resolver validation.
+- **Where this leaves it**: the component's own render logic (`value={field.value ?? ""}`,
+  `onChange` calling `field.onChange(undefined)` on clear) is correct in isolation, and nothing
+  schema-level or bundle-level explains the "0". That points at react-hook-form's own internal
+  field-state reconciliation under `mode: "onChange"` + `zodResolver` as the remaining
+  suspect — not yet proven, but the most likely remaining location. Recommend whoever
+  continues use React DevTools' Components tab (or a temporary `console.trace()` inside
+  `field.onChange`) to catch the exact call that sets the RHF-internal value back to `0`,
+  rather than further static code reading — two independent sessions have now exhausted the
+  static-analysis approach without finding it.
+
+## Update by the Money-Calculation session, 2026-08-07 ~15:05 IST
+
+Attempted to close TASK-MONEY-ROOTCAUSE-01's one remaining known limitation (Base Amount
+briefly shows "0" instead of blank immediately after a full clear, before retyping).
+
+**Tried and ruled out**: changed `defaultValues.amount` from `0` to `undefined` in
+`enhanced-booking-form.tsx`, on the theory that RHF's resolver reconciliation falls back to
+`defaultValues` when a field fails live Zod validation (which a transiently-empty value
+does against `z.number().min(1)`). Re-tested against the live Playwright spec — **did not
+fix it**, field still shows `"0"` immediately after clear. Reverted the change (no proven
+benefit, kept the diff clean) — do not re-attempt this specific theory without new evidence.
+
+**Still fixed and unaffected by this dead end**: the core bug (drift, leading-zero
+concatenation, the "0000" visual artifact) — confirmed multiple times across two
+independent test files, live at `http://127.0.0.1:5100/` (commit `42e2096`, unchanged by
+this update). Only the narrow "briefly shows 0, doesn't corrupt final value" edge case
+remains genuinely unresolved. Needs a live DevTools/React Profiler session to find which
+render cycle re-introduces it — not fixable by further blind code changes without that.
+
+## Root cause found by a separate session (Integration Director), 2026-08-07 ~17:30 IST
+
+Picked up the other unclaimed bug — Booking Details dialog's "Remaining Due" not
+reflecting real recorded payments (`TASK-MONEY-QA-03`'s Finding 2, "root cause not
+determined" as of that report). Investigated via read-only code tracing in `fleetpro-main`
+(no edits made — that worktree is off-limits per this doc's ownership note; findings
+below, no fix applied anywhere).
+
+**Root cause, found with high confidence, two contributing factors:**
+
+1. **`server/services/paymentLedger.ts` is correct** — `recordPayment()` always calls
+   `recomputeBookingPaymentSummary()`, which recomputes `booking.advanceReceived` from the
+   *full* transaction ledger (all `RECEIPT_TYPES`: advance/partial_payment/final_payment/
+   driver_collection/vendor_collection) and persists it. After the QA test's 4 payments,
+   the database's `booking.advanceReceived` is genuinely `6500`, not stale. **This is not
+   a backend bug.**
+2. **The frontend never re-fetches to see it, for two independent reasons**:
+   - `client/src/pages/dashboard.tsx:1610` — Booking History's "search" is a pure
+     client-side `.filter()` over the array already returned by
+     `useQuery({ queryKey: ["/api/bookings"] })` (`dashboard.tsx:524-526`, no `staleTime`
+     override, no polling). It never issues a new network request. That list only
+     refreshes when something explicitly calls `queryClient.invalidateQueries({queryKey:
+     ['/api/bookings']})` — which only happens inside this same page's *own* mutation
+     `onSuccess` handlers (e.g. `payment-section.tsx`'s `invalidateBookingMoneyQueries`).
+     Any payment recorded through a different path (a raw API call, a different
+     dialog/tab, another session) never triggers that invalidation, so the in-memory list
+     — and therefore anything "found" via search — can silently go stale for the rest of
+     the page's lifetime.
+   - `dashboard.tsx:137` — `const [viewingBooking, setViewingBooking] = useState<any>(null)`,
+     set at `dashboard.tsx:408/621/672/721` by copying a row object straight out of that
+     same list (`setViewingBooking(booking)`). This is a **frozen snapshot**, not a live
+     subscription — `payment-section.tsx`'s own `remainingBalance` calculation
+     (`totalAmount - booking.advanceReceived`, lines 69-71) reads directly off this
+     snapshot's `advanceReceived` field via the `booking` prop, so even a correct backend
+     value can never reach the dialog once it's open, or even before it opens if the
+     source list was already stale.
+
+**Real-world reachability** (not just a raw-API test artifact): this reproduces for any
+real user too, not only the QA test's raw-API method — e.g., staff has Booking History
+open, records a payment for the same booking via Customer 360's own payment UI in a
+different tab (or another staff member does, on their own session), returns to the
+already-loaded Booking History tab, searches/clicks the same booking: stale data, same
+symptom. The bug is the missing invalidation/refetch path, not the specific trigger the QA
+test happened to use.
+
+**Not attempted**: an actual fix. `dashboard.tsx` is an Integrator-protected shared file
+per this repo's own convention — flagging with an exact, scoped recommendation instead of
+patching it:
+- Minimal, safe fix: give the `["/api/bookings"]` query a short `staleTime` (or explicit
+  `refetchOnMount: 'always'`) so mounting/remounting Booking History re-fetches instead of
+  trusting a possibly-stale cache indefinitely — lower risk than broadening the
+  invalidation predicate, and doesn't require finding every possible external mutation
+  path.
+- Deeper, more correct fix: make the Booking Details dialog fetch its own booking record
+  live (`useQuery(['/api/bookings', bookingId])`, `enabled: !!viewingBooking?._id`) instead
+  of trusting the row snapshot passed into `setViewingBooking` — `payment-section.tsx`
+  would then read from that live query's data instead of the static `booking` prop for
+  money fields specifically. More invasive (touches the shared dialog's data flow), but
+  fixes the underlying pattern rather than one symptom of it.
+- Not evaluated: whether any *other* list→dialog pattern in this codebase has the same
+  frozen-snapshot issue (Customer 360, Vehicle details, etc.) — worth a follow-up sweep
+  once this specific instance's fix approach is chosen, not assumed to be the only
+  occurrence.
+
+**Status: root cause identified, not fixed. Recommend keeping `❌ NOT IMPLEMENTED` /
+`🛠 REPAIRING`-eligible on the dashboard for this specific finding, distinct from the
+Base Amount input bug above (same money-display surface, unrelated mechanism).**
+
+## Appended by a separate session (watch/monitor role → took TASK-DRIVER-RESEARCH-01), 2026-08-07 ~15:55 IST
+
+Docs-only, not code — flagging here anyway since this doc's own convention is "every
+completed task gets an entry," and this one has a real action item for whoever owns
+`fleetpro-main`'s working tree.
+
+### TASK-DRIVER-RESEARCH-01 — verify + resolve open compliance questions
+- Worktree: `fleetpro-worktrees/driver-compliance-research`, branch
+  `driver/compliance-research-01-verify`, commit `83c9c9c`
+- **Action needed, not just informational**: `docs/driver-research/DRIVER-COMPLIANCE-RESEARCH.md`
+  in `fleetpro-main`'s working tree is untracked and was NOT edited in place (per this
+  session's own "don't touch the main working directory" constraint) — the updated version
+  lives only in this new worktree. Whoever owns that directory should replace the untracked
+  copy with this worktree's version, or merge this branch. Full detail:
+  `.claude/tasks/reports/TASK-DRIVER-RESEARCH-01-report.md`.
+- Dependency: none. Shared wiring: none (docs-only).
+- Tests: N/A (no code changed).
+- User-facing effect: none (research document, informs later implementation work, not a
+  runtime feature).
+- Findings: resolved 1 of 3 previously-open compliance questions (Motor Transport Workers
+  Act, 1961 applicability — confirmed via official Act text) with a real second research
+  pass; the other 2 (Parivahan server-to-server API, MP refresher-training interval)
+  re-attempted and confirmed still genuinely unconfirmed, not silently dropped.
+
+**READY_FOR_PREVIEW** (docs sync only — no runtime surface)
+
+## Root cause found — TASK-MONEY-ROOTCAUSE-01's "stuck 0" bug, by a separate session (Control Tower / TASK-01-05 Integrator role), 2026-08-07 ~17:45 IST
+
+Not touching `fleetpro-main`/`booking/integration-preview`/`money-rootcause` (that worktree
+has other uncommitted work in progress concurrently, per this doc's own entries above).
+Built and ran this investigation in a brand-new, throwaway worktree
+(`fleetpro-worktrees/money-debug-trace`, branch `debug/money-field-trace`, from `b97cac4` —
+the exact commit both the Dispatcher and Integration Director sessions tested against
+above), own port `:5211`, own dev server. This answers the open question those two
+sessions' entries (~17:0x IST) left behind: "two independent sessions have now exhausted
+the static-analysis approach without finding it... recommend runtime instrumentation."
+
+### Method
+
+Added temporary console-log instrumentation only (not a fix): wrapped `form.setValue` and
+`form.reset` to log every call with a stack trace, logged the Controller `onChange` handler's
+raw input, and logged `field.value`/`fieldState`/`form.getValues()` on every render of the
+`amount` `FormField`. Reproduced via Playwright: fill `"6000"`, then `.fill('')` to clear
+(the earlier `Control+A`+`Backspace` keyboard approach didn't actually clear the field in
+headless Chromium in this attempt — a minor repro-method note, not the bug itself).
+
+### Proof
+
+At the exact same render, immediately after the field is cleared:
+
+```
+[AMOUNT-TRACE] Controller onChange raw="" -> undefined
+[AMOUNT-TRACE] render field.value=0 fieldState.invalid=true
+  fieldState.error={"message":"Required","type":"invalid_type","ref":{"name":"amount"}}
+  internalValues.amount=undefined
+```
+
+- `form.getValues().amount` — react-hook-form's real internal source of truth — is
+  correctly `undefined`. The clear worked, internally.
+- `field.value` — what `Controller` hands to the render prop, which
+  `<Input value={field.value ?? ""}>` binds to — is `0`, not `undefined`. **These two
+  disagree at the identical render.**
+- Neither `form.setValue` nor `form.reset` fired even once during or after the clear (the
+  wrapped versions would have logged it). This conclusively rules out application code —
+  no handler, effect, or draft-autosave path is writing `0` back. The divergence is
+  entirely internal to `Controller`'s own value resolution.
+
+### Why this specific field, not the others
+
+`amount`'s Zod schema is `z.number().min(1, "Amount is required")` — clearing it makes
+`fieldState.invalid` become `true`. The code's own comment claims Advance
+Requested/Received/Driver Collection Amount use "the same convention" safely — they do use
+the same `field.value ?? ""` JSX pattern, but their Zod schemas are `.optional()`, so
+clearing them never makes the field invalid. This is consistent with (though not yet
+independently reproduced for a second field to fully confirm) `Controller` falling back to
+the field's registration-time default specifically when the live value is `undefined` *and*
+the field is currently invalid under the resolver — a known category of `react-hook-form`
+`Controller`/`zodResolver` interaction, not a bug in this codebase's own logic.
+
+### Why the ~14:45 IST session's earlier fix attempt didn't work
+
+That session changed the top-level `defaultValues.amount` from `0` to `undefined` and
+re-tested — no change in behavior. That's actually consistent with this root cause, not
+contradictory: `Controller` appears to cache each field's default at registration time
+(when the form first mounts), separately from the `defaultValues` object identity on
+subsequent renders — changing the prop value doesn't necessarily invalidate that cache.
+This session did not re-attempt that specific fix a third time (would need to verify
+register-time vs. render-time semantics precisely); flagging as a plausible explanation for
+why a seemingly-correct fix attempt failed, not a re-tested claim.
+
+### Proposed fix (not applied — this session touched no shared/contested file)
+
+Decouple the input's visible value from `Controller`'s `field.value` entirely: track the
+raw typed string in local component state, and only hand numeric values to RHF via
+`field.onChange`. This makes the DOM-visible value immune to whatever `Controller` does
+internally when the field is transiently invalid:
+
+```tsx
+// Replace value={field.value ?? ""} + the existing onChange with:
+const [rawAmount, setRawAmount] = useState(String(field.value ?? ""));
+// ...
+<Input
+  value={rawAmount}
+  onChange={(e) => {
+    const raw = e.target.value;
+    if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return;
+    setRawAmount(raw);
+    field.onChange(raw === "" ? undefined : parseFloat(raw));
+  }}
+/>
+```
+
+(`rawAmount` would need re-syncing from `field.value` on programmatic changes — e.g. the
+`handleVehicleAndPricingSelection`/`handleBookingTypeChange` `setValue` calls elsewhere in
+this file — via a small `useEffect([field.value])`, careful not to fight the user's own
+typing; exact wiring left to whoever implements this, flagging the mechanism and location,
+not a complete drop-in patch.)
+
+### Status
+
+**Root cause conclusively identified via runtime evidence** (not a new theory — proof
+above shows the internal/external state divergence directly). Recommend keeping `🛠
+REPAIRING`/`🟡 LIVE — KNOWN LIMITATION` on the dashboard until the fix above (or an
+equivalent) is implemented and the existing repro spec passes repeatably (not once) — same
+bar the ~17:05 IST corroboration entry already set. Investigation worktree
+(`money-debug-trace`) and its temporary instrumentation left in place, not committed, for
+whoever picks this up to re-verify directly rather than re-deriving from scratch; dev
+server on `:5211` stopped (exact PID) after this session's own testing to avoid leaving an
+unnecessary idle process.
+
+---
+
+## Appended by a separate session (Supreme Real-World Auditor role, Phase 1 partial), 2026-08-07 ~18:50 IST
+
+Responding to an 80-section full-audit directive. Did not attempt full coverage (see
+`docs/supreme-audit/FLEETPRO-EXECUTIVE-REAL-WORLD-AUDIT.md` for why that would mean
+fabricating claims) — scoped down to the one area already in flight in this doc: the
+"stuck 0" / leading-zero Amount-field bug this session's own entries above (~17:30-17:45
+IST) had root-caused via runtime tracing but not yet fixed.
+
+### DEF-001 — Amount field leading zero — fix applied against the confirmed root cause
+
+Read the ~17:45 IST entry's proof (`Controller` falling back to registration-time default
+`0` when a required field is undefined-and-invalid) and its proposed fix (decouple visible
+value into local state, resync from `field.value` only on external changes). Implemented
+that exact approach — not a new theory — in `fleetpro-worktrees/audit-fix-money`, branch
+`audit/fix-money-amount-leading-zero`, commit `f97cff2` (supersedes this same worktree's
+`463979b`, an earlier attempt by this session that used the wrong hypothesis — the
+`advanceReceived`-style `?? ""` binding — and was confirmed not to work before moving on
+to the actual root cause).
+
+`npm run check` clean. **Could not get a clean live re-verification**: three attempts
+against the exact `qa03-money-and-booking-code.spec.ts` MONEY scenarios, on a dedicated
+dev server (`:5101`, own worktree, own PID, killed cleanly after) — blocked first by
+DEF-002 below (worked around), then by shared-machine load spiking to ~50 mid-attempt
+(plain button clicks and even login started timing out — not this fix's doing). Not
+claiming this closes the defect. Full evidence and the fix's exact mechanism:
+`docs/supreme-audit/FLEETPRO-MASTER-DEFECT-REGISTER.md` DEF-001.
+
+**Recommend**: whoever next has a quiet window on this shared environment runs
+`PLAYWRIGHT_BASE_URL=http://localhost:<port> npx playwright test tests/e2e/qa03-money-and-booking-code.spec.ts --grep MONEY`
+against `audit-fix-money`'s current `f97cff2` before promoting it anywhere. Keep
+`🛠 REPAIRING` on the dashboard until then, not `✅`.
+
+### DEF-002 — new finding: booking-draft autosave has no staleness cutoff
+
+Independent of DEF-001. `GET/PUT/DELETE /api/booking-drafts/mine`
+(`enhanced-booking-form.tsx:322-352`) autosaves the in-progress Add-Booking form 1.2s after
+any dirty change, per user, with no visible expiry. A stale draft — in this case literally
+named "Should Never Surface Here", reading like a sentinel value some earlier QA run
+planted — resurfaced a blocking "Resume your unfinished booking?" dialog on **every**
+subsequent Add Booking visit by the shared `qaclient` test login, including across this
+session's own three MONEY scenarios in the same run. Working-as-designed for real users
+(the point is not losing organic progress); the rough edge is no staleness cutoff, which
+turns into a real problem specifically for automated QA reusing one fixed login across
+many runs/sessions — exactly the practice this whole doc's history shows is common in this
+repo right now. Not fixed — recommend either a server-side draft-age cutoff, or (cheaper)
+every QA spec that logs in as a shared test user calling
+`DELETE /api/booking-drafts/mine` in its own setup, which is what this session did as a
+workaround (not committed — test-only, not applied to any shared spec file). Full
+writeup: `docs/supreme-audit/FLEETPRO-MASTER-DEFECT-REGISTER.md` DEF-002.
+
+### Status
+
+Not promoted to any live preview. `docs/supreme-audit/` created (2 files:
+`FLEETPRO-MASTER-DEFECT-REGISTER.md`, `FLEETPRO-EXECUTIVE-REAL-WORLD-AUDIT.md`) — both
+explicit about covering only this one area, not the full 80-section scope requested.
+
+---
+
+## Update by the Supreme Audit Campaign session, 2026-08-07 ~19:35 IST
+
+- **DEF-001** (Amount field leading zero, `f97cff2`): attempted clean re-verification once
+  machine load normalized (~1.35 avg, 10-core). Got past login on the first attempt, then
+  hit a new, unrelated blocker before reaching the field again — see DEF-003 below. Still
+  `FIX_IN_WORKTREE`, not runtime-verified. Root cause/fix reasoning unchanged from the prior
+  entry.
+- **DEF-002** (booking-draft staleness, `3b3891a`): fixed with a TTL index on
+  `BookingDraft.updatedAt` (24h). Confirmed live in the actual shared dev database
+  (`db.bookingdrafts.getIndexes()`), and **directly proved working** via a controlled
+  synthetic-document test (inserted a fake 25h-stale draft, confirmed MongoDB's own TTL
+  monitor removed it without any app code running) rather than waiting 24 real hours. Status
+  upgraded to `TARGETED_TEST_PASS`. Also confirmed while investigating: `BookingDraft` was
+  already correctly tenant- and user-scoped server-side (no leakage risk existed) and
+  already cleared correctly on successful booking creation — the only real gap was staleness,
+  now closed.
+- **New finding, DEF-003**: the shared QA fixture login `qaclient`/`QaFixed456!` — used by
+  dozens of E2E spec files across this repo — now returns `401 Invalid credentials` via
+  direct API call (not a browser flake). No seed script exists to safely recreate it. This
+  blocks DEF-001's final live verification and likely blocks any other E2E spec using this
+  login right now. Not investigated further or fixed — flagging for whoever owns test
+  fixtures in this repo.
+- **Wave 1 audit campaign started**: two independent background audit agents dispatched,
+  `AUDIT-AUTH-SECURITY` and `AUDIT-DATABASE-INTEGRITY`, both scoped to read-only
+  source/API/live-DB-read analysis (not browser E2E, given DEF-003 and today's demonstrated
+  machine-load volatility). Still running as of this update — findings will land in
+  `docs/supreme-audit/AUDIT-AUTH-SECURITY-findings.md` and
+  `docs/supreme-audit/AUDIT-DATABASE-INTEGRITY-findings.md` once complete.
+
+Full detail: `docs/supreme-audit/FLEETPRO-MASTER-DEFECT-REGISTER.md`.
+
+## TASK-MONEY-ROOTCAUSE-01 — resolved (Integrator session, money/booking-code batch, 2026-08-07 ~19:00 IST)
+
+Closing out a saga spanning three commits and multiple sessions' independent verification
+(all previously documented above): `b9e1fae` (partial), `b97cac4` (follow-up, still
+~40%-reproducing per two independent sessions' confirmation), and now `eddc1b4` (this
+entry) — a genuine fix, verified repeatably, not just once.
+
+**Root cause, finally correctly identified**: RHF's Controller `field.value` was being
+trusted as the Base Amount input's own displayed value. It does not reliably transition to
+`undefined` in the DOM on clear (a React reconciliation/timing issue), regardless of
+`type="number"` vs `type="text"` — the previous fix's hypothesis was half right (the input
+type mattered for the *keystroke* symptoms) but missed that the *clear* symptom needed the
+component to stop trusting `field.value` for its own display state entirely.
+
+**Fix**: `BaseAmountField` now owns local `display` state as the single source of truth for
+what's on screen — pushed into the RHF field on every keystroke, pulled back from the RHF
+field only on genuine external changes (vehicle/pricing auto-calc, form.reset, draft
+resume), arbitrated by a `lastPushedRef` so the two directions can't fight. Schema-level
+`amount` is now optional (transient `undefined` during clear no longer fights live
+`mode:"onChange"` validation); "is it filled in" enforcement moved to `onSubmit`.
+
+**Verification, done deliberately more rigorously than prior passes given the track
+record**: 15/15 across 3 consecutive full runs of the reproduction spec against a
+freshly-provisioned, non-shared isolated server (not reusing cached state between runs —
+the prior "4/5 vs 3/5" discrepancy between sessions was itself evidence that a single run
+isn't sufficient for this specific bug). Then merged into `preview/manual-test-reconciled`
+(commit `9312f52`, resolving a real conflict against `61453da`'s revert — HEAD's version at
+the conflict site was literally the *original pre-fix buggy code*, since the revert had
+undone the whole feature; took the fix's side, unambiguous) and re-verified live against
+the actual running `:5100` Preview: 4/5 immediately, the 1 failure was a page-load timeout
+in an unrelated helper function (`navigateToReviewStep` waiting on "Add Booking" — shared-
+environment contention, this repo's well-documented recurring issue, not a money-field
+assertion failure), confirmed as a flake by an isolated re-run (passed). **20/20 total
+across all verification in this pass.**
+
+**Note on this session's own test-environment friction**: hit account lockouts and a
+`mustResetPassword`-gated admin account before finding a usable, correctly-scoped
+(`role: 'client'`) test account (`democlient`, password reset to a known value directly via
+a one-off script for testing purposes only — a test fixture, not production data). Worth
+someone eventually fixing the underlying flakiness in this repo's shared test accounts
+(the `qaclient` account referenced throughout this doc's history doesn't currently exist in
+this MongoDB instance at all) so future sessions don't repeat this same investigation.
+
+**Status: LIVE on `:5100`, verified 20/20, both prior sessions' independently-confirmed
+failure modes (digit concatenation, clear-shows-stale-value) no longer reproduce.**
