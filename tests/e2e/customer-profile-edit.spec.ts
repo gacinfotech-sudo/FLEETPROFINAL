@@ -61,7 +61,7 @@ test('Customer profile fields are editable via PUT and derived stats stay protec
   expect(paymentHistory.some((t: any) => t.amount === 500 && t.paymentType === 'advance')).toBe(true);
 
   // UI: open the customer dashboard, edit via the pencil icon, verify it persists.
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(phone);
   await page.getByText('API Edited Name').first().click();
   await expect(page.getByText('Contact Preferences')).toBeVisible();

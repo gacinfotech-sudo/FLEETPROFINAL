@@ -1,4 +1,12 @@
 import mongoose, { Schema, Document } from 'mongoose';
+// TASK-BOOKING-DOMAIN-02: date-certainty enums + conditional-required
+// predicates. vehicleId/resourceFulfilmentStatus are NOT part of this —
+// that shipped separately (see the IBooking comments below). See
+// server/booking/domain/ for the full design rationale.
+import {
+  TRAVEL_DATE_STATUSES, TRIP_TYPES,
+  isPickupDateRequired, isTentativeRangeRequired,
+} from '../booking/domain';
 
 // Interfaces for TypeScript
 export interface ITenant extends Document {
@@ -14,6 +22,40 @@ export interface ITenant extends Document {
     vehicles: number;
     drivers: number;
     managers: number;
+  };
+  // Which service modes this tenant operates. Both default to true so every
+  // existing tenant (field absent) keeps today's behavior. Disabling a mode
+  // only blocks NEW bookings of that mode — history stays readable.
+  serviceModes?: {
+    selfDrive: boolean;
+    withDriver: boolean;
+  };
+  // IANA timezone all operational reminder times are computed/displayed in
+  // (spec: never browser-local). Absent means Asia/Kolkata — every existing
+  // tenant is an Indian operator, so the default changes nothing.
+  timezone?: string;
+  // Booking End Reminder policy (Operations → Booking End Reminders).
+  // Absent = built-in defaults (see server/operations/policy.ts). Stages are
+  // minutes-before-scheduled-end; a stage the tenant disabled simply never
+  // fires — the engine only ever escalates the most imminent enabled stage.
+  operationsSettings?: {
+    graceMinutes?: number;            // past end before OVERDUE (default 15)
+    turnaroundBufferMinutes?: number; // self-drive clean/fuel/inspect buffer (default 60)
+    notifyOwner?: boolean;
+    notifyAssignedUser?: boolean;
+    selfDriveStages?: { minutesBefore: number; enabled: boolean; whatsappInternal?: boolean; whatsappCustomer?: boolean }[];
+    withDriverStages?: { minutesBefore: number; enabled: boolean; whatsappInternal?: boolean; whatsappDriver?: boolean }[];
+    whatsappInternalPhone?: string;   // staff/ops number for internal reminders (falls back to tenant.phone)
+    // How long after staff acknowledge an OVERDUE alert before it re-arms
+    // (still overdue = still a problem; ack pauses, never dismisses).
+    overdueRealertMinutes?: number;
+    // Tenant's own Google review page + optional message template for the
+    // post-closure review request (multi-tenant: never one global link).
+    googleReviewUrl?: string;
+    reviewTemplate?: string;
+    // Customer-facing self-drive WhatsApp templates ({{placeholder}} based);
+    // absent keys fall back to built-in defaults in self-drive/routes.ts.
+    sdTemplates?: Record<string, string>;
   };
   createdAt: Date;
 }
@@ -35,6 +77,17 @@ export interface IUser extends Document {
     ip?: string;
     loginTime?: Date;
   };
+  // Multi-device sessions: each login gets its own entry (capped, LRU),
+  // so logging in on a second system no longer evicts the first one's
+  // session mid-work (this was surfacing as a random 401 "Invalid
+  // session" on POST /api/bookings from the other device). The legacy
+  // single `sessionId` field above is still written (latest login) for
+  // backward compatibility with anything still reading it.
+  activeSessions?: {
+    sessionId: string;
+    deviceInfo?: { userAgent?: string; ip?: string; loginTime?: Date };
+    createdAt?: Date;
+  }[];
   lastLogin?: Date;
   lastLoginIP?: string;
   lastLoginUserAgent?: string;
@@ -66,9 +119,12 @@ export interface IVehicle extends Document {
   vehicleModel?: string; // Optional
   year?: number; // Optional
   licensePlate?: string; // Optional
+  normalizedLicensePlate?: string; // Vehicle 360 (TASK-VEHICLE-DOMAIN-01) — mirrors VendorVehicle's normalizedRegistrationNumber
   capacity?: number; // Optional
   type: 'economy' | 'standard' | 'premium' | 'luxury' | 'suv' | 'sedan' | 'hatchback' | 'coupe' | 'convertible';
-  status: 'available' | 'on_trip' | 'maintenance';
+  status: 'available' | 'on_trip' | 'maintenance'
+    | 'RESERVED' | 'ASSIGNED' | 'RETURNING' | 'CLEANING' | 'MAINTENANCE_DUE'
+    | 'IN_MAINTENANCE' | 'BREAKDOWN' | 'ACCIDENT_HOLD' | 'INACTIVE' | 'SOLD'; // Vehicle 360 — additive superset, existing lowercase values unchanged
   features: string[];
   pricePerDay: number;
   pricePerHour: number;
@@ -77,6 +133,23 @@ export interface IVehicle extends Document {
   fuelType?: string;
   transmission?: string;
   createdAt: Date;
+  // --- Vehicle 360 additions (TASK-VEHICLE-DOMAIN-01), all optional/additive ---
+  vehicleCategory?: string;
+  variant?: string;
+  registrationDate?: Date;
+  transportClassification?: 'transport' | 'non_transport';
+  vin?: string;
+  chassisNumber?: string;
+  engineNumber?: string;
+  currentOdometer?: number;
+  engineHours?: number;
+  ownershipType?: 'owned' | 'leased' | 'financed' | 'rented';
+  acquisitionDate?: Date;
+  purchaseValue?: number; // Accounts-restricted by RBAC at the route/permission layer
+  branch?: string;
+  baseLocation?: string;
+  currentDriverId?: mongoose.Types.ObjectId; // denormalized pointer; source of truth remains VehicleHandover events
+  isDraft?: boolean; // backs Quick-Add's "Save Draft" action
 }
 
 export interface IDriver extends Document {
@@ -88,6 +161,15 @@ export interface IDriver extends Document {
   experience?: number;
   rating?: number;
   status: 'available' | 'on_duty' | 'inactive';
+  // Additive, second axis alongside `status` — see TASK-DRIVER-DOMAIN-02's
+  // report. Default 'active' preserves current behavior for every existing
+  // driver document (they're already past onboarding by construction).
+  // Resolves the former server/routes.ts 'suspended'-not-in-enum dead code:
+  // 'suspended' now lives here, not on `status`.
+  lifecycleStage?: 'candidate' | 'application' | 'document_collection' |
+    'identity_verification' | 'police_verification' | 'medical_fitness' |
+    'reference_verification' | 'employment_verification' | 'training' |
+    'approved' | 'active' | 'suspended' | 'on_leave' | 'offboarding' | 'offboarded';
   languages?: string[];
   // Additional fields
   permanentAddress?: string;
@@ -145,10 +227,47 @@ export interface IBooking extends Document {
   dutyAcceptedAt?: Date;
   pickupLocation: string;
   dropoffLocation?: string;
-  pickupDate: Date;
+  // Optional as of TASK-BOOKING-DOMAIN-02: required only when
+  // travelDateStatus is 'confirmed' (the default — see
+  // requiredRules.isPickupDateRequired and legacy.ts's
+  // resolveTravelDateStatus for why an ABSENT travelDateStatus on a
+  // pre-existing document must still mean 'confirmed', never
+  // 'not_decided').
+  pickupDate?: Date;
   returnDate?: Date;
   pickupTime?: string;
   returnTime?: string;
+  // Date-certainty axis (TASK-BOOKING-DOMAIN-02) — orthogonal to
+  // resourceFulfilmentStatus below (vehicle-certainty, already shipped).
+  // MUST default to 'confirmed': every document that predates this field
+  // was created back when pickupDate was unconditionally required, so
+  // its absence always means a real date was supplied, never
+  // uncertainty. See server/booking/domain/legacy.ts.
+  travelDateStatus?: 'confirmed' | 'range' | 'not_decided';
+  // Required (via requiredRules.isTentativeRangeRequired) only when
+  // travelDateStatus === 'range' — a customer-given window ("sometime in
+  // the first two weeks of next month") rather than a single confirmed date.
+  tentativeStartDate?: Date;
+  tentativeEndDate?: Date;
+  // When to next follow up on an undecided/tentative booking — genuinely
+  // new, no prior concept existed. No legacy-default meaning (see
+  // legacy.ts's resolveFollowUpAt): absence just means "no follow-up set".
+  followUpAt?: Date;
+  // Server-derived "last touched" signal — NOT accepted from client
+  // payloads (see bookingCertaintySchema.ts's comment on why). Falls back
+  // to updatedAt, then createdAt, for any document that predates it; see
+  // legacy.ts's resolveLastActivityAt. Not backfilled.
+  lastActivityAt?: Date;
+  // Booking had no updatedAt field at all before this task (verified:
+  // grep for `booking.updatedAt`/`Booking...updatedAt` across
+  // server/routes.ts, server/services/*.ts, server/storage-mongodb.ts
+  // returns nothing) — added here as a plain, pre('save')-maintained
+  // field (matching the existing CustomerSchema/ReferralSchema/etc.
+  // convention already used elsewhere in this file) rather than turning
+  // on Mongoose's `timestamps: true` schema option, which would also
+  // start managing createdAt and risk conflicting with its existing
+  // `default: Date.now` behavior.
+  updatedAt?: Date;
   // Auto-computed (pre-save hook) from pickupDate+pickupTime and
   // returnDate+returnTime — pickupDate/returnDate alone are ALWAYS
   // midnight, with the real clock time living only in the separate
@@ -167,6 +286,14 @@ export interface IBooking extends Document {
   actualEndDateTime?: Date;
   startOdometer?: number;
   endOdometer?: number;
+  // Self Drive operational fields (Live Operations). Deposit is held money,
+  // NEVER revenue — kept strictly outside totalAmount/advanceReceived so it
+  // can never leak into balance math (spec: "never mix deposit into
+  // revenue/balance"). All optional: with-driver bookings and every booking
+  // created before this feature simply don't have them.
+  securityDepositAmount?: number;
+  securityDepositStatus?: 'pending' | 'collected' | 'refund_pending' | 'partially_refunded' | 'refunded' | 'forfeited';
+  startFuelLevel?: string; // opening fuel/SOC as recorded at handover, e.g. "3/4", "82%"
   rescheduleHistory?: {
     oldPickupDate: Date;
     oldPickupTime?: string;
@@ -179,6 +306,21 @@ export interface IBooking extends Document {
     reason?: string;
     changedBy: { userId: string; role: string };
     changedAt: Date;
+  }[];
+  // Backdated authorized corrections (TASK-BOOKING-DOMAIN-02) — distinct
+  // from rescheduleHistory above (which records a FORWARD schedule change
+  // made through the normal reschedule flow). This is staff correcting
+  // the record of something already entered, on any field, always with a
+  // reason — see server/booking/domain/revisionHistory.ts, the only code
+  // path that can construct an entry (it throws without a non-empty
+  // reason). Never populated directly from a raw booking edit payload.
+  revisionHistory?: {
+    fieldsChanged: string[];
+    previousValues: Record<string, unknown>;
+    newValues: Record<string, unknown>;
+    reason: string;
+    authorizedBy: { userId: string; role: string };
+    correctedAt: Date;
   }[];
   // Booking Source: where the booking came from. Deliberately separate
   // from fulfilmentType below (who's providing the vehicle) — a booking
@@ -233,6 +375,14 @@ export interface IBooking extends Document {
     'vendor_confirmation_pending' | 'vendor_confirmed' | 'outsourcing_requested' | 'vendor_quotes_pending' |
     'resource_sourcing_pending' | 'resource_secured' | 'resource_rejected' | 'resource_failed';
   bookingType: 'self_drive' | 'with_driver' | 'one_way' | 'round_trip' | 'local' | 'airport';
+  // Trip shape (TASK-BOOKING-DOMAIN-02) — kept strictly distinct from
+  // bookingType above (who drives). Was declared and required on the
+  // client Zod schema and submitted on every create request, but silently
+  // stripped by the server Zod schema and never declared here — see
+  // server/booking/domain/tripType.ts and
+  // server/services/invoiceService.ts, which already reads this field
+  // expecting it to exist.
+  tripType?: 'one_way' | 'round_trip' | 'local' | 'airport';
   pricingType?: 'day' | 'km';
   totalKilometers?: number;
   status: 'enquiry' | 'quotation_sent' | 'tentative' | 'on_hold' | 'confirmed' | 'vehicle_assigned' |
@@ -315,7 +465,10 @@ export interface IBooking extends Document {
 export interface IExpense extends Document {
   tenantId: mongoose.Types.ObjectId;
   vehicleId: mongoose.Types.ObjectId;
-  category: 'maintenance' | 'damage' | 'tires' | 'fuel' | 'other';
+  category: 'maintenance' | 'damage' | 'tires' | 'fuel' | 'other'
+    | 'repair' | 'battery' | 'insurance' | 'permit' | 'fitness' | 'puc' | 'tax'
+    | 'toll' | 'parking' | 'cleaning' | 'accessories' | 'challan' | 'emi'
+    | 'lease' | 'gps_subscription'; // Vehicle 360 (TASK-VEHICLE-FUEL-EXPENSE-04), additive
   amount: number;
   date: Date;
   description?: string;
@@ -361,6 +514,40 @@ const TenantSchema = new Schema<ITenant>({
     drivers: { type: Number, default: 3 },  // Starter plan default
     managers: { type: Number, default: 1 }  // Starter plan default
   },
+  serviceModes: {
+    selfDrive: { type: Boolean, default: true },
+    withDriver: { type: Boolean, default: true }
+  },
+  timezone: { type: String },
+  operationsSettings: {
+    type: {
+      graceMinutes: { type: Number },
+      turnaroundBufferMinutes: { type: Number },
+      notifyOwner: { type: Boolean },
+      notifyAssignedUser: { type: Boolean },
+      selfDriveStages: [{
+        minutesBefore: { type: Number, required: true },
+        enabled: { type: Boolean, default: true },
+        whatsappInternal: { type: Boolean, default: false },
+        whatsappCustomer: { type: Boolean, default: false },
+        _id: false,
+      }],
+      withDriverStages: [{
+        minutesBefore: { type: Number, required: true },
+        enabled: { type: Boolean, default: true },
+        whatsappInternal: { type: Boolean, default: false },
+        whatsappDriver: { type: Boolean, default: false },
+        _id: false,
+      }],
+      whatsappInternalPhone: { type: String },
+      overdueRealertMinutes: { type: Number },
+      googleReviewUrl: { type: String },
+      reviewTemplate: { type: String },
+      sdTemplates: { type: Schema.Types.Mixed },
+    },
+    default: undefined,
+    _id: false,
+  },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -377,6 +564,15 @@ const UserSchema = new Schema<IUser>({
     ip: { type: String },
     loginTime: { type: Date }
   },
+  activeSessions: [{
+    sessionId: { type: String },
+    deviceInfo: {
+      userAgent: { type: String },
+      ip: { type: String },
+      loginTime: { type: Date }
+    },
+    createdAt: { type: Date, default: Date.now }
+  }],
   lastLogin: { type: Date },
   lastLoginIP: { type: String },
   lastLoginUserAgent: { type: String },
@@ -409,15 +605,20 @@ const VehicleSchema = new Schema<IVehicle>({
   vehicleModel: { type: String }, // Optional
   year: { type: Number }, // Optional
   licensePlate: { type: String }, // Optional
+  normalizedLicensePlate: { type: String },
   capacity: { type: Number }, // Optional
-  type: { 
-    type: String, 
-    enum: ['economy', 'standard', 'premium', 'luxury', 'suv', 'sedan', 'hatchback', 'coupe', 'convertible'], 
-    default: 'economy' 
+  type: {
+    type: String,
+    enum: ['economy', 'standard', 'premium', 'luxury', 'suv', 'sedan', 'hatchback', 'coupe', 'convertible'],
+    default: 'economy'
   },
   status: {
     type: String,
-    enum: ['available', 'on_trip', 'maintenance'],
+    enum: [
+      'available', 'on_trip', 'maintenance',
+      'RESERVED', 'ASSIGNED', 'RETURNING', 'CLEANING', 'MAINTENANCE_DUE',
+      'IN_MAINTENANCE', 'BREAKDOWN', 'ACCIDENT_HOLD', 'INACTIVE', 'SOLD',
+    ],
     default: 'available'
   },
   features: [{ type: String }],
@@ -427,7 +628,24 @@ const VehicleSchema = new Schema<IVehicle>({
   color: { type: String },
   fuelType: { type: String },
   transmission: { type: String },
-  createdAt: { type: Date, default: Date.now }
+  createdAt: { type: Date, default: Date.now },
+  // --- Vehicle 360 additions (TASK-VEHICLE-DOMAIN-01) ---
+  vehicleCategory: { type: String },
+  variant: { type: String },
+  registrationDate: { type: Date },
+  transportClassification: { type: String, enum: ['transport', 'non_transport'] },
+  vin: { type: String },
+  chassisNumber: { type: String },
+  engineNumber: { type: String },
+  currentOdometer: { type: Number },
+  engineHours: { type: Number },
+  ownershipType: { type: String, enum: ['owned', 'leased', 'financed', 'rented'] },
+  acquisitionDate: { type: Date },
+  purchaseValue: { type: Number },
+  branch: { type: String },
+  baseLocation: { type: String },
+  currentDriverId: { type: Schema.Types.ObjectId, ref: 'Driver' },
+  isDraft: { type: Boolean, default: false },
 });
 
 // Driver Schema
@@ -443,6 +661,14 @@ const DriverSchema = new Schema<IDriver>({
     type: String,
     enum: ['available', 'on_duty', 'inactive'],
     default: 'available'
+  },
+  lifecycleStage: {
+    type: String,
+    enum: ['candidate', 'application', 'document_collection', 'identity_verification',
+      'police_verification', 'medical_fitness', 'reference_verification',
+      'employment_verification', 'training', 'approved', 'active', 'suspended',
+      'on_leave', 'offboarding', 'offboarded'],
+    default: 'active',
   },
   languages: [{ type: String }],
   // Additional fields
@@ -477,16 +703,40 @@ const BookingSchema = new Schema<IBooking>({
   dutyAcceptedAt: { type: Date },
   pickupLocation: { type: String, required: true },
   dropoffLocation: { type: String },
-  pickupDate: { type: Date, required: true },
+  pickupDate: {
+    type: Date,
+    // Conditionally required (TASK-BOOKING-DOMAIN-02) — required exactly
+    // when travelDateStatus is 'confirmed' (the default). See
+    // requiredRules.isPickupDateRequired.
+    required: function (this: any) { return isPickupDateRequired(this); },
+  },
   returnDate: { type: Date },
   pickupTime: { type: String },
   returnTime: { type: String },
+  // Date-certainty axis (TASK-BOOKING-DOMAIN-02). default: 'confirmed' is
+  // the single most important line in this whole patch — see
+  // server/booking/domain/legacy.ts's resolveTravelDateStatus comment.
+  travelDateStatus: { type: String, enum: TRAVEL_DATE_STATUSES, default: 'confirmed' },
+  tentativeStartDate: {
+    type: Date,
+    required: function (this: any) { return isTentativeRangeRequired(this); },
+  },
+  tentativeEndDate: {
+    type: Date,
+    required: function (this: any) { return isTentativeRangeRequired(this); },
+  },
+  followUpAt: { type: Date },
+  lastActivityAt: { type: Date },
+  updatedAt: { type: Date },
   scheduledStartDateTime: { type: Date },
   scheduledEndDateTime: { type: Date },
   actualStartDateTime: { type: Date },
   actualEndDateTime: { type: Date },
   startOdometer: { type: Number },
   endOdometer: { type: Number },
+  securityDepositAmount: { type: Number },
+  securityDepositStatus: { type: String, enum: ['pending', 'collected', 'refund_pending', 'partially_refunded', 'refunded', 'forfeited'] },
+  startFuelLevel: { type: String },
   rescheduleHistory: [{
     oldPickupDate: { type: Date },
     oldPickupTime: { type: String },
@@ -502,6 +752,22 @@ const BookingSchema = new Schema<IBooking>({
       role: { type: String }
     },
     changedAt: { type: Date, default: Date.now }
+  }],
+  // Backdated authorized corrections (TASK-BOOKING-DOMAIN-02) — see the
+  // IBooking interface comment above and
+  // server/booking/domain/revisionHistory.ts. `reason` is `required: true`
+  // at the schema layer too (not just at the builder-function layer) so a
+  // direct/scripted write attempting to skip it fails loudly.
+  revisionHistory: [{
+    fieldsChanged: [{ type: String }],
+    previousValues: { type: Schema.Types.Mixed },
+    newValues: { type: Schema.Types.Mixed },
+    reason: { type: String, required: true },
+    authorizedBy: {
+      userId: { type: String },
+      role: { type: String }
+    },
+    correctedAt: { type: Date, default: Date.now }
   }],
   bookingSource: {
     type: String,
@@ -535,10 +801,16 @@ const BookingSchema = new Schema<IBooking>({
       'vendor_confirmed', 'outsourcing_requested', 'vendor_quotes_pending', 'resource_sourcing_pending',
       'resource_secured', 'resource_rejected', 'resource_failed'],
   },
+  // Trip shape (TASK-BOOKING-DOMAIN-02) — see the IBooking interface
+  // comment above for why this was previously dead code.
+  tripType: {
+    type: String,
+    enum: TRIP_TYPES,
+  },
   bookingType: {
-    type: String, 
-    enum: ['self_drive', 'with_driver', 'one_way', 'round_trip', 'local', 'airport'], 
-    required: true 
+    type: String,
+    enum: ['self_drive', 'with_driver', 'one_way', 'round_trip', 'local', 'airport'],
+    required: true
   },
   pricingType: {
     type: String,
@@ -670,6 +942,15 @@ BookingSchema.pre('save', function (next) {
   if (this.isModified('returnDate') || this.isModified('returnTime') || this.isModified('pickupDate') || this.isModified('pickupTime') || this.isNew) {
     this.scheduledEndDateTime = combineDateAndTime(this.returnDate || this.pickupDate, this.returnTime || this.pickupTime) || this.scheduledStartDateTime;
   }
+  // TASK-BOOKING-DOMAIN-02: Booking had no updatedAt at all before this —
+  // maintained here the same way CustomerSchema/ReferralSchema/etc.
+  // already do elsewhere in this file. lastActivityAt mirrors it for
+  // every document saved from this point forward; a document that
+  // predates this hook and is never re-saved keeps falling back through
+  // legacy.ts's resolveLastActivityAt (updatedAt, then createdAt) — no
+  // backfill happens here.
+  (this as any).updatedAt = new Date();
+  (this as any).lastActivityAt = (this as any).updatedAt;
   next();
 });
 
@@ -704,14 +985,40 @@ BookingSchema.pre('findOneAndUpdate', async function (next) {
   next();
 });
 
+// TASK-BOOKING-DOMAIN-02: same updatedAt/lastActivityAt maintenance as the
+// pre('save') hook above, for the findOneAndUpdate path (PUT
+// /api/bookings/:id goes through storage.updateBooking(), which — like
+// the scheduledStartDateTime sync above — does NOT run pre('save') hooks.
+// Runs on every update unconditionally (not just schedule-touching ones)
+// since "was this booking touched at all" is the actual signal
+// lastActivityAt exists to carry.
+BookingSchema.pre('findOneAndUpdate', function (next) {
+  const update: any = this.getUpdate();
+  const now = new Date();
+  if (update.$set) {
+    update.$set.updatedAt = now;
+    update.$set.lastActivityAt = now;
+  } else {
+    update.updatedAt = now;
+    update.lastActivityAt = now;
+  }
+  this.setUpdate(update);
+  next();
+});
+
 // Expense Schema
 const ExpenseSchema = new Schema<IExpense>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
   vehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle', required: true },
-  category: { 
-    type: String, 
-    enum: ['maintenance', 'damage', 'tires', 'fuel', 'other'], 
-    required: true 
+  category: {
+    type: String,
+    enum: [
+      'maintenance', 'damage', 'tires', 'fuel', 'other',
+      'repair', 'battery', 'insurance', 'permit', 'fitness', 'puc', 'tax',
+      'toll', 'parking', 'cleaning', 'accessories', 'challan', 'emi',
+      'lease', 'gps_subscription',
+    ],
+    required: true
   },
   amount: { type: Number, required: true },
   date: { type: Date, required: true },
@@ -745,7 +1052,9 @@ export interface IWhatsAppMessage extends Document {
   // ledger/audit trail rather than a second WhatsApp log.
   vendorId?: mongoose.Types.ObjectId;
   sourcingRequestId?: mongoose.Types.ObjectId;
-  recipientType: 'customer' | 'driver' | 'vendor';
+  // 'staff' — internal operations reminders (Booking End Reminder engine);
+  // additive so existing customer/driver/vendor flows are untouched.
+  recipientType: 'customer' | 'driver' | 'vendor' | 'staff';
   recipientPhone: string;
   messageType: string;
   content: string;
@@ -768,7 +1077,7 @@ const WhatsAppMessageSchema = new Schema<IWhatsAppMessage>({
   quotationId: { type: Schema.Types.ObjectId, ref: 'Quotation' },
   vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor' },
   sourcingRequestId: { type: Schema.Types.ObjectId, ref: 'VendorSourcingRequest' },
-  recipientType: { type: String, enum: ['customer', 'driver', 'vendor'], required: true },
+  recipientType: { type: String, enum: ['customer', 'driver', 'vendor', 'staff'], required: true },
   recipientPhone: { type: String, required: true },
   messageType: { type: String, required: true },
   content: { type: String, required: true },
@@ -868,6 +1177,10 @@ export interface IDriverLeave extends Document {
   startDate: Date;
   endDate: Date;
   leaveType: 'paid' | 'unpaid' | 'medical' | 'emergency' | 'weekly_off' | 'comp_off' | 'other';
+  // Half-day support: which part of the day the leave covers. Blocks
+  // assignment for the whole day either way (bookings have no half-day
+  // granularity) — this drives display + ops override decisions only.
+  dayPart: 'full' | 'first_half' | 'second_half';
   reason?: string;
   status: 'pending' | 'approved' | 'rejected' | 'cancelled';
   requestedBy: { userId: string; role: string };
@@ -887,6 +1200,7 @@ const DriverLeaveSchema = new Schema<IDriverLeave>({
     enum: ['paid', 'unpaid', 'medical', 'emergency', 'weekly_off', 'comp_off', 'other'],
     default: 'unpaid'
   },
+  dayPart: { type: String, enum: ['full', 'first_half', 'second_half'], default: 'full' },
   reason: { type: String },
   status: { type: String, enum: ['pending', 'approved', 'rejected', 'cancelled'], default: 'pending' },
   requestedBy: {
@@ -1492,7 +1806,14 @@ export const Referral = mongoose.model<IReferral>('Referral', ReferralSchema);
 
 // Create indexes for better performance
 UserSchema.index({ sessionId: 1 });
+UserSchema.index({ 'activeSessions.sessionId': 1 });
 VehicleSchema.index({ tenantId: 1, status: 1 });
+// Vehicle 360 (TASK-VEHICLE-DOMAIN-01) — real duplicate-registration
+// protection, mirroring VendorVehicle's normalizedRegistrationNumber index.
+VehicleSchema.index(
+  { tenantId: 1, normalizedLicensePlate: 1 },
+  { unique: true, partialFilterExpression: { normalizedLicensePlate: { $type: 'string' } } },
+);
 DriverSchema.index({ tenantId: 1, status: 1 });
 BookingSchema.index({ tenantId: 1, status: 1 });
 BookingSchema.index(
@@ -1505,6 +1826,17 @@ BookingSchema.index(
 // grows exactly where it matters most (assignment time).
 BookingSchema.index({ tenantId: 1, driverId: 1, status: 1, scheduledStartDateTime: 1, scheduledEndDateTime: 1 });
 BookingSchema.index({ tenantId: 1, vehicleId: 1, status: 1, scheduledStartDateTime: 1, scheduledEndDateTime: 1 });
+// Backs driverDeviceCorrelation.ts's findDriverCandidates (GPS/meter trip
+// reconciliation, TASK-GPS-MAPPING-03/TASK-GPS-TRIP-BILLING-06) — that query
+// filters on actual (not scheduled) start/end, which the index above does
+// not cover; without this, every reconciliation call scans the vehicle's
+// full booking history.
+BookingSchema.index({ tenantId: 1, vehicleId: 1, actualStartDateTime: 1, actualEndDateTime: 1 });
+// Backs the Booking End Reminder sweep and the Live Operations view — both
+// are bounded queries on (tenant, active status, scheduled end), never a
+// full-table poll (spec §66). The existing {tenantId, status} index can't
+// serve the end-time range efficiently once booking history grows.
+BookingSchema.index({ tenantId: 1, status: 1, scheduledEndDateTime: 1 });
 ExpenseSchema.index({ tenantId: 1, date: 1 });
 ExpenseSchema.index({ tenantId: 1, vehicleId: 1 });
 // Backs the Trip Cost Summary's per-booking expense lookup.
@@ -2813,6 +3145,22 @@ const BookingDraftSchema = new Schema<IBookingDraft>({
 BookingDraftSchema.index({ tenantId: 1, userId: 1 }, { unique: true });
 export const BookingDraft = mongoose.model<IBookingDraft>('BookingDraft', BookingDraftSchema);
 
+// Cross-process mutex for Booking creation against a standalone (non-replica-set)
+// MongoDB, where session.withTransaction() cannot run and createBooking() falls back
+// to a non-atomic check-then-insert (see storage-mongodb.ts's withVehicleLock). The
+// _id (tenantId:vehicleId) doubling as the unique index makes acquisition a single
+// atomic insert; the TTL index is a safety net if a process crashes mid-lock.
+export interface IVehicleBookingLock extends Document<string> {
+  _id: string;
+  createdAt: Date;
+}
+
+const VehicleBookingLockSchema = new Schema<IVehicleBookingLock>({
+  _id: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now, expires: 30 },
+});
+export const VehicleBookingLock = mongoose.model<IVehicleBookingLock>('VehicleBookingLock', VehicleBookingLockSchema);
+
 // ---------------------------------------------------------------------
 // Vendor 360°
 // ---------------------------------------------------------------------
@@ -3279,3 +3627,162 @@ export const WhatsAppMessage = mongoose.model<IWhatsAppMessage>('WhatsAppMessage
 export const PaymentTransaction = mongoose.model<IPaymentTransaction>('PaymentTransaction', PaymentTransactionSchema);
 export const DriverLeave = mongoose.model<IDriverLeave>('DriverLeave', DriverLeaveSchema);
 export const DriverAttendance = mongoose.model<IDriverAttendance>('DriverAttendance', DriverAttendanceSchema);
+
+// ============================================================
+// LIVE OPERATIONS — Booking End Reminder engine (operations/*)
+// ============================================================
+// OperationsAlert is a NOTIFICATION/ALERT record derived from the canonical
+// Booking — never a second source of truth for booking state. The engine
+// (server/operations/reminderEngine.ts) creates one row per
+// (booking, kind/stage, end-time snapshot) via the unique dedupeKey, so a
+// retried or restarted sweep can never double-fire the same reminder
+// (spec §59 idempotency). When a booking's scheduled end moves (extension),
+// open alerts carrying the old endAtSnapshot are resolved as 'superseded'
+// and the next sweep re-derives fresh ones from the new end time.
+export interface IOperationsAlert extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  bookingId: mongoose.Types.ObjectId;
+  dedupeKey: string;
+  kind: 'ending_soon' | 'return_due' | 'overdue' | 'payment_due' | 'end_time_pending' | 'turnaround_conflict' | 'refund_pending';
+  stageKey?: string; // e.g. 't-180', 't-60', 'end', 'overdue'
+  serviceMode: 'self_drive' | 'with_driver';
+  priority: 'info' | 'attention' | 'urgent' | 'critical';
+  title: string;
+  body: string;
+  // Snapshot of Booking.scheduledEndDateTime when the alert was created —
+  // the supersede detector after an extension.
+  endAtSnapshot?: Date;
+  status: 'active' | 'acknowledged' | 'snoozed' | 'resolved';
+  snoozedUntil?: Date;
+  // Bumped each time a still-overdue acknowledged alert re-arms — the client
+  // popup keys its "seen" set on (id, realertCount) so re-arming re-pops.
+  realertCount?: number;
+  acknowledgedBy?: { userId: string; name?: string };
+  acknowledgedAt?: Date;
+  resolvedAt?: Date;
+  resolvedReason?: 'completed' | 'cancelled' | 'superseded' | 'paid' | 'manual' | 'end_time_set';
+  // Who was contacted / what was done, attributed (spec §42-43, §65).
+  contactLog: { at: Date; userId: string; userName?: string; action: string; note?: string }[];
+  // WhatsApp delivery attempts for this alert — honest status only, a
+  // provider failure is recorded as FAILED, never faked as sent (spec §60).
+  whatsapp: { target: 'internal' | 'customer' | 'driver'; status: 'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED'; error?: string; sentAt?: Date }[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const OperationsAlertSchema = new Schema<IOperationsAlert>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
+  dedupeKey: { type: String, required: true },
+  kind: { type: String, enum: ['ending_soon', 'return_due', 'overdue', 'payment_due', 'end_time_pending', 'turnaround_conflict', 'refund_pending'], required: true },
+  stageKey: { type: String },
+  serviceMode: { type: String, enum: ['self_drive', 'with_driver'], required: true },
+  priority: { type: String, enum: ['info', 'attention', 'urgent', 'critical'], required: true },
+  title: { type: String, required: true },
+  body: { type: String, required: true },
+  endAtSnapshot: { type: Date },
+  status: { type: String, enum: ['active', 'acknowledged', 'snoozed', 'resolved'], default: 'active' },
+  snoozedUntil: { type: Date },
+  realertCount: { type: Number, default: 0 },
+  acknowledgedBy: { userId: { type: String }, name: { type: String } },
+  acknowledgedAt: { type: Date },
+  resolvedAt: { type: Date },
+  resolvedReason: { type: String, enum: ['completed', 'cancelled', 'superseded', 'paid', 'manual', 'end_time_set'] },
+  contactLog: [{
+    at: { type: Date, required: true },
+    userId: { type: String, required: true },
+    userName: { type: String },
+    action: { type: String, required: true },
+    note: { type: String },
+    _id: false,
+  }],
+  whatsapp: [{
+    target: { type: String, enum: ['internal', 'customer', 'driver'], required: true },
+    status: { type: String, enum: ['PENDING', 'SENT', 'FAILED', 'SKIPPED'], required: true },
+    error: { type: String },
+    sentAt: { type: Date },
+    _id: false,
+  }],
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+OperationsAlertSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+OperationsAlertSchema.index({ dedupeKey: 1 }, { unique: true });
+OperationsAlertSchema.index({ tenantId: 1, status: 1, priority: 1, createdAt: -1 });
+OperationsAlertSchema.index({ tenantId: 1, bookingId: 1, status: 1 });
+
+export const OperationsAlert = mongoose.model<IOperationsAlert>('OperationsAlert', OperationsAlertSchema);
+
+// Operational activity timeline per booking — "who called the customer,
+// when, what came of it" (spec §42-44). Attribution is mandatory; this is
+// an append-only audit trail, separate from booking.statusHistory (which
+// records lifecycle transitions, not contact attempts/notes).
+export interface IOperationsActivity extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  bookingId: mongoose.Types.ObjectId;
+  userId: string;
+  userName?: string;
+  action: 'called_customer' | 'called_driver' | 'whatsapp_customer' | 'whatsapp_driver' | 'note' | 'return_confirmed' | 'extension_discussed' | 'collection_assigned';
+  note?: string;
+  at: Date;
+}
+
+const OperationsActivitySchema = new Schema<IOperationsActivity>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
+  userId: { type: String, required: true },
+  userName: { type: String },
+  action: { type: String, enum: ['called_customer', 'called_driver', 'whatsapp_customer', 'whatsapp_driver', 'note', 'return_confirmed', 'extension_discussed', 'collection_assigned'], required: true },
+  note: { type: String },
+  at: { type: Date, default: Date.now },
+});
+OperationsActivitySchema.index({ tenantId: 1, bookingId: 1, at: -1 });
+
+export const OperationsActivity = mongoose.model<IOperationsActivity>('OperationsActivity', OperationsActivitySchema);
+
+// Vehicle Type Master — centralized catalog of vehicle types available for inquiry requirements
+// Separate from actual Fleet vehicles; customers may request types not currently owned
+export interface IVehicleType extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  category: string;
+  vehicleModel: string;
+  seatingCapacity: number;
+  luggageCapacity?: number;
+  acStatus: 'ac' | 'non_ac' | 'both';
+  transmission?: 'manual' | 'automatic' | 'both';
+  fuelType?: 'petrol' | 'diesel' | 'hybrid' | 'electric' | 'cng';
+  luxuryLevel?: 'economy' | 'standard' | 'premium' | 'luxury';
+  description?: string;
+  displayName: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const VehicleTypeSchema = new Schema<IVehicleType>(
+  {
+    tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+    category: { type: String, required: true },
+    vehicleModel: { type: String, required: true },
+    seatingCapacity: { type: Number, required: true },
+    luggageCapacity: { type: Number },
+    acStatus: { type: String, enum: ['ac', 'non_ac', 'both'], default: 'ac' },
+    transmission: { type: String, enum: ['manual', 'automatic', 'both'] },
+    fuelType: { type: String, enum: ['petrol', 'diesel', 'hybrid', 'electric', 'cng'] },
+    luxuryLevel: { type: String, enum: ['economy', 'standard', 'premium', 'luxury'] },
+    description: { type: String },
+    displayName: { type: String, required: true },
+    sortOrder: { type: Number, default: 0 },
+    isActive: { type: Boolean, default: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+  },
+  { timestamps: false }
+);
+
+VehicleTypeSchema.index({ tenantId: 1, isActive: 1, sortOrder: 1 });
+VehicleTypeSchema.index({ tenantId: 1, seatingCapacity: 1 });
+VehicleTypeSchema.index({ tenantId: 1, vehicleModel: 1 });
+
+export const VehicleType = mongoose.model<IVehicleType>('VehicleType', VehicleTypeSchema);

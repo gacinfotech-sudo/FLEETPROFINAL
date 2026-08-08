@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { optionalString } from './validation-helpers';
 
 // MongoDB Tenant Schema
 export const mongoTenantSchema = z.object({
@@ -51,7 +52,11 @@ export const mongoVehicleSchema = z.object({
   capacity: z.number().int().positive().optional(),
   type: z.enum(['economy', 'standard', 'premium', 'luxury', 'suv', 'sedan', 'hatchback', 'coupe', 'convertible']).default('economy'),
   vehicleType: z.string().optional(),
-  status: z.enum(['available', 'on_trip', 'maintenance']).default('available'),
+  status: z.enum([
+    'available', 'on_trip', 'maintenance',
+    'RESERVED', 'ASSIGNED', 'RETURNING', 'CLEANING', 'MAINTENANCE_DUE',
+    'IN_MAINTENANCE', 'BREAKDOWN', 'ACCIDENT_HOLD', 'INACTIVE', 'SOLD',
+  ]).default('available'),
   features: z.array(z.string()).default([]),
   pricePerDay: z.number().min(0).default(0),
   pricePerHour: z.number().min(0).default(0),
@@ -62,7 +67,14 @@ export const mongoVehicleSchema = z.object({
   color: z.string().optional(),
   fuelType: z.string().optional(),
   transmission: z.string().optional(),
-  model: z.string().optional()
+  model: z.string().optional(),
+  // --- Vehicle 360 additions (TASK-VEHICLE-DOMAIN-01) ---
+  vehicleCategory: z.string().optional(),
+  variant: z.string().optional(),
+  ownershipType: z.enum(['owned', 'leased', 'financed', 'rented']).optional(),
+  currentOdometer: z.number().min(0).optional(),
+  branch: z.string().optional(),
+  isDraft: z.boolean().optional(),
 });
 
 // MongoDB Driver Schema
@@ -70,16 +82,43 @@ export const mongoDriverSchema = z.object({
   tenantId: z.string(),
   name: z.string().min(1, 'Name is required'),
   phone: z.string().min(1, 'Phone is required'),
-  email: z.string().email().optional(),
-  licenseNumber: z.string().min(1).optional(),
-  experience: z.number().int().min(0).optional(),
-  rating: z.number().min(1).max(5).optional(),
+  // TASK-DRIVER-ADD-400-FIX: both of these are product-optional fields but
+  // previously ran their format check (`.email()` / `.min(1)`) against a
+  // literal `""` sent by a blank form field, since `.optional()` alone
+  // does not exempt "provided but blank" — only "absent". optionalString
+  // normalizes blank/whitespace-only to `undefined` first so the format
+  // check only ever runs against a genuinely-provided value. See
+  // ./validation-helpers.ts for the full contract.
+  email: optionalString(z.string().email('Please enter a valid email address.')),
+  // Kept intentionally light: this only rejects obviously-malformed input
+  // (too short / disallowed characters), not a specific national license
+  // format — driver license formats vary too widely across
+  // states/countries for this product to hard-code one.
+  licenseNumber: optionalString(
+    z.string()
+      .min(4, 'Driving Licence Number must be at least 4 characters.')
+      .regex(/^[A-Za-z0-9][A-Za-z0-9 \-\/]*$/, 'Driving Licence Number format is invalid.')
+  ),
+  // experience/rating: the current UI never sends "" for these (its
+  // onChange handlers already convert a blank input to `undefined` before
+  // the request is built), but optionalString is applied defensively so
+  // any other caller (mobile app, API integration, future UI) that DOES
+  // send "" for these gets the same "blank -> not provided" contract
+  // instead of a type-mismatch 400 — optionalString's preprocess works
+  // for any inner schema, not just strings.
+  experience: optionalString(z.number().int().min(0)),
+  rating: optionalString(z.number().min(1).max(5)),
+  // status has a real default and the UI's Select never offers a blank
+  // option, so this is left as-is — not part of the reported bug.
   status: z.enum(['available', 'on_duty', 'inactive']).default('available'),
   languages: z.array(z.string()).default([]),
   // Additional fields
   permanentAddress: z.string().optional(),
   currentAddress: z.string().optional(),
-  maritalStatus: z.enum(['single', 'married', 'divorced', 'widowed']).optional(),
+  // Same defensive reasoning as experience/rating above: the UI never
+  // submits "" for an enum select today, but a blank string sent by any
+  // other caller should mean "not provided", not an invalid-enum 400.
+  maritalStatus: optionalString(z.enum(['single', 'married', 'divorced', 'widowed'])),
   aadharNumber: z.string().optional(),
   panNumber: z.string().optional(),
   dateOfJoining: z.string().optional()
@@ -112,11 +151,34 @@ export const mongoBookingSchema = z.object({
   driverId: z.string().optional(),
   pickupLocation: z.string().min(1, 'Pickup location is required'),
   dropoffLocation: z.string().optional(),
-  pickupDate: z.string(),
+  // TASK-BOOKING-DOMAIN-02: relaxed from unconditionally-required to
+  // structurally optional here — the actual conditional-requirement rule
+  // (required unless travelDateStatus is 'range'/'not_decided') is
+  // enforced by mongoBookingSchemaWithCertainty in
+  // server/booking/domain/bookingCertaintySchema.ts, which POST
+  // /api/bookings uses in place of this bare schema (see the routes.ts
+  // patch). This schema's own `.partial()` use in the PUT
+  // /api/bookings/:id edit route is exactly why the relaxation happens
+  // here directly rather than only in a `.superRefine()`-wrapped variant
+  // — ZodEffects (what `.superRefine()` produces) has no `.partial()`
+  // method.
+  pickupDate: z.string().optional(),
   returnDate: z.string().optional(),
   pickupTime: z.string().optional(),
   returnTime: z.string().optional(),
+  // Date-certainty axis (TASK-BOOKING-DOMAIN-02) — see
+  // server/booking/domain/types.ts. Absent means 'confirmed' (see
+  // legacy.ts's resolveTravelDateStatus). do not change this default.
+  travelDateStatus: z.enum(['confirmed', 'range', 'not_decided']).optional(),
+  tentativeStartDate: z.string().optional(),
+  tentativeEndDate: z.string().optional(),
+  followUpAt: z.string().optional(),
   bookingType: z.enum(['self_drive', 'with_driver', 'one_way', 'round_trip', 'local', 'airport']),
+  // Trip shape (TASK-BOOKING-DOMAIN-02) — kept distinct from bookingType
+  // above. Was declared on the client schema and submitted on every
+  // create request but silently stripped here (this exact gap is audit
+  // finding #3) — see server/booking/domain/tripType.ts.
+  tripType: z.enum(['one_way', 'round_trip', 'local', 'airport']).optional(),
   pricingType: z.enum(['day', 'km']).optional(),
   totalKilometers: z.number().min(0).optional(),
   status: z.enum(['enquiry', 'quotation_sent', 'tentative', 'on_hold', 'confirmed', 'vehicle_assigned',
@@ -147,6 +209,11 @@ export const mongoBookingSchema = z.object({
   actualEndDateTime: z.string().optional(),
   startOdometer: z.number().min(0).optional(),
   endOdometer: z.number().min(0).optional(),
+  // Self Drive operational fields (Live Operations) — deposit is held
+  // money, tracked apart from totalAmount/advanceReceived by design.
+  securityDepositAmount: z.number().min(0).optional(),
+  securityDepositStatus: z.enum(['pending', 'collected', 'refund_pending', 'partially_refunded', 'refunded', 'forfeited']).optional(),
+  startFuelLevel: z.string().max(20).optional(),
   bookingSource: z.enum(['direct_customer', 'walk_in', 'phone_call', 'whatsapp', 'website', 'google_business_profile',
     'google_ads', 'facebook', 'instagram', 'hotel', 'corporate_client', 'travel_agent', 'vendor_partner',
     'referral', 'online_travel_platform', 'repeat_customer', 'other']).default('direct_customer'),

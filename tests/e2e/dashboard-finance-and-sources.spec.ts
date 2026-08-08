@@ -31,57 +31,39 @@ test.describe('Dashboard: Finance overview and Booking Sources chart', () => {
     }
   });
 
-  test('UI: Today\'s Collection card renders real numbers and navigates to Revenue Report on click', async ({ page }) => {
+  // The finance mode-split and booking-sources cards moved off the
+  // Dashboard in the final-ui redesign (information-limit rule): money on
+  // the Dashboard is now the Revenue KPI + Revenue Trend chart, both
+  // backed by the same canonical sources (completed bookings + payment
+  // ledger). The API contract above is unchanged and still covered.
+
+  test('UI: Revenue KPI card shows period revenue and navigates to Revenue Report', async ({ page }) => {
     await login(page, 'qaclient', 'QaFixed456!');
-    await expect(page.getByText("Today's Collection")).toBeVisible();
+    await page.waitForLoadState('networkidle');
 
-    const finance = await (await page.request.get('/api/dashboard/finance-summary')).json();
-    await expect(page.getByText(`₹${finance.total.toLocaleString('en-IN')}`)).toBeVisible();
-
-    await page.getByText("Today's Collection").click();
+    const kpi = page.getByRole('button', { name: /Revenue — view Revenue Report/ });
+    await expect(kpi).toBeVisible();
+    await kpi.click();
     await expect(page).toHaveURL(/\/dashboard\/revenue$/);
   });
 
-  test('UI: Booking Sources chart renders real per-source counts, and clicking a source navigates to Booking History filtered to only that source', async ({ page }) => {
+  test('UI: Revenue Trend chart renders with period selector and real ledger-backed legend totals', async ({ page }) => {
     await login(page, 'qaclient', 'QaFixed456!');
-    await expect(page.getByText('Booking Sources')).toBeVisible();
+    await page.waitForLoadState('networkidle');
 
-    const sources = await (await page.request.get('/api/dashboard/lead-sources')).json();
-    const top = sources[0];
-    const topLabel = new RegExp(top.source.replace(/_/g, '[ _]'), 'i');
+    const overview = await (await page.request.get('/api/dashboard/overview?days=30')).json();
+    expect(typeof overview.kpis.revenue.period).toBe('number');
+    expect(Array.isArray(overview.revenueTrend)).toBe(true);
+    expect(overview.revenueTrend.length).toBe(30);
 
-    const sourcesCard = page.locator('main div.rounded-lg', { has: page.getByText('Booking Sources', { exact: true }) }).first();
-    await expect(sourcesCard.getByText(String(top.count), { exact: true })).toBeVisible();
-
-    await sourcesCard.locator('button').filter({ hasText: topLabel }).first().click();
-    await expect(page).toHaveURL(/\/dashboard\/history$/);
-    await expect(page.getByText('Filters active:')).toBeVisible();
-
-    // Every visible row's Source column must match the clicked source —
-    // proves this is a real client-side filter, not a decorative click.
-    const rows = page.getByRole('table').locator('tbody tr');
-    const rowCount = await rows.count();
-    expect(rowCount).toBeGreaterThan(0);
-    for (let i = 0; i < Math.min(rowCount, 10); i++) {
-      await expect(rows.nth(i)).toContainText(topLabel);
+    const trendCard = page.locator('main div.rounded-lg', { has: page.getByText('Revenue Trend', { exact: true }) }).first();
+    await expect(trendCard).toBeVisible();
+    for (const label of ['7D', '30D', '90D']) {
+      await expect(trendCard.getByRole('button', { name: label })).toBeVisible();
     }
-
-    await page.getByRole('button', { name: 'Clear filters' }).click();
-    await expect(page.getByText('Filters active:')).not.toBeVisible();
-  });
-
-  test('UI: navigating away from Booking History and back resets the source filter (does not leak across unrelated visits)', async ({ page }) => {
-    await login(page, 'qaclient', 'QaFixed456!');
-    const sourcesCard = page.locator('main div.rounded-lg', { has: page.getByText('Booking Sources', { exact: true }) }).first();
-    await sourcesCard.locator('button').first().click();
-    await expect(page).toHaveURL(/\/dashboard\/history$/);
-    await expect(page.getByText('Filters active:')).toBeVisible();
-
-    await page.locator('nav').getByRole('button', { name: 'Dashboard' }).click();
-    await expect(page).toHaveURL(/\/dashboard\/dashboard$/);
-
-    await page.locator('nav').getByRole('button', { name: 'Booking History' }).click();
-    await expect(page).toHaveURL(/\/dashboard\/history$/);
-    await expect(page.getByText('Filters active:')).not.toBeVisible();
+    // Numeric summary is always present alongside the chart (data is
+    // never color-alone).
+    await expect(trendCard.getByText(/Revenue ₹/)).toBeVisible();
+    await expect(trendCard.getByText(/Collections ₹/)).toBeVisible();
   });
 });

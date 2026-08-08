@@ -57,7 +57,9 @@ test('Advance Payment: record ₹500 of ₹1,500, remaining due is ₹1,000, and
   // earlier in the DOM than any table row).
   await page.locator('table').getByRole('button', { name: 'View', exact: true }).first().click();
 
-  const dialog = page.getByRole('dialog').filter({ hasText: 'Booking Details' });
+  // View now opens the Unified Booking Workspace — its Overview shows the
+  // ledger-derived Fare / Received / Balance grid.
+  const dialog = page.getByRole('dialog').filter({ hasText: 'Advance Test Customer' });
   await expect(dialog.getByText('₹1,500')).toBeVisible();
   await expect(dialog.getByText('₹500', { exact: true })).toBeVisible();
   await expect(dialog.getByText('₹1,000', { exact: true })).toBeVisible();
@@ -69,10 +71,11 @@ test('Advance Payment: record ₹500 of ₹1,500, remaining due is ₹1,000, and
   await page.getByPlaceholder('Search bookings...').fill(uniquePhone);
   await page.waitForTimeout(500);
   await page.locator('table').getByRole('button', { name: 'View', exact: true }).first().click();
-  const dialog2 = page.getByRole('dialog').filter({ hasText: 'Booking Details' });
+  const dialog2 = page.getByRole('dialog').filter({ hasText: 'Advance Test Customer' });
   await expect(dialog2.getByText('₹500', { exact: true })).toBeVisible();
   await expect(dialog2.getByText('₹1,000', { exact: true })).toBeVisible();
 
-  // Payment history must show the advance transaction.
+  // Payment history (ledger) lives in the workspace's Pricing & Payments tab.
+  await dialog2.getByRole('tab', { name: /Pricing & Payments/i }).click();
   await expect(dialog2.getByText(/Advance \(Cash\)/i)).toBeVisible();
 });

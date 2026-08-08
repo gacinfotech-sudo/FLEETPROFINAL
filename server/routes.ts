@@ -39,6 +39,15 @@ import {
   mongoDriverSchema,
   mongoBookingSchema
 } from "./schemas/mongodb-schemas";
+import { zodErrorToFieldErrors } from "./schemas/validation-helpers";
+// TASK-BOOKING-DOMAIN-02: date-certainty validation (pickupDate
+// conditional on travelDateStatus, tripType). vehicleId/
+// resourceFulfilmentStatus are untouched — that shipped separately. See
+// server/booking/domain/ for the full design.
+import {
+  mongoBookingSchemaWithCertainty,
+  mongoBookingSchemaWithCertaintyPartial,
+} from "./booking/domain";
 import {
   transitionBooking,
   getAllowedNextStatuses,
@@ -47,12 +56,14 @@ import {
   type BookingStatus,
 } from "./services/bookingStateMachine";
 import { buildLiveOperations } from "./services/liveOperations";
+import { registerOperationsRoutes } from "./operations/routes";
+import { resweepBooking } from "./operations/reminderEngine";
 import { buildUpcomingBookings, classifyUpcomingBookings } from "./services/upcomingBookings";
 import { buildPaymentDues } from "./services/paymentDues";
 import { whatsappProvider } from "./whatsapp/index";
 import { buildMessage, type MessageType } from "./whatsapp/templates";
 import { normalizeIndianPhone } from "./whatsapp/phone";
-import { WhatsAppMessage, Booking } from "./models/index";
+import { WhatsAppMessage, Booking, VehicleType } from "./models/index";
 import { sendBookingMessage } from "./whatsapp/sendBookingMessage";
 import { buildCustomerTemplatePreviews, CUSTOMER_TEMPLATE_KEYS, type CustomerTemplateKey } from "./whatsapp/customerTemplates";
 import { findVehicleConflicts, checkDriverAvailability, combineDateTime } from "./services/availability";
@@ -97,6 +108,24 @@ import { authenticateDriver, type DriverAuthRequest } from "./middleware/driverA
 import { registerGpsConnectionRoutes } from "./gps/routes/connections";
 import { registerGpsDeviceRoutes } from "./gps/routes/devices";
 import { registerGpsAssignmentRoutes } from "./gps/routes/assignments";
+import { registerGpsVehicleStateRoutes } from "./gps/routes/vehicleState";
+import { registerGpsWebhookRoutes } from "./gps/ingestion/webhookRoute";
+import { registerGpsBillingRoutes } from "./gps/billing/routes";
+import { registerDashboardOverviewRoute } from "./dashboard/overview";
+import { registerBookingQueuesRoutes } from "./booking/queues";
+import { registerDriverDomainRoutes } from "./driver/domain/routes";
+import { registerDriverDocumentModule } from "./driver/documents/index";
+import { registerVehicleHandoverRoutes } from "./driver/handover/index";
+import { registerDriverOperationsRoutes } from "./driver/operations/index";
+import { registerSelfDriveRoutes } from "./booking/self-drive/index";
+import { acceptHandoverHandler, getPendingHandoversForDriverPortal } from "./driver/handover/driverPortalRoutes";
+import { registerVehicleDocumentRoutes } from "./vehicle/documents/routes";
+import { registerVehicleMaintenanceRoutes } from "./vehicle/maintenance/routes";
+import { registerVehicleFuelRoutes } from "./vehicle/expenses/routes";
+import { registerVehicleFastagRoutes } from "./vehicle/fastag/routes";
+import { registerVehicleIncidentRoutes } from "./vehicle/incidents/routes";
+import { registerVehicleInspectionRoutes } from "./vehicle/inspections/routes";
+import { resolveOwnFleetEligibility } from "./vehicle/core/ownFleetEligibility";
 
 // Statuses where the booking has been financially finalized — further
 // financial edits require an explicit adjustment reason instead of a
@@ -291,6 +320,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerGpsConnectionRoutes(app);
   registerGpsDeviceRoutes(app);
   registerGpsAssignmentRoutes(app);
+  registerGpsVehicleStateRoutes(app);
+  registerGpsWebhookRoutes(app);
+  registerGpsBillingRoutes(app);
+  registerBookingQueuesRoutes(app);
+  registerDashboardOverviewRoute(app);
+  registerDriverDomainRoutes(app);
+  registerDriverDocumentModule(app);
+  registerVehicleHandoverRoutes(app);
+  registerDriverOperationsRoutes(app);
+  registerSelfDriveRoutes(app);
+  registerVehicleDocumentRoutes(app);
+  registerVehicleMaintenanceRoutes(app);
+  registerVehicleFuelRoutes(app);
+  registerVehicleFastagRoutes(app);
+  registerVehicleIncidentRoutes(app);
+  registerVehicleInspectionRoutes(app);
+  // Live Operations — Vehicles on Booking view + Booking End Reminder
+  // engine surface. A VIEW/alert layer over canonical Booking records,
+  // never a second booking store.
+  registerOperationsRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
@@ -521,7 +570,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/logout", authenticateUser, async (req: AuthRequest, res) => {
     try {
-      await storage.updateUserSession(req.user.id, null);
+      // Log out THIS device's session only — the user's other logged-in
+      // devices (multi-device sessions) stay logged in.
+      const currentSessionId = (req.session as any)?.userId;
+      if (currentSessionId) {
+        await storage.removeUserSession(req.user.id, currentSessionId);
+      } else {
+        await storage.updateUserSession(req.user.id, null);
+      }
       req.session.destroy((err) => {
         if (err) {
           return res.status(500).json({ message: "Logout failed" });
@@ -654,7 +710,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/driver-portal/me", authenticateDriver, async (req: DriverAuthRequest, res) => {
-    res.json({ id: req.driver._id, name: req.driver.name, phone: req.driver.phone, status: req.driver.status });
+    const pendingHandovers = await getPendingHandoversForDriverPortal(String(req.driver.tenantId), req.driverId!);
+    res.json({ id: req.driver._id, name: req.driver.name, phone: req.driver.phone, status: req.driver.status, pendingHandovers });
   });
 
   // A driver's own assigned duties only — scoped by BOTH driverId and the
@@ -691,6 +748,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to accept duty" });
     }
   });
+
+  // TASK-VEHICLE-HANDOVER-05 — the ONE new driver-portal-reachable route
+  // this task adds.
+  app.post("/api/driver-portal/handovers/:id/accept", authenticateDriver, acceptHandoverHandler);
 
   // Staff-side PIN management — a driver can never set/see their own PIN
   // hash; only office staff with MANAGE_DRIVERS can set or reset one, the
@@ -1460,6 +1521,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Which service modes (Self Drive / With Driver) a tenant operates.
+  // Absent field = both enabled, so pre-existing tenants are unaffected.
+  app.get("/api/admin/tenants/:tenantId/service-modes", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const tenant = await storage.getTenant(req.params.tenantId);
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
+      res.json({
+        selfDrive: tenant.serviceModes?.selfDrive !== false,
+        withDriver: tenant.serviceModes?.withDriver !== false,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch service modes" });
+    }
+  });
+
+  app.patch("/api/admin/tenants/:tenantId/service-modes", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { selfDrive, withDriver } = req.body;
+      if (typeof selfDrive !== 'boolean' || typeof withDriver !== 'boolean') {
+        return res.status(400).json({ message: "selfDrive and withDriver must be booleans" });
+      }
+      if (!selfDrive && !withDriver) {
+        return res.status(400).json({ message: "At least one service mode must remain enabled" });
+      }
+      const tenant = await storage.updateTenantServiceModes(req.params.tenantId, { selfDrive, withDriver });
+      if (!tenant) return res.status(404).json({ message: "Tenant not found" });
+      res.json({ message: "Service modes updated", serviceModes: tenant.serviceModes });
+    } catch (error) {
+      console.error('Error updating tenant service modes:', error);
+      res.status(500).json({ message: "Failed to update service modes" });
+    }
+  });
+
   // Check current usage vs limits for a tenant
   app.get("/api/admin/tenants/:tenantId/usage", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
     try {
@@ -1600,6 +1694,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error reactivating sub-user:", error);
       res.status(500).json({ message: "Failed to reactivate sub-user" });
+    }
+  });
+
+  // Permissions a manager can be granted through this endpoint — the
+  // original 4 defaults plus the Vehicle 360 batch's vehicle.* set (Final
+  // Vehicle 360 Integrator, "Open follow-ups" #3: these were added to
+  // PERMISSIONS/requirePermission but had no way to actually be assigned to
+  // a manager after creation). Deliberately not the full ~80-entry
+  // PERMISSIONS object — expanding this to every module's permissions is
+  // out of scope here.
+  const MANAGER_ASSIGNABLE_PERMISSIONS = new Set<string>([
+    PERMISSIONS.CREATE_BOOKING,
+    PERMISSIONS.VIEW_BOOKINGS,
+    PERMISSIONS.EDIT_BOOKING,
+    PERMISSIONS.GENERATE_INVOICE,
+    PERMISSIONS.VEHICLE_COMPLIANCE_VIEW,
+    PERMISSIONS.VEHICLE_COMPLIANCE_MANAGE,
+    PERMISSIONS.VEHICLE_MAINTENANCE_VIEW,
+    PERMISSIONS.VEHICLE_MAINTENANCE_MANAGE,
+    PERMISSIONS.VEHICLE_EXPENSE_VIEW,
+    PERMISSIONS.VEHICLE_EXPENSE_MANAGE,
+    PERMISSIONS.VEHICLE_FASTAG_VIEW,
+    PERMISSIONS.VEHICLE_FASTAG_MANAGE,
+    PERMISSIONS.VEHICLE_INCIDENTS_VIEW,
+    PERMISSIONS.VEHICLE_INCIDENTS_MANAGE,
+  ]);
+
+  app.patch("/api/users/sub-users/:userId/permissions", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin' && req.user?.role !== 'client') {
+        return res.status(403).json({ message: "Access denied. Only admins and clients can edit manager permissions." });
+      }
+
+      const requested = req.body.permissions;
+      if (!Array.isArray(requested) || !requested.every((p) => typeof p === 'string')) {
+        return res.status(400).json({ message: "permissions must be an array of strings." });
+      }
+      const invalid = requested.filter((p) => !MANAGER_ASSIGNABLE_PERMISSIONS.has(p));
+      if (invalid.length > 0) {
+        return res.status(400).json({ message: `Unknown or non-assignable permission(s): ${invalid.join(', ')}` });
+      }
+
+      const updated = await storage.updateSubUserPermissions(req.params.userId, requested, scopeTenant(req));
+      const { password, ...userResponse } = updated.toObject();
+      res.json(userResponse);
+    } catch (error) {
+      console.error("Error updating sub-user permissions:", error);
+      res.status(500).json({ message: "Failed to update sub-user permissions" });
     }
   });
 
@@ -1814,6 +1956,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Vehicle Type Master Routes
+  app.get("/api/vehicle-types", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { search, minSeating, maxSeating } = req.query;
+      const query: Record<string, any> = { tenantId: req.tenantId, isActive: true };
+
+      if (search) {
+        const searchTerm = String(search).toLowerCase();
+        query.$or = [
+          { displayName: { $regex: searchTerm, $options: 'i' } },
+          { model: { $regex: searchTerm, $options: 'i' } },
+          { category: { $regex: searchTerm, $options: 'i' } },
+        ];
+      }
+
+      if (minSeating) {
+        query.seatingCapacity = { $gte: parseInt(String(minSeating)) };
+      }
+      if (maxSeating) {
+        if (!query.seatingCapacity) query.seatingCapacity = {};
+        query.seatingCapacity.$lte = parseInt(String(maxSeating));
+      }
+
+      const types = await VehicleType.find(query).sort({ sortOrder: 1 });
+      res.json(types);
+    } catch (error: any) {
+      console.error('Get vehicle types error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch vehicle types" });
+    }
+  });
+
+  app.get("/api/vehicle-types/by-seating/:seating", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const seating = parseInt(req.params.seating);
+      if (isNaN(seating) || seating < 1) {
+        return res.status(400).json({ message: "Invalid seating capacity" });
+      }
+
+      const types = await VehicleType.find({
+        tenantId: req.tenantId,
+        isActive: true,
+        seatingCapacity: { $gte: seating },
+      }).sort({ seatingCapacity: 1, sortOrder: 1 });
+
+      res.json(types);
+    } catch (error: any) {
+      console.error('Get vehicle types by seating error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch vehicle types" });
+    }
+  });
+
   // Driver Routes
   app.get("/api/drivers", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
@@ -1853,8 +2046,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(driver);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid driver data", errors: error.errors });
+        // TASK-DRIVER-ADD-400-FIX: previously returned the raw Zod
+        // `error.errors` array as the response body — the "giant JSON
+        // toast" bug. Log the full issue list server-side only (useful
+        // for debugging, not sensitive) and give the client a shape it
+        // can render as field-specific messages instead.
+        console.error('Driver create validation failed:', error.issues.map(i => ({ path: i.path.join('.'), code: i.code })));
+        return res.status(400).json({
+          message: "Please check the highlighted fields.",
+          fields: zodErrorToFieldErrors(error),
+        });
       }
+      console.error('Error creating driver:', error);
       res.status(500).json({ message: "Failed to create driver" });
     }
   });
@@ -1864,13 +2067,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = req.params.id;
       const driverData = mongoDriverSchema.partial().parse(req.body);
       const driver = await storage.updateDriver(id, driverData, scopeTenant(req));
-      
+
       if (!driver) {
         return res.status(404).json({ message: "Driver not found" });
       }
-      
+
       res.json(driver);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        // TASK-DRIVER-ADD-400-FIX: this previously fell through to the
+        // generic catch-all below and returned a 500 "Failed to update
+        // driver" for a validation error — indistinguishable from a real
+        // server failure, and gave no field-level information at all.
+        console.error('Driver update validation failed:', error.issues.map(i => ({ path: i.path.join('.'), code: i.code })));
+        return res.status(400).json({
+          message: "Please check the highlighted fields.",
+          fields: zodErrorToFieldErrors(error),
+        });
+      }
+      console.error('Error updating driver:', error);
       res.status(500).json({ message: "Failed to update driver" });
     }
   });
@@ -1918,7 +2133,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const results = await Promise.all(allDrivers.map(async (d: any) => {
         const driverObj = typeof d.toObject === 'function' ? d.toObject() : d;
 
-        if (d.status === 'inactive' || d.status === 'suspended') {
+        const lifecycleStage = driverObj.lifecycleStage ?? 'active';
+        if (d.status === 'inactive' || lifecycleStage === 'suspended') {
           if (!wantUnavailable) return null;
           return { ...driverObj, available: false, unavailabilityReason: d.status === 'inactive' ? 'Inactive' : 'Suspended' };
         }
@@ -1952,6 +2168,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Booking Routes
+  // Enabled service modes for the CURRENT tenant — drives which of the
+  // Self Drive / With Driver selectors the booking UI shows at all.
+  app.get("/api/tenant/service-modes", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const tenant = await storage.getTenant(String(req.tenantId));
+      res.json({
+        selfDrive: tenant?.serviceModes?.selfDrive !== false,
+        withDriver: tenant?.serviceModes?.withDriver !== false,
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch service modes" });
+    }
+  });
+
   app.get("/api/bookings", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const bookings = await storage.getBookingsByTenant(req.tenantId!);
@@ -2288,6 +2518,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Single booking by id — genuinely missing until now (found via DEF-001
+  // final retest: every other single-booking need is a sub-resource,
+  // e.g. /api/bookings/:id/payments, so a bare fetch-by-id was never
+  // built). Registered after every literal /api/bookings/<word> route
+  // above (upcoming) so this :id wildcard can't shadow them — Express
+  // matches in registration order. storage.getBooking() already exists
+  // and is already tenant-scoped + ObjectId-validated; this just exposes it.
+  app.get("/api/bookings/:id", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const booking = await storage.getBooking(req.params.id, req.tenantId!);
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+      // The Unified Booking Workspace renders its lifecycle actions off
+      // this list so the client never needs its own copy of the state
+      // machine's transition table — one status engine, served with the
+      // record it governs.
+      const plain: any = typeof (booking as any).toObject === 'function' ? (booking as any).toObject() : booking;
+      res.json({ ...plain, allowedNextStatuses: getAllowedNextStatuses((booking as any).status) });
+    } catch (error) {
+      console.error('Get booking by id error:', error);
+      res.status(500).json({ message: "Failed to fetch booking" });
+    }
+  });
+
   // Booking wizard draft persistence — one slot per (tenant, user). Purely
   // additive: the Add Booking form works exactly as before if a caller never
   // touches these routes. Scoped to authenticateUser + requireTenant only
@@ -2374,7 +2627,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // P0 FIX: no longer logging the full mapped booking payload — it
       // contains customer PII (name, phone, email) and financial amounts.
-      const bookingData: any = mongoBookingSchema.parse(mappedData);
+      // TASK-BOOKING-DOMAIN-02: mongoBookingSchemaWithCertainty replaces
+      // the bare mongoBookingSchema here — same base validation (including
+      // the vehicleId/resourceFulfilmentStatus rule right below, untouched
+      // by this task), plus the conditional pickupDate requirement (see
+      // server/booking/domain/bookingCertaintySchema.ts). A caller that
+      // never sends travelDateStatus gets today's exact "pickupDate is
+      // required" behavior unchanged.
+      const bookingData: any = mongoBookingSchemaWithCertainty.parse(mappedData);
 
       // Flexible fulfilment: vehicleId is no longer schema-required (a
       // booking may be confirmed with the physical resource still
@@ -2395,6 +2655,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (!bookingData.resourceFulfilmentStatus) {
         bookingData.resourceFulfilmentStatus = bookingData.vehicleId ? 'own_fleet_assigned' : 'not_started';
+      }
+
+      // An initial advance can never exceed the booking's own total —
+      // overpayments/extra collections go through the payment ledger
+      // afterwards, where they are auditable, not through create.
+      if ((bookingData.advanceReceived || 0) > bookingData.totalAmount) {
+        return res.status(400).json({
+          message: `Advance received (₹${bookingData.advanceReceived}) cannot exceed the total amount (₹${bookingData.totalAmount}).`,
+          code: "ADVANCE_EXCEEDS_TOTAL",
+        });
+      }
+
+      // Service-mode gate: a tenant configured as Self-Drive-only or
+      // With-Driver-only must not accept NEW bookings in the disabled mode
+      // (hidden UI alone is not enforcement). Existing bookings/history are
+      // untouched — this runs only on create.
+      if (bookingData.bookingType === 'self_drive' || bookingData.bookingType === 'with_driver') {
+        const tenant = await storage.getTenant(String(req.tenantId));
+        const modeEnabled = bookingData.bookingType === 'self_drive'
+          ? tenant?.serviceModes?.selfDrive !== false
+          : tenant?.serviceModes?.withDriver !== false;
+        if (!modeEnabled) {
+          return res.status(403).json({
+            message: `${bookingData.bookingType === 'self_drive' ? 'Self Drive' : 'With Driver'} bookings are not enabled for this account.`,
+            code: "SERVICE_MODE_DISABLED",
+          });
+        }
       }
 
       // Duplicate-request guard (pipeline audit finding: this route had no
@@ -2624,7 +2911,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // conflicts, instead of silently creating a double-booked driver —
       // this is the hard backend stop that exists even if the frontend
       // dropdown incorrectly let the conflicting driver be selected).
-      if (error?.code === 'VEHICLE_DOUBLE_BOOKING' || error?.code === 'DRIVER_TIME_CONFLICT' || error?.code === 'VEHICLE_TENTATIVELY_HELD') {
+      // TASK-VEHICLE-SAFETY-ELIGIBILITY: same 409 convention as the
+      // conflict codes above — VEHICLE_SAFETY_HOLD is thrown by
+      // storage.createBooking's live eligibility recheck, never something
+      // the frontend can bypass by not calling the picker.
+      if (error?.code === 'VEHICLE_DOUBLE_BOOKING' || error?.code === 'DRIVER_TIME_CONFLICT' || error?.code === 'VEHICLE_TENTATIVELY_HELD' || error?.code === 'VEHICLE_SAFETY_HOLD') {
         const c = error.conflict;
         return res.status(409).json({
           success: false,
@@ -2635,6 +2926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             startDateTime: c.pickupDate,
             endDateTime: c.returnDate,
           } : undefined,
+          openCriticalDefects: error.openCriticalDefects,
         });
       }
       console.error('Booking creation error:', error?.message || error);
@@ -2658,7 +2950,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const bookingData: any = mongoBookingSchema.partial().parse(req.body);
+      // TASK-BOOKING-DOMAIN-02: mongoBookingSchemaWithCertaintyPartial
+      // only enforces the conditional pickupDate requirement when a
+      // request actually touches the date-certainty fields
+      // (travelDateStatus/pickupDate/tentativeStartDate/
+      // tentativeEndDate) — an edit that only changes e.g. `notes` is
+      // completely unaffected.
+      const bookingData: any = mongoBookingSchemaWithCertaintyPartial.parse(req.body);
 
       // advanceReceived is a ledger-derived cached summary, not a plain
       // editable field, once a booking exists — allowing a raw overwrite
@@ -2671,9 +2969,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // after the fact (an edit changing it would defeat the point).
       delete bookingData.idempotencyKey;
 
+      // Empty string means "clear this field" for the reference/date fields
+      // the Unified Booking Workspace can unset (Clear driver/vehicle →
+      // allocation pending; Mark Follow-up Done). Zod's z.string().optional()
+      // accepts '', but Mongoose can't cast '' to ObjectId/Date — map to
+      // null here, once, for every caller.
+      for (const clearable of ['driverId', 'vehicleId', 'followUpAt'] as const) {
+        if ((bookingData as any)[clearable] === '') (bookingData as any)[clearable] = null;
+      }
+
       const existing = await storage.getBooking(id, scopeTenant(req));
       if (!existing) {
         return res.status(404).json({ message: "Booking not found" });
+      }
+
+      // Derived-state repair (root cause of the visible "Driver Assigned +
+      // Unallocated" contradiction): resourceFulfilmentStatus was only ever
+      // computed at create time, so a booking created without a vehicle kept
+      // 'not_started' forever — even after a vehicle was assigned through
+      // this edit route. Recompute it atomically with the assignment itself,
+      // but ONLY across the not_started ⇄ own_fleet_assigned pair; vendor/
+      // outsourcing states belong to their own flows and are never touched
+      // here.
+      const existingFulfilment = (existing as any).resourceFulfilmentStatus || 'not_started';
+      if (bookingData.vehicleId !== undefined && bookingData.resourceFulfilmentStatus === undefined) {
+        if (bookingData.vehicleId && existingFulfilment === 'not_started') {
+          bookingData.resourceFulfilmentStatus = 'own_fleet_assigned';
+        } else if (bookingData.vehicleId === null && existingFulfilment === 'own_fleet_assigned') {
+          bookingData.resourceFulfilmentStatus = 'not_started';
+        }
       }
 
       const touchesFinancials = FINANCIAL_FIELDS.some((f) => (bookingData as any)[f] !== undefined);
@@ -2697,17 +3021,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           bookingData.pickupDate || existing.pickupDate,
           bookingData.pickupTime ?? existing.pickupTime
         );
-        const rangeEnd = combineDateTime(
+        const hasReturnInfo = !!(bookingData.returnDate || existing.returnDate || bookingData.returnTime !== undefined || existing.returnTime);
+        let rangeEnd = combineDateTime(
           bookingData.returnDate || existing.returnDate || bookingData.pickupDate || existing.pickupDate,
           bookingData.returnTime ?? existing.returnTime ?? bookingData.pickupTime ?? existing.pickupTime
         );
+        if (rangeEnd <= rangeStart && !hasReturnInfo) {
+          // No return date/time exists anywhere (e.g. the queue's compact
+          // Set Date action supplying only pickup date+time): don't reject
+          // a legitimately open-ended same-day booking over a zero-width
+          // window. Validate/conflict-check against end-of-day instead —
+          // nothing is persisted from this value.
+          rangeEnd = new Date(rangeStart);
+          rangeEnd.setHours(23, 59, 59, 999);
+        }
         if (rangeEnd <= rangeStart) {
           return res.status(400).json({ message: "Return date/time must be after pickup date/time." });
         }
 
         const conflicts: any = {};
-        const effectiveVehicleId = bookingData.vehicleId ?? (existing as any).vehicleId;
-        const effectiveDriverId = bookingData.driverId ?? (existing as any).driverId;
+        // `!== undefined` (not ??): null means "being cleared in this
+        // request" — a resource being removed must not be availability-
+        // checked as if it were still assigned.
+        const effectiveVehicleId = bookingData.vehicleId !== undefined ? bookingData.vehicleId : (existing as any).vehicleId;
+        const effectiveDriverId = bookingData.driverId !== undefined ? bookingData.driverId : (existing as any).driverId;
         if (effectiveVehicleId) {
           const rows = await findVehicleConflicts(req.tenantId!, refId(effectiveVehicleId), rangeStart, rangeEnd, id);
           if (rows.length) conflicts.vehicle = rows;
@@ -2717,6 +3054,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (availability.bookingConflicts.length) conflicts.driverBookings = availability.bookingConflicts;
           if (availability.leaveConflicts.length) conflicts.driverLeave = availability.leaveConflicts;
         }
+
+        // TASK-VEHICLE-SAFETY-ELIGIBILITY: stale-allocation recheck. Only
+        // fires when THIS request is actually assigning/reassigning the
+        // own-fleet vehicle (`vehicleChanged`) — re-evaluates SAFETY_HOLD
+        // live, at the moment of this save, never trusting whatever was
+        // true when the edit form/Add Booking wizard was opened. A vehicle
+        // that became SAFETY_HOLD in between (e.g. another staff member
+        // just logged a critical Daily Inspection defect) is caught here
+        // even though it looked fine when the form loaded. Deliberately
+        // NOT folded into the `conflicts`/`override` block above and NOT
+        // overridable the way a scheduling conflict is: a double-booking
+        // can be a legitimate, rare admin override; an unresolved critical
+        // safety defect cannot — the only way past this is to resolve the
+        // defect or pick a different vehicle/allocation path.
+        if (vehicleChanged && effectiveVehicleId) {
+          const eligibility = await resolveOwnFleetEligibility(req.tenantId!, refId(effectiveVehicleId));
+          if (eligibility.safetyHold) {
+            return res.status(409).json({
+              success: false,
+              code: "VEHICLE_SAFETY_HOLD",
+              message: "This vehicle is on Safety Hold due to an unresolved critical Daily Inspection defect and cannot be assigned to this booking. Resolve the defect or choose a different vehicle / allocation path (Allocation Pending, Vendor, Outsource).",
+              openCriticalDefects: eligibility.openCriticalDefects,
+            });
+          }
+        }
+
         if (Object.keys(conflicts).length) {
           if (!req.body.override) {
             return res.status(409).json({ message: "Driver or vehicle is unavailable for this schedule.", code: "AVAILABILITY_CONFLICT", conflicts });
@@ -2729,6 +3092,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
+
+      // Server-derived "last touched" signal — the Most Recent queue and
+      // every Last Activity column read this. Never accepted from the
+      // client (see bookingCertaintySchema.ts), always stamped here.
+      bookingData.lastActivityAt = new Date();
+      bookingData.updatedAt = new Date();
 
       const booking = await storage.updateBooking(id, bookingData, scopeTenant(req));
 
@@ -2977,7 +3346,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cleanTag = tag.trim();
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
-
       const actor = { userId: req.userId!, role: req.user?.role || 'client' };
       if (!customer.tags.includes(cleanTag)) {
         customer.tags.push(cleanTag);
@@ -3453,9 +3821,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (typeof requestId !== 'string' || !/^[A-Za-z0-9_-]{8,100}$/.test(requestId)) {
         return res.status(400).json({ message: "A valid requestId is required" });
       }
-      const pageUrl = safeGoogleReviewUrl(reviewPageUrl);
-      if (!pageUrl) return res.status(400).json({ message: "A valid Google review page URL is required" });
-
       const [customer, booking, tenant] = await Promise.all([
         Customer.findOne({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } }),
         Booking.findOne({ _id: bookingId, tenantId: req.tenantId, customerId: req.params.id }),
@@ -3466,6 +3831,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!REVIEW_ELIGIBLE_STATUSES.has(booking.status)) {
         return res.status(400).json({ message: "Google review requests are allowed only after trip completion" });
       }
+      // Multi-tenant review link: an explicit URL wins; otherwise the
+      // tenant's configured Google review page (Settings → Operations).
+      // Never a hardcoded global link.
+      const pageUrl = safeGoogleReviewUrl(reviewPageUrl || (tenant as any)?.operationsSettings?.googleReviewUrl || '');
+      if (!pageUrl) return res.status(400).json({ message: "No Google review page URL — pass one or configure it in Settings → Operations." });
 
       let tracking = await GoogleReviewTracking.findOne({ tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id });
       if (tracking?.reviewReceived) return res.status(409).json({ message: "A received Google review is already confirmed for this booking" });
@@ -6154,6 +6524,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (newPickupTime !== undefined) booking.pickupTime = newPickupTime;
       if (newReturnDate !== undefined) booking.returnDate = new Date(newReturnDate);
       if (newReturnTime !== undefined) booking.returnTime = newReturnTime;
+      booking.lastActivityAt = new Date();
+      booking.updatedAt = new Date();
 
       await booking.save();
       res.json(booking);
@@ -6544,6 +6916,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await booking.save();
 
+      // Reminder schedule follows the new end time atomically with the
+      // extension: stale time-anchored alerts resolve as 'superseded' and
+      // fresh stages derive from the new scheduledEndDateTime (spec §32).
+      // Best-effort — a reminder-engine hiccup must not fail the extension.
+      resweepBooking(req.tenantId!, booking._id.toString())
+        .catch((err) => console.error('Extension reminder resweep failed:', err?.message || err));
+
       // Auto-send updated confirmation/duty details — best-effort, must
       // not fail the extension itself if WhatsApp is down.
       sendBookingMessage({
@@ -6743,7 +7122,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         let status = attendance?.status || 'not_scheduled';
         if (leave && !attendance) {
-          status = leave.leaveType === 'paid' ? 'paid_leave' : leave.leaveType === 'weekly_off' ? 'weekly_off' : 'unpaid_leave';
+          status = (leave.dayPart && leave.dayPart !== 'full') ? 'half_day'
+            : leave.leaveType === 'paid' ? 'paid_leave' : leave.leaveType === 'weekly_off' ? 'weekly_off' : 'unpaid_leave';
         }
 
         return {
@@ -6755,6 +7135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lateDurationMinutes: attendance?.lateDurationMinutes || null,
           onLeave: !!leave,
           leaveType: leave?.leaveType || null,
+          leaveDayPart: leave?.dayPart || null,
           currentBooking: todaysBooking ? { id: todaysBooking._id, bookingId: todaysBooking.bookingId, status: todaysBooking.status, customerName: todaysBooking.customerName } : null,
         };
       });
@@ -6778,14 +7159,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Leave dates are CALENDAR days (tenant-local, inclusive). A bare
+  // "YYYY-MM-DD" parsed with new Date() lands on UTC midnight, which made
+  // the LAST day of every leave range fall outside the availability
+  // overlap check (endDate midnight is never > any intra-day booking
+  // start) — the driver showed as assignable on the final day of their own
+  // approved leave. Normalize: start-of-day for startDate, END-of-day for
+  // endDate, both in server-local (tenant office) time.
+  const parseLeaveDay = (value: string, boundary: 'start' | 'end'): Date => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+    if (m) {
+      return boundary === 'start'
+        ? new Date(+m[1], +m[2] - 1, +m[3], 0, 0, 0, 0)
+        : new Date(+m[1], +m[2] - 1, +m[3], 23, 59, 59, 999);
+    }
+    return new Date(value);
+  };
+
   app.post("/api/drivers/:id/leave", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
     try {
-      const { startDate, endDate, leaveType, reason } = req.body || {};
+      const { startDate, endDate, leaveType, dayPart, reason } = req.body || {};
       if (!startDate || !endDate) {
         return res.status(400).json({ message: "startDate and endDate are required" });
       }
-      const start = new Date(startDate);
-      const end = new Date(endDate);
+      const start = parseLeaveDay(startDate, 'start');
+      const end = parseLeaveDay(endDate, 'end');
       if (end < start) {
         return res.status(400).json({ message: "endDate cannot be before startDate" });
       }
@@ -6799,6 +7197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startDate: start,
         endDate: end,
         leaveType: leaveType || 'unpaid',
+        dayPart: dayPart || 'full',
         reason,
         status: 'pending',
         requestedBy: { userId: req.userId!, role: req.user?.role || 'client' },
@@ -6865,6 +7264,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(leave);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to reject leave" });
+    }
+  });
+
+  // Edit a leave request. Pending leave is freely editable; approved leave
+  // only until it has started (rewriting history would corrupt the
+  // attendance/availability audit trail). Dates/type edits on approved
+  // leave re-run the booking-conflict check like approval does.
+  app.patch("/api/driver-leaves/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+    try {
+      const leave: any = await DriverLeave.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!leave) return res.status(404).json({ message: "Leave request not found" });
+      if (leave.status === 'rejected' || leave.status === 'cancelled') {
+        return res.status(400).json({ message: `A ${leave.status} leave request cannot be edited.` });
+      }
+      if (leave.status === 'approved' && new Date(leave.startDate) <= new Date()) {
+        return res.status(400).json({ message: "Leave that has already started cannot be edited — cancel it instead." });
+      }
+
+      const { startDate, endDate, leaveType, dayPart, reason } = req.body || {};
+      const start = startDate ? parseLeaveDay(startDate, 'start') : leave.startDate;
+      const end = endDate ? parseLeaveDay(endDate, 'end') : leave.endDate;
+      if (end < start) {
+        return res.status(400).json({ message: "endDate cannot be before startDate" });
+      }
+
+      if (leave.status === 'approved' && (startDate || endDate)) {
+        const { override } = req.body || {};
+        const avail = await checkDriverAvailability(req.tenantId!, leave.driverId.toString(), start, end);
+        if (avail.bookingConflicts.length > 0 && !override) {
+          return res.status(409).json({
+            message: "This driver has confirmed bookings during the new leave period.",
+            code: "LEAVE_BOOKING_CONFLICT",
+            conflicts: avail.bookingConflicts,
+          });
+        }
+        leave.conflictingBookings = avail.bookingConflicts.map((c) => c.bookingId);
+      }
+
+      leave.startDate = start;
+      leave.endDate = end;
+      if (leaveType) leave.leaveType = leaveType;
+      if (dayPart) leave.dayPart = dayPart;
+      if (reason !== undefined) leave.reason = reason;
+      await leave.save();
+      res.json(leave);
+    } catch (error: any) {
+      console.error('Edit leave error:', error?.message || error);
+      res.status(500).json({ message: "Failed to edit leave request" });
+    }
+  });
+
+  // Cancel a leave request (pending or approved). Soft state change, never
+  // a delete — the record stays for the audit/history views, and the
+  // availability engine only honours status 'approved', so cancelling
+  // automatically frees the driver for assignment again.
+  app.post("/api/driver-leaves/:id/cancel", authenticateUser, requireTenant, requirePermission(PERMISSIONS.MANAGE_DRIVERS), async (req: AuthRequest, res) => {
+    try {
+      const leave: any = await DriverLeave.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!leave) return res.status(404).json({ message: "Leave request not found" });
+      if (leave.status !== 'pending' && leave.status !== 'approved') {
+        return res.status(400).json({ message: `This leave request is already ${leave.status}.` });
+      }
+      leave.status = 'cancelled';
+      leave.approvedBy = { userId: req.userId!, role: req.user?.role || 'client' };
+      if (req.body?.approvalNote) leave.approvalNote = req.body.approvalNote;
+      await leave.save();
+      res.json(leave);
+    } catch (error: any) {
+      console.error('Cancel leave error:', error?.message || error);
+      res.status(500).json({ message: "Failed to cancel leave request" });
     }
   });
 

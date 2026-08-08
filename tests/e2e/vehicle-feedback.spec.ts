@@ -127,7 +127,7 @@ test('vehicle feedback links Customer, Booking and Fleet profiles with odometer-
   expect(monthlyVehicle.cleanlinessRating).toBeGreaterThanOrEqual(1);
   expect(monthlyVehicle.verifiedVehicleIssueCount).toBeGreaterThanOrEqual(2);
 
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(phone);
   await page.locator('table tbody tr').first().click();
   const customerDashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });
@@ -145,7 +145,7 @@ test('vehicle feedback links Customer, Booking and Fleet profiles with odometer-
   await expect(vehicleDialog.getByText(`Vehicle feedback ${marker}`, { exact: true }).first()).toBeVisible();
   const relatedBookingRow = vehicleDialog.getByRole('row').filter({ hasText: booking.bookingId });
   await relatedBookingRow.getByRole('button', { name: 'Open Booking' }).click();
-  const bookingDialog = page.getByRole('dialog', { name: 'Booking Details' });
+  const bookingDialog = page.getByRole('dialog').filter({ has: page.getByRole('tab', { name: 'Allocation' }) });
   await expect(bookingDialog.getByText(booking.bookingId, { exact: true })).toBeVisible();
   await bookingDialog.getByRole('button', { name: 'Close' }).click();
   await expect(bookingDialog).toBeHidden();

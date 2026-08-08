@@ -20,8 +20,20 @@ export const authenticateUser = async (req: AuthRequest, res: Response, next: Ne
       return res.status(401).json({ message: "Authentication required" });
     }
 
-    const user = await storage.getUserBySessionId(sessionId);
-    
+    // SA-01: a lookup FAILURE (thrown error — e.g. a transient MongoDB
+    // reconnect blip) must never be treated the same as "no such session".
+    // Only a clean null result means the session genuinely doesn't map to a
+    // real user and should be destroyed; a failed lookup gets a retryable
+    // 503 with the session left intact, so a brief DB hiccup can't
+    // permanently force-log-out a user who was validly logged in.
+    let user;
+    try {
+      user = await storage.getUserBySessionId(sessionId);
+    } catch (lookupError) {
+      console.error('Session lookup failed (transient?), not destroying session:', lookupError);
+      return res.status(503).json({ message: "Temporarily unavailable, please retry." });
+    }
+
     if (!user) {
       // Clear invalid session
       req.session.destroy((err) => {

@@ -18,3 +18,8 @@ uploads/
 # WhatsApp session credentials (per-tenant login state) — equivalent to a
 # live auth token, never commit
 whatsapp-sessions/
+# Per-worktree orchestration/coordination state (task manifests, reports,
+# locks) — untracked by design, but was exposed to a bare `git clean -fd`
+# wiping shared coordination state on trunk. Ignoring it means plain
+# `git clean -fd` (without -x) now skips it.
+.claude/

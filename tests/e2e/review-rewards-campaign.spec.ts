@@ -130,7 +130,7 @@ test('verified reviews earn one configured bonus and pending-review campaigns ta
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
 
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(reviewed.phone);
   await page.locator('table tbody tr').first().click();
   const dashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });

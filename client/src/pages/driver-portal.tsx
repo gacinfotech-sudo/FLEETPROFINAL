@@ -7,6 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { Car, LogOut, MapPin, Phone, CheckCircle2, IndianRupee } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+// TASK-VEHICLE-HANDOVER-05 — the one addition this task makes to this file,
+// per its hard scope ("extend for handover acceptance, don't rebuild it,
+// and don't touch it beyond that one addition"). Renders any handovers
+// surfaced on GET /api/driver-portal/me's `pendingHandovers` field (a
+// response-body addition to this already-allow-listed route, not a new
+// route) and lets the driver acknowledge one via the ONE new driver-portal
+// route this task adds, POST /api/driver-portal/handovers/:id/accept.
+import DriverHandoverAcceptance from "@/components/handover/DriverHandoverAcceptance";
+import type { DriverPortalHandoverSummary } from "@/components/handover/types";
 
 interface Duty {
   _id: string;
@@ -87,6 +96,7 @@ export default function DriverPortalPage() {
       </div>
 
       <div className="p-4 space-y-3 max-w-lg mx-auto">
+        <DriverHandoverAcceptance handovers={(meQuery.data.pendingHandovers || []) as DriverPortalHandoverSummary[]} />
         <h1 className="text-lg font-semibold text-gray-900">My Duties</h1>
         {dutiesQuery.isLoading ? (
           <p className="text-sm text-gray-500">Loading...</p>

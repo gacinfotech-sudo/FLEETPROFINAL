@@ -98,7 +98,7 @@ test.describe('Invoice numbering is deferred to finalization', () => {
       data: { bookingId: booking._id, documentType: 'tax_invoice', serviceDescription: 'UI deferred numbering test' },
     });
 
-    await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+    await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
     await page.getByPlaceholder('Search name, mobile, or email').fill(booking.customerPhone);
     await page.locator('table tbody tr').first().click();
     const dashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });

@@ -151,7 +151,7 @@ test('billing profiles and immutable invoice lifecycle use booking and payment l
   const timeline = await (await page.request.get(`/api/customers/${customer._id}/timeline`)).json();
   expect(timeline.some((event: any) => event.type === 'invoice' && event.description.includes(finalNumber))).toBe(true);
 
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(phone);
   await page.locator('table tbody tr').first().click();
   const dashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });

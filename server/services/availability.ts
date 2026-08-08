@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { Booking, DriverLeave, BookingDraft } from '../models/index';
+import { isEligibleForAssignment } from '../driver/domain/eligibility';
 
 // Bookings store the calendar date and the clock time as SEPARATE fields
 // (pickupDate is always midnight; the real time-of-day lives in the
@@ -28,6 +29,37 @@ const OCCUPYING_STATUSES = [
   'confirmed', 'vehicle_assigned', 'driver_assigned', 'ready_for_dispatch',
   'trip_started', 'ongoing', 'extended', 'return_pending',
 ];
+
+// A trip that is physically underway does NOT release its vehicle/driver
+// just because the scheduled end time passed (Live Operations spec §20-22):
+// until the return/completion workflow moves the booking forward, an
+// overdue active trip conflicts with ANY window — its real end is unknown
+// and in the future. Without this, a customer running late made the
+// vehicle silently double-bookable the moment the clock passed the old end.
+const PHYSICALLY_OUT_STATUSES = ['trip_started', 'ongoing', 'extended', 'return_pending'];
+
+function occupancyWindowClause(queryStart: Date, queryEnd: Date): any {
+  const now = new Date();
+  // The open-ended clause only guards windows starting within the next
+  // 24h — an overdue-by-an-hour trip must block a booking starting this
+  // evening, but not one three weeks out (the vehicle will long be back;
+  // if it somehow isn't, the same check re-runs at that booking's own
+  // assignment/dispatch gates).
+  if (queryStart.getTime() > now.getTime() + 24 * 3600_000) {
+    return {
+      scheduledStartDateTime: { $lt: queryEnd },
+      scheduledEndDateTime: { $gt: queryStart },
+    };
+  }
+  return {
+    $or: [
+      { scheduledStartDateTime: { $lt: queryEnd }, scheduledEndDateTime: { $gt: queryStart } },
+      // Overdue, still out: scheduled end already passed but no return
+      // recorded — treat as open-ended occupancy.
+      { status: { $in: PHYSICALLY_OUT_STATUSES }, scheduledEndDateTime: { $lte: now } },
+    ],
+  };
+}
 
 export interface ConflictingBooking {
   id: string;
@@ -98,8 +130,7 @@ export async function findVehicleConflicts(
   const query: any = {
     tenantId, vehicleId,
     status: { $in: OCCUPYING_STATUSES },
-    scheduledStartDateTime: { $lt: queryEnd },
-    scheduledEndDateTime: { $gt: queryStart },
+    ...occupancyWindowClause(queryStart, queryEnd),
   };
   if (excludeBookingId) query._id = { $ne: excludeBookingId };
   const rows = await Booking.find(query).session(session ?? null);
@@ -113,8 +144,7 @@ export async function findDriverConflicts(
   const query: any = {
     tenantId, driverId,
     status: { $in: OCCUPYING_STATUSES },
-    scheduledStartDateTime: { $lt: queryEnd },
-    scheduledEndDateTime: { $gt: queryStart },
+    ...occupancyWindowClause(queryStart, queryEnd),
   };
   if (excludeBookingId) query._id = { $ne: excludeBookingId };
   const rows = await Booking.find(query).session(session ?? null);
@@ -136,6 +166,10 @@ export interface LeaveConflict {
   startDate: Date;
   endDate: Date;
   leaveType: string;
+  // 'full' | 'first_half' | 'second_half' — a half-day leave still blocks
+  // assignment for the whole day (bookings have no half-day granularity),
+  // but the UI must be able to say WHICH half so ops can decide overrides.
+  dayPart: string;
 }
 
 export async function findDriverLeaveConflicts(
@@ -152,6 +186,7 @@ export async function findDriverLeaveConflicts(
     startDate: l.startDate,
     endDate: l.endDate,
     leaveType: l.leaveType,
+    dayPart: l.dayPart || 'full',
   }));
 }
 
@@ -159,6 +194,9 @@ export interface DriverAvailabilityResult {
   available: boolean;
   bookingConflicts: ConflictingBooking[];
   leaveConflicts: LeaveConflict[];
+  // TASK-DRIVER-DOMAIN-02: set only when `available: false` was decided by
+  // the lifecycle-eligibility gate below, not a scheduling conflict.
+  eligibilityReason?: string;
 }
 
 // start/end MUST be full date+time instants (use combineDateTime) — see
@@ -167,6 +205,10 @@ export interface DriverAvailabilityResult {
 export async function checkDriverAvailability(
   tenantId: string, driverId: string, start: Date, end: Date, excludeBookingId?: string, session?: mongoose.ClientSession
 ): Promise<DriverAvailabilityResult> {
+  const eligibility = await isEligibleForAssignment(tenantId, driverId);
+  if (!eligibility.eligible) {
+    return { available: false, bookingConflicts: [], leaveConflicts: [], eligibilityReason: eligibility.reason };
+  }
   const [bookingConflicts, leaveConflicts] = await Promise.all([
     findDriverConflicts(tenantId, driverId, start, end, excludeBookingId, session),
     findDriverLeaveConflicts(tenantId, driverId, start, end, session),

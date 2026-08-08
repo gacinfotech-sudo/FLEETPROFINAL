@@ -11,9 +11,10 @@ interface Props {
 }
 
 // One reusable global search, reachable from the Sidebar (the only element
-// actually persistent across every page and both mobile/desktop layouts —
-// the standalone client/src/components/layout/header.tsx is dead code,
-// never imported anywhere, so mounting there would have been invisible).
+// actually persistent across every page and both mobile/desktop layouts).
+// The trigger button carries no horizontal margins of its own — its
+// sidebar wrapper owns the inset (a w-full button with its own mx-* was
+// the root cause of the historical sidebar-search overflow).
 // Reuses GET /api/customers?search= verbatim — same endpoint, same
 // debounce-free-but-now-correct search logic already powering
 // customers.tsx, no new backend route.
@@ -49,7 +50,7 @@ export default function GlobalCustomerSearch({ onSelectCustomer }: Props) {
     <>
       <Button
         variant="ghost"
-        className="w-full justify-start px-3 lg:px-4 py-3 text-sm lg:text-base text-gray-600 hover:bg-gray-100 border border-gray-200 mx-3 lg:mx-4 mb-2"
+        className="w-full justify-start px-3 py-2.5 h-10 text-sm text-gray-500 hover:bg-gray-100 border border-gray-200 rounded-lg focus-visible:ring-2 focus-visible:ring-blue-500"
         onClick={() => setOpen(true)}
       >
         <Search className="h-4 w-4 mr-2" /> Search customers...

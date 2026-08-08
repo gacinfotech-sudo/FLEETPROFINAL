@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Phone, MessageCircle, AlertTriangle } from "lucide-react";
+import { useBookingWorkspace } from "@/components/booking/booking-workspace-context";
 
 function fmtMoney(n?: number) {
   if (n === undefined || n === null) return "-";
@@ -11,6 +12,7 @@ function fmtMoney(n?: number) {
 }
 
 export default function UpcomingBookings() {
+  const { openBooking } = useBookingWorkspace();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["/api/operations/upcoming-bookings?days=3"],
     refetchInterval: 60000,
@@ -56,8 +58,12 @@ export default function UpcomingBookings() {
                 </TableHeader>
                 <TableBody>
                   {day.bookings.map((b: any) => (
-                    <TableRow key={b.id}>
-                      <TableCell className="font-mono text-xs">{b.bookingId}</TableCell>
+                    <TableRow key={b.id} className="cursor-pointer hover:bg-gray-50" onClick={() => openBooking(b.id)}>
+                      <TableCell className="font-mono text-xs">
+                        <button type="button" className="text-blue-700 hover:underline" onClick={(e) => { e.stopPropagation(); openBooking(b.id); }}>
+                          {b.bookingId}
+                        </button>
+                      </TableCell>
                       <TableCell>{b.customerName}</TableCell>
                       <TableCell>{b.pickupTime || "-"}</TableCell>
                       <TableCell className="text-sm">{b.pickupLocation}{b.dropoffLocation ? ` → ${b.dropoffLocation}` : ""}</TableCell>
@@ -80,13 +86,15 @@ export default function UpcomingBookings() {
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          {b.flags?.driverNotAssigned && <span className="flex items-center text-xs text-amber-600"><AlertTriangle className="w-3 h-3 mr-1" />No driver</span>}
-                          {b.flags?.vehicleNotAssigned && <span className="flex items-center text-xs text-amber-600"><AlertTriangle className="w-3 h-3 mr-1" />No vehicle</span>}
-                          {b.flags?.invalidCustomerPhone && <span className="flex items-center text-xs text-red-600"><AlertTriangle className="w-3 h-3 mr-1" />Bad phone</span>}
+                          {/* Flags are quick fixes — each opens the workspace on the section that resolves it (§59) */}
+                          {b.flags?.driverNotAssigned && <button type="button" className="flex items-center text-xs text-amber-600 hover:underline" onClick={(e) => { e.stopPropagation(); openBooking(b.id, { focus: "allocation" }); }}><AlertTriangle className="w-3 h-3 mr-1" />No driver</button>}
+                          {b.flags?.vehicleNotAssigned && <button type="button" className="flex items-center text-xs text-amber-600 hover:underline" onClick={(e) => { e.stopPropagation(); openBooking(b.id, { focus: "allocation" }); }}><AlertTriangle className="w-3 h-3 mr-1" />No vehicle</button>}
+                          {b.flags?.invalidCustomerPhone && <button type="button" className="flex items-center text-xs text-red-600 hover:underline" onClick={(e) => { e.stopPropagation(); openBooking(b.id, { focus: "customer" }); }}><AlertTriangle className="w-3 h-3 mr-1" />Bad phone</button>}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
+                          <Button variant="outline" size="sm" className="h-7" onClick={() => openBooking(b.id)}>Open</Button>
                           <a href={`tel:${b.customerPhone}`}>
                             <Button variant="ghost" size="icon"><Phone className="w-4 h-4" /></Button>
                           </a>

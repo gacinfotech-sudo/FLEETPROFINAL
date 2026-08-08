@@ -109,7 +109,7 @@ test('driver feedback links Customer, Booking and Driver profiles without unveri
   expect(customerDriver.averageRating).toBe(5);
   expect(customerDriver.feedback.some((row: any) => row._id === feedback._id)).toBe(true);
 
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(phone);
   await page.locator('table tbody tr').first().click();
   const customerDashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });
@@ -118,7 +118,9 @@ test('driver feedback links Customer, Booking and Driver profiles without unveri
   await expect(customerDashboard.getByText(`Excellent driver assistance ${marker}`, { exact: true }).first()).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await page.locator('nav').getByRole('button', { name: 'Manage Drivers' }).click();
+  // Driver list moved into the consolidated "Drivers" sidebar group.
+  await page.locator('nav').getByRole('button', { name: 'Drivers', exact: true }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Drivers', exact: true }).click();
   const driverRow = page.locator('table tbody tr').filter({ hasText: driver.name }).first();
   await driverRow.getByRole('button', { name: 'View Profile' }).click();
   const driverDialog = page.getByRole('dialog', { name: 'Driver Profile' });
@@ -128,7 +130,7 @@ test('driver feedback links Customer, Booking and Driver profiles without unveri
   const openBooking = relatedBookingRow.getByRole('button', { name: 'Open Booking' });
   await expect(openBooking).toBeEnabled();
   await openBooking.click();
-  const bookingDialog = page.getByRole('dialog', { name: 'Booking Details' });
+  const bookingDialog = page.getByRole('dialog').filter({ has: page.getByRole('tab', { name: 'Allocation' }) });
   await expect(bookingDialog.getByText(booking.bookingId, { exact: true })).toBeVisible();
 
   // The feedback-time driver link is historical evidence. Reassigning the

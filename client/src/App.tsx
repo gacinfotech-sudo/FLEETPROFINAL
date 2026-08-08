@@ -4,11 +4,13 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
+import { BookingWorkspaceProvider } from "@/components/booking/booking-workspace-context";
 import { OfflineNotification } from "@/components/offline-notification";
 import LandingPage from "./pages/landing";
 import LoginPage from "./pages/login";
 import AdminPanel from "./pages/admin-panel";
 import Dashboard from "./pages/dashboard";
+import Vehicle360Page from "./pages/vehicle-360";
 import ForcedPasswordResetPage from "./pages/forced-password-reset";
 import NotFound from "@/pages/not-found";
 import ProtectedRoute from "@/components/auth/protected-route";
@@ -73,6 +75,13 @@ function AuthenticatedApp() {
         </ProtectedRoute>
       </Route>
       
+      {/* Vehicle 360 (TASK-VEHICLE-360-UI-06) */}
+      <Route path="/vehicles/:vehicleId">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <Vehicle360Page />
+        </ProtectedRoute>
+      </Route>
+
       {/* Fallback route for any unknown paths - redirects to appropriate dashboard */}
       <Route>
         {loading ? (
@@ -93,7 +102,12 @@ function AuthenticatedApp() {
 function Router() {
   return (
     <AuthProvider>
-      <AuthenticatedApp />
+      {/* One provider for the ONE Unified Booking Workspace — every booking
+          surface (queues, upcoming, live, history, Customer 360, dashboard,
+          search, Vehicle 360) opens the same canonical editor through it. */}
+      <BookingWorkspaceProvider>
+        <AuthenticatedApp />
+      </BookingWorkspaceProvider>
     </AuthProvider>
   );
 }

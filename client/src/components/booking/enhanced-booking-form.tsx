@@ -1,3 +1,4 @@
+import { safeRandomUUID } from "@/lib/utils";
 import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, Check, Phone, Mail, IndianRupee, Download, ChevronDown, ChevronRight, Building2, Send, AlertTriangle } from "lucide-react";
+import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, Check, Phone, Mail, IndianRupee, Download, ChevronDown, ChevronRight, Building2, Send, AlertTriangle, HelpCircle, CalendarRange } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -55,10 +56,29 @@ const bookingSchema = z.object({
   tripType: z.enum(["one_way", "round_trip", "local", "airport"]),
   pickupLocation: z.string().min(1, "Pickup location is required"),
   dropoffLocation: z.string().min(1, "Drop-off location is required"),
-  pickupDate: z.string().min(1, "Pickup date is required"),
-  pickupTime: z.string().min(1, "Pickup time is required"),
-  returnDate: z.string().min(1, "Return date is required"),
-  returnTime: z.string().min(1, "Return time is required"),
+  // Date-certainty axis (TASK-BOOKING-UI-04, field contract from
+  // TASK-BOOKING-DOMAIN-02): pickupDate/pickupTime/returnDate/returnTime
+  // are relaxed from unconditionally-required to structurally optional
+  // here, the same pattern already used for vehicleId above — the real
+  // "required when travelDateStatus is 'confirmed' (the default)" rule is
+  // enforced procedurally, by the Step 1 Continue button below, not by
+  // this static Zod shape (mirrors how the vehicle/resourceMode
+  // requirement is enforced by the Step 2 Continue button instead of the
+  // schema). NOTE: the server-side counterpart of this relaxation
+  // (mongoBookingSchemaWithCertainty) is DOMAIN-02's proposed patch,
+  // not yet applied to this branch's backend — see this task's report.
+  pickupDate: z.string().optional(),
+  pickupTime: z.string().optional(),
+  returnDate: z.string().optional(),
+  returnTime: z.string().optional(),
+  // travelDateStatus/tentativeStartDate/tentativeEndDate/followUpAt: real
+  // field names from TASK-BOOKING-DOMAIN-02's report — do not rename.
+  // lastActivityAt is deliberately NOT a client field (server-derived only,
+  // per that report).
+  travelDateStatus: z.enum(["confirmed", "range", "not_decided"]).default("confirmed"),
+  tentativeStartDate: z.string().optional(),
+  tentativeEndDate: z.string().optional(),
+  followUpAt: z.string().optional(),
   amount: z.number().min(1, "Amount is required"),
   totalKilometers: z.number().min(0).optional(),
   tollCharges: z.number().min(0, "Toll charges must be 0 or greater").optional(),
@@ -122,6 +142,43 @@ function referralLookupStatus(inputValue: string, minLength: number, pending: bo
   return <p className="text-xs text-red-600">No matching customer found — this booking will not be linked to a referral.</p>;
 }
 
+// Date-certainty option metadata (TASK-BOOKING-UI-04). Three states only,
+// matching travelDateStatus exactly (TASK-BOOKING-DOMAIN-02's real,
+// shipped field name/values) — do not add a fourth or rename these.
+const DATE_CERTAINTY_OPTIONS = [
+  { value: "confirmed" as const, label: "Confirmed Date", desc: "Customer knows exactly when they're traveling.", icon: Calendar },
+  { value: "range" as const, label: "Sometime in a Range", desc: "Customer has a rough window in mind.", icon: CalendarRange },
+  { value: "not_decided" as const, label: "Not Decided Yet", desc: "Date isn't fixed — we'll follow up later.", icon: HelpCircle },
+];
+
+// Combines the two independent axes — date-certainty (this task,
+// travelDateStatus) and resource-fulfilment (already shipped on the
+// inherited branch, resourceMode/selection state) — into ONE coherent
+// summary sentence instead of two disconnected badges (spec: "Confirmed
+// date, vendor sourcing in progress" as a single line). Reads the
+// existing resourceMode/selection values as given; does not change how
+// they are computed or what they mean.
+function describeCombinedBookingStatus(
+  travelDateStatus: "confirmed" | "range" | "not_decided",
+  resourceMode: "own_fleet" | "vendor_vehicle" | "outsource",
+  hasOwnVehicleSelected: boolean,
+  hasVendorVehicleSelected: boolean,
+): string {
+  const datePhrase =
+    travelDateStatus === "confirmed" ? "Confirmed date" :
+    travelDateStatus === "range" ? "Flexible date window" :
+    "Date not decided yet";
+
+  const resourcePhrase =
+    resourceMode === "own_fleet"
+      ? (hasOwnVehicleSelected ? "own fleet vehicle assigned" : "own fleet vehicle not yet selected")
+      : resourceMode === "vendor_vehicle"
+      ? (hasVendorVehicleSelected ? "vendor vehicle selected" : "vendor vehicle sourcing pending")
+      : "vendor sourcing in progress";
+
+  return `${datePhrase}, ${resourcePhrase}`;
+}
+
 export default function EnhancedBookingForm({ onSuccess, initialValues }: EnhancedBookingFormProps) {
   const [step, setStep] = useState(1);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
@@ -131,6 +188,13 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   // "vendor_vehicle"/"outsource" let Step 2 be completed without a
   // resolved company vehicle — see docs/BOOKING_RESOURCE_DEAD_END_AUDIT.md.
   const [resourceMode, setResourceMode] = useState<"own_fleet" | "vendor_vehicle" | "outsource">("own_fleet");
+  // Self-drive booking-time capture (spec §1-§2, §10): deposit stays a
+  // held amount strictly outside fare/advance math; late policy rides to
+  // the SelfDriveTrip record right after creation.
+  const [sdOps, setSdOps] = useState({
+    depositAmount: "", depositMode: "cash", depositReceived: false, depositReference: "",
+    lateGrace: "30", lateRate: "200", lateUnit: "per_hour",
+  });
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
   const [selectedVendorVehicleId, setSelectedVendorVehicleId] = useState<string>("");
   const [selectedVendorDriverId, setSelectedVendorDriverId] = useState<string>("");
@@ -173,7 +237,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   // regenerated whenever the form is deliberately reset to start a
   // genuinely new booking. See server/routes.ts's POST /api/bookings
   // duplicate-request guard.
-  const bookingIdempotencyKeyRef = useRef<string>(crypto.randomUUID());
+  const bookingIdempotencyKeyRef = useRef<string>(safeRandomUUID());
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -204,6 +268,10 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       pickupTime: "",
       returnDate: "",
       returnTime: "",
+      travelDateStatus: "confirmed",
+      tentativeStartDate: "",
+      tentativeEndDate: "",
+      followUpAt: "",
       amount: 0,
       tollCharges: 0,
       parkingCharges: 0,
@@ -282,7 +350,20 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
 
   const resumeDraft = () => {
     if (!pendingDraft) return;
-    form.reset({ ...form.getValues(), ...pendingDraft.formData });
+    const { __resourceMode, ...draftFormData } = pendingDraft.formData || {};
+    form.reset({ ...form.getValues(), ...draftFormData });
+    // Re-sync the selection state that lives OUTSIDE react-hook-form and is
+    // therefore not covered by form.reset(): the Vehicle step's gate,
+    // pricing UI, and the submit payload's resource-mode branch all read
+    // these. Without this, a resumed draft looked complete but submitted an
+    // own-fleet booking with no vehicle (always a server 400) whenever the
+    // draft was saved on a Vendor/Outsource path — resourceMode silently
+    // reset to "own_fleet".
+    if (__resourceMode === "own_fleet" || __resourceMode === "vendor_vehicle" || __resourceMode === "outsource") {
+      setResourceMode(__resourceMode);
+    }
+    if (draftFormData.vehicleId) setSelectedVehicleId(draftFormData.vehicleId);
+    if (draftFormData.pricingType) setSelectedPricingType(draftFormData.pricingType);
     setStep(pendingDraft.step);
     setPendingDraft(null);
   };
@@ -301,11 +382,14 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
     if (!form.formState.isDirty) return;
     if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current);
     draftSaveTimer.current = setTimeout(() => {
-      apiRequest("PUT", "/api/booking-drafts/mine", { step, formData: watchedValues }).catch(() => {});
+      // __resourceMode rides inside formData (Mixed on the server) so the
+      // resume path can restore the fulfilment mode — it is stripped back
+      // out before form.reset() in resumeDraft().
+      apiRequest("PUT", "/api/booking-drafts/mine", { step, formData: { ...watchedValues, __resourceMode: resourceMode } }).catch(() => {});
     }, 1200);
     return () => { if (draftSaveTimer.current) clearTimeout(draftSaveTimer.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedValues, step, draftChecked, pendingDraft, bookingConfirmed]);
+  }, [watchedValues, step, resourceMode, draftChecked, pendingDraft, bookingConfirmed]);
 
   // Fetch available vehicles.
   // P0 FIX (flexible-fulfilment initiative): this used to omit
@@ -557,6 +641,32 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
     enabled: EXTERNAL_SOURCE_TYPES.has(watchedValues.bookingSource) || resourceMode === "vendor_vehicle",
   });
 
+  // Tenant service-mode configuration: a Self-Drive-only or With-Driver-only
+  // tenant never sees the other mode's selector; the form silently opens in
+  // its single enabled mode. Until the query resolves, both stay available
+  // (same as a both-modes tenant), so nothing flashes or blocks.
+  const { data: tenantServiceModes } = useQuery<{ selfDrive: boolean; withDriver: boolean }>({
+    queryKey: ["/api/tenant/service-modes"],
+    queryFn: async () => {
+      const res = await fetch("/api/tenant/service-modes", { credentials: "include" });
+      if (!res.ok) return { selfDrive: true, withDriver: true };
+      return res.json();
+    },
+  });
+  const selfDriveEnabled = tenantServiceModes?.selfDrive !== false;
+  const withDriverEnabled = tenantServiceModes?.withDriver !== false;
+  const singleServiceMode: "self_drive" | "with_driver" | null =
+    selfDriveEnabled !== withDriverEnabled
+      ? (selfDriveEnabled ? "self_drive" : "with_driver")
+      : null;
+  useEffect(() => {
+    if (singleServiceMode && form.getValues("bookingType") !== singleServiceMode) {
+      form.setValue("bookingType", singleServiceMode);
+      handleBookingTypeChange(singleServiceMode);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [singleServiceMode]);
+
   // Fetch business profile for logo
   const { data: businessProfile } = useQuery({
     queryKey: ['/api/auth/business-profile-for-documents'],
@@ -583,6 +693,14 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       const bookingData = {
         ...data,
         amount: finalAmount,
+        // Security deposit is held money, never revenue (Rule A/B): the
+        // amount is snapshotted on the booking for the live cards; the
+        // actual receipt is recorded through the self-drive deposit
+        // endpoint right after creation (chained in onSuccess below).
+        ...(data.bookingType === "self_drive" && Number(sdOps.depositAmount) > 0 ? {
+          securityDepositAmount: Number(sdOps.depositAmount),
+          securityDepositStatus: sdOps.depositReceived ? "collected" : "pending",
+        } : {}),
         // Below the minimum, treat it as "not redeeming" rather than
         // sending a value the backend would just reject — the UI already
         // shows the minimum requirement inline while typing.
@@ -611,6 +729,28 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       if (resourceMode !== "own_fleet") {
         delete (bookingData as any).vehicleId;
         (bookingData as any).resourceAssignmentPending = true;
+      }
+
+      // TASK-BOOKING-UI-04: date-certainty payload shaping — independent
+      // of the resourceMode block above. Only the fields relevant to the
+      // selected travelDateStatus are sent; the other axis's now-empty
+      // string fields (e.g. pickupDate="" for a 'range'/'not_decided'
+      // booking) are dropped rather than sent as empty strings, matching
+      // TASK-BOOKING-DOMAIN-02's field contract (absent, not empty-string).
+      // lastActivityAt is never sent — server-derived only, per that task's
+      // report.
+      if ((bookingData as any).travelDateStatus !== "range") {
+        delete (bookingData as any).tentativeStartDate;
+        delete (bookingData as any).tentativeEndDate;
+      }
+      if ((bookingData as any).travelDateStatus !== "not_decided") {
+        delete (bookingData as any).followUpAt;
+      }
+      if ((bookingData as any).travelDateStatus !== "confirmed") {
+        delete (bookingData as any).pickupDate;
+        delete (bookingData as any).pickupTime;
+        delete (bookingData as any).returnDate;
+        delete (bookingData as any).returnTime;
       }
 
       const response = await apiRequest("POST", "/api/bookings", bookingData);
@@ -668,6 +808,23 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
 
       setCreatedBooking(result);
       setBookingConfirmed(true);
+      // Self-drive chained setup — best-effort; failures surface as toasts
+      // but never roll back the created booking (staff can redo them from
+      // the workspace's Self-Drive tab).
+      if (result?.bookingType === "self_drive" && (result?._id || result?.id)) {
+        const sdId = result._id || result.id;
+        if (sdOps.depositReceived && Number(sdOps.depositAmount) > 0) {
+          apiRequest("POST", `/api/bookings/${sdId}/self-drive/deposit`, {
+            amount: Number(sdOps.depositAmount), method: sdOps.depositMode,
+            ...(sdOps.depositReference.trim() ? { reference: sdOps.depositReference.trim() } : {}),
+          }).catch((err: any) => toast({ title: "Deposit receipt not recorded", description: String(err?.message || ""), variant: "destructive" }));
+        }
+        if (sdOps.lateGrace !== "30" || sdOps.lateRate !== "200" || sdOps.lateUnit !== "per_hour") {
+          apiRequest("PATCH", `/api/bookings/${sdId}/self-drive/late-policy`, {
+            graceMinutes: Number(sdOps.lateGrace) || 0, rate: Number(sdOps.lateRate) || 0, unit: sdOps.lateUnit,
+          }).catch(() => {});
+        }
+      }
       toast({
         variant: "success",
         title: "Booking created successfully!",
@@ -682,11 +839,33 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       // conflict reason instead of a generic "please try again" that
       // gives staff no idea what to do differently.
       let description = "Please try again.";
+      // apiRequest surfaces a 401 as a bare "Session expired" (this app is
+      // single-session-per-user: logging in from another window/device ends
+      // this one) — say that instead of a "try again" that cannot succeed.
+      if (err?.message === "Session expired") {
+        description = "This login was opened somewhere else, so this session ended. Log in again — your booking is saved as a draft.";
+      }
       const match = /^(\d+):\s*([\s\S]*)$/.exec(err?.message || "");
       if (match) {
         try {
           const body = JSON.parse(match[2]);
-          if (body?.message) description = body.message;
+          // Zod validation failures (400, "Invalid booking data") carry a
+          // structured `errors` array pinpointing the exact field — e.g.
+          // {path:["customerName"], message:"Customer name is required"}.
+          // Surface that instead of the generic top-level message, which
+          // was previously the only thing shown, making every validation
+          // failure indistinguishable from every other one.
+          if (Array.isArray(body?.errors) && body.errors.length > 0) {
+            description = body.errors
+              .map((e: any) => {
+                const field = Array.isArray(e?.path) ? e.path.join('.') : undefined;
+                return field ? `${field}: ${e.message}` : e.message;
+              })
+              .filter(Boolean)
+              .join('; ');
+          } else if (body?.message) {
+            description = body.message;
+          }
         } catch { /* not JSON, keep generic message */ }
       }
       toast({
@@ -805,16 +984,44 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   };
 
   const onSubmit = async (data: BookingFormData) => {
+    // A resumed draft restores form fields and step, but resourceMode is
+    // component state that used to reset to its "own_fleet" default — that
+    // combination (own fleet, no vehicle) reaches Confirm and is then
+    // always rejected server-side (VEHICLE_OR_ASSIGNMENT_PENDING_REQUIRED).
+    // Catch it before the doomed request and route the user to the Vehicle
+    // step with a real instruction instead of a generic failure.
+    if (resourceMode === "own_fleet" && !data.vehicleId) {
+      toast({
+        title: "Select a vehicle first",
+        description: "Choose a vehicle from your fleet, or switch to Vendor Vehicle / Outsource on the Vehicle step to continue without one.",
+        variant: "destructive",
+      });
+      setStep(2);
+      return;
+    }
+    // An advance larger than the booking's own final total is an entry
+    // mistake (extra collections belong in the ledger later, not here) —
+    // catch it before submit so the money state can never start invalid.
+    const finalTotal = (data.amount || 0) + (data.tollCharges || 0) + (data.parkingCharges || 0) + (data.miscellaneousAmount || 0)
+      - (data.petrolCharges || 0) - (data.dieselCharges || 0) - (data.cngCharges || 0);
+    if ((data.advanceReceived || 0) > finalTotal) {
+      toast({
+        title: "Advance exceeds total amount",
+        description: `Advance Received (₹${data.advanceReceived}) cannot be more than the final total (₹${finalTotal}). Please correct the amounts.`,
+        variant: "destructive",
+      });
+      return;
+    }
     await createBookingMutation.mutateAsync(data);
   };
 
+  // TASK-BOOKING-UI-04: the caller (Step 1's Continue button below) already
+  // validated the correct date fields for the current travelDateStatus
+  // before calling this — a 'range'/'not_decided' booking has no
+  // pickupDate/returnDate at all, so this no longer re-checks them here
+  // (doing so would silently strand those two states on Step 1 forever).
   const handleDateSelection = () => {
-    const pickup = form.getValues("pickupDate");
-    const returnDate = form.getValues("returnDate");
-    
-    if (pickup && returnDate) {
-      setStep(2);
-    }
+    setStep(2);
   };
 
   const handleVehicleAndPricingSelection = (vehicleId: string, pricingType: "day" | "km") => {
@@ -828,9 +1035,14 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       form.setValue("vehicleId", vehicleId);
       form.setValue("pricingType", pricingType);
       
-      // Calculate amount based on pricing type
-      const pickupDate = new Date(watchedValues.pickupDate);
-      const returnDate = new Date(watchedValues.returnDate);
+      // Calculate amount based on pricing type. pickupDate/returnDate are
+      // only optional (TASK-BOOKING-UI-04) for a 'range'/'not_decided'
+      // booking — reaching here at all requires a real own-fleet vehicle
+      // to have been offered, which only happens once dates are confirmed
+      // (see the availableVehicles query's enabled condition above), so
+      // the fallback below is a type-satisfier, not a real runtime path.
+      const pickupDate = new Date(watchedValues.pickupDate || "");
+      const returnDate = new Date(watchedValues.returnDate || "");
       const days = Math.max(1, Math.ceil((returnDate.getTime() - pickupDate.getTime()) / (1000 * 60 * 60 * 24)));
       
       let amount = 0;
@@ -866,14 +1078,37 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
     }
   };
 
-  // Reset selection when booking type changes
+  // Reset selection when booking type changes. Switching modes must never
+  // silently carry the other mode's allocation into the submit payload
+  // (e.g. serviceMode=self_drive + a stale chauffeur driverId), so any
+  // incompatible unsaved selection is cleared here, with a toast so the
+  // removal is visible rather than silent.
   const handleBookingTypeChange = (newBookingType: "self_drive" | "with_driver") => {
     setSelectedVehicleId("");
     setSelectedPricingType("");
     form.setValue("vehicleId", "");
     form.setValue("pricingType", "day");
     form.setValue("amount", 0);
+    if (newBookingType === "self_drive" && form.getValues("driverId")) {
+      form.setValue("driverId", "");
+      toast({
+        title: "Driver selection removed",
+        description: "Self Drive bookings don't have a chauffeur, so the previously selected driver was cleared.",
+      });
+    }
+    if (newBookingType === "self_drive") setSelectedVendorDriverId("");
   };
+
+  // The mode cards wrap their RadioGroupItem, and Radix bubbles a synthetic
+  // `click` from each item's hidden form input whenever its checked state
+  // changes — including on UNcheck. A card-level onClick that re-submits its
+  // own mode therefore fires for the OLD mode's uncheck too, and the two
+  // writers ping-pong until the wrong value wins (the "can't switch back to
+  // Self Drive" bug). Only treat clicks as user intent when they did NOT
+  // originate from the radio primitive itself (Radix already reports those
+  // through onValueChange).
+  const isDirectCardClick = (e: React.MouseEvent) =>
+    !(e.target as HTMLElement).closest('button[role="radio"], input');
 
   const stepConfig = [
     { number: 1, title: "Trip Details", icon: MapPin, color: "bg-blue-500" },
@@ -952,7 +1187,66 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
               <p className="text-blue-100 text-xs sm:text-sm">Tell us when and where you need to go</p>
             </CardHeader>
             <CardContent className="p-4 sm:p-8">
-              {/* Date & Time Section */}
+              {/* Date-Certainty Section (TASK-BOOKING-UI-04) — positioned
+                  before the date-entry section below, per spec. Three
+                  states only, matching travelDateStatus exactly
+                  (TASK-BOOKING-DOMAIN-02's real field/values). This is an
+                  independent axis from the resource-fulfilment selection
+                  in Step 2 below (untouched by this task) — the two are
+                  only combined for display, in the Review step's summary
+                  line. */}
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                  <Calendar className="w-5 h-5 mr-2 text-blue-500" />
+                  How certain is the travel date?
+                </h3>
+                <FormField
+                  control={form.control}
+                  name="travelDateStatus"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div role="radiogroup" aria-label="How certain is the travel date?" className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {DATE_CERTAINTY_OPTIONS.map((option) => (
+                            <div
+                              key={option.value}
+                              id={`date-certainty-${option.value}`}
+                              role="radio"
+                              aria-checked={field.value === option.value}
+                              aria-label={option.label}
+                              tabIndex={0}
+                              onClick={() => field.onChange(option.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  field.onChange(option.value);
+                                }
+                              }}
+                              className={`min-w-0 p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+                                field.value === option.value
+                                  ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              <option.icon className={`w-5 h-5 mb-1.5 ${field.value === option.value ? 'text-blue-600' : 'text-gray-400'}`} />
+                              <div className="font-medium text-xs sm:text-sm break-words">{option.label}</div>
+                              <div className="text-xs text-gray-500 mt-0.5 break-words hidden sm:block">{option.desc}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <Separator className="my-8" />
+
+              {/* Date & Time Section — only when the date is actually
+                  confirmed (travelDateStatus === 'confirmed', the
+                  default). Unchanged fields/validation for that case. */}
+              {watchedValues.travelDateStatus === "confirmed" && (
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
                   <Calendar className="w-5 h-5 mr-2 text-blue-500" />
@@ -970,9 +1264,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                             Pickup Date
                           </FormLabel>
                           <FormControl>
-                            <Input 
-                              type="date" 
-                              {...field} 
+                            <Input
+                              type="date"
+                              {...field}
                               min={new Date().toISOString().split('T')[0]}
                               className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
                             />
@@ -991,8 +1285,8 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                             Pickup Time
                           </FormLabel>
                           <FormControl>
-                            <Input 
-                              type="time" 
+                            <Input
+                              type="time"
                               {...field}
                               className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
                             />
@@ -1002,7 +1296,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                       )}
                     />
                   </div>
-                  
+
                   <div className="space-y-4">
                     <FormField
                       control={form.control}
@@ -1014,9 +1308,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                             Return Date
                           </FormLabel>
                           <FormControl>
-                            <Input 
-                              type="date" 
-                              {...field} 
+                            <Input
+                              type="date"
+                              {...field}
                               min={watchedValues.pickupDate || new Date().toISOString().split('T')[0]}
                               className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
                             />
@@ -1035,8 +1329,8 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                             Return Time
                           </FormLabel>
                           <FormControl>
-                            <Input 
-                              type="time" 
+                            <Input
+                              type="time"
                               {...field}
                               className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
                             />
@@ -1048,6 +1342,98 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   </div>
                 </div>
               </div>
+              )}
+
+              {/* Tentative range — shown only when travelDateStatus === 'range'. */}
+              {watchedValues.travelDateStatus === "range" && (
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                  <CalendarRange className="w-5 h-5 mr-2 text-blue-500" />
+                  What's the earliest and latest date?
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="tentativeStartDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center text-sm font-medium text-gray-700">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Earliest Date
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            {...field}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="tentativeEndDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center text-sm font-medium text-gray-700">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          Latest Date
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            {...field}
+                            min={watchedValues.tentativeStartDate || new Date().toISOString().split('T')[0]}
+                            className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-3">Exact pickup/return date and time can be pinned down once the customer confirms — this booking will still show as ready to review.</p>
+              </div>
+              )}
+
+              {/* Not decided yet — shown only when travelDateStatus === 'not_decided'.
+                  followUpAt is optional (no prior concept existed for it —
+                  see TASK-BOOKING-DOMAIN-02's report). */}
+              {watchedValues.travelDateStatus === "not_decided" && (
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+                  <HelpCircle className="w-5 h-5 mr-2 text-blue-500" />
+                  Follow-up (optional)
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="followUpAt"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center text-sm font-medium text-gray-700">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          When should we follow up?
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            {...field}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-3">No travel date is required to save this booking — it will show as Date Pending until the customer decides.</p>
+              </div>
+              )}
 
               <Separator className="my-8" />
 
@@ -1204,20 +1590,34 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   type="button" 
                   onClick={() => {
                     const dropoffValid = routeType !== "custom" || form.getValues("dropoffLocation");
-                    const isValid = form.getValues("pickupDate") && 
-                                   form.getValues("returnDate") && 
-                                   form.getValues("pickupTime") && 
-                                   form.getValues("returnTime") &&
+                    // TASK-BOOKING-UI-04: which date fields are required
+                    // depends on travelDateStatus — 'confirmed' (default)
+                    // keeps today's exact pickup/return date+time
+                    // requirement; 'range' requires the tentative window
+                    // instead; 'not_decided' requires no date field at all.
+                    const travelDateStatus = form.getValues("travelDateStatus");
+                    const dateFieldsValid =
+                      travelDateStatus === "range"
+                        ? !!(form.getValues("tentativeStartDate") && form.getValues("tentativeEndDate"))
+                        : travelDateStatus === "not_decided"
+                        ? true
+                        : !!(form.getValues("pickupDate") && form.getValues("returnDate") &&
+                             form.getValues("pickupTime") && form.getValues("returnTime"));
+                    const isValid = dateFieldsValid &&
                                    form.getValues("pickupLocation") &&
                                    dropoffValid &&
                                    form.getValues("tripType");
-                    
+
                     if (isValid) {
                       handleDateSelection();
                     } else {
                       toast({
                         title: "Please fill all required fields",
-                        description: "All date, time, location and trip type fields are required.",
+                        description: travelDateStatus === "range"
+                          ? "Earliest/latest date, location and trip type fields are required."
+                          : travelDateStatus === "not_decided"
+                          ? "Location and trip type fields are required."
+                          : "All date, time, location and trip type fields are required.",
                         variant: "destructive"
                       });
                     }
@@ -1245,7 +1645,17 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
               <p className="text-green-100 text-xs sm:text-sm">Choose from our available fleet</p>
             </CardHeader>
             <CardContent className="p-4 sm:p-8">
-              {/* Service Type Selection */}
+              {/* Service Type Selection — hidden entirely for a tenant that
+                  operates only one mode (spec: no dead selector, open the
+                  single enabled workflow directly). */}
+              {singleServiceMode ? (
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold text-gray-800 mb-2">Service Type</h3>
+                  <Badge variant="outline" data-testid="single-service-mode">
+                    {singleServiceMode === "self_drive" ? "Self Drive" : "With Driver"}
+                  </Badge>
+                </div>
+              ) : (
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Service Type</h3>
                 <FormField
@@ -1263,7 +1673,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                           className="grid grid-cols-1 md:grid-cols-2 gap-4"
                         >
                           <div
-                            onClick={() => {
+                            onClick={(e) => {
+                              if (!isDirectCardClick(e)) return;
+                              if (field.value === "self_drive") return;
                               field.onChange("self_drive");
                               handleBookingTypeChange("self_drive");
                             }}
@@ -1282,7 +1694,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                             </div>
                           </div>
                           <div
-                            onClick={() => {
+                            onClick={(e) => {
+                              if (!isDirectCardClick(e)) return;
+                              if (field.value === "with_driver") return;
                               field.onChange("with_driver");
                               handleBookingTypeChange("with_driver");
                             }}
@@ -1307,6 +1721,71 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   )}
                 />
               </div>
+              )}
+
+              {watchedValues.bookingType === "self_drive" && (
+                <div className="mb-8 rounded-lg border border-violet-200 bg-violet-50/50 p-4 space-y-3" data-testid="sd-booking-section">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <h3 className="text-sm font-semibold text-gray-800">Self Drive — Deposit & Late Charges</h3>
+                    <span className="text-sm text-violet-700 font-medium" data-testid="sd-duration-line">
+                      {(() => {
+                        const start = watchedValues.pickupDate ? new Date(`${watchedValues.pickupDate}T${watchedValues.pickupTime || "00:00"}`) : null;
+                        const end = watchedValues.returnDate ? new Date(`${watchedValues.returnDate}T${watchedValues.returnTime || "00:00"}`) : null;
+                        if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) return "Duration: —";
+                        const mins = Math.round((end.getTime() - start.getTime()) / 60000);
+                        const d = Math.floor(mins / 1440), h = Math.floor((mins % 1440) / 60), m = mins % 60;
+                        return `Duration: ${d > 0 ? `${d} Day${d > 1 ? "s" : ""} ` : ""}${h > 0 ? `${h} Hour${h > 1 ? "s" : ""}` : ""}${d === 0 && h === 0 ? `${m} Min` : ""}`.trim();
+                      })()}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div>
+                      <Label className="text-xs">Security Deposit (₹)</Label>
+                      <Input type="number" min="0" value={sdOps.depositAmount} onChange={(e) => setSdOps({ ...sdOps, depositAmount: e.target.value })} data-testid="sd-wizard-deposit" onWheel={(e) => (e.target as HTMLElement).blur()} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Deposit Mode</Label>
+                      <Select value={sdOps.depositMode} onValueChange={(v) => setSdOps({ ...sdOps, depositMode: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cash">Cash</SelectItem><SelectItem value="upi">UPI</SelectItem>
+                          <SelectItem value="card">Card</SelectItem><SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Ref / Txn ID</Label>
+                      <Input value={sdOps.depositReference} onChange={(e) => setSdOps({ ...sdOps, depositReference: e.target.value })} placeholder="optional" />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 pt-5">
+                      <input type="checkbox" checked={sdOps.depositReceived} onChange={(e) => setSdOps({ ...sdOps, depositReceived: e.target.checked })} data-testid="sd-wizard-deposit-received" />
+                      Deposit received
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 sm:max-w-md">
+                    <div>
+                      <Label className="text-xs">Grace (min)</Label>
+                      <Input type="number" min="0" value={sdOps.lateGrace} onChange={(e) => setSdOps({ ...sdOps, lateGrace: e.target.value })} onWheel={(e) => (e.target as HTMLElement).blur()} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Late Rate (₹)</Label>
+                      <Input type="number" min="0" value={sdOps.lateRate} onChange={(e) => setSdOps({ ...sdOps, lateRate: e.target.value })} onWheel={(e) => (e.target as HTMLElement).blur()} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Interval</Label>
+                      <Select value={sdOps.lateUnit} onValueChange={(v) => setSdOps({ ...sdOps, lateUnit: v })}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="per_hour">Per Hour</SelectItem><SelectItem value="per_30min">Per 30 Min</SelectItem>
+                          <SelectItem value="per_day">Per Day</SelectItem><SelectItem value="fixed">Fixed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-gray-500">Deposit is held separately — it never mixes with fare, advance or balance.</p>
+                </div>
+              )}
 
               <Separator className="my-8" />
 
@@ -1941,6 +2420,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                               <Input
                                 type="number" min={0} placeholder="0"
                                 value={field.value ?? ""}
+                                onWheel={(e) => (e.target as HTMLElement).blur()}
                                 onChange={(e) => field.onChange(e.target.value === "" ? undefined : Number(e.target.value))}
                                 className="h-11 border-2 border-gray-200 rounded-lg"
                               />
@@ -2164,7 +2644,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                       variant="outline"
                       onClick={() => {
                         form.reset();
-                        bookingIdempotencyKeyRef.current = crypto.randomUUID();
+                        bookingIdempotencyKeyRef.current = safeRandomUUID();
                         setStep(1);
                         setSelectedVehicleId("");
                         setSelectedPricingType("");
@@ -2196,6 +2676,24 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
               <p className="text-orange-100 text-xs sm:text-sm">Review all details before confirming</p>
             </CardHeader>
             <CardContent className="p-4 sm:p-8">
+              {/* Combined date-certainty + resource-fulfilment summary
+                  (TASK-BOOKING-UI-04) — the two axes read together as ONE
+                  coherent line (e.g. "Confirmed date, vendor sourcing in
+                  progress"), not two disconnected badges. resourceMode and
+                  the vehicle-selection state it reads are the inherited
+                  branch's own, untouched values. */}
+              <div className="mb-6 p-3 sm:p-4 rounded-lg border-2 border-blue-200 bg-blue-50 flex items-start gap-2 min-w-0">
+                <Calendar className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                <p id="combined-booking-status-line" className="text-sm sm:text-base font-medium text-blue-900 min-w-0 break-words">
+                  {describeCombinedBookingStatus(
+                    watchedValues.travelDateStatus || "confirmed",
+                    resourceMode,
+                    !!selectedVehicleId,
+                    !!selectedVendorVehicleId,
+                  )}
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Left Column - Trip Details */}
                 <div className="space-y-6">
@@ -2211,13 +2709,34 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                         <span className="font-medium">{watchedValues.dropoffLocation}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Pickup:</span>
-                        <span className="font-medium">{watchedValues.pickupDate} at {watchedValues.pickupTime}</span>
+                        <span className="text-gray-600">Date Certainty:</span>
+                        <Badge variant="outline">
+                          {watchedValues.travelDateStatus === "range" ? "Flexible Window" :
+                           watchedValues.travelDateStatus === "not_decided" ? "Not Decided Yet" : "Confirmed"}
+                        </Badge>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Return:</span>
-                        <span className="font-medium">{watchedValues.returnDate} at {watchedValues.returnTime}</span>
-                      </div>
+                      {watchedValues.travelDateStatus === "range" ? (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Window:</span>
+                          <span className="font-medium">{watchedValues.tentativeStartDate} to {watchedValues.tentativeEndDate}</span>
+                        </div>
+                      ) : watchedValues.travelDateStatus === "not_decided" ? (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Follow up:</span>
+                          <span className="font-medium">{watchedValues.followUpAt || "Not set"}</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Pickup:</span>
+                            <span className="font-medium">{watchedValues.pickupDate} at {watchedValues.pickupTime}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Return:</span>
+                            <span className="font-medium">{watchedValues.returnDate} at {watchedValues.returnTime}</span>
+                          </div>
+                        </>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-gray-600">Trip Type:</span>
                         <Badge variant="outline">
@@ -2305,7 +2824,13 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Duration:</span>
-                            <span>{Math.ceil((new Date(watchedValues.returnDate).getTime() - new Date(watchedValues.pickupDate).getTime()) / (1000 * 60 * 60 * 24))} days</span>
+                            {/* TASK-BOOKING-UI-04: pickupDate/returnDate
+                                are now typed optional, but this branch
+                                only renders once selectedPricingType is
+                                "day", which only own-fleet's confirmed-date
+                                flow can set — the fallback below is a type
+                                satisfier, not a real runtime path. */}
+                            <span>{Math.ceil((new Date(watchedValues.returnDate || "").getTime() - new Date(watchedValues.pickupDate || "").getTime()) / (1000 * 60 * 60 * 24))} days</span>
                           </div>
                         </>
                       ) : selectedPricingType === "km" ? (
@@ -2326,9 +2851,10 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                     <Input 
                                       type="number" 
                                       placeholder="Enter total kilometers"
-                                      value={field.value || 0}
+                                      value={field.value ? field.value : ""}
+                                      onWheel={(e) => (e.target as HTMLElement).blur()}
                                       onChange={(e) => {
-                                        const km = parseFloat(e.target.value) || 0;
+                                        const km = e.target.value === "" ? 0 : parseFloat(e.target.value) || 0;
                                         field.onChange(km);
                                         // Auto-calculate base amount when kilometers change
                                         const rate = selectedVehicle?.pricePerKm || 0;
@@ -2352,7 +2878,18 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Duration:</span>
-                            <span>{Math.ceil((new Date(watchedValues.returnDate).getTime() - new Date(watchedValues.pickupDate).getTime()) / (1000 * 60 * 60 * 24))} days</span>
+                            {/* TASK-BOOKING-UI-04: pickupDate/returnDate are
+                                empty for a 'range'/'not_decided' booking
+                                (this branch is reached whenever no pricing
+                                type has been picked, i.e. the Vendor
+                                Vehicle/Outsource paths) — guard against
+                                NaN rather than compute a meaningless
+                                duration from two empty strings. */}
+                            <span>
+                              {watchedValues.pickupDate && watchedValues.returnDate
+                                ? `${Math.ceil((new Date(watchedValues.returnDate).getTime() - new Date(watchedValues.pickupDate).getTime()) / (1000 * 60 * 60 * 24))} days`
+                                : "—"}
+                            </span>
                           </div>
                         </>
                       )}
@@ -2368,11 +2905,12 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                               <FormControl>
                                 <div className="relative">
                                   <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                                  <Input 
-                                    type="number" 
+                                  <Input
+                                    type="number"
                                     placeholder="Enter final amount"
-                                    value={field.value || 0}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    value={field.value ? field.value : ""}
+                                    onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                    onWheel={(e) => (e.target as HTMLElement).blur()}
                                     className="h-12 pl-10 text-lg font-medium border-2 border-orange-300 focus:border-orange-500 rounded-lg"
                                   />
                                 </div>
@@ -2396,8 +2934,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                   <Input 
                                     type="number" 
                                     placeholder="0"
-                                    value={field.value || 0}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    value={field.value ? field.value : ""}
+                                    onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                    onWheel={(e) => (e.target as HTMLElement).blur()}
                                     className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
                                   />
                                 </FormControl>
@@ -2416,8 +2955,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                   <Input 
                                     type="number" 
                                     placeholder="0"
-                                    value={field.value || 0}
-                                    onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                    value={field.value ? field.value : ""}
+                                    onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                    onWheel={(e) => (e.target as HTMLElement).blur()}
                                     className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
                                   />
                                 </FormControl>
@@ -2475,8 +3015,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                             <Input
                                               type="number"
                                               placeholder="0"
-                                              value={field.value || 0}
-                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              value={field.value ? field.value : ""}
+                                              onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                              onWheel={(e) => (e.target as HTMLElement).blur()}
                                               className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
                                             />
                                           </FormControl>
@@ -2494,8 +3035,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                             <Input
                                               type="number"
                                               placeholder="0"
-                                              value={field.value || 0}
-                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              value={field.value ? field.value : ""}
+                                              onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                              onWheel={(e) => (e.target as HTMLElement).blur()}
                                               className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
                                             />
                                           </FormControl>
@@ -2513,8 +3055,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                             <Input
                                               type="number"
                                               placeholder="0"
-                                              value={field.value || 0}
-                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              value={field.value ? field.value : ""}
+                                              onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                              onWheel={(e) => (e.target as HTMLElement).blur()}
                                               className="h-10 text-sm border border-red-300 focus:border-red-500 rounded"
                                             />
                                           </FormControl>
@@ -2539,8 +3082,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                             <Input
                                               type="number"
                                               placeholder="0"
-                                              value={field.value || 0}
-                                              onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                                              value={field.value ? field.value : ""}
+                                              onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                              onWheel={(e) => (e.target as HTMLElement).blur()}
                                               className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
                                             />
                                           </FormControl>
@@ -2667,6 +3211,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                   <Input
                                     type="number" min={0} placeholder="0"
                                     value={field.value ?? ""}
+                                    onWheel={(e) => (e.target as HTMLElement).blur()}
                                     onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                     className="h-10 text-sm border border-gray-300 focus:border-blue-500 rounded"
                                   />
@@ -2685,6 +3230,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                   <Input
                                     type="number" min={0} placeholder="0"
                                     value={field.value ?? ""}
+                                    onWheel={(e) => (e.target as HTMLElement).blur()}
                                     onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                     className="h-10 text-sm border border-gray-300 focus:border-blue-500 rounded"
                                   />
@@ -2777,6 +3323,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                   <Input
                                     type="number" min={0} placeholder="0"
                                     value={field.value ?? ""}
+                                    onWheel={(e) => (e.target as HTMLElement).blur()}
                                     onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
                                     className="h-10 text-sm border border-gray-300 focus:border-blue-500 rounded"
                                   />
@@ -2894,7 +3441,26 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   return (
     <div className="max-w-5xl mx-auto p-2 sm:p-4">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8" key={`booking-form-${step}`}>
+        <form
+          onSubmit={form.handleSubmit(onSubmit, (errors) => {
+            // Zod failures on Confirm used to be completely silent — the
+            // button just did nothing (e.g. amount stays 0 because the
+            // selected vehicle has no rate configured). Name the first
+            // failing fields so staff know what to fix instead of
+            // re-clicking a dead button.
+            const details = Object.entries(errors)
+              .slice(0, 3)
+              .map(([field, err]: [string, any]) => err?.message || field)
+              .join('; ');
+            toast({
+              title: "Booking is missing required details",
+              description: details || "Check the highlighted fields and try again.",
+              variant: "destructive",
+            });
+          })}
+          className="space-y-8"
+          key={`booking-form-${step}`}
+        >
           {renderProgressBar()}
           {renderStep()}
         </form>
@@ -3038,7 +3604,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                 variant="outline"
                 onClick={() => {
                   form.reset();
-                  bookingIdempotencyKeyRef.current = crypto.randomUUID();
+                  bookingIdempotencyKeyRef.current = safeRandomUUID();
                   setStep(1);
                   setSelectedVehicleId("");
                   setSelectedPricingType("");

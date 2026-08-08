@@ -1,13 +1,15 @@
 import bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import mongoose from 'mongoose';
-import { Tenant, User, Vehicle, Driver, Booking, Expense, ITenant, IUser, IVehicle, IDriver, IBooking, IExpense } from './models';
+import { Tenant, User, Vehicle, Driver, Booking, Expense, VehicleBookingLock, ITenant, IUser, IVehicle, IDriver, IBooking, IExpense } from './models';
 import { findVehicleConflicts, findDriverConflicts, findTentativeDraftConflicts, combineDateTime } from './services/availability';
+import { resolveOwnFleetEligibility } from './vehicle/core/ownFleetEligibility';
 
 export interface IStorage {
   // Auth methods
   getUserByCredentials(userId: string, password: string): Promise<IUser | undefined>;
   updateUserSession(id: string, sessionId: string | null, deviceInfo?: any): Promise<void>;
+  removeUserSession(id: string, sessionId: string): Promise<void>;
   getUserBySessionId(sessionId: string): Promise<IUser | undefined>;
   getUserSession(id: string): Promise<{ sessionId: string; deviceInfo?: any } | undefined>;
   resetUserPassword(id: string, newPassword: string): Promise<void>;
@@ -33,6 +35,7 @@ export interface IStorage {
   createSubUser(userData: any, createdBy: string): Promise<IUser>;
   getSubUsersByTenant(tenantId: string): Promise<IUser[]>;
   deactivateSubUser(userId: string, deactivatedBy: string, tenantId?: string): Promise<void>;
+  updateSubUserPermissions(userId: string, permissions: string[], tenantId?: string): Promise<IUser>;
   reactivateSubUser(userId: string, reactivatedBy: string, tenantId?: string): Promise<void>;
   checkUserPermission(userId: string, permission: string): Promise<boolean>;
   fixBookingAuditTrail(): Promise<number>;
@@ -88,6 +91,7 @@ export interface IStorage {
 
   // Subscription Plan Management
   updateTenantPlan(tenantId: string, plan: string, limits: { vehicles: number; drivers: number; managers: number; }): Promise<ITenant | undefined>;
+  updateTenantServiceModes(tenantId: string, serviceModes: { selfDrive: boolean; withDriver: boolean; }): Promise<ITenant | undefined>;
   getTenantLimits(tenantId: string): Promise<{ vehicles: number; drivers: number; managers: number; } | null>;
   checkVehicleLimit(tenantId: string): Promise<{ current: number; limit: number; canAdd: boolean; }>;
   checkDriverLimit(tenantId: string): Promise<{ current: number; limit: number; canAdd: boolean; }>;
@@ -103,6 +107,40 @@ export interface IStorage {
   updateExpense(id: string, data: any, tenantId?: string): Promise<IExpense | undefined>;
   deleteExpense(id: string, tenantId?: string): Promise<void>;
   getTotalExpenses(tenantId: string, startDate?: string, endDate?: string): Promise<number>;
+}
+
+// Serializes concurrent createBooking() calls for the same vehicle when running
+// against a standalone (non-replica-set) MongoDB, where session.withTransaction()
+// throws and createBooking() falls back to a non-atomic check-then-insert — without
+// this, two requests can both pass the conflict check before either saves,
+// double-booking the vehicle. Acquisition is a single atomic insert on a unique _id
+// (tenantId:vehicleId), so it holds even across multiple server processes; the
+// lock's own TTL index (models/index.ts) cleans up if a process crashes mid-lock.
+async function withVehicleLock<T>(tenantId: string, vehicleId: string, fn: () => Promise<T>): Promise<T> {
+  const lockId = `${tenantId}:${vehicleId}`;
+  const maxAttempts = 40;
+  let acquired = false;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      await VehicleBookingLock.create({ _id: lockId });
+      acquired = true;
+      break;
+    } catch (err: any) {
+      if (err?.code === 11000) {
+        await new Promise((resolve) => setTimeout(resolve, 25 + Math.random() * 50));
+        continue;
+      }
+      throw err;
+    }
+  }
+  if (!acquired) {
+    throw new Error('Could not acquire vehicle booking lock — another booking attempt is still in progress for this vehicle.');
+  }
+  try {
+    return await fn();
+  } finally {
+    await VehicleBookingLock.deleteOne({ _id: lockId }).catch(() => {});
+  }
 }
 
 export class MongoDBStorage implements IStorage {
@@ -132,18 +170,45 @@ export class MongoDBStorage implements IStorage {
 
   async updateUserSession(id: string, sessionId: string | null, deviceInfo?: any): Promise<void> {
     try {
-      const updateData: any = { 
-        sessionId,
-        lastLogin: sessionId ? new Date() : undefined 
-      };
-      
-      if (deviceInfo) {
-        updateData.deviceInfo = deviceInfo;
+      if (sessionId === null) {
+        // Clear ALL sessions (password reset / deactivation paths).
+        await User.findByIdAndUpdate(id, { sessionId: null, activeSessions: [] });
+        return;
       }
-      
+      // Multi-device: append this login's session (cap 5, oldest evicted)
+      // instead of overwriting — a second system logging in must not kill
+      // the first system's session mid-booking. Legacy `sessionId` still
+      // tracks the latest login for backward compatibility.
+      const updateData: any = {
+        $set: { sessionId, lastLogin: new Date() },
+        $push: {
+          activeSessions: {
+            $each: [{ sessionId, deviceInfo, createdAt: new Date() }],
+            $slice: -5,
+          },
+        },
+      };
+      if (deviceInfo) {
+        updateData.$set.deviceInfo = deviceInfo;
+      }
       await User.findByIdAndUpdate(id, updateData);
     } catch (error) {
       console.error('Error updating user session:', error);
+      throw error;
+    }
+  }
+
+  // Logout for ONE device only: remove that session entry, leave the
+  // user's other devices logged in. Clears the legacy field too when it
+  // pointed at the session being removed.
+  async removeUserSession(id: string, sessionId: string): Promise<void> {
+    try {
+      await User.findByIdAndUpdate(id, {
+        $pull: { activeSessions: { sessionId } },
+      });
+      await User.updateOne({ _id: id, sessionId }, { $set: { sessionId: null } });
+    } catch (error) {
+      console.error('Error removing user session:', error);
       throw error;
     }
   }
@@ -166,7 +231,9 @@ export class MongoDBStorage implements IStorage {
 
   async getUserBySessionId(sessionId: string): Promise<IUser | undefined> {
     try {
-      const user = await User.findOne({ sessionId }).populate('tenantId') || undefined;
+      const user = await User.findOne({
+        $or: [{ sessionId }, { 'activeSessions.sessionId': sessionId }],
+      }).populate('tenantId') || undefined;
 
       if (user) {
         console.log('User loaded by sessionId:', {
@@ -179,8 +246,16 @@ export class MongoDBStorage implements IStorage {
 
       return user;
     } catch (error) {
+      // SA-01 root cause: this previously swallowed every error (including a
+      // transient MongoDB disconnect/reconnect blip — this app's session
+      // store is Mongo-backed) and returned undefined, which
+      // authenticateUser() cannot distinguish from "no such session" — so a
+      // transient DB hiccup permanently destroyed a perfectly valid session
+      // and force-logged-out the user. Re-throw so the caller can tell
+      // "lookup failed" (retryable) apart from "not found" (destroy the
+      // session) instead of collapsing both into the same undefined.
       console.error('Error getting user by session ID:', error);
-      return undefined;
+      throw error;
     }
   }
 
@@ -190,7 +265,7 @@ export class MongoDBStorage implements IStorage {
       await User.findByIdAndUpdate(id, { 
         password: hashedPassword,
         mustResetPassword: false,
-        sessionId: null // Clear session to force re-login
+        sessionId: null, activeSessions: [] // Clear session to force re-login
       });
     } catch (error) {
       console.error('Error resetting user password:', error);
@@ -204,7 +279,7 @@ export class MongoDBStorage implements IStorage {
       await User.findByIdAndUpdate(userId, { 
         password: hashedPassword,
         mustResetPassword: true,
-        sessionId: null // Clear session to force re-login
+        sessionId: null, activeSessions: [] // Clear session to force re-login
       });
     } catch (error) {
       console.error('Error admin resetting password:', error);
@@ -465,7 +540,18 @@ export class MongoDBStorage implements IStorage {
       const candidates = await Vehicle.find({ tenantId, status: 'available' }).sort({ createdAt: -1 });
       const availability = await Promise.all(candidates.map(async (v) => {
         const conflicts = await findVehicleConflicts(tenantId, v.id, start, end);
-        return conflicts.length === 0;
+        if (conflicts.length > 0) return false;
+        // TASK-VEHICLE-SAFETY-ELIGIBILITY: exclude SAFETY_HOLD vehicles from
+        // the own-fleet picker's candidate list, matching the exact pattern
+        // this list already uses for every other ineligible state
+        // (maintenance/on-trip via the `status: 'available'` filter above,
+        // already-assigned via the overlap check just above) — plain
+        // exclusion, not a disabled-with-reason entry (that pattern is only
+        // used for drivers elsewhere in this app). Every candidate here is
+        // already known-`status: 'available'`, so `knownOperationalStatus`
+        // is passed for a fully real (not neutral-placeholder) evaluation.
+        const eligibility = await resolveOwnFleetEligibility(tenantId, v.id, { knownOperationalStatus: 'AVAILABLE' });
+        return eligibility.eligible;
       }));
       return candidates.filter((_v, i) => availability[i]);
     } catch (error) {
@@ -669,6 +755,32 @@ export class MongoDBStorage implements IStorage {
         }
       }
 
+      // TASK-VEHICLE-SAFETY-ELIGIBILITY: real server-side enforcement, not
+      // just UI filtering — a SAFETY_HOLD own-fleet vehicle (unresolved
+      // CRITICAL Daily Inspection defect) can never be assigned to a new
+      // booking, even via a direct API call that bypasses the picker
+      // entirely. Evaluated live, inside this same create path/transaction
+      // — this is what makes it a real "final confirmation" recheck rather
+      // than trusting whatever was true when an Add Booking form was
+      // opened: a vehicle that became SAFETY_HOLD in between is caught
+      // here regardless. Only runs when an own-fleet vehicleId is actually
+      // being assigned — a booking captured via any other resource path
+      // (Allocation Pending / Vendor Vehicle / Outsource / Tentative /
+      // Quote Only, i.e. no vehicleId) is completely unaffected.
+      if (bookingData.vehicleId) {
+        const eligibility = await resolveOwnFleetEligibility(
+          bookingData.tenantId.toString(), bookingData.vehicleId.toString(), { session }
+        );
+        if (eligibility.safetyHold) {
+          const err: any = new Error(
+            'This vehicle is on Safety Hold due to an unresolved critical Daily Inspection defect and cannot be assigned to a new booking. Resolve the defect or choose a different vehicle / allocation path (Allocation Pending, Vendor, Outsource).'
+          );
+          err.code = 'VEHICLE_SAFETY_HOLD';
+          err.openCriticalDefects = eligibility.openCriticalDefects;
+          throw err;
+        }
+      }
+
       const booking = new Booking(bookingData);
       const savedBooking = await booking.save({ session });
 
@@ -699,9 +811,13 @@ export class MongoDBStorage implements IStorage {
       }
     } catch (error: any) {
       // Standalone MongoDB (no replica set) does not support transactions;
-      // fall back to a best-effort, non-transactional check-then-insert.
+      // fall back to a best-effort, non-transactional check-then-insert, made safe
+      // against concurrent double-booking of the same vehicle via withVehicleLock.
       if (typeof error?.message === 'string' && error.message.includes('Transaction numbers')) {
         try {
+          if (checkVehicleOverlap) {
+            return await withVehicleLock(bookingData.tenantId.toString(), bookingData.vehicleId.toString(), () => runCreate(undefined));
+          }
           return await runCreate(undefined);
         } catch (fallbackError) {
           console.error('Error creating booking (no-transaction fallback):', fallbackError);
@@ -805,6 +921,11 @@ export class MongoDBStorage implements IStorage {
       const result = await Booking.updateMany(
         {
           status: 'confirmed',
+          // A self-drive vehicle is physically with the customer until the
+          // return workflow records it back — the scheduled end passing must
+          // never auto-complete the booking or free the vehicle. It surfaces
+          // as RETURN DUE / OVERDUE in Live Operations instead.
+          bookingType: { $ne: 'self_drive' },
           returnDate: { $lt: now }
         },
         { status: 'completed' }
@@ -1143,7 +1264,7 @@ export class MongoDBStorage implements IStorage {
         query,
         {
           isActive: false,
-          sessionId: null // Clear session to force logout
+          sessionId: null, activeSessions: [] // Clear session to force logout
         }
       );
       if (!result) {
@@ -1152,6 +1273,28 @@ export class MongoDBStorage implements IStorage {
       console.log(`Sub-user ${userId} deactivated by ${deactivatedBy}`);
     } catch (error) {
       console.error('Error deactivating sub-user:', error);
+      throw error;
+    }
+  }
+
+  // Tenant-scoped for the same reason as deactivateSubUser above — a
+  // manager belongs to exactly one tenant and must only be editable by that
+  // tenant's admin/client.
+  async updateSubUserPermissions(userId: string, permissions: string[], tenantId?: string): Promise<IUser> {
+    try {
+      const query: any = { userId: userId.toLowerCase(), role: 'manager' };
+      if (tenantId) query.tenantId = tenantId;
+      const result = await User.findOneAndUpdate(
+        query,
+        { permissions },
+        { new: true },
+      );
+      if (!result) {
+        throw new Error('Sub-user not found in this tenant');
+      }
+      return result;
+    } catch (error) {
+      console.error('Error updating sub-user permissions:', error);
       throw error;
     }
   }
@@ -1288,6 +1431,21 @@ export class MongoDBStorage implements IStorage {
   }
 
   // Subscription Plan Management Methods
+  async updateTenantServiceModes(tenantId: string, serviceModes: { selfDrive: boolean; withDriver: boolean; }): Promise<ITenant | undefined> {
+    try {
+      const objectId = new mongoose.Types.ObjectId(tenantId);
+      const updatedTenant = await Tenant.findByIdAndUpdate(
+        objectId,
+        { $set: { serviceModes } },
+        { new: true }
+      );
+      return updatedTenant || undefined;
+    } catch (error) {
+      console.error('Error updating tenant service modes:', error);
+      return undefined;
+    }
+  }
+
   async updateTenantPlan(tenantId: string, plan: string, limits: { vehicles: number; drivers: number; managers: number; }): Promise<ITenant | undefined> {
     try {
       const objectId = new mongoose.Types.ObjectId(tenantId);

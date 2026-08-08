@@ -115,7 +115,7 @@ test('Google review requests are linked, idempotent and require evidence before 
   expect(timeline.some((event: any) => event.type === 'google_review_received' && event.description.includes('5★'))).toBe(true);
   expect(timeline.some((event: any) => event.type === 'google_review_responded')).toBe(true);
 
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(phone);
   await page.locator('table tbody tr').first().click();
   const dashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });

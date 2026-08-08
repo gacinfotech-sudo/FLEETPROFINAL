@@ -1,4 +1,5 @@
 import { Booking, DriverAttendance } from '../models/index';
+import { resolveOwnFleetEligibility } from '../vehicle/core/ownFleetEligibility';
 
 const ATTENDANCE_LATE_GRACE_MINUTES = 15;
 
@@ -197,7 +198,35 @@ export async function transitionBooking(
     }
   }
 
+  // TASK-VEHICLE-SAFETY-ELIGIBILITY — Trip Start gate: an own-fleet vehicle
+  // that entered SAFETY_HOLD (unresolved critical Daily Inspection defect)
+  // at any point before Trip Start must never silently start a trip, even
+  // if it was perfectly eligible when originally assigned. Re-evaluated
+  // live, at the moment of this actual transition — not whatever was true
+  // when the dispatch board/booking form was last loaded. Vendor-fulfilled
+  // bookings are untouched (SAFETY_HOLD is an owned-fleet Daily Inspection
+  // concept, vendor vehicles aren't in this fleet's inspection records).
+  // No override, unlike the missing-assignment check above: this is a hard
+  // safety stop, not a scheduling judgment call — the only way past it is
+  // to resolve the defect or reassign the vehicle (Change Vehicle /
+  // Allocation Pending / Vendor / Outsource). The booking is left
+  // completely untouched (this throws before any field is written), so it
+  // is never silently cancelled or mutated — exactly the "booking is
+  // preserved, allocation needs review" behavior this gate exists for.
+  if (toStatus === 'trip_started' && booking.vehicleId) {
+    const eligibility = await resolveOwnFleetEligibility(String(booking.tenantId), String(booking.vehicleId));
+    if (eligibility.safetyHold) {
+      throw new InvalidTransitionError(
+        `Booking ${booking.bookingId}'s assigned vehicle is on Safety Hold (unresolved critical Daily Inspection defect) and cannot start a trip. Resolve the defect or reassign the vehicle (Change Vehicle / Allocation Pending / Vendor / Outsource) first.`
+      );
+    }
+  }
+
   booking.status = toStatus;
+  // Every real status change is booking activity — keeps the Most Recent
+  // queue and Last Activity columns truthful without any client help.
+  (booking as any).lastActivityAt = new Date();
+  (booking as any).updatedAt = new Date();
   (booking as any).statusHistory = (booking as any).statusHistory || [];
   (booking as any).statusHistory.push({
     fromStatus,

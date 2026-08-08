@@ -56,7 +56,7 @@ test('authorized merge preserves linked records and resolves old phone to canoni
   const sourceCandidate = candidates.candidates.find((row: any) => row._id === duplicate.customer._id);
   expect(sourceCandidate?.matchReasons).toContain('company');
 
-  await page.locator('nav').getByRole('button', { name: 'Customers' }).click();
+  await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
   await page.getByPlaceholder('Search name, mobile, or email').fill(canonical.phone);
   await page.locator('table tbody tr').first().click();
   const dashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });
