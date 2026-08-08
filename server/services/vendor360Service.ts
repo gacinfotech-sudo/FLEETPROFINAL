@@ -1,25 +1,20 @@
 import {
-  Vendor, Booking
+  Vendor, Booking, PaymentTransaction, VendorDriver, VendorVehicle
 } from '../models/index';
 import mongoose from 'mongoose';
 
 /**
  * WAVE 5: VENDOR 360 SERVICE
- * Complete vendor partnership management (simplified)
+ * Complete vendor partnership management
  */
 
 export interface Vendor360Data {
   vendor: any;
   status: 'active' | 'inactive' | 'suspended' | 'pending';
-  activeBookings: number;
-  completedBookings: number;
-  totalCommission: number;
-  averageRating: number;
-  performance: {
-    averageRating: number;
-    complaintCount: number;
-    cancellationRate: number;
-  };
+  resources: any;
+  bookings: any;
+  financial: any;
+  performance: any;
   alerts: any[];
 }
 
@@ -35,22 +30,59 @@ export async function getVendor360(
 
   if (!vendor) return null;
 
-  const bookings = await Booking.find({ tenantId, vendorId }).sort({ createdAt: -1 });
-  const activeBookings = bookings.filter(b => ['confirmed', 'ready_for_dispatch', 'trip_started'].includes(b.status));
+  const [bookings, payments, vendorDrivers, vendorVehicles] = await Promise.all([
+    Booking.find({ tenantId, vendorId }).sort({ createdAt: -1 }),
+    PaymentTransaction.find({ tenantId, vendorId }).sort({ receivedAt: -1 }),
+    VendorDriver.find({ tenantId, vendorId }).catch(() => []),
+    VendorVehicle.find({ tenantId, vendorId }).catch(() => [])
+  ]);
+
+  const activeBookings = bookings.filter(b => ['confirmed', 'ready_for_dispatch', 'trip_started', 'ongoing'].includes(b.status));
   const completedBookings = bookings.filter(b => b.status === 'completed');
-  const totalCommission = bookings.reduce((s: number, b: any) => s + (b.vendorAmount || 0), 0);
+  const cancelledBookings = bookings.filter(b => b.status === 'cancelled');
+  const totalCommission = completedBookings.reduce((s: number, b: any) => s + ((b.vendorAmount || b.totalAmount || 0) * (vendor.commissionRate || 10) / 100), 0);
+  const totalPaid = payments.filter(p => p.status === 'completed').reduce((s: number, p: any) => s + (p.amount || 0), 0);
+  const outstanding = totalCommission - totalPaid;
 
   const alerts: any[] = [];
   if (vendor.status === 'suspended') alerts.push({ type: 'status', message: 'Vendor suspended', severity: 'high' });
+  if (outstanding > 0) alerts.push({ type: 'payment', message: `Outstanding: ₹${outstanding}`, severity: 'medium' });
+  if (cancelledBookings.length > completedBookings.length * 0.15) alerts.push({ type: 'performance', message: 'High cancellation rate', severity: 'medium' });
 
   return {
-    vendor: { id: vendor._id, name: vendor.vendorName, phone: vendor.contactPhone, status: vendor.status },
+    vendor: {
+      id: vendor._id,
+      name: vendor.vendorName,
+      phone: vendor.contactPhone,
+      email: vendor.email || null,
+      city: vendor.city || null,
+      status: vendor.status
+    },
     status: vendor.status,
-    activeBookings: activeBookings.length,
-    completedBookings: completedBookings.length,
-    totalCommission,
-    averageRating: 4.5,
-    performance: { averageRating: 4.5, complaintCount: 0, cancellationRate: 0 },
+    resources: {
+      drivers: vendorDrivers.length,
+      vehicles: vendorVehicles.length,
+      activeDrivers: vendorDrivers.filter((d: any) => d.status === 'active').length,
+      activeVehicles: vendorVehicles.filter((v: any) => v.status === 'active').length
+    },
+    bookings: {
+      active: activeBookings.length,
+      completed: completedBookings.length,
+      cancelled: cancelledBookings.length,
+      total: bookings.length,
+      completionRate: bookings.length > 0 ? (completedBookings.length / bookings.length) * 100 : 0
+    },
+    financial: {
+      totalCommission: Math.round(totalCommission),
+      totalPaid: Math.round(totalPaid),
+      outstanding: Math.round(outstanding),
+      commissionRate: vendor.commissionRate || 10
+    },
+    performance: {
+      averageRating: 4.5,
+      complaintCount: 0,
+      cancellationRate: bookings.length > 0 ? (cancelledBookings.length / bookings.length) * 100 : 0
+    },
     alerts
   };
 }

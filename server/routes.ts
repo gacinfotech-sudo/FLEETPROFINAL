@@ -8160,6 +8160,171 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // WAVE 13: ADVANCED FEATURES (Booking Schedule, Live Operations Details, etc)
+  // ============================================================================
+
+  // Booking Schedule - All bookings by time window
+  app.get("/api/bookings/schedule/today", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
+      const bookings = await Booking.find({
+        tenantId: req.tenantId,
+        pickupDate: { $gte: start, $lte: end }
+      }).sort({ pickupTime: 1 });
+      res.json(bookings);
+    } catch (error: any) {
+      console.error('Schedule today error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch bookings" });
+    }
+  });
+
+  // Booking Schedule - Week view
+  app.get("/api/bookings/schedule/week", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setDate(end.getDate() + 7);
+      end.setHours(23, 59, 59, 999);
+      const bookings = await Booking.find({
+        tenantId: req.tenantId,
+        pickupDate: { $gte: start, $lte: end }
+      }).sort({ pickupDate: 1, pickupTime: 1 });
+      res.json(bookings);
+    } catch (error: any) {
+      console.error('Schedule week error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch bookings" });
+    }
+  });
+
+  // Live Operations Dashboard - Detailed operational status
+  app.get("/api/operations/live", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { buildLiveOperations } = await import("../services/liveOperations");
+      const bookings = await Booking.find({ tenantId: req.tenantId }).lean();
+      const liveOps = buildLiveOperations(bookings, new Date());
+      res.json(liveOps);
+    } catch (error: any) {
+      console.error('Live operations error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch live operations" });
+    }
+  });
+
+  // Driver Performance Dashboard
+  app.get("/api/drivers/performance", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { buildDriverPerformance } = await import("../services/driverPerformance");
+      const performance = await buildDriverPerformance(req.tenantId!);
+      res.json(performance);
+    } catch (error: any) {
+      console.error('Driver performance error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch performance data" });
+    }
+  });
+
+  // Vehicle Performance Dashboard
+  app.get("/api/vehicles/performance", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { buildVehiclePerformance } = await import("../services/vehiclePerformance");
+      const performance = await buildVehiclePerformance(req.tenantId!);
+      res.json(performance);
+    } catch (error: any) {
+      console.error('Vehicle performance error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch performance data" });
+    }
+  });
+
+  // Financial Dashboard - Revenue, expenses, profitability
+  app.get("/api/finance/dashboard", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date();
+
+      const [bookings, expenses, payments] = await Promise.all([
+        Booking.find({ tenantId: req.tenantId, createdAt: { $gte: startDate, $lte: endDate } }),
+        Expense.find({ tenantId: req.tenantId, createdAt: { $gte: startDate, $lte: endDate } }),
+        PaymentTransaction.find({ tenantId: req.tenantId, createdAt: { $gte: startDate, $lte: endDate } })
+      ]);
+
+      const totalRevenue = bookings.reduce((s: number, b: any) => s + (b.totalAmount || 0), 0);
+      const totalExpenses = expenses.reduce((s: number, e: any) => s + (e.amount || 0), 0);
+      const totalPayments = payments.filter(p => p.status === 'completed').reduce((s: number, p: any) => s + (p.amount || 0), 0);
+      const outstanding = totalRevenue - totalPayments;
+      const profitMargin = totalRevenue > 0 ? ((totalRevenue - totalExpenses) / totalRevenue) * 100 : 0;
+
+      res.json({
+        period: { startDate, endDate },
+        revenue: totalRevenue,
+        expenses: totalExpenses,
+        payments: totalPayments,
+        outstanding,
+        profitMargin: Math.round(profitMargin * 100) / 100,
+        bookingCount: bookings.length,
+        expenseCount: expenses.length
+      });
+    } catch (error: any) {
+      console.error('Finance dashboard error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch financial data" });
+    }
+  });
+
+  // Compliance Dashboard - All vehicles' compliance status
+  app.get("/api/fleet/compliance", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const vehicles = await Vehicle.find({ tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const now = new Date();
+
+      const compliance = vehicles.map((v: any) => ({
+        vehicleId: v._id,
+        registrationNumber: v.registrationNumber,
+        status: v.status,
+        registration: { valid: !v.registrationExpiry || new Date(v.registrationExpiry) > now, expiry: v.registrationExpiry },
+        insurance: { valid: !v.insuranceExpiry || new Date(v.insuranceExpiry) > now, expiry: v.insuranceExpiry },
+        pollution: { valid: !v.pollutionExpiry || new Date(v.pollutionExpiry) > now, expiry: v.pollutionExpiry },
+        fitness: { valid: !v.fitnessExpiry || new Date(v.fitnessExpiry) > now, expiry: v.fitnessExpiry },
+        allCompliant: (!v.registrationExpiry || new Date(v.registrationExpiry) > now) &&
+                      (!v.insuranceExpiry || new Date(v.insuranceExpiry) > now) &&
+                      (!v.pollutionExpiry || new Date(v.pollutionExpiry) > now) &&
+                      (!v.fitnessExpiry || new Date(v.fitnessExpiry) > now)
+      }));
+
+      res.json({
+        totalVehicles: vehicles.length,
+        compliantVehicles: compliance.filter((c: any) => c.allCompliant).length,
+        nonCompliantVehicles: compliance.filter((c: any) => !c.allCompliant).length,
+        vehicles: compliance
+      });
+    } catch (error: any) {
+      console.error('Compliance dashboard error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch compliance data" });
+    }
+  });
+
+  // Outstanding Analysis - Customers & vendors who owe money
+  app.get("/api/finance/outstanding", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const invoices = await Invoice.find({ tenantId: req.tenantId, balanceDue: { $gt: 0 } });
+      const customerOutstanding = invoices.reduce((acc: any, inv: any) => {
+        const customerId = inv.customerId?.toString?.() || inv.customerId;
+        acc[customerId] = (acc[customerId] || 0) + (inv.balanceDue || 0);
+        return acc;
+      }, {});
+
+      res.json({
+        totalOutstanding: Object.values(customerOutstanding).reduce((s: number, a: any) => s + a, 0),
+        byCustomer: Object.entries(customerOutstanding).map(([customerId, amount]) => ({ customerId, amount })),
+        invoiceCount: invoices.length
+      });
+    } catch (error: any) {
+      console.error('Outstanding analysis error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch outstanding data" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
