@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { LiveVehicleCard } from "@/pages/live-operations";
-import { money } from "@/pages/live-operations";
+import { money, apiErrorMessage } from "@/pages/live-operations";
 
 export default function CollectPaymentDialog({ card, onClose, onDone }: {
   card: LiveVehicleCard;
@@ -37,21 +37,17 @@ export default function CollectPaymentDialog({ card, onClose, onDone }: {
     }
     setSubmitting(true);
     try {
-      const res = await apiRequest("POST", `/api/bookings/${card.id}/payments`, {
+      await apiRequest("POST", `/api/bookings/${card.id}/payments`, {
         amount: amt,
         paymentType: amt >= card.balance ? "final_payment" : "partial_payment",
         paymentMode,
         transactionReference: reference || undefined,
         idempotencyKey,
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.message || "Payment failed");
-      }
       toast({ title: "Payment recorded", description: `${money(amt)} against ${card.bookingCode}` });
       onDone();
     } catch (err: any) {
-      toast({ title: "Payment failed", description: err?.message, variant: "destructive" });
+      toast({ title: "Payment failed", description: apiErrorMessage(err), variant: "destructive" });
     } finally {
       setSubmitting(false);
     }

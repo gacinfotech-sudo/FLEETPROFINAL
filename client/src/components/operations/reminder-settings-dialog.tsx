@@ -103,7 +103,7 @@ export default function ReminderSettingsDialog({ open, onOpenChange }: {
   const save = async () => {
     setSaving(true);
     try {
-      const res = await apiRequest("PATCH", "/api/tenant/operations-settings", {
+      await apiRequest("PATCH", "/api/tenant/operations-settings", {
         operationsSettings: {
           graceMinutes: Number(graceMinutes),
           turnaroundBufferMinutes: Number(turnaround),
@@ -112,7 +112,6 @@ export default function ReminderSettingsDialog({ open, onOpenChange }: {
           withDriverStages,
         },
       });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || "Save failed");
       toast({ title: "Reminder settings saved" });
       queryClient.invalidateQueries({ queryKey: ["/api/tenant/operations-settings"] });
       onOpenChange(false);

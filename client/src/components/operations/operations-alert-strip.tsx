@@ -14,7 +14,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { AlertTriangle, Bell, Check, Clock3, PhoneCall, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -92,7 +91,6 @@ export default function OperationsAlertStrip({ onViewAll, onOpenBooking }: {
   const act = useMutation({
     mutationFn: async ({ id, action, payload }: { id: string; action: "acknowledge" | "snooze" | "contact"; payload?: any }) => {
       const res = await apiRequest("POST", `/api/operations/alerts/${id}/${action}`, payload || {});
-      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || "Failed");
       return res.json();
     },
     onSuccess: invalidate,
@@ -148,44 +146,52 @@ export default function OperationsAlertStrip({ onViewAll, onOpenBooking }: {
         </div>
       )}
 
-      <Dialog open={!!popupAlert} onOpenChange={(o) => !o && setPopupAlert(null)}>
-        <DialogContent className="sm:max-w-md" data-testid="operations-alert-popup">
-          {popupAlert && (
-            <>
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <Badge className={PRIORITY_BADGE[popupAlert.priority]}>{popupAlert.priority.toUpperCase()}</Badge>
-                  <span className="min-w-0">{popupAlert.title}</span>
-                </DialogTitle>
-              </DialogHeader>
-              <p className="text-sm text-gray-700 whitespace-pre-line">{popupAlert.body}</p>
-              <div className="flex flex-wrap justify-end gap-2 pt-2">
-                {bookingOf(popupAlert)?.customerPhone && (
-                  <Button variant="outline" size="sm" asChild
-                    onClick={() => act.mutate({ id: popupAlert._id, action: "contact", payload: { action: "called_customer" } })}>
-                    <a href={`tel:${bookingOf(popupAlert)!.customerPhone}`}><PhoneCall size={14} className="mr-1" />Call</a>
-                  </Button>
-                )}
-                {bookingOf(popupAlert) && (
-                  <Button variant="outline" size="sm" onClick={() => { onOpenBooking(bookingOf(popupAlert)!._id); setPopupAlert(null); }}>
-                    Open Booking
-                  </Button>
-                )}
-                {popupAlert.priority !== "critical" && (
-                  <Button variant="outline" size="sm"
-                    onClick={() => { act.mutate({ id: popupAlert._id, action: "snooze", payload: { minutes: 30 } }); setPopupAlert(null); }}>
-                    <Clock3 size={14} className="mr-1" />Snooze 30m
-                  </Button>
-                )}
-                <Button size="sm" data-testid="popup-acknowledge"
-                  onClick={() => { act.mutate({ id: popupAlert._id, action: "acknowledge" }); setPopupAlert(null); }}>
-                  <Check size={14} className="mr-1" />Acknowledge
-                </Button>
-              </div>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Urgent-alert popup — deliberately NON-modal (spec §13/§47: never
+          block all work). A fixed corner card the user can act on or
+          ignore; acknowledged state persists server-side so it never
+          re-pops after refresh or on another device. */}
+      {popupAlert && (
+        <div
+          data-testid="operations-alert-popup"
+          role="alertdialog"
+          aria-label={popupAlert.title}
+          className={`fixed bottom-4 right-4 z-50 w-[calc(100vw-2rem)] sm:w-96 rounded-lg border-2 bg-white shadow-xl p-4 space-y-2 ${
+            popupAlert.priority === "critical" ? "border-red-400" : "border-orange-300"
+          }`}
+        >
+          <div className="flex items-start gap-2">
+            <Badge className={PRIORITY_BADGE[popupAlert.priority]}>{popupAlert.priority.toUpperCase()}</Badge>
+            <span className="font-semibold text-sm text-gray-900 min-w-0">{popupAlert.title}</span>
+            <button className="ml-auto text-gray-400 hover:text-gray-600" aria-label="Dismiss popup" onClick={() => setPopupAlert(null)}>
+              <X size={16} />
+            </button>
+          </div>
+          <p className="text-sm text-gray-700 whitespace-pre-line">{popupAlert.body}</p>
+          <div className="flex flex-wrap justify-end gap-2 pt-1">
+            {bookingOf(popupAlert)?.customerPhone && (
+              <Button variant="outline" size="sm" asChild
+                onClick={() => act.mutate({ id: popupAlert._id, action: "contact", payload: { action: "called_customer" } })}>
+                <a href={`tel:${bookingOf(popupAlert)!.customerPhone}`}><PhoneCall size={14} className="mr-1" />Call</a>
+              </Button>
+            )}
+            {bookingOf(popupAlert) && (
+              <Button variant="outline" size="sm" onClick={() => { onOpenBooking(bookingOf(popupAlert)!._id); setPopupAlert(null); }}>
+                Open Booking
+              </Button>
+            )}
+            {popupAlert.priority !== "critical" && (
+              <Button variant="outline" size="sm"
+                onClick={() => { act.mutate({ id: popupAlert._id, action: "snooze", payload: { minutes: 30 } }); setPopupAlert(null); }}>
+                <Clock3 size={14} className="mr-1" />Snooze 30m
+              </Button>
+            )}
+            <Button size="sm" data-testid="popup-acknowledge"
+              onClick={() => { act.mutate({ id: popupAlert._id, action: "acknowledge" }); setPopupAlert(null); }}>
+              <Check size={14} className="mr-1" />Acknowledge
+            </Button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
