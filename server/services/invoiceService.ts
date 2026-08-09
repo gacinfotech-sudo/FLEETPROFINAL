@@ -111,7 +111,7 @@ async function loadContext(input: {
       invoiceFooterMessage: invoiceSettings.invoiceFooterMessage,
     },
     bookingSnapshot: {
-      bookingNumber: (booking as any).bookingId, pickupDate: (booking as any).pickupDate,
+      bookingNumber: (booking as any).bookingId, bookingCode: (booking as any).bookingCode, pickupDate: (booking as any).pickupDate,
       returnDate: (booking as any).returnDate, pickupTime: (booking as any).pickupTime, returnTime: (booking as any).returnTime,
       pickupLocation: (booking as any).pickupLocation, dropoffLocation: (booking as any).dropoffLocation,
       bookingType: (booking as any).bookingType, tripType: (booking as any).tripType,

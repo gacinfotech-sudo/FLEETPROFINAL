@@ -760,7 +760,18 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       if (draftEnabled) {
-        apiRequest("DELETE", "/api/booking-drafts/mine").catch(() => {});
+        // DEF-002 fix: this was previously fire-and-forget
+        // (`.catch(() => {})` with no `await`), which raced any
+        // near-immediate next Add Booking visit (rapid automated retries,
+        // or simply a fast real user) — the draft could still exist server-
+        // side when the next page's "resume?" check ran, showing a stale
+        // "Resume your unfinished booking?" dialog for a booking that had
+        // already been successfully submitted. Awaiting it here means the
+        // draft is guaranteed gone before this success flow (and any
+        // subsequent navigation away from this form) completes. Best-effort
+        // is preserved — a failed delete still doesn't block the booking
+        // itself, which already succeeded.
+        await apiRequest("DELETE", "/api/booking-drafts/mine").catch(() => {});
       }
 
       // Vendor Vehicle path: link the selected vendor vehicle/driver via
@@ -2899,25 +2910,63 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                         <FormField
                           control={form.control}
                           name="amount"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-sm font-medium text-gray-700">Final Base Amount (Editable)</FormLabel>
-                              <FormControl>
-                                <div className="relative">
-                                  <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                                  <Input
-                                    type="number"
-                                    placeholder="Enter final amount"
-                                    value={field.value ? field.value : ""}
-                                    onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
-                                    onWheel={(e) => (e.target as HTMLElement).blur()}
-                                    className="h-12 pl-10 text-lg font-medium border-2 border-orange-300 focus:border-orange-500 rounded-lg"
-                                  />
-                                </div>
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
+                          render={({ field }) => {
+                            // DEF-001 fix: `amount` is a required field
+                            // (z.number().min(1)). react-hook-form's
+                            // Controller falls back to the field's
+                            // registration-time default (0) instead of the
+                            // live value specifically when the value is
+                            // undefined AND the field is currently invalid
+                            // under the resolver — confirmed via runtime
+                            // instrumentation (see
+                            // docs/manual-preview/PENDING-LIVE-INTEGRATION.md,
+                            // "Root cause found — TASK-MONEY-ROOTCAUSE-01's
+                            // 'stuck 0' bug"). advanceReceived etc. never
+                            // hit this because they're .optional(), so
+                            // clearing them never makes the field invalid.
+                            // Fix: keep the visible input value in local
+                            // state, decoupled from field.value entirely,
+                            // so it's immune to Controller's internal
+                            // fallback. Only resync from field.value when
+                            // it changed for a reason other than this
+                            // input's own onChange (e.g. the vehicle/
+                            // pricing-selection or booking-type-reset
+                            // form.setValue("amount", ...) calls elsewhere
+                            // in this file).
+                            const [rawAmount, setRawAmount] = useState<string>(() =>
+                              field.value === undefined || field.value === null ? "" : String(field.value)
+                            );
+                            useEffect(() => {
+                              const parsedRaw = rawAmount === "" ? undefined : parseFloat(rawAmount);
+                              if (parsedRaw !== field.value) {
+                                setRawAmount(field.value === undefined || field.value === null ? "" : String(field.value));
+                              }
+                              // eslint-disable-next-line react-hooks/exhaustive-deps
+                            }, [field.value]);
+                            return (
+                              <FormItem>
+                                <FormLabel className="text-sm font-medium text-gray-700">Final Base Amount (Editable)</FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <IndianRupee className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                                    <Input
+                                      type="number"
+                                      placeholder="Enter final amount"
+                                      value={rawAmount}
+                                      onChange={(e) => {
+                                        const raw = e.target.value;
+                                        if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return;
+                                        setRawAmount(raw);
+                                        field.onChange(raw === "" ? undefined : parseFloat(raw));
+                                      }}
+                                      className="h-12 pl-10 text-lg font-medium border-2 border-orange-300 focus:border-orange-500 rounded-lg"
+                                    />
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            );
+                          }}
                         />
                       </div>
                       

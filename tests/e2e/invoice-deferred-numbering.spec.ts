@@ -100,6 +100,10 @@ test.describe('Invoice numbering is deferred to finalization', () => {
 
     await page.locator('nav').getByRole('button', { name: 'All Customers' }).click();
     await page.getByPlaceholder('Search name, mobile, or email').fill(booking.customerPhone);
+    // customers.tsx debounces the search box 350ms before re-querying; wait
+    // for it to settle (and the "Updating results..." guard to clear) so this
+    // doesn't click the still-rendered stale table and open the wrong record.
+    await page.waitForTimeout(600);
     await page.locator('table tbody tr').first().click();
     const dashboard = page.getByRole('dialog').filter({ hasText: 'Customer Dashboard' });
     await expect(dashboard.getByText('DRAFT (not yet numbered)')).toBeVisible();

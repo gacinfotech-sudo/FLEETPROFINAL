@@ -128,12 +128,18 @@ export const loginSpeedLimit = slowDown({
 });
 
 // HTTPS redirect middleware
+// Assumes production always sits behind a TLS-terminating proxy that sets
+// x-forwarded-proto. That's false for a production build served directly
+// on a local network with no proxy/TLS in front of it — there, this would
+// unconditionally redirect every request to an https:// URL nothing is
+// listening on, making the app completely unreachable. FORCE_HTTPS_REDIRECT
+// lets that specific case opt out; default (unset) behavior is unchanged.
 export const httpsRedirect = (req: Request, res: Response, next: NextFunction) => {
-  // Skip redirect for localhost / development
-  const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1' || req.hostname === '192.168.29.142';
-  const forwardedProto = req.header('x-forwarded-proto');
-  const isHttps = req.protocol === 'https' || forwardedProto === 'https';
-  if (process.env.NODE_ENV === 'production' && !isLocalhost && !isHttps) {
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.FORCE_HTTPS_REDIRECT !== 'false' &&
+    req.header('x-forwarded-proto') !== 'https'
+  ) {
     return res.redirect(`https://${req.header('host')}${req.url}`);
   }
   next();
