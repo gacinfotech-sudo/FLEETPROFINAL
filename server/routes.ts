@@ -108,6 +108,9 @@ import { authenticateDriver, type DriverAuthRequest } from "./middleware/driverA
 import { registerGpsConnectionRoutes } from "./gps/routes/connections";
 import { registerGpsDeviceRoutes } from "./gps/routes/devices";
 import { registerGpsAssignmentRoutes } from "./gps/routes/assignments";
+// TASK-02 (telephony/RBAC isolation) additive import — new namespace only,
+// no existing route/import in this file was touched.
+import { registerTelephonyRoutes } from "./telephony/index";
 import { registerGpsVehicleStateRoutes } from "./gps/routes/vehicleState";
 import { registerGpsWebhookRoutes } from "./gps/ingestion/webhookRoute";
 import { registerGpsBillingRoutes } from "./gps/billing/routes";
@@ -125,6 +128,20 @@ import { registerVehicleFuelRoutes } from "./vehicle/expenses/routes";
 import { registerVehicleFastagRoutes } from "./vehicle/fastag/routes";
 import { registerVehicleIncidentRoutes } from "./vehicle/incidents/routes";
 import { registerVehicleInspectionRoutes } from "./vehicle/inspections/routes";
+// Root Control Plane (Wave 1) additive imports — new /api/root/** namespace
+// only, no existing route/import in this file was touched. See
+// docs/root-control-plane/ROOT-INTEGRATION-report.md for the full mount list.
+import { isPlatformRole } from "./root/types";
+import { registerRootDashboardRoutes } from "./root/routes/dashboard";
+import { registerRootTenantRoutes } from "./root/routes/tenants";
+import { registerRootCustomerRoutes } from "./root/routes/customers";
+import { securityRouter } from "./root/routes/security";
+import { auditRouter } from "./root/routes/audit";
+import { registerSupportRoutes } from "./root/routes/support";
+import { registerErrorRoutes } from "./root/routes/errors";
+import { registerSalesRoutes } from "./root/routes/sales";
+import { registerConfigRoutes } from "./root/routes/config";
+import { registerFeatureFlagRoutes } from "./root/routes/features";
 import { resolveOwnFleetEligibility } from "./vehicle/core/ownFleetEligibility";
 
 // Statuses where the booking has been financially finalized — further
@@ -164,13 +181,35 @@ function googleReviewRequestMessage(customer: any, booking: any, tenant: any, re
   ].join('\n');
 }
 
+// Integrator addition (telephony WebSocket bootstrap, see TASK-02-report.md
+// "Proposed WebSocket bootstrap + room design"): the same express-session
+// middleware instance configured below needs to be reused by
+// server/index.ts's Socket.IO handshake (`io.engine.use(sessionMiddleware)`)
+// so a socket can only ever join rooms for the tenant/user its *existing*
+// authenticated HTTP session already belongs to — never a client-supplied
+// id. Captured into this module-level variable when registerRoutes() runs
+// and exposed via the getter below; server/index.ts calls the getter only
+// after `await registerRoutes(app)` has resolved, so it is always populated
+// by the time it's read.
+let sessionMiddlewareInstance: ReturnType<typeof session> | undefined;
+export function getSessionMiddleware(): ReturnType<typeof session> | undefined {
+  return sessionMiddlewareInstance;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // P0 SECURITY HELPER: admin users are allowed cross-tenant access (see
-  // requireTenant middleware); everyone else must be scoped to their own
-  // tenant on every single-record read/update/delete to prevent IDOR
-  // (one tenant reading/modifying another tenant's data by guessing an id).
+  // P0 SECURITY HELPER: platform staff (a VALID, recognized platformRole)
+  // are allowed cross-tenant access (see requireTenant middleware);
+  // everyone else must be scoped to their own tenant on every single-record
+  // read/update/delete to prevent IDOR (one tenant reading/modifying
+  // another tenant's data by guessing an id). Replaces the old
+  // `role === "admin"` bypass — see TASK-ROOT-SECURITY-05's report for the
+  // full before/after behavior analysis. Validated via isPlatformRole(),
+  // not a bare truthy check (integration review fix) — mirrors
+  // requireTenant's own hardening in server/middleware/auth.ts; see that
+  // file's comment for why this must fail closed independent of what
+  // currently writes this field.
   const scopeTenant = (req: AuthRequest): string | undefined =>
-    req.user?.role === "admin" ? undefined : req.tenantId;
+    isPlatformRole(req.user?.platformRole) ? undefined : req.tenantId;
 
   const escapeRegex = (value: string): string =>
     value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -280,7 +319,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Session configuration with enhanced security and PWA support
-  app.use(session({
+  const sessionMiddleware = session({
     secret: sessionSecret,
     name: 'fleetpro.sid', // avoid leaking that this is an express app via default 'connect.sid'
     resave: false,
@@ -294,12 +333,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       autoRemove: 'native',
     }),
     cookie: {
-      secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+      // HTTPS only in production, UNLESS explicitly overridden — needed to
+      // run a production build (for LAN load-time) over plain HTTP on a
+      // local network with no TLS termination; a browser silently refuses
+      // to send a Secure cookie over non-HTTPS, which would break login
+      // with no visible error otherwise. Unset behavior is unchanged.
+      secure: process.env.SESSION_COOKIE_SECURE != null
+        ? process.env.SESSION_COOKIE_SECURE === 'true'
+        : process.env.NODE_ENV === 'production',
       httpOnly: true,
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days for PWA persistence
       sameSite: 'lax' // Changed from 'strict' to 'lax' for better PWA compatibility
     }
-  }));
+  });
+  sessionMiddlewareInstance = sessionMiddleware; // see getSessionMiddleware() above
+  app.use(sessionMiddleware);
 
   // Apply session security middleware (hijacking/fingerprint checks)
   app.use(sessionSecurityMiddleware);
@@ -320,6 +368,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerGpsConnectionRoutes(app);
   registerGpsDeviceRoutes(app);
   registerGpsAssignmentRoutes(app);
+  // TASK-02 (telephony/RBAC isolation) additive registration — new
+  // /api/telephony/* namespace only, appended after the existing GPS
+  // registrations without reordering or editing any existing line.
+  registerTelephonyRoutes(app);
   registerGpsVehicleStateRoutes(app);
   registerGpsWebhookRoutes(app);
   registerGpsBillingRoutes(app);
@@ -340,6 +392,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // engine surface. A VIEW/alert layer over canonical Booking records,
   // never a second booking store.
   registerOperationsRoutes(app);
+
+  // Root Control Plane (Wave 1) additive registration — new /api/root/**
+  // namespace only. See docs/root-control-plane/ROOT-INTEGRATION-report.md.
+  registerRootDashboardRoutes(app);
+  registerRootTenantRoutes(app);
+  registerRootCustomerRoutes(app);
+  app.use('/api/root', authenticateUser, securityRouter);
+  app.use('/api/root', authenticateUser, auditRouter);
+  registerSupportRoutes(app);
+  registerErrorRoutes(app);
+  registerSalesRoutes(app);
+  registerConfigRoutes(app);
+  registerFeatureFlagRoutes(app);
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
@@ -2427,8 +2492,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/bookings", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
+      if (req.query.limit || req.query.skip) {
+        const limit = Math.min(500, Math.max(1, parseInt(req.query.limit as string) || 100));
+        const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
+        const { rows, total } = await storage.getBookingsByTenantPaginated(req.tenantId!, { limit, skip });
+        return res.json({ rows, total, limit, skip });
+      }
       const bookings = await storage.getBookingsByTenant(req.tenantId!);
-
 
 
       res.json(bookings);
@@ -2772,12 +2842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const booking = await storage.getBooking(req.params.id, req.tenantId!);
       if (!booking) return res.status(404).json({ message: "Booking not found" });
-      // The Unified Booking Workspace renders its lifecycle actions off
-      // this list so the client never needs its own copy of the state
-      // machine's transition table — one status engine, served with the
-      // record it governs.
-      const plain: any = typeof (booking as any).toObject === 'function' ? (booking as any).toObject() : booking;
-      res.json({ ...plain, allowedNextStatuses: getAllowedNextStatuses((booking as any).status) });
+      res.json(booking);
     } catch (error) {
       console.error('Get booking by id error:', error);
       res.status(500).json({ message: "Failed to fetch booking" });
@@ -3792,7 +3857,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ] : []),
         ];
       }
-      const customers = await Customer.find(query).sort({ lastBookingDate: -1, createdAt: -1 }).limit(500);
+      const limit = Math.min(500, Math.max(1, parseInt(req.query.limit as string) || 500));
+      const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
+      const { rows: customers } = await storage.getCustomersListPaginated(query, { limit, skip });
       res.json(customers);
     } catch (error: any) {
       console.error('List customers error:', error?.message || error);

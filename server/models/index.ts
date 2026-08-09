@@ -7,6 +7,11 @@ import {
   TRAVEL_DATE_STATUSES, TRIP_TYPES,
   isPickupDateRequired, isTentativeRangeRequired,
 } from '../booking/domain';
+// TASK-ROOT-DOMAIN-01 — additive platform-staff field on the existing User
+// model (Root Control Plane). Applied here at integration per that task's
+// report's proposed patch. See server/root/types.ts for the full contract
+// doc comment on why this is a separate, never-mixed axis from `role`.
+import { PLATFORM_ROLES, type PlatformRole } from '../root/types';
 
 // Interfaces for TypeScript
 export interface ITenant extends Document {
@@ -58,6 +63,24 @@ export interface ITenant extends Document {
     sdTemplates?: Record<string, string>;
   };
   createdAt: Date;
+  // TASK-ROOT-DASHBOARD-02 (Root Control Plane) — additive/optional, applied
+  // at integration per that task's report's proposed patch. All existing
+  // tenants render these as "not set" until explicitly backfilled; Root's
+  // routes already read them defensively.
+  tenantCode?: string;
+  trialStartsAt?: Date;
+  trialEndsAt?: Date;
+  usageCounters?: {
+    bookingsThisMonth: number;
+    lastActivityAt?: Date;
+  };
+  healthRiskFlag?: 'none' | 'watch' | 'at_risk';
+  internalNotes?: {
+    note: string;
+    authorId: string;
+    authorName?: string;
+    createdAt: Date;
+  }[];
 }
 
 export interface IUser extends Document {
@@ -65,6 +88,11 @@ export interface IUser extends Document {
   name?: string;
   password: string;
   role: 'admin' | 'client' | 'manager';
+  // TASK-ROOT-DOMAIN-01 (Root Control Plane) — additive, optional. NEVER
+  // compared against `role` above; see server/root/types.ts's
+  // UserPlatformFields doc comment. Absent/undefined = not platform staff,
+  // the safe default (no cross-tenant access).
+  platformRole?: PlatformRole;
   tenantId?: mongoose.Types.ObjectId;
   sessionId?: string;
   // P1 FIX: this field is used throughout storage-mongodb.ts /
@@ -196,6 +224,10 @@ export interface IDriver extends Document {
 export interface IBooking extends Document {
   tenantId: mongoose.Types.ObjectId;
   bookingId: string;
+  // Short, human-friendly public code (TASK-BOOKING-CODE-02) — additive,
+  // alongside bookingId/_id, never a replacement for either. Optional so
+  // existing bookings created before this field existed remain valid.
+  bookingCode?: string;
   // Client-generated, one per booking-form submission session (not
   // persisted/reused across a genuinely new booking) — lets a double
   // form-submit or a retried request after a dropped response resolve to
@@ -514,41 +546,20 @@ const TenantSchema = new Schema<ITenant>({
     drivers: { type: Number, default: 3 },  // Starter plan default
     managers: { type: Number, default: 1 }  // Starter plan default
   },
-  serviceModes: {
-    selfDrive: { type: Boolean, default: true },
-    withDriver: { type: Boolean, default: true }
+  createdAt: { type: Date, default: Date.now },
+  // TASK-ROOT-DASHBOARD-02 (Root Control Plane) — additive/optional, no
+  // migration required. See ITenant's doc comment above.
+  tenantCode: { type: String, unique: true, sparse: true },
+  trialStartsAt: { type: Date },
+  trialEndsAt: { type: Date },
+  usageCounters: {
+    bookingsThisMonth: { type: Number, default: 0 },
+    lastActivityAt: { type: Date },
   },
-  timezone: { type: String },
-  operationsSettings: {
-    type: {
-      graceMinutes: { type: Number },
-      turnaroundBufferMinutes: { type: Number },
-      notifyOwner: { type: Boolean },
-      notifyAssignedUser: { type: Boolean },
-      selfDriveStages: [{
-        minutesBefore: { type: Number, required: true },
-        enabled: { type: Boolean, default: true },
-        whatsappInternal: { type: Boolean, default: false },
-        whatsappCustomer: { type: Boolean, default: false },
-        _id: false,
-      }],
-      withDriverStages: [{
-        minutesBefore: { type: Number, required: true },
-        enabled: { type: Boolean, default: true },
-        whatsappInternal: { type: Boolean, default: false },
-        whatsappDriver: { type: Boolean, default: false },
-        _id: false,
-      }],
-      whatsappInternalPhone: { type: String },
-      overdueRealertMinutes: { type: Number },
-      googleReviewUrl: { type: String },
-      reviewTemplate: { type: String },
-      sdTemplates: { type: Schema.Types.Mixed },
-    },
-    default: undefined,
-    _id: false,
-  },
-  createdAt: { type: Date, default: Date.now }
+  healthRiskFlag: { type: String, enum: ['none', 'watch', 'at_risk'] },
+  internalNotes: [{
+    note: String, authorId: String, authorName: String, createdAt: { type: Date, default: Date.now },
+  }],
 });
 
 // User Schema
@@ -557,6 +568,10 @@ const UserSchema = new Schema<IUser>({
   name: { type: String },
   password: { type: String, required: true },
   role: { type: String, enum: ['admin', 'client', 'manager'], default: 'client' },
+  // TASK-ROOT-DOMAIN-01 (Root Control Plane) — additive, optional, no
+  // default/required. Populated only via scripts/migrate-admin-to-platform-role.ts
+  // or explicit platform-staff provisioning.
+  platformRole: { type: String, enum: PLATFORM_ROLES },
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant' },
   sessionId: { type: String },
   deviceInfo: {
@@ -693,6 +708,9 @@ DriverSchema.index({ sessionId: 1 });
 const BookingSchema = new Schema<IBooking>({
   tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
   bookingId: { type: String, required: true, unique: true },
+  // TASK-BOOKING-CODE-02: short public code, additive alongside bookingId.
+  // sparse so existing/legacy bookings without one don't violate uniqueness.
+  bookingCode: { type: String, unique: true, sparse: true },
   idempotencyKey: { type: String },
   customerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
   customerName: { type: String, required: true },
@@ -1512,6 +1530,11 @@ CustomerSchema.index(
   { tenantId: 1, referralCode: 1 },
   { unique: true, partialFilterExpression: { referralCode: { $type: 'string' } } }
 );
+// TASK-03 (performance QA) — backs GET /api/customers' default
+// find({tenantId, isDeleted}).sort({lastBookingDate:-1, createdAt:-1}) so
+// Mongo can satisfy the sort from the index instead of a blocking
+// in-memory SORT stage. See .claude/tasks/reports/TASK-03-report.md.
+CustomerSchema.index({ tenantId: 1, isDeleted: 1, lastBookingDate: -1, createdAt: -1 });
 CustomerSchema.pre('save', function (next) { this.updatedAt = new Date(); next(); });
 
 // Reward rules — tenant-configurable, not hard-coded (spec explicitly
@@ -1826,6 +1849,12 @@ BookingSchema.index(
 // grows exactly where it matters most (assignment time).
 BookingSchema.index({ tenantId: 1, driverId: 1, status: 1, scheduledStartDateTime: 1, scheduledEndDateTime: 1 });
 BookingSchema.index({ tenantId: 1, vehicleId: 1, status: 1, scheduledStartDateTime: 1, scheduledEndDateTime: 1 });
+// TASK-03 (performance QA) — backs getBookingsByTenant/getBookingsByTenantPaginated's
+// sort, and getUpcomingBookings' {tenantId,status,pickupDate} filter+sort (previously
+// only {tenantId,status} was indexed, forcing an in-memory sort on pickupDate). See
+// .claude/tasks/reports/TASK-03-report.md.
+BookingSchema.index({ tenantId: 1, createdAt: -1 });
+BookingSchema.index({ tenantId: 1, status: 1, pickupDate: 1 });
 // Backs driverDeviceCorrelation.ts's findDriverCandidates (GPS/meter trip
 // reconciliation, TASK-GPS-MAPPING-03/TASK-GPS-TRIP-BILLING-06) — that query
 // filters on actual (not scheduled) start/end, which the index above does
@@ -2532,6 +2561,149 @@ LeadSchema.index(
 );
 export const Lead = mongoose.model<ILead>('Lead', LeadSchema);
 
+// ---------------------------------------------------------------------
+// Telephony (TASK-02) — per-executive telephony identity + CallSession.
+// Consolidated from server/telephony/models/telephonyIdentity.ts and
+// server/telephony/models/callSession.ts (TASK-02) into the shared model
+// file by the Integrator; see .claude/tasks/reports/TASK-02-report.md's
+// "Proposed server/models/index.ts patch" and
+// .claude/tasks/reports/INTEGRATION-report.md. server/telephony/models/*
+// has been removed and every importer repointed at this file.
+// ---------------------------------------------------------------------
+
+export type TelephonyIdentityStatus = 'available' | 'busy' | 'wrap_up' | 'offline' | 'disabled';
+
+export interface ITelephonyIdentity extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  userId: string;
+  providerKey: string;
+  providerAgentId?: string;
+  registeredNumber?: string;
+  virtualNumber?: string;
+  extension?: string;
+  incomingEnabled: boolean;
+  outgoingEnabled: boolean;
+  status: TelephonyIdentityStatus;
+  encryptedCredentials?: string;
+  credentialFields: string[];
+  createdBy: string;
+  updatedBy: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const TelephonyIdentitySchema = new Schema<ITelephonyIdentity>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  userId: { type: String, required: true, lowercase: true, trim: true },
+  providerKey: { type: String, required: true, trim: true, lowercase: true, default: 'mock' },
+  providerAgentId: { type: String, trim: true, maxlength: 200 },
+  registeredNumber: { type: String, trim: true, maxlength: 32 },
+  virtualNumber: { type: String, trim: true, maxlength: 32 },
+  extension: { type: String, trim: true, maxlength: 16 },
+  incomingEnabled: { type: Boolean, default: true },
+  outgoingEnabled: { type: Boolean, default: true },
+  status: { type: String, enum: ['available', 'busy', 'wrap_up', 'offline', 'disabled'], default: 'offline' },
+  encryptedCredentials: { type: String, select: false },
+  credentialFields: { type: [String], default: [] },
+  createdBy: { type: String, required: true },
+  updatedBy: { type: String, required: true },
+}, { timestamps: true });
+TelephonyIdentitySchema.index({ tenantId: 1, userId: 1 }, { unique: true });
+export const TelephonyIdentity = mongoose.model<ITelephonyIdentity>('TelephonyIdentity', TelephonyIdentitySchema);
+
+export type TelephonyCallDirection = 'outbound' | 'inbound';
+export type TelephonyCallStatus =
+  | 'initiated' | 'ringing' | 'in_progress' | 'completed' | 'failed' | 'missed' | 'no_answer' | 'cancelled';
+
+export interface ICallNote {
+  text: string;
+  createdBy: { userId: string; role: string };
+  createdAt: Date;
+}
+export interface ICallReassignmentEvent {
+  fromUserId: string;
+  toUserId: string;
+  changedBy: { userId: string; role: string };
+  changedAt: Date;
+  reason?: string;
+}
+
+export interface ICallSession extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  direction: TelephonyCallDirection;
+  status: TelephonyCallStatus;
+  userId: string;
+  assignedUserId: string;
+  fromNumber: string;
+  toNumber: string;
+  virtualNumber?: string;
+  providerKey: string;
+  providerCallId?: string;
+  providerAgentId?: string;
+  customerId?: mongoose.Types.ObjectId;
+  inquiryId?: mongoose.Types.ObjectId;
+  leadId?: mongoose.Types.ObjectId;
+  startedAt?: Date;
+  endedAt?: Date;
+  durationSeconds?: number;
+  notes: ICallNote[];
+  reassignmentHistory: ICallReassignmentEvent[];
+  createdBy: { userId: string; role: string };
+  updatedBy: { userId: string; role: string };
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const CallNoteSchema = new Schema<ICallNote>({
+  text: { type: String, required: true, maxlength: 5000 },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  createdAt: { type: Date, default: Date.now },
+}, { _id: false });
+
+const CallReassignmentEventSchema = new Schema<ICallReassignmentEvent>({
+  fromUserId: { type: String, required: true },
+  toUserId: { type: String, required: true },
+  changedBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  changedAt: { type: Date, default: Date.now },
+  reason: { type: String, maxlength: 500 },
+}, { _id: false });
+
+const CallSessionSchema = new Schema<ICallSession>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  direction: { type: String, enum: ['outbound', 'inbound'], required: true },
+  status: {
+    type: String,
+    enum: ['initiated', 'ringing', 'in_progress', 'completed', 'failed', 'missed', 'no_answer', 'cancelled'],
+    default: 'initiated',
+  },
+  userId: { type: String, required: true, lowercase: true, trim: true },
+  assignedUserId: { type: String, required: true, lowercase: true, trim: true },
+  fromNumber: { type: String, required: true, trim: true, maxlength: 32 },
+  toNumber: { type: String, required: true, trim: true, maxlength: 32 },
+  virtualNumber: { type: String, trim: true, maxlength: 32 },
+  providerKey: { type: String, required: true, trim: true, lowercase: true, default: 'mock' },
+  providerCallId: { type: String, trim: true, maxlength: 200 },
+  providerAgentId: { type: String, trim: true, maxlength: 200 },
+  customerId: { type: Schema.Types.ObjectId, ref: 'Customer' },
+  inquiryId: { type: Schema.Types.ObjectId, ref: 'Inquiry' },
+  leadId: { type: Schema.Types.ObjectId, ref: 'Lead' },
+  startedAt: { type: Date },
+  endedAt: { type: Date },
+  durationSeconds: { type: Number, min: 0 },
+  notes: { type: [CallNoteSchema], default: [] },
+  reassignmentHistory: { type: [CallReassignmentEventSchema], default: [] },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+  updatedBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+}, { timestamps: true });
+
+CallSessionSchema.index({ tenantId: 1, userId: 1, createdAt: -1 });
+CallSessionSchema.index({ tenantId: 1, assignedUserId: 1, createdAt: -1 });
+CallSessionSchema.index({ tenantId: 1, status: 1, createdAt: -1 });
+CallSessionSchema.index({ tenantId: 1, providerCallId: 1 }, { unique: true, partialFilterExpression: { providerCallId: { $type: 'string' } } });
+CallSessionSchema.index({ tenantId: 1, virtualNumber: 1 });
+
+export const CallSession = mongoose.model<ICallSession>('CallSession', CallSessionSchema);
+
 // Quotation — one or more priced vehicle/package options prepared against a
 // Lead. Money is stored as integer paise throughout (spec §18) to avoid the
 // float-drift class of bug already flagged for the older Booking/Payment
@@ -3143,6 +3315,19 @@ const BookingDraftSchema = new Schema<IBookingDraft>({
   updatedAt: { type: Date, default: Date.now },
 });
 BookingDraftSchema.index({ tenantId: 1, userId: 1 }, { unique: true });
+// DEF-002 fix: a draft with no activity for 24h is considered abandoned.
+// MongoDB's TTL monitor sweeps expired documents automatically (~every 60s,
+// eventually-consistent, not instant) — no app-level filtering needed, and
+// this is additive: existing drafts simply gain an expiry from their
+// current `updatedAt`, nothing else about draft read/write/clear behavior
+// changes. Indexed on `updatedAt` (refreshed on every autosave), not
+// `createdAt`, so an actively-edited draft never expires mid-session —
+// only one truly abandoned since its last save. 24h chosen as a
+// reasonable default for "don't lose today's interrupted work, do stop
+// resurfacing indefinitely" — no existing tenant-configurable TTL
+// convention was found elsewhere in this codebase to match instead; tune
+// via TTL if a product decision sets a different value.
+BookingDraftSchema.index({ updatedAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 });
 export const BookingDraft = mongoose.model<IBookingDraft>('BookingDraft', BookingDraftSchema);
 
 // Cross-process mutex for Booking creation against a standalone (non-replica-set)

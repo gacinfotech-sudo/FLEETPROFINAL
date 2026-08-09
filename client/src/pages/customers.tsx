@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Search, Users, X } from "lucide-react";
 import CustomerDashboard from "@/components/customers/customer-dashboard";
 import QuickInquiryForm from "@/components/inquiries/quick-inquiry-form";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 function fmtMoney(n?: number) {
   return `₹${(n || 0).toLocaleString("en-IN")}`;
@@ -43,6 +44,7 @@ interface CustomersPageProps {
 
 export default function CustomersPage({ onEditBooking, onNewBooking, initialCustomerId, onNavigateToInquiry, onNavigateToLead, initialShowIntake }: CustomersPageProps) {
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 350);
   const [activeSegment, setActiveSegment] = useState<{ key: string; label: string } | null>(null);
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [viewingCustomerId, setViewingCustomerId] = useState<string | null>(null);
@@ -59,11 +61,11 @@ export default function CustomersPage({ onEditBooking, onNewBooking, initialCust
   const { data: segments } = useQuery<any[]>({ queryKey: ["/api/customers/segments"] });
   const { data: tagCounts } = useQuery<any[]>({ queryKey: ["/api/customers/tags"] });
 
-  const { data, isLoading } = useQuery<any[]>({
-    queryKey: ["/api/customers", search, activeSegment?.key, activeTag],
+  const { data, isLoading, isFetching } = useQuery<any[]>({
+    queryKey: ["/api/customers", debouncedSearch, activeSegment?.key, activeTag],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (search) params.set("search", search);
+      if (debouncedSearch) params.set("search", debouncedSearch);
       if (activeSegment) params.set("segment", activeSegment.key);
       if (activeTag) params.set("tag", activeTag);
       const res = await fetch(`/api/customers?${params.toString()}`, { credentials: "include" });
@@ -73,6 +75,13 @@ export default function CustomersPage({ onEditBooking, onNewBooking, initialCust
   });
 
   const customers = data || [];
+  // True while the rendered table can't be trusted to match `search` yet —
+  // either the 350ms debounce hasn't caught up (`search !== debouncedSearch`)
+  // or the debounced query is still in flight. Row clicks must be ignored
+  // during this window: otherwise a click that lands on the still-rendered
+  // stale table can open the wrong customer's record (see
+  // .claude/tasks/reports/INTEGRATION-report.md, "Follow-up needed" #1).
+  const isSearchStale = search !== debouncedSearch || isFetching;
   const nonEmptySegments = (segments || []).filter((s) => s.key === 'all' || s.count > 0);
   // The "unknown NUMBER → Quick Inquiry" flow (spec) is specifically about
   // a phone search coming up empty — a plain name search with zero results
@@ -172,8 +181,13 @@ export default function CustomersPage({ onEditBooking, onNewBooking, initialCust
               )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
+            <div className="relative overflow-x-auto">
+              {isSearchStale && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/70 text-sm text-gray-500" data-testid="customers-search-updating">
+                  Updating results...
+                </div>
+              )}
+              <Table className={isSearchStale ? "opacity-50 pointer-events-none" : undefined}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
@@ -189,7 +203,11 @@ export default function CustomersPage({ onEditBooking, onNewBooking, initialCust
                   {customers.map((c: any) => {
                     const badge = STATUS_BADGE[c.customerStatus] || STATUS_BADGE.new;
                     return (
-                      <TableRow key={c._id} className="cursor-pointer hover:bg-gray-50" onClick={() => setViewingCustomerId(c._id)}>
+                      <TableRow
+                        key={c._id}
+                        className="cursor-pointer hover:bg-gray-50"
+                        onClick={() => { if (!isSearchStale) setViewingCustomerId(c._id); }}
+                      >
                         <TableCell className="font-medium">{c.name}</TableCell>
                         <TableCell>{c.primaryMobile?.replace(/^91/, '')}</TableCell>
                         <TableCell className="capitalize">{(c.customerType || "individual").replace(/_/g, " ")}</TableCell>

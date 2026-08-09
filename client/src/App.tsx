@@ -16,12 +16,39 @@ import NotFound from "@/pages/not-found";
 import ProtectedRoute from "@/components/auth/protected-route";
 import DriverLoginPage from "./pages/driver-login";
 import DriverPortalPage from "./pages/driver-portal";
+// Root Control Plane (Wave 1) additive route registrations — new /root/**
+// namespace only. `requiredRole="admin"` is a documented stopgap (per each
+// task's report) matching ProtectedRoute's current role-only API; real
+// authorization is enforced server-side on every /api/root/** route via
+// RootAccessService.requirePlatformRole regardless of this client-side gate.
+// See docs/root-control-plane/ROOT-INTEGRATION-report.md.
+import RootDashboard from "./pages/root/dashboard";
+import RootTenants from "./pages/root/tenants";
+import RootTenant360 from "./pages/root/tenant-360";
+import RootGlobalCustomers from "./pages/root/global-customers";
+import RootCustomer360 from "./pages/root/customer-360";
+import SecurityCenter from "./pages/root/security-center";
+import AuditLogPage from "./pages/root/audit-log";
+import SupportTicketsPage from "./pages/root/support-tickets";
+import ErrorCenterPage from "./pages/root/error-center";
+import DiagnosticsPage from "./pages/root/diagnostics";
+import SalesPipeline from "./pages/root/sales-pipeline";
+import ProductConfigPage from "./pages/root/product-config";
+import FeatureFlagsPage from "./pages/root/feature-flags";
+import SupportAccessBanner from "@/components/root/support-access-banner";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
 
   return (
-    <Switch>
+    <>
+      {/* TASK-ROOT-SECURITY-05 — rendered once here (not per-route) so it's
+          visible across the whole authenticated app shell while a Support
+          Access grant is active. Self-gates to null via its own
+          server-derived query for any non-platform-staff/unauthenticated
+          user — see the component's own header comment. */}
+      {user && <SupportAccessBanner />}
+      <Switch>
       {/* Public Landing Page */}
       <Route path="/" component={LandingPage} />
       
@@ -54,6 +81,77 @@ function AuthenticatedApp() {
       <Route path="/admin">
         <ProtectedRoute requiredRole="admin">
           <AdminPanel key={user?.userId} />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Root Control Plane (Wave 1) — platform Super Admin console.
+          requiredRole="admin" is a documented stopgap; see import comment
+          above and docs/root-control-plane/ROOT-INTEGRATION-report.md. */}
+      <Route path="/root/dashboard">
+        <ProtectedRoute requiredRole="admin">
+          <RootDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/root/tenants">
+        <ProtectedRoute requiredRole="admin">
+          <RootTenants />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/root/tenants/:tenantId/features">
+        {(params: { tenantId: string }) => (
+          <ProtectedRoute requiredRole="admin">
+            <FeatureFlagsPage tenantId={params.tenantId} />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/root/tenants/:tenantId">
+        <ProtectedRoute requiredRole="admin">
+          <RootTenant360 />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/root/customers">
+        <ProtectedRoute requiredRole="admin">
+          <RootGlobalCustomers />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/root/customers/:customerId">
+        <ProtectedRoute requiredRole="admin">
+          <RootCustomer360 />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/root/security">
+        <ProtectedRoute requiredRole="admin">
+          <SecurityCenter />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/root/audit-log">
+        <ProtectedRoute requiredRole="admin">
+          <AuditLogPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/root/support-tickets">
+        <ProtectedRoute requiredRole="admin">
+          <SupportTicketsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/root/error-center">
+        <ProtectedRoute requiredRole="admin">
+          <ErrorCenterPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/root/diagnostics">
+        <ProtectedRoute requiredRole="admin">
+          <DiagnosticsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/root/sales">
+        <ProtectedRoute requiredRole="admin">
+          <SalesPipeline />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/root/product-config">
+        <ProtectedRoute requiredRole="admin">
+          <ProductConfigPage />
         </ProtectedRoute>
       </Route>
 
@@ -95,7 +193,8 @@ function AuthenticatedApp() {
           <LoginPage />
         )}
       </Route>
-    </Switch>
+      </Switch>
+    </>
   );
 }
 

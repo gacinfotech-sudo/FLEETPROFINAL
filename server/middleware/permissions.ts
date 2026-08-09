@@ -131,6 +131,10 @@ export const PERMISSIONS = {
   VENDOR_DRIVER_EDIT: 'vendor_driver_edit',
   VENDOR_VEHICLE_CREATE: 'vendor_vehicle_create',
   VENDOR_VEHICLE_EDIT: 'vendor_vehicle_edit',
+  // Referral/Rewards Engine — see docs/REWARDS_REFERRAL_CURRENT_AUDIT.md.
+  // Existing view_revenue/manage_users are reused where a spec-suggested
+  // permission would duplicate one already enforced (e.g. financial
+  // redemption approval already fits under existing owner/admin checks).
   REWARD_RULE_MANAGE: 'reward.rule.manage',
   REWARD_ADJUST: 'reward.adjust',
   REFERRAL_VIEW: 'referral.view',
@@ -139,6 +143,27 @@ export const PERMISSIONS = {
   OUTSOURCING_VIEW: 'outsourcing.view',
   OUTSOURCING_CREATE: 'outsourcing.create',
   OUTSOURCING_MANAGE: 'outsourcing.manage',
+  // Outsource Vehicle sourcing workflow — see docs/VENDOR_OUTSOURCE_WORKFLOW_AUDIT.md.
+  // Consolidated to view/create/manage (send/record-response/select/cancel)
+  // rather than the spec's finer per-action split, matching this codebase's
+  // existing one-permission-per-action-class granularity elsewhere
+  // (e.g. VENDOR_EDIT covers several distinct vendor-record actions).
+  // Telephony / multi-user call ownership (TASK-02) — see
+  // server/telephony/routes/** for the call sites. Previously exposed as
+  // server/telephony/permissions.ts's TELEPHONY_PERMISSIONS string
+  // constants (identical values) before the Integrator consolidated them
+  // here; see .claude/tasks/reports/TASK-02-report.md.
+  CALL_VIEW_OWN: 'call.view_own',
+  CALL_VIEW_TEAM: 'call.view_team',
+  CALL_INITIATE: 'call.initiate',
+  CALL_MANAGE: 'call.manage',
+  CALL_REASSIGN: 'call.reassign',
+  TELEPHONY_IDENTITY_VIEW: 'telephony.identity.view',
+  TELEPHONY_IDENTITY_MANAGE: 'telephony.identity.manage',
+  // Vehicle 360 batch — dot-namespaced per the GPS block's established
+  // convention (CURRENT-FLEET-MODULE-AUDIT.md §9). Core Vehicle CRUD
+  // continues to reuse the existing MANAGE_VEHICLES; VIEW_REVENUE continues
+  // to gate the Profitability tab — neither is duplicated here.
   VEHICLE_EXPENSE_VIEW: 'vehicle.expense.view',
   VEHICLE_EXPENSE_MANAGE: 'vehicle.expense.manage',
   VEHICLE_FASTAG_VIEW: 'vehicle.fastag.view',

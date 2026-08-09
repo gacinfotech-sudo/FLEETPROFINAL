@@ -67,10 +67,17 @@ export async function createBackupAdmin(userId: string, password: string) {
       userId,
       password,
       role: 'admin' as const,
+      // TASK-ROOT-DOMAIN-01 / TASK-ROOT-SECURITY-05 (Root Control Plane):
+      // requireTenant's cross-tenant bypass now gates on `platformRole`, not
+      // `role === "admin"` — an admin account created without this would be
+      // immediately locked out of cross-tenant admin routes, defeating the
+      // point of a recovery admin. See TASK-ROOT-SECURITY-05's report,
+      // "Notes for Integrator" #1.
+      platformRole: 'PLATFORM_ROOT' as const,
       isActive: true,
       mustResetPassword: false
     };
-    
+
     await storage.createUser(adminData);
     console.log("✅ Backup admin user created successfully");
     return true;
@@ -110,6 +117,9 @@ export async function createEmergencyAdmin() {
       userId: emergencyId,
       password: emergencyPassword,
       role: 'admin' as const,
+      // See createBackupAdmin's comment above — same requireTenant gating
+      // change, same reason this must be set at creation time.
+      platformRole: 'PLATFORM_ROOT' as const,
       isActive: true,
       mustResetPassword: true // Force password change on first login
     };
