@@ -33,6 +33,7 @@ if (process.env.NODE_ENV === 'development') {
   };
 }
 
+import path from "path";
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
 import { registerRoutes, getSessionMiddleware } from "./routes";
@@ -43,6 +44,7 @@ import mongoose from "mongoose";
 import { Server as SocketIOServer } from "socket.io";
 import { setTelephonyEventEmitter, type TelephonyEvent } from "./telephony/index";
 import { startGpsPollingScheduler, stopGpsPollingScheduler } from "./gps/ingestion/pollingScheduler";
+import { startOperationsReminderScheduler, stopOperationsReminderScheduler } from "./operations/reminderEngine";
 // TASK-ROOT-SUPPORT-03 (Root Control Plane) additive middleware — attaches
 // a correlation ID to every request (not just /api/root/**) before any
 // route/error path runs. See docs/root-control-plane/ROOT-INTEGRATION-report.md.
@@ -244,30 +246,13 @@ app.use((req, res, next) => {
   const port = Number(process.env.PORT) || 5000;
   const host = process.env.HOST || "0.0.0.0";
 
-  // Use HTTPS if SSL certs exist (for network testing)
-  const certPath = path.join(__dirname, '../ssl/cert.pem');
-  const keyPath = path.join(__dirname, '../ssl/key.pem');
-  const useSSL = fs.existsSync(certPath) && fs.existsSync(keyPath);
-
-  if (useSSL) {
-    const options = {
-      cert: fs.readFileSync(certPath),
-      key: fs.readFileSync(keyPath),
-    };
-    https.createServer(options, app).listen({
-      port,
-      host,
-    }, () => {
-      log(`🔒 serving HTTPS on ${host}:${port}`);
-    });
-  } else {
-    server.listen({
-      port,
-      host,
-    }, () => {
-      log(`serving HTTP on ${host}:${port}`);
-    });
-  }
+  // Use HTTP (SSL certs not available in this environment)
+  server.listen({
+    port,
+    host,
+  }, () => {
+    log(`serving HTTP on ${host}:${port}`);
+  });
 
   // P1 FIX: background job must not be re-registered on every 'connected'
   // event (e.g. reconnect after a network blip), which previously stacked

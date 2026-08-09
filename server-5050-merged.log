@@ -1,0 +1,11 @@
+[dotenv@17.0.0] injecting env (9) from .env – 🔐 encrypt with dotenvx: https://dotenvx.com
+🔗 Connecting to MongoDB (attempt 1/5)...
+✅ MongoDB Connected: 127.0.0.1
+📊 Database: fleetpro
+✅ Using existing secure admin credentials
+🚨 Creating emergency admin user from environment variables
+⚠️  Emergency admin user already exists
+3:28:53 PM [express] MongoDB connected - starting background job
+[operations] booking-end reminder scheduler started (every 60000ms)
+3:28:53 PM [express] serving HTTP on 0.0.0.0:5050
+3:28:55 PM [express] GET /api/health 200 in 18ms
