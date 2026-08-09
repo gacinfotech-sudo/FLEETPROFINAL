@@ -49,10 +49,11 @@ export default function Vehicle360Page() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar />
-      <div className="flex-1 overflow-auto">
-        <div className="space-y-6 p-4 sm:p-6 max-w-full overflow-x-hidden">
+    <>
+      <div className="h-screen flex bg-gray-50 overflow-hidden">
+        <Sidebar />
+        <div className="flex-1 overflow-auto">
+          <div className="space-y-6 p-4 sm:p-6 max-w-full overflow-x-hidden">
           <div>
             <h1 className="text-xl font-semibold truncate">{vehicle.make} {vehicle.vehicleModel} — {vehicle.licensePlate ?? 'No plate'}</h1>
             <p className="text-sm text-muted-foreground">Vehicle 360</p>
@@ -105,8 +106,9 @@ export default function Vehicle360Page() {
             <TabsContent value="profitability"><ProfitabilityTab vehicleId={vehicle._id} /></TabsContent>
             <TabsContent value="timeline"><TimelineTab vehicleId={vehicle._id} /></TabsContent>
           </Tabs>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

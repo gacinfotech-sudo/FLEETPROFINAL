@@ -64,13 +64,12 @@ function AuthenticatedApp() {
       <Route path="/driver-login" component={DriverLoginPage} />
       <Route path="/driver" component={DriverPortalPage} />
 
-      {/* Vehicle 360 (TASK-VEHICLE-360-UI-06) — DISABLED for stability
-          Re-enable after fixing route issues */}
-      {/* <Route path="/vehicles/:vehicleId">
+      {/* Vehicle 360 (TASK-VEHICLE-360-UI-06) */}
+      <Route path="/vehicles/:vehicleId">
         <ProtectedRoute allowedRoles={["client", "manager"]}>
           <Vehicle360Page />
         </ProtectedRoute>
-      </Route> */}
+      </Route>
 
       {/* Dashboard */}
       <Route path="/dashboard/:section?">
