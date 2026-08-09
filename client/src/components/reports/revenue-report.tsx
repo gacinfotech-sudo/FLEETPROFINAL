@@ -382,14 +382,16 @@ export default function RevenueReport() {
       {/* Main KPI Cards */}
       {data.totalRevenue !== undefined && (
         <>
+          {/* One CardDataProps object ({title, value}) per card — raw
+              numbers here were the call-site's recurring tsc break. */}
           <KPICardsGrid
-            totalRevenue={data.totalRevenue}
-            totalExpenses={data.totalExpenses}
-            netRevenue={data.netRevenue}
-            averageBookingValue={data.averageBookingValue}
-            revenuePerVehicle={data.revenuePerVehicle}
-            fleetUtilization={data.fleetUtilization}
-            completedBookings={data.completedBookings}
+            totalRevenue={{ title: "Total Revenue", value: formatIndianCurrency(data.totalRevenue || 0) }}
+            totalExpenses={{ title: "Total Expenses", value: formatIndianCurrency(data.totalExpenses || 0) }}
+            netProfit={{ title: "Net Profit", value: formatIndianCurrency(data.netRevenue || 0) }}
+            averageBookingValue={{ title: "Avg Booking Value", value: formatIndianCurrency(Math.round(data.averageBookingValue || 0)) }}
+            revenuePerVehicle={{ title: "Revenue / Vehicle", value: formatIndianCurrency(Math.round(data.revenuePerVehicle || 0)) }}
+            fleetUtilization={{ title: "Fleet Utilization", value: formatPercentage(data.fleetUtilization || 0) }}
+            totalBookings={{ title: "Completed Bookings", value: data.completedBookings || 0 }}
           />
 
           {/* Revenue Overview Chart - TODO: integrate with chart data */}
@@ -397,21 +399,30 @@ export default function RevenueReport() {
           {/* Revenue Breakdown Charts */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {data.revenueByVehicleType.length > 0 && (
-              <RevenueByVehicleChart vehicleData={data.revenueByVehicleType} />
+              <RevenueByVehicleChart data={data.revenueByVehicleType} />
             )}
             {data.revenueByBookingType.length > 0 && (
-              <RevenueByBookingTypeChart bookingData={data.revenueByBookingType} />
+              <RevenueByBookingTypeChart data={data.revenueByBookingType} />
             )}
           </div>
 
           {/* Expense Breakdown */}
           {data.expensesByCategory.length > 0 && (
-            <ExpenseBreakdownChart expenseData={data.expensesByCategory} />
+            <ExpenseBreakdownChart data={data.expensesByCategory} />
           )}
 
           {/* Top Vehicles */}
           {data.topPerformingVehicles.length > 0 && (
-            <TopVehiclesRanking vehicles={data.topPerformingVehicles} />
+            <TopVehiclesRanking
+              data={data.topPerformingVehicles.map((v: any) => ({
+                vehicle: v.vehicle,
+                revenue: v.revenue,
+                trips: v.bookings,
+                // Real utilization isn't in this payload — 0 renders an
+                // empty bar, never a fabricated number.
+                utilization: 0,
+              }))}
+            />
           )}
 
           {/* Financial Transactions Table - TODO: fetch from backend */}

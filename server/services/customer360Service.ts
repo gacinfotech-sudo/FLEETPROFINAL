@@ -57,8 +57,8 @@ export interface Customer360Data {
 }
 
 export async function getCustomer360(
-  tenantId: mongoose.Types.ObjectId,
-  customerId: mongoose.Types.ObjectId
+  tenantId: string | mongoose.Types.ObjectId,
+  customerId: string | mongoose.Types.ObjectId
 ): Promise<Customer360Data | null> {
   const customer = await Customer.findOne({
     _id: customerId,
@@ -77,7 +77,7 @@ export async function getCustomer360(
   ]);
 
   // Booking categorization
-  const upcomingBookings = bookings.filter(b => new Date(b.pickupDate) > now && b.status !== 'cancelled');
+  const upcomingBookings = bookings.filter(b => b.pickupDate && new Date(b.pickupDate) > now && b.status !== 'cancelled');
   const currentBooking = bookings.find(b => ['trip_started', 'ongoing'].includes(b.status));
   const completedBookings = bookings.filter(b => b.status === 'completed');
   const cancelledBookings = bookings.filter(b => b.status === 'cancelled');
@@ -101,11 +101,11 @@ export async function getCustomer360(
   return {
     customer: {
       id: customer._id.toString(),
-      name: customer.customerName,
+      name: customer.name,
       email: customer.email || '',
-      phone: customer.mobileNumber,
-      city: customer.city || '',
-      status: customer.status,
+      phone: customer.primaryMobile,
+      city: (customer as any).city || '',
+      status: (customer as any).customerStatus ?? (customer as any).status ?? null,
       joinDate: customer.createdAt,
       lastBookingDate: bookings[0]?.pickupDate
     },
@@ -126,7 +126,7 @@ export async function getCustomer360(
       advanceAmount: 0,
       loyaltyPoints: Math.floor(totalSpent / 1000) * 10
     },
-    whatsappStatus: !!customer.mobileNumber,
+    whatsappStatus: !!((customer as any).whatsappNumber || customer.primaryMobile),
     googleReviews: [],
     preferredRoutes,
     timeline: [],
@@ -135,8 +135,8 @@ export async function getCustomer360(
 }
 
 export async function getCustomer360KPISummary(
-  tenantId: mongoose.Types.ObjectId,
-  customerId: mongoose.Types.ObjectId
+  tenantId: string | mongoose.Types.ObjectId,
+  customerId: string | mongoose.Types.ObjectId
 ): Promise<any> {
   const data = await getCustomer360(tenantId, customerId);
   if (!data) return null;

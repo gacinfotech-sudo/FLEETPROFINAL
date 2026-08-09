@@ -4,6 +4,9 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import GlobalCustomerSearch from "@/components/customers/global-customer-search";
+// The final-canonical merge brought back this manifest-driven sidebar but
+// dropped the import that feeds it.
+import { SAAS_MODULES, getNavigationStructure } from "@/modules/manifest";
 import { ShieldCheck } from "lucide-react";
 
 // Root Control Plane (Wave 1) — platform Super Admin console. These are
@@ -31,6 +34,9 @@ interface SidebarProps {
   onViewChange: (view: string) => void;
   isOpen: boolean;
   onToggle: () => void;
+  // Customer chosen from the sidebar's global customer search — optional so
+  // shells without a customer pane can omit it.
+  onSelectCustomer?: (customerId: string) => void;
 }
 
 const icons = {

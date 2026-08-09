@@ -19,8 +19,8 @@ export interface Vendor360Data {
 }
 
 export async function getVendor360(
-  tenantId: mongoose.Types.ObjectId,
-  vendorId: mongoose.Types.ObjectId
+  tenantId: string | mongoose.Types.ObjectId,
+  vendorId: string | mongoose.Types.ObjectId
 ): Promise<Vendor360Data | null> {
   const vendor = await Vendor.findOne({
     _id: vendorId,
@@ -40,25 +40,29 @@ export async function getVendor360(
   const activeBookings = bookings.filter(b => ['confirmed', 'ready_for_dispatch', 'trip_started', 'ongoing'].includes(b.status));
   const completedBookings = bookings.filter(b => b.status === 'completed');
   const cancelledBookings = bookings.filter(b => b.status === 'cancelled');
-  const totalCommission = completedBookings.reduce((s: number, b: any) => s + ((b.vendorAmount || b.totalAmount || 0) * (vendor.commissionRate || 10) / 100), 0);
+  // Commission only when a percentage is actually configured — never a
+  // guessed default rate.
+  const terms: any = (vendor as any).defaultCommercialTerms || {};
+  const commissionRate: number | null = terms.commissionType === 'percentage' && Number.isFinite(terms.commissionValue) ? terms.commissionValue : null;
+  const totalCommission = commissionRate === null ? 0 : completedBookings.reduce((s: number, b: any) => s + ((b.vendorAmount || b.totalAmount || 0) * commissionRate / 100), 0);
   const totalPaid = payments.filter(p => p.status === 'completed').reduce((s: number, p: any) => s + (p.amount || 0), 0);
   const outstanding = totalCommission - totalPaid;
 
   const alerts: any[] = [];
-  if (vendor.status === 'suspended') alerts.push({ type: 'status', message: 'Vendor suspended', severity: 'high' });
+  if (String(vendor.status) !== 'active') alerts.push({ type: 'status', message: `Vendor ${String(vendor.status).replace(/_/g, ' ')}`, severity: 'high' });
   if (outstanding > 0) alerts.push({ type: 'payment', message: `Outstanding: ₹${outstanding}`, severity: 'medium' });
   if (cancelledBookings.length > completedBookings.length * 0.15) alerts.push({ type: 'performance', message: 'High cancellation rate', severity: 'medium' });
 
   return {
     vendor: {
       id: vendor._id,
-      name: vendor.vendorName,
-      phone: vendor.contactPhone,
-      email: vendor.email || null,
-      city: vendor.city || null,
-      status: vendor.status
+      name: vendor.companyName,
+      phone: (vendor as any).primaryMobile ?? null,
+      email: (vendor as any).email || null,
+      city: (vendor as any).address?.city || null,
+      status: String(vendor.status)
     },
-    status: vendor.status,
+    status: String(vendor.status) as any,
     resources: {
       drivers: vendorDrivers.length,
       vehicles: vendorVehicles.length,
@@ -76,11 +80,12 @@ export async function getVendor360(
       totalCommission: Math.round(totalCommission),
       totalPaid: Math.round(totalPaid),
       outstanding: Math.round(outstanding),
-      commissionRate: vendor.commissionRate || 10
+      commissionRate
     },
     performance: {
-      averageRating: 4.5,
-      complaintCount: 0,
+      // No rating source wired yet — null, never a fabricated score.
+      averageRating: null,
+      complaintCount: null,
       cancellationRate: bookings.length > 0 ? (cancelledBookings.length / bookings.length) * 100 : 0
     },
     alerts
@@ -88,11 +93,11 @@ export async function getVendor360(
 }
 
 export async function getVendor360KPISummary(
-  tenantId: mongoose.Types.ObjectId,
-  vendorId: mongoose.Types.ObjectId
+  tenantId: string | mongoose.Types.ObjectId,
+  vendorId: string | mongoose.Types.ObjectId
 ): Promise<any> {
   const data = await getVendor360(tenantId, vendorId);
-  return data ? { vendorId, status: data.status, activeBookings: data.activeBookings, totalEarnings: data.totalCommission } : null;
+  return data ? { vendorId, status: data.status, activeBookings: data.bookings.active, totalEarnings: data.financial.totalCommission } : null;
 }
 
 export function getVendor360QuickActions(vendor360: Vendor360Data) {

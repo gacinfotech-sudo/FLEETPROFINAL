@@ -1,7 +1,8 @@
 import {
-  Driver, Booking, DriverCompliance, DriverIncident, DriverFeedback,
+  Driver, Booking, CustomerFeedback,
   PaymentTransaction, DriverAttendance, DriverLeave
 } from '../models/index';
+import { DriverIncident } from '../driver/operations/models';
 import mongoose from 'mongoose';
 import { computeBookingTimeline } from './timelineService';
 
@@ -89,8 +90,8 @@ export interface Driver360Data {
  * Get complete Driver 360 data
  */
 export async function getDriver360(
-  tenantId: mongoose.Types.ObjectId,
-  driverId: mongoose.Types.ObjectId
+  tenantId: string | mongoose.Types.ObjectId,
+  driverId: string | mongoose.Types.ObjectId
 ): Promise<Driver360Data | null> {
   const driver = await Driver.findOne({
     _id: driverId,
@@ -105,9 +106,12 @@ export async function getDriver360(
   // Fetch all related data in parallel
   const [bookings, compliance, incidents, feedback, payments, attendance, leave] = await Promise.all([
     Booking.find({ tenantId, driverId }).sort({ pickupDate: -1 }),
-    DriverCompliance.find({ tenantId, driverId }),
-    DriverIncident.find({ tenantId, driverId }).sort({ incidentDate: -1 }),
-    DriverFeedback.find({ tenantId, driverId }).sort({ createdAt: -1 }),
+    // No separate DriverCompliance collection exists — empty list, never
+    // invented records (compliance lives in the driver document registry).
+    Promise.resolve([] as any[]),
+    DriverIncident.find({ tenantId, driverId }).sort({ incidentDate: -1 }).limit(100),
+    // Driver ratings come from CustomerFeedback rows linked to the driver.
+    CustomerFeedback.find({ tenantId, driverId }).sort({ createdAt: -1 }).limit(100),
     PaymentTransaction.find({ tenantId, driverId }).sort({ receivedAt: -1 }),
     DriverAttendance.find({ tenantId, driverId }).sort({ date: -1 }),
     DriverLeave.find({ tenantId, driverId }).sort({ fromDate: -1 }),
@@ -192,7 +196,7 @@ export async function getDriver360(
       severity: 'high' as const,
     });
   }
-  if (driver.currentStatus === 'suspended') {
+  if (driver.status === 'inactive') {
     alerts.push({
       type: 'suspension',
       message: 'Driver account suspended',
@@ -203,18 +207,18 @@ export async function getDriver360(
   return {
     driver: {
       id: driver._id,
-      name: driver.driverName,
-      phone: driver.mobileNumber,
-      altPhone: driver.alternatePhone,
+      name: driver.name,
+      phone: driver.phone,
+      altPhone: (driver as any).alternatePhone ?? null,
       email: driver.email,
       address: driver.permanentAddress,
-      status: driver.currentStatus,
-      joinDate: driver.joinDate,
+      status: driver.status,
+      joinDate: driver.dateOfJoining,
       licenseNumber: driver.licenseNumber,
       licenseExpiry: licenses.length > 0 ? licenses[0].expiryDate : null,
     },
     availability: {
-      status: currentBooking ? 'on_trip' : activeLeave ? 'on_leave' : driver.currentStatus === 'suspended' ? 'suspended' : 'available',
+      status: currentBooking ? 'on_trip' : activeLeave ? 'on_leave' : driver.status === 'inactive' ? 'suspended' : 'available',
       currentTrip: currentBooking?.bookingId || null,
       leaveStatus: activeLeave ? activeLeave.leaveType : null,
     },
@@ -262,7 +266,7 @@ export async function getDriver360(
     incidents: incidents.slice(0, 5),
     activeIncidents,
     salary: {
-      monthlyBaseSalary: driver.baseSalary || 0,
+      monthlyBaseSalary: ((driver as any).baseSalary ?? 0),
       advances: payments.filter((p: any) => p.paymentType === 'advance').reduce((s: number, p: any) => s + p.amount, 0),
       deductions: payments.filter((p: any) => p.paymentType === 'deduction').reduce((s: number, p: any) => s + p.amount, 0),
       totalEarnings: payments.reduce((s: number, p: any) => s + p.amount, 0),
@@ -276,8 +280,8 @@ export async function getDriver360(
  * Get Driver 360 KPI summary
  */
 export async function getDriver360KPISummary(
-  tenantId: mongoose.Types.ObjectId,
-  driverId: mongoose.Types.ObjectId
+  tenantId: string | mongoose.Types.ObjectId,
+  driverId: string | mongoose.Types.ObjectId
 ): Promise<any> {
   const data = await getDriver360(tenantId, driverId);
 

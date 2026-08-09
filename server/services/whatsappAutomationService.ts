@@ -12,7 +12,7 @@ const TEMPLATES = {
 };
 
 export async function sendAutomatedWhatsApp(
-  tenantId: mongoose.Types.ObjectId,
+  tenantId: string | mongoose.Types.ObjectId,
   templateKey: string,
   phoneNumber: string,
   data: Record<string, string>,
@@ -35,39 +35,39 @@ export async function sendAutomatedWhatsApp(
   }
 }
 
-export async function triggerBookingConfirmation(tenantId: mongoose.Types.ObjectId, bookingId: mongoose.Types.ObjectId): Promise<boolean> {
+export async function triggerBookingConfirmation(tenantId: string | mongoose.Types.ObjectId, bookingId: string | mongoose.Types.ObjectId): Promise<boolean> {
   try {
     const booking = await Booking.findById(bookingId);
     const customer = booking ? await Customer.findById(booking.customerId) : null;
-    if (!customer) return false;
+    if (!booking || !customer) return false;
 
-    await sendAutomatedWhatsApp(tenantId, 'booking_confirmation', customer.mobileNumber, {
+    await sendAutomatedWhatsApp(tenantId, 'booking_confirmation', customer.primaryMobile, {
       pickup: booking.pickupLocation,
-      time: new Date(booking.pickupDate).toLocaleTimeString(),
-      driver: 'TBD'
+      time: booking.pickupDate ? new Date(booking.pickupDate).toLocaleTimeString() : '',
+      driver: booking.driverId ? String(booking.driverId) : ''
     });
     return true;
   } catch { return false; }
 }
 
-export async function triggerTripStarted(tenantId: mongoose.Types.ObjectId, bookingId: mongoose.Types.ObjectId): Promise<boolean> {
+export async function triggerTripStarted(tenantId: string | mongoose.Types.ObjectId, bookingId: string | mongoose.Types.ObjectId): Promise<boolean> {
   try {
     const booking = await Booking.findById(bookingId);
     const customer = booking ? await Customer.findById(booking.customerId) : null;
     if (!customer) return false;
 
-    await sendAutomatedWhatsApp(tenantId, 'trip_started', customer.mobileNumber, { driver: 'Driver' });
+    await sendAutomatedWhatsApp(tenantId, 'trip_started', customer.primaryMobile, { driver: 'Driver' });
     return true;
   } catch { return false; }
 }
 
-export async function triggerTripCompleted(tenantId: mongoose.Types.ObjectId, bookingId: mongoose.Types.ObjectId): Promise<boolean> {
+export async function triggerTripCompleted(tenantId: string | mongoose.Types.ObjectId, bookingId: string | mongoose.Types.ObjectId): Promise<boolean> {
   try {
     const booking = await Booking.findById(bookingId);
     const customer = booking ? await Customer.findById(booking.customerId) : null;
     if (!customer) return false;
 
-    await sendAutomatedWhatsApp(tenantId, 'trip_completed', customer.mobileNumber, { amount: booking?.totalAmount?.toString() || '0' });
+    await sendAutomatedWhatsApp(tenantId, 'trip_completed', customer.primaryMobile, { amount: booking?.totalAmount?.toString() || '0' });
     return true;
   } catch { return false; }
 }

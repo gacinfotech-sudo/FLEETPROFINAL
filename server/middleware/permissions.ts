@@ -96,6 +96,41 @@ export const PERMISSIONS = {
   GPS_SETTINGS_MANAGE: 'gps.settings.manage',
   GPS_REPORT_EXPORT: 'gps.report.export',
   GPS_RAW_DATA_VIEW: 'gps.raw_data.view',
+  // Restored constants — the secure-login merge committed a truncated
+  // PERMISSIONS map, silently 403-ing every route that referenced the
+  // dropped keys (inquiry/lead/quotation/vendor/GPS/vehicle modules).
+  MANAGE_INVOICE_SETTINGS: 'manage_invoice_settings',
+  VIEW_INQUIRIES: 'inquiry.view',
+  CREATE_INQUIRY: 'inquiry.create',
+  EDIT_INQUIRY: 'inquiry.edit',
+  QUALIFY_INQUIRY: 'inquiry.qualify',
+  CONVERT_INQUIRY_TO_LEAD: 'inquiry.convert_to_lead',
+  MARK_INQUIRY_LOST: 'inquiry.mark_lost',
+  VIEW_LEADS: 'lead.view',
+  EDIT_LEAD: 'lead.edit',
+  ASSIGN_LEAD: 'lead.assign',
+  MARK_LEAD_LOST: 'lead.mark_lost',
+  VIEW_QUOTATIONS: 'quotation.view',
+  CREATE_QUOTATION: 'quotation.create',
+  EDIT_QUOTATION_DRAFT: 'quotation.edit_draft',
+  APPROVE_QUOTATION: 'quotation.approve',
+  SEND_QUOTATION: 'quotation.send',
+  ACCEPT_QUOTATION: 'quotation.accept',
+  VIEW_FOLLOWUPS: 'followup.view',
+  CREATE_FOLLOWUP: 'followup.create',
+  COMPLETE_FOLLOWUP: 'followup.complete',
+  CONVERT_LEAD_TO_CUSTOMER: 'lead.convert_to_customer',
+  CONVERT_LEAD_TO_BOOKING: 'lead.convert_to_booking',
+  APPROVE_EXPENSE: 'expense.approve',
+  VIEW_TRIP_PROFITABILITY: 'trip.profitability.view',
+  VENDOR_VIEW: 'vendor_view',
+  VENDOR_CREATE: 'vendor_create',
+  VENDOR_EDIT: 'vendor_edit',
+  VENDOR_BLOCK: 'vendor_block',
+  VENDOR_DRIVER_CREATE: 'vendor_driver_create',
+  VENDOR_DRIVER_EDIT: 'vendor_driver_edit',
+  VENDOR_VEHICLE_CREATE: 'vendor_vehicle_create',
+  VENDOR_VEHICLE_EDIT: 'vendor_vehicle_edit',
   // Referral/Rewards Engine — see docs/REWARDS_REFERRAL_CURRENT_AUDIT.md.
   // Existing view_revenue/manage_users are reused where a spec-suggested
   // permission would duplicate one already enforced (e.g. financial
@@ -105,14 +140,14 @@ export const PERMISSIONS = {
   REFERRAL_VIEW: 'referral.view',
   REFERRAL_CREATE: 'referral.create',
   REFERRAL_MANAGE: 'referral.manage',
+  OUTSOURCING_VIEW: 'outsourcing.view',
+  OUTSOURCING_CREATE: 'outsourcing.create',
+  OUTSOURCING_MANAGE: 'outsourcing.manage',
   // Outsource Vehicle sourcing workflow — see docs/VENDOR_OUTSOURCE_WORKFLOW_AUDIT.md.
   // Consolidated to view/create/manage (send/record-response/select/cancel)
   // rather than the spec's finer per-action split, matching this codebase's
   // existing one-permission-per-action-class granularity elsewhere
   // (e.g. VENDOR_EDIT covers several distinct vendor-record actions).
-  OUTSOURCING_VIEW: 'outsourcing.view',
-  OUTSOURCING_CREATE: 'outsourcing.create',
-  OUTSOURCING_MANAGE: 'outsourcing.manage',
   // Telephony / multi-user call ownership (TASK-02) — see
   // server/telephony/routes/** for the call sites. Previously exposed as
   // server/telephony/permissions.ts's TELEPHONY_PERMISSIONS string
@@ -129,10 +164,6 @@ export const PERMISSIONS = {
   // convention (CURRENT-FLEET-MODULE-AUDIT.md §9). Core Vehicle CRUD
   // continues to reuse the existing MANAGE_VEHICLES; VIEW_REVENUE continues
   // to gate the Profitability tab — neither is duplicated here.
-  VEHICLE_COMPLIANCE_VIEW: 'vehicle.compliance.view',
-  VEHICLE_COMPLIANCE_MANAGE: 'vehicle.compliance.manage',
-  VEHICLE_MAINTENANCE_VIEW: 'vehicle.maintenance.view',
-  VEHICLE_MAINTENANCE_MANAGE: 'vehicle.maintenance.manage',
   VEHICLE_EXPENSE_VIEW: 'vehicle.expense.view',
   VEHICLE_EXPENSE_MANAGE: 'vehicle.expense.manage',
   VEHICLE_FASTAG_VIEW: 'vehicle.fastag.view',

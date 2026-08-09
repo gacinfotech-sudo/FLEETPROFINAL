@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
  */
 
 export async function getExpense360(
-  tenantId: mongoose.Types.ObjectId,
+  tenantId: string | mongoose.Types.ObjectId,
   startDate?: Date,
   endDate?: Date
 ): Promise<any> {
