@@ -343,7 +343,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : process.env.NODE_ENV === 'production',
       httpOnly: true,
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days for PWA persistence
-      sameSite: 'lax' // Changed from 'strict' to 'lax' for better PWA compatibility
+      sameSite: 'none' // Allow cross-origin access on LAN (phone/tablet accessing server IP)
     }
   });
   sessionMiddlewareInstance = sessionMiddleware; // see getSessionMiddleware() above
