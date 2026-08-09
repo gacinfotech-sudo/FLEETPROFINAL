@@ -15,9 +15,27 @@ export const authenticateUser = async (req: AuthRequest, res: Response, next: Ne
     }
 
     const sessionId = (req.session as any)?.userId;
-    
+
     if (!sessionId) {
       return res.status(401).json({ message: "Authentication required" });
+    }
+
+    // Device fingerprint validation - detect session hijacking
+    const storedFingerprint = (req.session as any)?.deviceFingerprint;
+    const currentIP = req.ip || req.connection.remoteAddress || 'unknown';
+    const currentUserAgent = req.get('User-Agent') || 'unknown';
+
+    if (storedFingerprint) {
+      // Check for significant changes that indicate potential hijacking
+      if (storedFingerprint.ip !== currentIP) {
+        console.warn(`⚠️ Session IP mismatch: stored=${storedFingerprint.ip}, current=${currentIP}`);
+        // Allow IP changes (mobile networks) but log it
+      }
+
+      if (storedFingerprint.userAgent !== currentUserAgent) {
+        console.warn(`⚠️ Session user agent mismatch - possible browser/device change`);
+        // Allow UA changes but log it
+      }
     }
 
     // SA-01: a lookup FAILURE (thrown error — e.g. a transient MongoDB
@@ -30,19 +48,20 @@ export const authenticateUser = async (req: AuthRequest, res: Response, next: Ne
     try {
       user = await storage.getUserBySessionId(sessionId);
     } catch (lookupError) {
-      console.error('Session lookup failed (transient?), not destroying session:', lookupError);
+      console.error('🔴 Session lookup failed (transient?), not destroying session:', lookupError);
       return res.status(503).json({ message: "Temporarily unavailable, please retry." });
     }
 
     if (!user) {
       // Clear invalid session
       req.session.destroy((err) => {
-        if (err) console.error('Error destroying session:', err);
+        if (err) console.error('🔴 Error destroying session:', err);
       });
       return res.status(401).json({ message: "Invalid session" });
     }
 
     if (!user.isActive) {
+      console.warn(`⚠️ Inactive user session attempt: ${user.userId}`);
       return res.status(401).json({ message: "Invalid session" });
     }
 

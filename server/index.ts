@@ -35,6 +35,10 @@ if (process.env.NODE_ENV === 'development') {
 
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
+import https from "https";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import connectDB from "./connectDB";
@@ -42,6 +46,8 @@ import { storage } from "./storage-mongodb";
 import mongoose from "mongoose";
 import { startGpsPollingScheduler, stopGpsPollingScheduler } from "./gps/ingestion/pollingScheduler";
 import { startOperationsReminderScheduler, stopOperationsReminderScheduler } from "./operations/reminderEngine";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 // Trust only the known number of reverse-proxy hops. `true` trusts arbitrary
@@ -150,16 +156,31 @@ app.use((req, res, next) => {
   // hard-coded value, falling back to 5000 for local development.
   const port = Number(process.env.PORT) || 5000;
   const host = process.env.HOST || "0.0.0.0";
-  // reusePort (SO_REUSEPORT) is for multiple processes sharing one port;
-  // this app is a single process, so it's never needed, and enabling it
-  // on a 0.0.0.0 bind crashes with ENOTSUP on this macOS/Node combo —
-  // that crash was the actual root cause of LAN access being unreachable.
-  server.listen({
-    port,
-    host,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+
+  // Use HTTPS if SSL certs exist (for network testing)
+  const certPath = path.join(__dirname, '../ssl/cert.pem');
+  const keyPath = path.join(__dirname, '../ssl/key.pem');
+  const useSSL = fs.existsSync(certPath) && fs.existsSync(keyPath);
+
+  if (useSSL) {
+    const options = {
+      cert: fs.readFileSync(certPath),
+      key: fs.readFileSync(keyPath),
+    };
+    https.createServer(options, app).listen({
+      port,
+      host,
+    }, () => {
+      log(`🔒 serving HTTPS on ${host}:${port}`);
+    });
+  } else {
+    server.listen({
+      port,
+      host,
+    }, () => {
+      log(`serving HTTP on ${host}:${port}`);
+    });
+  }
 
   // P1 FIX: background job must not be re-registered on every 'connected'
   // event (e.g. reconnect after a network blip), which previously stacked

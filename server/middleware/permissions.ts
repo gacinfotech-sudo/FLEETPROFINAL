@@ -53,44 +53,32 @@ export const PERMISSIONS = {
   VIEW_REVENUE: 'view_revenue',
   MANAGE_USERS: 'manage_users',
   MANAGE_CAMPAIGNS: 'manage_campaigns',
-  MANAGE_INVOICE_SETTINGS: 'manage_invoice_settings',
-  // Inquiry/Lead CRM (additive — see docs/INQUIRY_LEAD_EXISTING_AUDIT.md)
-  VIEW_INQUIRIES: 'inquiry.view',
-  CREATE_INQUIRY: 'inquiry.create',
-  EDIT_INQUIRY: 'inquiry.edit',
-  QUALIFY_INQUIRY: 'inquiry.qualify',
-  CONVERT_INQUIRY_TO_LEAD: 'inquiry.convert_to_lead',
-  MARK_INQUIRY_LOST: 'inquiry.mark_lost',
-  // Lead pipeline (additive — see docs/RECOMMENDED_IMPLEMENTATION_ROADMAP.md)
-  VIEW_LEADS: 'lead.view',
-  EDIT_LEAD: 'lead.edit',
-  ASSIGN_LEAD: 'lead.assign',
-  MARK_LEAD_LOST: 'lead.mark_lost',
-  // Quotations (additive)
-  VIEW_QUOTATIONS: 'quotation.view',
-  CREATE_QUOTATION: 'quotation.create',
-  EDIT_QUOTATION_DRAFT: 'quotation.edit_draft',
-  APPROVE_QUOTATION: 'quotation.approve',
-  SEND_QUOTATION: 'quotation.send',
-  ACCEPT_QUOTATION: 'quotation.accept',
-  // Lead follow-ups (additive)
-  VIEW_FOLLOWUPS: 'followup.view',
-  CREATE_FOLLOWUP: 'followup.create',
-  COMPLETE_FOLLOWUP: 'followup.complete',
-  // One-click Lead conversions (additive)
-  CONVERT_LEAD_TO_CUSTOMER: 'lead.convert_to_customer',
-  CONVERT_LEAD_TO_BOOKING: 'lead.convert_to_booking',
-  // Trip costing / driver expense (additive — see docs/TRIP_COSTING_DATA_MAPPING.md)
-  APPROVE_EXPENSE: 'expense.approve',
-  VIEW_TRIP_PROFITABILITY: 'trip.profitability.view',
-  VENDOR_VIEW: 'vendor_view',
-  VENDOR_CREATE: 'vendor_create',
-  VENDOR_EDIT: 'vendor_edit',
-  VENDOR_BLOCK: 'vendor_block',
-  VENDOR_DRIVER_CREATE: 'vendor_driver_create',
-  VENDOR_DRIVER_EDIT: 'vendor_driver_edit',
-  VENDOR_VEHICLE_CREATE: 'vendor_vehicle_create',
-  VENDOR_VEHICLE_EDIT: 'vendor_vehicle_edit',
+
+  // Vehicle 360 Permissions
+  VEHICLE360_VIEW: 'vehicle360.view',
+  VEHICLE_VIEW: 'vehicle.view',
+  VEHICLE_MANAGE: 'vehicle.manage',
+  VEHICLE_GPS_VIEW: 'vehicle.gps.view',
+  VEHICLE_GPS_MANAGE: 'vehicle.gps.manage',
+  VEHICLE_PERFORMANCE_VIEW: 'vehicle.performance.view',
+  VEHICLE_COMPLIANCE_VIEW: 'vehicle.compliance.view',
+  VEHICLE_COMPLIANCE_MANAGE: 'vehicle.compliance.manage',
+  VEHICLE_DOCUMENTS_VIEW: 'vehicle.documents.view',
+  VEHICLE_DOCUMENTS_MANAGE: 'vehicle.documents.manage',
+  VEHICLE_MAINTENANCE_VIEW: 'vehicle.maintenance.view',
+  VEHICLE_MAINTENANCE_MANAGE: 'vehicle.maintenance.manage',
+  VEHICLE_FUEL_VIEW: 'vehicle.fuel.view',
+  VEHICLE_FUEL_MANAGE: 'vehicle.fuel.manage',
+  VEHICLE_EXPENSES_VIEW: 'vehicle.expenses.view',
+  VEHICLE_EXPENSES_MANAGE: 'vehicle.expenses.manage',
+  VEHICLE_BOOKINGS_VIEW: 'vehicle.bookings.view',
+  VEHICLE_DRIVER_ASSIGNMENT_VIEW: 'vehicle.driver_assignment.view',
+  VEHICLE_DRIVER_ASSIGNMENT_MANAGE: 'vehicle.driver_assignment.manage',
+  VEHICLE_FINANCIALS_VIEW: 'vehicle.financials.view',
+  VEHICLE_ALERTS_VIEW: 'vehicle.alerts.view',
+  VEHICLE_ALERTS_MANAGE: 'vehicle.alerts.manage',
+
+  // Legacy GPS permissions (kept for backward compatibility)
   GPS_CONNECTION_VIEW: 'gps.connection.view',
   GPS_CONNECTION_MANAGE: 'gps.connection.manage',
   GPS_DEVICE_VIEW: 'gps.device.view',
@@ -108,35 +96,4 @@ export const PERMISSIONS = {
   GPS_SETTINGS_MANAGE: 'gps.settings.manage',
   GPS_REPORT_EXPORT: 'gps.report.export',
   GPS_RAW_DATA_VIEW: 'gps.raw_data.view',
-  // Referral/Rewards Engine — see docs/REWARDS_REFERRAL_CURRENT_AUDIT.md.
-  // Existing view_revenue/manage_users are reused where a spec-suggested
-  // permission would duplicate one already enforced (e.g. financial
-  // redemption approval already fits under existing owner/admin checks).
-  REWARD_RULE_MANAGE: 'reward.rule.manage',
-  REWARD_ADJUST: 'reward.adjust',
-  REFERRAL_VIEW: 'referral.view',
-  REFERRAL_CREATE: 'referral.create',
-  REFERRAL_MANAGE: 'referral.manage',
-  // Outsource Vehicle sourcing workflow — see docs/VENDOR_OUTSOURCE_WORKFLOW_AUDIT.md.
-  // Consolidated to view/create/manage (send/record-response/select/cancel)
-  // rather than the spec's finer per-action split, matching this codebase's
-  // existing one-permission-per-action-class granularity elsewhere
-  // (e.g. VENDOR_EDIT covers several distinct vendor-record actions).
-  OUTSOURCING_VIEW: 'outsourcing.view',
-  OUTSOURCING_CREATE: 'outsourcing.create',
-  OUTSOURCING_MANAGE: 'outsourcing.manage',
-  // Vehicle 360 batch — dot-namespaced per the GPS block's established
-  // convention (CURRENT-FLEET-MODULE-AUDIT.md §9). Core Vehicle CRUD
-  // continues to reuse the existing MANAGE_VEHICLES; VIEW_REVENUE continues
-  // to gate the Profitability tab — neither is duplicated here.
-  VEHICLE_COMPLIANCE_VIEW: 'vehicle.compliance.view',
-  VEHICLE_COMPLIANCE_MANAGE: 'vehicle.compliance.manage',
-  VEHICLE_MAINTENANCE_VIEW: 'vehicle.maintenance.view',
-  VEHICLE_MAINTENANCE_MANAGE: 'vehicle.maintenance.manage',
-  VEHICLE_EXPENSE_VIEW: 'vehicle.expense.view',
-  VEHICLE_EXPENSE_MANAGE: 'vehicle.expense.manage',
-  VEHICLE_FASTAG_VIEW: 'vehicle.fastag.view',
-  VEHICLE_FASTAG_MANAGE: 'vehicle.fastag.manage',
-  VEHICLE_INCIDENTS_VIEW: 'vehicle.incidents.view',
-  VEHICLE_INCIDENTS_MANAGE: 'vehicle.incidents.manage',
 } as const;

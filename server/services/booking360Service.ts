@@ -71,8 +71,9 @@ export async function getBooking360(
   const [vehicle, driver, vendor, itinerary, expenses, invoices, paymentTxns] = await Promise.all([
     booking.vehicleId ? Vehicle.findById(booking.vehicleId) : Promise.resolve(null),
     booking.driverId ? Driver.findById(booking.driverId) : Promise.resolve(null),
-    booking.vendorId ? Vendor.findById(booking.vendorId) : Promise.resolve(null),
-    booking.itineraryId ? Itinerary.findById(booking.itineraryId) : Promise.resolve(null),
+    (booking as any).fulfilmentVendorId ? Vendor.findById((booking as any).fulfilmentVendorId) : Promise.resolve(null),
+    // Itinerary is keyed by booking, not referenced from it.
+    Itinerary.findOne({ tenantId, bookingId }),
     Expense.find({ tenantId, bookingId }),
     Invoice.find({ tenantId, bookingId }),
     PaymentTransaction.find({ tenantId, bookingId })
@@ -89,7 +90,7 @@ export async function getBooking360(
   let operationalStatus: 'ready' | 'running' | 'delayed' | 'completed' = 'ready';
   if (booking.status === 'completed') operationalStatus = 'completed';
   else if (['trip_started', 'ongoing'].includes(booking.status)) operationalStatus = 'running';
-  else if (new Date(booking.pickupDate) < now && !['completed', 'cancelled'].includes(booking.status)) operationalStatus = 'delayed';
+  else if (booking.pickupDate && new Date(booking.pickupDate) < now && !['completed', 'cancelled'].includes(booking.status)) operationalStatus = 'delayed';
 
   // On-time percentage (from completed bookings)
   const onTimePercentage = booking.actualStartDateTime && booking.scheduledStartDateTime
@@ -108,25 +109,24 @@ export async function getBooking360(
       customer: booking.customerName,
       status: booking.status,
       bookingDate: booking.createdAt,
-      tripDate: booking.pickupDate,
+      tripDate: booking.pickupDate ?? booking.createdAt,
       tripType: booking.tripType || 'standard'
     },
     vehicle: vehicle ? {
       id: vehicle._id,
-      registrationNumber: vehicle.registrationNumber,
+      registrationNumber: vehicle.licensePlate,
       make: vehicle.make,
-      model: vehicle.model
+      model: vehicle.vehicleModel
     } : null,
     driver: driver ? {
       id: driver._id,
-      name: driver.driverName,
-      phone: driver.mobileNumber,
-      rating: 4.5
+      name: driver.name,
+      phone: driver.phone
     } : null,
     vendor: vendor ? {
       id: vendor._id,
-      name: vendor.vendorName,
-      phone: vendor.contactPhone
+      name: vendor.companyName,
+      phone: (vendor as any).contactPhone ?? (vendor as any).phone ?? null
     } : null,
     itinerary: itinerary || null,
     financial: {
@@ -138,7 +138,7 @@ export async function getBooking360(
     },
     operationalStatus,
     onTimePercentage,
-    notes: booking.operationalNotes ? [booking.operationalNotes] : [],
+    notes: booking.notes ? [booking.notes] : [],
     invoices: invoices || [],
     timeline: [],
     actions: [

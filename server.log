@@ -1,0 +1,30 @@
+[dotenv@17.0.0] injecting env (8) from .env – 🔐 encrypt with dotenvx: https://dotenvx.com
+🔗 Connecting to MongoDB (attempt 1/5)...
+✅ MongoDB Connected: 127.0.0.1
+📊 Database: fleetpro
+✅ Using existing secure admin credentials
+🚨 Creating emergency admin user from environment variables
+⚠️  Emergency admin user already exists
+3:09:35 PM [express] MongoDB connected - starting background job
+[operations] booking-end reminder scheduler started (every 60000ms)
+3:09:35 PM [express] 🔒 serving HTTPS on 0.0.0.0:5050
+✅ Secure login: user=testadmin, role=admin, ip=192.168.29.142, time=2026-08-09T09:39:42.873Z
+3:09:43 PM [express] POST /api/auth/login 200 in 225ms :: {"user":{"id":"6a75e38ae5b82cf059bf5446","…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    serviceModes: { selfDrive: true, withDriver: true },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0
+  },
+  tenantIdType: 'object'
+}
+3:11:06 PM [express] GET /api/operations/alerts 200 in 21ms :: []

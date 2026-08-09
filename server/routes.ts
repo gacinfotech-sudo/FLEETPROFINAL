@@ -442,26 +442,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { userId, password } = req.body;
       const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
       const userAgent = req.get('User-Agent') || 'unknown';
-      
+      const loginTimestamp = new Date();
+
       if (!userId || !password) {
         return res.status(400).json({ message: "User ID and password are required" });
+      }
+
+      // Validate input format (prevent injection)
+      if (typeof userId !== 'string' || typeof password !== 'string') {
+        return res.status(400).json({ message: "Invalid input format" });
       }
 
       // Check for recent failed attempts
       const recentFailedAttempts = getRecentFailedAttempts(userId);
       if (recentFailedAttempts >= 5) {
         trackLoginAttempt(userId, clientIP, false, userAgent);
-        return res.status(429).json({ 
+        return res.status(429).json({
           message: "Account temporarily locked due to too many failed login attempts. Please wait 5 minutes.",
           lockoutTime: 5 * 60
         });
       }
 
       const user = await storage.getUserByCredentials(userId, password);
-      
+
       if (!user) {
         // Track failed login attempt
         trackLoginAttempt(userId, clientIP, false, userAgent);
+        // Generic error message to prevent user enumeration attacks
         return res.status(401).json({ message: "Invalid credentials" });
       }
 
@@ -489,40 +496,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Track successful login
       trackLoginAttempt(userId, clientIP, true, userAgent);
-      
+
       // Update last login information in database
       await storage.updateUserLoginInfo(user.id, clientIP, userAgent);
 
       // PWA-friendly session management - allow longer sessions but prevent concurrent logins
       const sessionId = nanoid();
-      const deviceInfo = {
+      const deviceFingerprint = {
         userAgent: userAgent,
         ip: clientIP,
-        loginTime: new Date()
+        loginTime: loginTimestamp,
+        // Add additional device fingerprint data for security
+        acceptLanguage: req.get('Accept-Language') || 'unknown',
+        acceptEncoding: req.get('Accept-Encoding') || 'unknown'
       };
-      
-      // Always update session in database
+
+      // Always update session in database with enhanced device info
       try {
-        await storage.updateUserSession(user.id, sessionId, deviceInfo);
-        // P0 FIX: never log the session id — it is a bearer credential
-        // equivalent to a password; anyone with log access could hijack the
-        // session with it.
-        console.log('Session updated successfully for user:', user.userId);
+        await storage.updateUserSession(user.id, sessionId, deviceFingerprint);
+        // Security log: successful login
+        console.log(`✅ Secure login: user=${user.userId}, role=${user.role}, ip=${clientIP}, time=${loginTimestamp.toISOString()}`);
       } catch (error) {
-        console.error('Error updating user session:', error);
+        console.error('🔴 Session creation failed:', error instanceof Error ? error.message : error);
         return res.status(500).json({ message: "Failed to create session" });
       }
-      
-      // Set session cookie
+
+      // Set session cookie with enhanced security attributes
       (req.session as any).userId = sessionId;
-      
+      (req.session as any).loginTime = loginTimestamp.getTime();
+      (req.session as any).deviceFingerprint = {
+        ip: clientIP,
+        userAgent: userAgent
+      };
+
       // Save session to ensure it's properly stored before response
       req.session.save((err) => {
         if (err) {
-          console.error('Error saving session:', err);
+          console.error('🔴 Session persistence failed:', err);
           return res.status(500).json({ message: "Failed to save session" });
         }
-        
+
+        // Return minimal user info - no sensitive data in response
         res.json({
           user: {
             id: user.id,

@@ -6,16 +6,16 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { UserPlus, Trash2, Users, Key, Eye, EyeOff, Mail, AlertCircle } from "lucide-react";
+import { UserPlus, Trash2, Users, Key, Eye, EyeOff, Mail, AlertCircle, ChevronDown, ChevronRight } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Form schema for creating new sub-users
 const createSubUserSchema = z.object({
@@ -26,33 +26,51 @@ const createSubUserSchema = z.object({
 
 type CreateSubUserForm = z.infer<typeof createSubUserSchema>;
 
-// Always granted to a new manager, matching this form's pre-existing
-// default (server/routes.ts POST /api/users/sub-users falls back to the
-// same list when no permissions are supplied).
-const DEFAULT_MANAGER_PERMISSIONS = ["create_booking", "view_bookings", "edit_booking", "generate_invoice"];
-
-// Vehicle 360 batch permissions (Final Vehicle 360 Integrator, "Open
-// follow-ups" #3) — the only additional permissions this UI exposes for
-// now. Must match server/routes.ts's MANAGER_ASSIGNABLE_PERMISSIONS.
-const VEHICLE_PERMISSIONS: Array<{ value: string; label: string }> = [
-  { value: "vehicle.compliance.view", label: "Vehicle Compliance — View" },
-  { value: "vehicle.compliance.manage", label: "Vehicle Compliance — Manage" },
-  { value: "vehicle.maintenance.view", label: "Vehicle Maintenance — View" },
-  { value: "vehicle.maintenance.manage", label: "Vehicle Maintenance — Manage" },
-  { value: "vehicle.expense.view", label: "Vehicle Fuel/Expenses — View" },
-  { value: "vehicle.expense.manage", label: "Vehicle Fuel/Expenses — Manage" },
-  { value: "vehicle.fastag.view", label: "Vehicle FASTag/Toll — View" },
-  { value: "vehicle.fastag.manage", label: "Vehicle FASTag/Toll — Manage" },
-  { value: "vehicle.incidents.view", label: "Vehicle Incidents — View" },
-  { value: "vehicle.incidents.manage", label: "Vehicle Incidents — Manage" },
-];
+// Permission groups for Vehicle 360
+const PERMISSION_GROUPS = {
+  bookings: {
+    label: 'Bookings',
+    permissions: [
+      { id: 'create_booking', label: 'Create Booking' },
+      { id: 'view_bookings', label: 'View Bookings' },
+      { id: 'edit_booking', label: 'Edit Booking' },
+      { id: 'delete_booking', label: 'Delete Booking' },
+      { id: 'generate_invoice', label: 'Generate Invoice' },
+    ],
+  },
+  vehicle360: {
+    label: 'Vehicle 360',
+    permissions: [
+      { id: 'vehicle.view', label: 'View Vehicles', manage: false },
+      { id: 'vehicle.manage', label: 'Manage Vehicles', manage: true },
+      { id: 'vehicle.gps.view', label: 'View GPS Tracking', manage: false },
+      { id: 'vehicle.gps.manage', label: 'Manage GPS', manage: true },
+      { id: 'vehicle.performance.view', label: 'View Performance', manage: false },
+      { id: 'vehicle.compliance.view', label: 'View Compliance', manage: false },
+      { id: 'vehicle.compliance.manage', label: 'Manage Compliance', manage: true },
+      { id: 'vehicle.documents.view', label: 'View Documents', manage: false },
+      { id: 'vehicle.documents.manage', label: 'Manage Documents', manage: true },
+      { id: 'vehicle.maintenance.view', label: 'View Maintenance', manage: false },
+      { id: 'vehicle.maintenance.manage', label: 'Manage Maintenance', manage: true },
+      { id: 'vehicle.fuel.view', label: 'View Fuel/Expenses', manage: false },
+      { id: 'vehicle.fuel.manage', label: 'Manage Fuel/Expenses', manage: true },
+      { id: 'vehicle.expenses.view', label: 'View Expenses', manage: false },
+      { id: 'vehicle.expenses.manage', label: 'Manage Expenses', manage: true },
+      { id: 'vehicle.bookings.view', label: 'View Vehicle Bookings', manage: false },
+      { id: 'vehicle.driver_assignment.view', label: 'View Driver Assignment', manage: false },
+      { id: 'vehicle.driver_assignment.manage', label: 'Manage Driver Assignment', manage: true },
+      { id: 'vehicle.financials.view', label: 'View Vehicle Financials', manage: false },
+      { id: 'vehicle.alerts.view', label: 'View Alerts', manage: false },
+      { id: 'vehicle.alerts.manage', label: 'Manage Alerts', manage: true },
+    ],
+  },
+};
 
 export default function UserManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedVehiclePermissions, setSelectedVehiclePermissions] = useState<string[]>([]);
-  const [editingPermissionsUser, setEditingPermissionsUser] = useState<any | null>(null);
-  const [editVehiclePermissions, setEditVehiclePermissions] = useState<string[]>([]);
+  const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set(['create_booking', 'view_bookings', 'edit_booking', 'generate_invoice', 'vehicle.view']));
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['bookings']));
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -65,6 +83,40 @@ export default function UserManagement() {
       name: "",
     },
   });
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  };
+
+  const togglePermission = (permId: string) => {
+    setSelectedPermissions(prev => {
+      const next = new Set(prev);
+      if (next.has(permId)) next.delete(permId);
+      else next.add(permId);
+      return next;
+    });
+  };
+
+  const selectAllVehicle360 = () => {
+    const allVehicle360Perms = new Set(selectedPermissions);
+    PERMISSION_GROUPS.vehicle360.permissions.forEach(perm => {
+      allVehicle360Perms.add(perm.id);
+    });
+    setSelectedPermissions(allVehicle360Perms);
+  };
+
+  const clearAllVehicle360 = () => {
+    const remaining = new Set(selectedPermissions);
+    PERMISSION_GROUPS.vehicle360.permissions.forEach(perm => {
+      remaining.delete(perm.id);
+    });
+    setSelectedPermissions(remaining);
+  };
 
   // Fetch sub-users
   const { data: subUsers = [], isLoading } = useQuery({
@@ -89,52 +141,25 @@ export default function UserManagement() {
   // Create sub-user mutation
   const createSubUserMutation = useMutation({
     mutationFn: async (data: CreateSubUserForm) => {
-      console.log("Creating manager with data:", data);
       const requestBody = {
         userId: data.userId,
         password: data.password,
         name: data.name,
         role: "manager",
-        permissions: [...DEFAULT_MANAGER_PERMISSIONS, ...selectedVehiclePermissions],
+        permissions: Array.from(selectedPermissions)
       };
-      console.log("Request body:", requestBody);
-      
+
       const response = await apiRequest("POST", "/api/users/sub-users", requestBody);
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/sub-users"] });
       setIsCreateDialogOpen(false);
-      setSelectedVehiclePermissions([]);
       form.reset();
       toast({
         variant: "success",
         title: "Manager Created!",
         description: "New manager account has been created successfully.",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message,
-      });
-    },
-  });
-
-  // Update an existing manager's vehicle.* permissions
-  const updatePermissionsMutation = useMutation({
-    mutationFn: async ({ userId, permissions }: { userId: string; permissions: string[] }) => {
-      const response = await apiRequest("PATCH", `/api/users/sub-users/${userId}/permissions`, { permissions });
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/sub-users"] });
-      setEditingPermissionsUser(null);
-      toast({
-        variant: "success",
-        title: "Permissions Updated",
-        description: "Manager permissions have been updated successfully.",
       });
     },
     onError: (error: Error) => {
@@ -219,22 +244,6 @@ export default function UserManagement() {
     }
   };
 
-  const openEditPermissions = (targetUser: any) => {
-    const current: string[] = Array.isArray(targetUser.permissions) ? targetUser.permissions : [];
-    setEditVehiclePermissions(current.filter((p) => VEHICLE_PERMISSIONS.some((vp) => vp.value === p)));
-    setEditingPermissionsUser(targetUser);
-  };
-
-  const handleSavePermissions = () => {
-    if (!editingPermissionsUser) return;
-    const existingNonVehicle: string[] = (Array.isArray(editingPermissionsUser.permissions) ? editingPermissionsUser.permissions : [])
-      .filter((p: string) => DEFAULT_MANAGER_PERMISSIONS.includes(p));
-    updatePermissionsMutation.mutate({
-      userId: editingPermissionsUser.userId,
-      permissions: [...existingNonVehicle, ...editVehiclePermissions],
-    });
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -253,7 +262,14 @@ export default function UserManagement() {
             Create and manage manager accounts for your team
           </p>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) {
+            form.reset();
+            setSelectedPermissions(new Set(['create_booking', 'view_bookings', 'edit_booking', 'generate_invoice', 'vehicle.view']));
+            setExpandedGroups(new Set(['bookings']));
+          }
+        }}>
           <DialogTrigger asChild>
             <Button 
               disabled={isLimitReached}
@@ -272,12 +288,12 @@ export default function UserManagement() {
               Add Manager
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create New Manager</DialogTitle>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                 <FormField
                   control={form.control}
                   name="userId"
@@ -346,37 +362,80 @@ export default function UserManagement() {
                   )}
                 />
 
-                <div className="space-y-2">
-                  <Label>Vehicle 360 Permissions (optional)</Label>
-                  <div className="max-h-40 overflow-y-auto space-y-2 border rounded-md p-2">
-                    {VEHICLE_PERMISSIONS.map((perm) => (
-                      <div key={perm.value} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`create-${perm.value}`}
-                          checked={selectedVehiclePermissions.includes(perm.value)}
-                          onCheckedChange={(checked) => {
-                            setSelectedVehiclePermissions((prev) =>
-                              checked ? [...prev, perm.value] : prev.filter((p) => p !== perm.value),
-                            );
-                          }}
-                        />
-                        <label htmlFor={`create-${perm.value}`} className="text-sm">{perm.label}</label>
-                      </div>
-                    ))}
+                {/* Permissions Section */}
+                <div className="space-y-3 pt-2 border-t">
+                  <div>
+                    <Label className="text-base font-semibold">Permissions</Label>
+                    <p className="text-sm text-gray-600 mt-1">Select which features this manager can access</p>
                   </div>
+
+                  {Object.entries(PERMISSION_GROUPS).map(([groupId, group]) => (
+                    <div key={groupId} className="border rounded-lg">
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(groupId)}
+                        className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+                      >
+                        <span className="font-medium text-sm">{group.label}</span>
+                        {expandedGroups.has(groupId) ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </button>
+
+                      {expandedGroups.has(groupId) && (
+                        <div className="px-4 py-3 bg-gray-50 border-t space-y-2">
+                          {groupId === 'vehicle360' && (
+                            <div className="flex gap-2 mb-3 pb-3 border-b">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={selectAllVehicle360}
+                              >
+                                Select All
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={clearAllVehicle360}
+                              >
+                                Clear All
+                              </Button>
+                            </div>
+                          )}
+
+                          {group.permissions.map((perm) => (
+                            <div key={perm.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={perm.id}
+                                checked={selectedPermissions.has(perm.id)}
+                                onCheckedChange={() => togglePermission(perm.id)}
+                              />
+                              <Label htmlFor={perm.id} className="text-sm cursor-pointer font-normal">
+                                {perm.label}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <Button
-                    type="submit"
+                  <Button 
+                    type="submit" 
                     disabled={createSubUserMutation.isPending}
                     className="flex-1"
                   >
                     {createSubUserMutation.isPending ? "Creating..." : "Create Manager"}
                   </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
+                  <Button 
+                    type="button" 
+                    variant="outline" 
                     onClick={() => setIsCreateDialogOpen(false)}
                   >
                     Cancel
@@ -484,27 +543,16 @@ export default function UserManagement() {
                   </div>
 
                   {user.isActive ? (
-                    <div className="space-y-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => openEditPermissions(user)}
-                      >
-                        <Key className="w-4 h-4 mr-2" />
-                        Edit Permissions
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => handleDeactivateUser(user.userId, user.name || user.userId)}
-                        disabled={deactivateSubUserMutation.isPending}
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Deactivate
-                      </Button>
-                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => handleDeactivateUser(user.userId, user.name || user.userId)}
+                      disabled={deactivateSubUserMutation.isPending}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Deactivate
+                    </Button>
                   ) : (
                     <Button
                       variant="default"
@@ -523,45 +571,6 @@ export default function UserManagement() {
           ))}
         </div>
       )}
-
-      <Dialog open={!!editingPermissionsUser} onOpenChange={(open) => !open && setEditingPermissionsUser(null)}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Edit Permissions — {editingPermissionsUser?.name || editingPermissionsUser?.userId}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label>Vehicle 360 Permissions</Label>
-            <div className="max-h-60 overflow-y-auto space-y-2 border rounded-md p-2">
-              {VEHICLE_PERMISSIONS.map((perm) => (
-                <div key={perm.value} className="flex items-center gap-2">
-                  <Checkbox
-                    id={`edit-${perm.value}`}
-                    checked={editVehiclePermissions.includes(perm.value)}
-                    onCheckedChange={(checked) => {
-                      setEditVehiclePermissions((prev) =>
-                        checked ? [...prev, perm.value] : prev.filter((p) => p !== perm.value),
-                      );
-                    }}
-                  />
-                  <label htmlFor={`edit-${perm.value}`} className="text-sm">{perm.label}</label>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="flex gap-3 pt-4">
-            <Button
-              className="flex-1"
-              onClick={handleSavePermissions}
-              disabled={updatePermissionsMutation.isPending}
-            >
-              {updatePermissionsMutation.isPending ? "Saving..." : "Save Permissions"}
-            </Button>
-            <Button variant="outline" onClick={() => setEditingPermissionsUser(null)}>
-              Cancel
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

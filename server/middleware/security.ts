@@ -130,8 +130,10 @@ export const loginSpeedLimit = slowDown({
 // HTTPS redirect middleware
 export const httpsRedirect = (req: Request, res: Response, next: NextFunction) => {
   // Skip redirect for localhost / development
-  const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-  if (process.env.NODE_ENV === 'production' && !isLocalhost && req.header('x-forwarded-proto') !== 'https') {
+  const isLocalhost = req.hostname === 'localhost' || req.hostname === '127.0.0.1' || req.hostname === '192.168.29.142';
+  const forwardedProto = req.header('x-forwarded-proto');
+  const isHttps = req.protocol === 'https' || forwardedProto === 'https';
+  if (process.env.NODE_ENV === 'production' && !isLocalhost && !isHttps) {
     return res.redirect(`https://${req.header('host')}${req.url}`);
   }
   next();
