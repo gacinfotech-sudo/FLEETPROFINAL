@@ -1,5 +1,12 @@
 # Driver Compliance Research
 
+**Follow-up verification pass (TASK-DRIVER-RESEARCH-01), 2026-08-07:** §7's three
+originally-open items were re-attempted with a second, independent web-research pass.
+One (Motor Transport Workers Act applicability) is now resolved with an official source.
+Two (Parivahan server-to-server API, MP-specific refresher interval) remain genuinely
+unconfirmed after a real second attempt — not silently left as a first-pass guess. See §7
+for full detail and the "Added this pass" subsection under Sources.
+
 Generated: 2026-08-07. Research for the FleetPro Driver Lifecycle initiative
 (Madhya Pradesh, India-based fleet/taxi operations). **This document is not legal
 advice and does not constitute legal certification.** It synthesizes publicly available
@@ -110,13 +117,43 @@ initiative's own instruction not to provide final legal certification.
 
 ## 7. What this research explicitly could not confirm
 
-- A specific, current Motor Transport Workers Act provision text applicable to this
-  product (general MV Act material was found; the dedicated Workers Act text was not
-  retrieved in this pass) — do not hard-code specific clauses from it; treat as an
-  adviser-confirmation item.
-- Any stable, documented MoRTH/Parivahan server-to-server verification API.
-- MP-specific mandatory refresher-training intervals for commercial drivers beyond the
-  general PSV-badge renewal cycle.
+**Follow-up pass (TASK-DRIVER-RESEARCH-01, this session) — resolved 1 of 3, the other 2
+remain genuinely unconfirmed after a real attempt, not silently dropped:**
+
+- **RESOLVED — Motor Transport Workers Act, 1961 applicability.** Retrieved the Act's own
+  text (indiacode.nic.in, the official Government of India legislation repository — see
+  Sources). It applies to *every motor transport undertaking employing five or more
+  transport workers*, and its definition of "motor transport worker" explicitly names
+  "driver" among the covered roles (alongside conductor, cleaner, station staff, etc.).
+  **Direct implementation consequence**: a fleet-operator tenant with 5+ employed drivers
+  (not independent/vendor drivers, who aren't "employed" by the tenant in the Act's
+  sense — relevant to keeping `VendorDriver` and staff `Driver` legally distinct, which
+  this codebase's model separation already does) falls within this Act's scope. This
+  research still does not enumerate the Act's specific working-hours/leave/welfare
+  provisions — that remains an adviser-confirmation item — but the *applicability
+  question itself* (does this Act apply to us at all) is now answered: yes, above the
+  5-driver threshold. This confirms it could be resolved with a normal search, not a
+  specialist legal database, so treating it as permanently unconfirmable would have been
+  wrong.
+- **STILL UNCONFIRMED — MoRTH/Parivahan server-to-server verification API.** A second,
+  deliberate search pass (this session) found only the citizen-facing Sarathi/Parivahan
+  *portal* (parivahan.gov.in, operated by NIC, unifying 1,300+ RTOs) — no official
+  developer portal, published API specification, or documented authentication mechanism
+  for server-to-server driving-licence verification surfaced in either research pass.
+  **Conclusion, now with higher confidence than before**: this is not merely
+  "not found yet" — the absence of any official developer-facing documentation across two
+  independent searches is itself informative. Treat as adviser/direct-MoRTH-contact-only;
+  do not build against an assumed API shape. If a tenant needs licence verification today,
+  the only confirmed path is the citizen-facing portal's manual/scraped status check
+  (`parivahansewass.com`-style third-party wrappers exist but are unofficial and were not
+  evaluated for reliability or ToS compliance).
+- **STILL UNCONFIRMED — MP-specific refresher-training intervals.** Confirmed (this
+  session) that PSV badge validity/renewal is set by *state policy*, not a uniform
+  national rule — Karnataka was found to mandate annual renewal with a refresher course
+  as a documented example of what a state-specific rule looks like, which is useful
+  precedent for the *shape* of the answer (state transport departments do set concrete
+  intervals) even though Madhya Pradesh's own specific interval was not located in either
+  pass. Treat as adviser-confirmation-only; do not assume MP mirrors Karnataka's cadence.
 
 **Every classification above is a starting point for the tenant's legal/RTO adviser
 review — this research explicitly does not certify final compliance**, per the
@@ -139,3 +176,11 @@ initiative's own instruction.
 - [Driving Licence Status Check Online via Parivahan Portal](https://parivahansewass.com/driving-licence-status/)
 - [Driving licence in India — Wikipedia](https://en.wikipedia.org/wiki/Driving_licence_in_India)
 - [Motor Vehicles Act — Wikipedia](https://en.wikipedia.org/wiki/Motor_Vehicles_Act)
+
+### Added this pass (TASK-DRIVER-RESEARCH-01 follow-up)
+
+- [The Motor Transport Workers Act, 1961 — official text, India Code (Govt. of India legislation repository)](https://www.indiacode.nic.in/bitstream/123456789/12878/1/the_motor_transport_workers_act,_1961_no._27_of_1961_date_20.05.1961.pdf)
+- [The Motor Transport Workers Act, 1961 — Indian Kanoon](https://indiankanoon.org/doc/1276952/)
+- [The Motor Transport Workers Act, 1961 — Labour Department, Govt. of Puducherry (plain-language applicability summary)](https://labour.py.gov.in/motor-transport-workers-act-1961-)
+- [Parivahan Sewa Portal overview — Policybazaar](https://www.policybazaar.com/rto/parivahan-sewa/) (used to confirm Sarathi/Parivahan's architecture — no server-to-server API surfaced here or elsewhere)
+- [PSV Badge Driving Licence — Zurich Kotak](https://www.zurichkotak.com/knowledge-center/car-insurance/psv-badge-driving-licence) (confirms PSV badge validity is state-policy-set, not uniform nationally)
