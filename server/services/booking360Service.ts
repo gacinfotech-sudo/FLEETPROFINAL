@@ -56,8 +56,8 @@ export interface Booking360Data {
 }
 
 export async function getBooking360(
-  tenantId: mongoose.Types.ObjectId,
-  bookingId: mongoose.Types.ObjectId
+  tenantId: string | mongoose.Types.ObjectId,
+  bookingId: string | mongoose.Types.ObjectId
 ): Promise<Booking360Data | null> {
   const booking = await Booking.findOne({
     _id: bookingId,
@@ -157,8 +157,8 @@ export async function getBooking360(
 }
 
 export async function getBooking360KPISummary(
-  tenantId: mongoose.Types.ObjectId,
-  bookingId: mongoose.Types.ObjectId
+  tenantId: string | mongoose.Types.ObjectId,
+  bookingId: string | mongoose.Types.ObjectId
 ): Promise<any> {
   const data = await getBooking360(tenantId, bookingId);
   if (!data) return null;

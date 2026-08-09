@@ -48,7 +48,7 @@ export default function Vehicle360({ onViewChange }: Vehicle360Props) {
   const [selectedTab, setSelectedTab] = useState<"overview" | "fleet" | "gps" | "performance" | "compliance" | "maintenance" | "fuel" | "alerts">("overview");
 
   // Fetch vehicle data
-  const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery({
+  const { data: vehicles = [], isLoading: vehiclesLoading } = useQuery<any[]>({
     queryKey: ["/api/vehicles"],
     enabled: canViewVehicles(),
   });

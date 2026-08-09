@@ -23,8 +23,8 @@ export interface ItineraryDayPlan {
 }
 
 export interface CreateItineraryInput {
-  tenantId: mongoose.Types.ObjectId;
-  bookingId: mongoose.Types.ObjectId;
+  tenantId: string | mongoose.Types.ObjectId;
+  bookingId: string | mongoose.Types.ObjectId;
   title: string;
   tripStartDate: Date;
   tripEndDate: Date;
@@ -127,8 +127,8 @@ export async function createItinerary(input: CreateItineraryInput): Promise<IIti
  * Prevents silent overwrites by maintaining previous versions
  */
 export async function updateItinerary(
-  tenantId: mongoose.Types.ObjectId,
-  bookingId: mongoose.Types.ObjectId,
+  tenantId: string | mongoose.Types.ObjectId,
+  bookingId: string | mongoose.Types.ObjectId,
   updates: UpdateItineraryInput
 ): Promise<IItinerary> {
   const itinerary = await Itinerary.findOne({
@@ -216,8 +216,8 @@ export async function updateItinerary(
  * Record approval history
  */
 export async function approveItinerary(
-  tenantId: mongoose.Types.ObjectId,
-  bookingId: mongoose.Types.ObjectId,
+  tenantId: string | mongoose.Types.ObjectId,
+  bookingId: string | mongoose.Types.ObjectId,
   newStatus: 'discussed' | 'approved' | 'final',
   approvedBy: { userId: string; userName: string }
 ): Promise<IItinerary> {
@@ -265,8 +265,8 @@ export async function approveItinerary(
  * Get itinerary for a booking
  */
 export async function getItinerary(
-  tenantId: mongoose.Types.ObjectId,
-  bookingId: mongoose.Types.ObjectId
+  tenantId: string | mongoose.Types.ObjectId,
+  bookingId: string | mongoose.Types.ObjectId
 ): Promise<IItinerary | null> {
   return Itinerary.findOne({
     tenantId,
@@ -279,8 +279,8 @@ export async function getItinerary(
  * Get all versions of an itinerary (for audit trail)
  */
 export async function getItineraryVersions(
-  tenantId: mongoose.Types.ObjectId,
-  bookingId: mongoose.Types.ObjectId
+  tenantId: string | mongoose.Types.ObjectId,
+  bookingId: string | mongoose.Types.ObjectId
 ): Promise<any[]> {
   const itinerary = await Itinerary.findOne({ tenantId, bookingId });
 
@@ -316,8 +316,8 @@ export async function getItineraryVersions(
  * Archive an itinerary (soft delete)
  */
 export async function archiveItinerary(
-  tenantId: mongoose.Types.ObjectId,
-  bookingId: mongoose.Types.ObjectId,
+  tenantId: string | mongoose.Types.ObjectId,
+  bookingId: string | mongoose.Types.ObjectId,
   reason?: string
 ): Promise<IItinerary> {
   const itinerary = await Itinerary.findOne({ tenantId, bookingId });
@@ -444,8 +444,8 @@ function calculateTotalDays(startDate: Date, endDate: Date): number {
  * Called whenever itinerary is created/updated/approved
  */
 export async function syncItineraryToTimeline(
-  tenantId: mongoose.Types.ObjectId,
-  bookingId: mongoose.Types.ObjectId,
+  tenantId: string | mongoose.Types.ObjectId,
+  bookingId: string | mongoose.Types.ObjectId,
   itinerary: IItinerary,
   action: 'created' | 'updated' | 'approved'
 ): Promise<void> {

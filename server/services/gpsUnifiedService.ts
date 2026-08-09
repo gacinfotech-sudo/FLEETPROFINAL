@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
  */
 
 export async function getGPSUnifiedDashboard(
-  tenantId: mongoose.Types.ObjectId
+  tenantId: string | mongoose.Types.ObjectId
 ): Promise<any> {
   const activeBookings = await Booking.find({
     tenantId,
@@ -28,8 +28,8 @@ export async function getGPSUnifiedDashboard(
 }
 
 export async function getVehicleTrack(
-  tenantId: mongoose.Types.ObjectId,
-  vehicleId: mongoose.Types.ObjectId,
+  tenantId: string | mongoose.Types.ObjectId,
+  vehicleId: string | mongoose.Types.ObjectId,
   hoursBack: number = 24
 ): Promise<any[]> {
   return [];

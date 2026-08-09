@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
  */
 
 export async function getPaymentTimeline(
-  tenantId: mongoose.Types.ObjectId,
+  tenantId: string | mongoose.Types.ObjectId,
   startDate?: Date,
   endDate?: Date
 ): Promise<any> {
@@ -21,7 +21,7 @@ export async function getPaymentTimeline(
   const timeline = invoices.map(i => ({
     type: 'invoice',
     date: i.createdAt,
-    description: `Invoice to ${i.customerName}`,
+    description: `Invoice to ${(i as any).customerSnapshot?.name ?? 'customer'}`,
     amount: i.totalAmount,
     reference: i.invoiceNumber
   }));
@@ -36,8 +36,8 @@ export async function getPaymentTimeline(
 }
 
 export async function getCustomerPaymentStatus(
-  tenantId: mongoose.Types.ObjectId,
-  customerId: mongoose.Types.ObjectId
+  tenantId: string | mongoose.Types.ObjectId,
+  customerId: string | mongoose.Types.ObjectId
 ): Promise<any> {
   const invoices = await Invoice.find({ tenantId, customerId });
   const totalInvoiced = invoices.reduce((s: number, i: any) => s + (i.totalAmount || 0), 0);

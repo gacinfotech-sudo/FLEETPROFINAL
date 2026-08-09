@@ -10,6 +10,9 @@ interface SidebarProps {
   onViewChange: (view: string) => void;
   isOpen: boolean;
   onToggle: () => void;
+  // Customer chosen from the sidebar's global customer search — optional so
+  // shells without a customer pane can omit it.
+  onSelectCustomer?: (customerId: string) => void;
 }
 
 const icons = {

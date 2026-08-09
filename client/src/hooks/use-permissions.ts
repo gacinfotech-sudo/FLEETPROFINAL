@@ -28,6 +28,10 @@ export function usePermissions() {
   const canCreateBooking = () => hasPermission('create_booking');
   const canEditBooking = () => hasPermission('edit_booking');
   const canDeleteBooking = () => hasPermission('delete_booking');
+  // Restored — trip-cost-summary depends on these (dropped in the
+  // permission-hook rewrite).
+  const canViewTripProfitability = () => hasPermission('trip.profitability.view');
+  const canApproveExpense = () => hasPermission('expense.approve');
   const canGenerateInvoice = () => hasPermission('generate_invoice');
   const canViewBookings = () => hasPermission('view_bookings');
   const canViewRevenue = () => hasPermission('view_revenue');
@@ -63,6 +67,8 @@ export function usePermissions() {
     canCreateBooking,
     canEditBooking,
     canDeleteBooking,
+    canViewTripProfitability,
+    canApproveExpense,
     canGenerateInvoice,
     canViewBookings,
     canViewRevenue,

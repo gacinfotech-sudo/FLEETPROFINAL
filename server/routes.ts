@@ -2195,7 +2195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid customer ID" });
       }
 
-      const { getCustomer360 } = await import("../services/customer360Service");
+      const { getCustomer360 } = await import("./services/customer360Service");
 
       const customer360 = await getCustomer360(req.tenantId!, new mongoose.Types.ObjectId(customerId));
 
@@ -2219,7 +2219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid customer ID" });
       }
 
-      const { getCustomer360KPISummary } = await import("../services/customer360Service");
+      const { getCustomer360KPISummary } = await import("./services/customer360Service");
 
       const kpis = await getCustomer360KPISummary(req.tenantId!, new mongoose.Types.ObjectId(customerId));
 
@@ -2243,7 +2243,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid customer ID" });
       }
 
-      const { getCustomer360, getCustomer360QuickActions } = await import("../services/customer360Service");
+      const { getCustomer360, getCustomer360QuickActions } = await import("./services/customer360Service");
 
       const customer360 = await getCustomer360(req.tenantId!, new mongoose.Types.ObjectId(customerId));
 
@@ -2268,7 +2268,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid booking ID" });
       }
 
-      const { getBooking360 } = await import("../services/booking360Service");
+      const { getBooking360 } = await import("./services/booking360Service");
 
       const booking360 = await getBooking360(req.tenantId!, new mongoose.Types.ObjectId(bookingId));
 
@@ -2292,7 +2292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid booking ID" });
       }
 
-      const { getBooking360KPISummary } = await import("../services/booking360Service");
+      const { getBooking360KPISummary } = await import("./services/booking360Service");
 
       const kpis = await getBooking360KPISummary(req.tenantId!, new mongoose.Types.ObjectId(bookingId));
 
@@ -2316,7 +2316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid booking ID" });
       }
 
-      const { getBooking360, getBooking360QuickActions } = await import("../services/booking360Service");
+      const { getBooking360, getBooking360QuickActions } = await import("./services/booking360Service");
 
       const booking360 = await getBooking360(req.tenantId!, new mongoose.Types.ObjectId(bookingId));
 
@@ -2346,7 +2346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid driver ID" });
       }
 
-      const { getDriver360 } = await import("../services/driver360Service");
+      const { getDriver360 } = await import("./services/driver360Service");
 
       const driver360 = await getDriver360(req.tenantId!, new mongoose.Types.ObjectId(driverId));
 
@@ -2370,7 +2370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid driver ID" });
       }
 
-      const { getDriver360KPISummary } = await import("../services/driver360Service");
+      const { getDriver360KPISummary } = await import("./services/driver360Service");
 
       const kpis = await getDriver360KPISummary(req.tenantId!, new mongoose.Types.ObjectId(driverId));
 
@@ -2394,7 +2394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid driver ID" });
       }
 
-      const { getDriver360, getDriver360QuickActions } = await import("../services/driver360Service");
+      const { getDriver360, getDriver360QuickActions } = await import("./services/driver360Service");
 
       const driver360 = await getDriver360(req.tenantId!, new mongoose.Types.ObjectId(driverId));
 
@@ -3549,7 +3549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Missing required itinerary fields" });
       }
 
-      const { createItinerary } = await import("../services/itineraryService");
+      const { createItinerary } = await import("./services/itineraryService");
 
       const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
@@ -3596,7 +3596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/bookings/:id/itinerary", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { id: bookingId } = req.params;
-      const { getItinerary } = await import("../services/itineraryService");
+      const { getItinerary } = await import("./services/itineraryService");
 
       const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
@@ -3620,7 +3620,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id: bookingId } = req.params;
       const updates = req.body;
 
-      const { updateItinerary } = await import("../services/itineraryService");
+      const { updateItinerary } = await import("./services/itineraryService");
 
       const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
@@ -3646,7 +3646,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid status" });
       }
 
-      const { approveItinerary } = await import("../services/itineraryService");
+      const { approveItinerary } = await import("./services/itineraryService");
 
       const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
@@ -3669,7 +3669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/bookings/:id/itinerary/versions", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { id: bookingId } = req.params;
-      const { getItineraryVersions } = await import("../services/itineraryService");
+      const { getItineraryVersions } = await import("./services/itineraryService");
 
       const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
@@ -3687,7 +3687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/bookings/:id/itinerary/customer-view", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { id: bookingId } = req.params;
-      const { getItinerary, formatItineraryForCustomer } = await import("../services/itineraryService");
+      const { getItinerary, formatItineraryForCustomer } = await import("./services/itineraryService");
 
       const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
@@ -3710,7 +3710,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/bookings/:id/itinerary/driver-view", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { id: bookingId } = req.params;
-      const { getItinerary, formatItineraryForDriver } = await import("../services/itineraryService");
+      const { getItinerary, formatItineraryForDriver } = await import("./services/itineraryService");
 
       const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
@@ -3735,7 +3735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id: bookingId } = req.params;
       const { reason } = req.body;
 
-      const { archiveItinerary } = await import("../services/itineraryService");
+      const { archiveItinerary } = await import("./services/itineraryService");
 
       const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
@@ -8218,7 +8218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Live Operations Dashboard - Detailed operational status
   app.get("/api/operations/live", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const { buildLiveOperations } = await import("../services/liveOperations");
+      const { buildLiveOperations } = await import("./services/liveOperations");
       const bookings = await Booking.find({ tenantId: req.tenantId }).lean();
       const liveOps = buildLiveOperations(bookings, new Date());
       res.json(liveOps);
@@ -8228,24 +8228,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Driver Performance Dashboard
+  // Driver Performance Dashboard — same derivation as the canonical
+  // /api/reports/driver-performance (pure builder over fetched bookings;
+  // the builder takes data, never a tenant id).
   app.get("/api/drivers/performance", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const { buildDriverPerformance } = await import("../services/driverPerformance");
-      const performance = await buildDriverPerformance(req.tenantId!);
-      res.json(performance);
+      const { buildDriverPerformance } = await import("./services/driverPerformance");
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const bookings = await storage.getBookingsByTenant(req.tenantId!);
+      res.json(buildDriverPerformance(bookings, monthStart, monthEnd));
     } catch (error: any) {
       console.error('Driver performance error:', error?.message);
       res.status(500).json({ message: "Failed to fetch performance data" });
     }
   });
 
-  // Vehicle Performance Dashboard
+  // Vehicle Performance Dashboard — mirrors /api/reports/vehicle-performance.
   app.get("/api/vehicles/performance", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const { buildVehiclePerformance } = await import("../services/vehiclePerformance");
-      const performance = await buildVehiclePerformance(req.tenantId!);
-      res.json(performance);
+      const { buildVehiclePerformance } = await import("./services/vehiclePerformance");
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      const [bookings, expenses, vehicles] = await Promise.all([
+        storage.getBookingsByTenant(req.tenantId!),
+        storage.getExpensesByTenant(req.tenantId!),
+        storage.getVehiclesByTenant(req.tenantId!),
+      ]);
+      res.json(buildVehiclePerformance(bookings, expenses, vehicles, monthStart, monthEnd));
     } catch (error: any) {
       console.error('Vehicle performance error:', error?.message);
       res.status(500).json({ message: "Failed to fetch performance data" });
@@ -8289,22 +8301,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Compliance Dashboard - All vehicles' compliance status
   app.get("/api/fleet/compliance", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const vehicles = await Vehicle.find({ tenantId: req.tenantId, isDeleted: { $ne: true } });
+      // Compliance dates live on VehicleDocument records — own-fleet
+      // Vehicles carry no expiry fields (the previous version read
+      // invented properties and reported every vehicle compliant).
+      const { VehicleDocument } = await import("./vehicle/documents/models/vehicleDocument");
+      const vehicles = await storage.getVehiclesByTenant(req.tenantId!);
+      const docs: any[] = await VehicleDocument.find({ tenantId: req.tenantId })
+        .select('vehicleId documentType expiryDate').lean();
       const now = new Date();
-
-      const compliance = vehicles.map((v: any) => ({
-        vehicleId: v._id,
-        registrationNumber: v.registrationNumber,
-        status: v.status,
-        registration: { valid: !v.registrationExpiry || new Date(v.registrationExpiry) > now, expiry: v.registrationExpiry },
-        insurance: { valid: !v.insuranceExpiry || new Date(v.insuranceExpiry) > now, expiry: v.insuranceExpiry },
-        pollution: { valid: !v.pollutionExpiry || new Date(v.pollutionExpiry) > now, expiry: v.pollutionExpiry },
-        fitness: { valid: !v.fitnessExpiry || new Date(v.fitnessExpiry) > now, expiry: v.fitnessExpiry },
-        allCompliant: (!v.registrationExpiry || new Date(v.registrationExpiry) > now) &&
-                      (!v.insuranceExpiry || new Date(v.insuranceExpiry) > now) &&
-                      (!v.pollutionExpiry || new Date(v.pollutionExpiry) > now) &&
-                      (!v.fitnessExpiry || new Date(v.fitnessExpiry) > now)
-      }));
+      const byVehicle = new Map<string, Map<string, Date | null>>();
+      for (const d of docs) {
+        const vk = String(d.vehicleId);
+        if (!byVehicle.has(vk)) byVehicle.set(vk, new Map());
+        const m = byVehicle.get(vk)!;
+        const cur = d.expiryDate ? new Date(d.expiryDate) : null;
+        const prev = m.get(d.documentType);
+        if (prev === undefined || (cur && (!prev || cur > prev))) m.set(d.documentType, cur);
+      }
+      // valid: true | false | null (null = no document on record — unknown)
+      const check = (vk: string, type: string) => {
+        const exp = byVehicle.get(vk)?.get(type);
+        return { valid: exp === undefined ? null : exp ? exp > now : null, expiry: exp ?? null };
+      };
+      const compliance = vehicles.map((v: any) => {
+        const vk = String(v._id);
+        const parts = {
+          registration: check(vk, 'rc'),
+          insurance: check(vk, 'insurance'),
+          pollution: check(vk, 'puc'),
+          fitness: check(vk, 'fitness'),
+        };
+        return {
+          vehicleId: v._id,
+          registrationNumber: v.licensePlate ?? null,
+          status: v.status,
+          ...parts,
+          allCompliant: Object.values(parts).every((p) => p.valid !== false),
+        };
+      });
 
       res.json({
         totalVehicles: vehicles.length,

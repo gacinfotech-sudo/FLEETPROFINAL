@@ -13,8 +13,8 @@ const ROLE_HIERARCHY = {
 };
 
 export async function getUser360(
-  tenantId: mongoose.Types.ObjectId,
-  userId: mongoose.Types.ObjectId
+  tenantId: string | mongoose.Types.ObjectId,
+  userId: string | mongoose.Types.ObjectId
 ): Promise<any | null> {
   const user = await User.findOne({ _id: userId, tenantId, isDeleted: { $ne: true } });
   if (!user) return null;
@@ -23,10 +23,10 @@ export async function getUser360(
   const roleConfig = ROLE_HIERARCHY[user.role as keyof typeof ROLE_HIERARCHY] || { displayName: user.role, permissions: [] };
 
   return {
-    user: { id: user._id, email: user.email, name: user.firstName + ' ' + (user.lastName || ''), role: user.role, status: user.status },
+    user: { id: user._id, userId: user.userId, name: user.name || user.userId, role: user.role, status: user.isActive === false ? 'inactive' : 'active' },
     roleInfo: { roleName: roleConfig.displayName, permissions: roleConfig.permissions },
     bookingsManaged: bookings.length,
-    alerts: user.status === 'suspended' ? [{ type: 'account', message: 'Account suspended', severity: 'high' }] : []
+    alerts: user.isActive === false ? [{ type: 'account', message: 'Account deactivated', severity: 'high' }] : []
   };
 }
 
@@ -38,7 +38,7 @@ export function getAllRoles() {
   return Object.entries(ROLE_HIERARCHY).map(([key, value]) => ({ id: key, name: value.displayName, permissions: value.permissions }));
 }
 
-export async function checkPermission(tenantId: mongoose.Types.ObjectId, userId: mongoose.Types.ObjectId, permission: string): Promise<boolean> {
+export async function checkPermission(tenantId: string | mongoose.Types.ObjectId, userId: string | mongoose.Types.ObjectId, permission: string): Promise<boolean> {
   const user = await User.findOne({ _id: userId, tenantId });
   if (!user) return false;
   const role = ROLE_HIERARCHY[user.role as keyof typeof ROLE_HIERARCHY];
