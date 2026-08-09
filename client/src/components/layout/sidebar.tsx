@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Car, BarChart3, Calendar, Users, History, TrendingUp, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks, Building2, ChevronDown, ChevronRight, Gift, ListFilter, Satellite, UserRoundPlus, Users2 , KeySquare } from "lucide-react";
+import { Car, BarChart3, Calendar, Users, History, TrendingUp, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, PhoneIncoming, GitBranch, ListChecks, Building2, ChevronDown, ChevronRight, Gift, ListFilter, Satellite, UserRoundPlus, Users2, KeySquare, MapPin, AlertCircle, FileText, Repeat2, DollarSign } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -20,54 +20,78 @@ interface SidebarProps {
 // `group` is purely a sidebar-presentation grouping — it does not change
 // an item's id, route, permission flags, or the page component it renders.
 //
+// WAVE 1: Section-wise consolidation (2026-08-09)
+// Dashboard → Customers (inquiries/leads/followups) → Bookings (all booking ops)
+// → Drivers → Fleet → Vendors → Finance/Payments → Communication → Admin
+//
 // MANDATED PRIMARY ORDER (see docs/final-ui report): Dashboard, then
-// Customers (All Customers / Add Customer), then Bookings. Future modules
-// must be appended AFTER the Bookings group, never between Dashboard and
-// Bookings — there is a permanent e2e regression for this order
-// (tests/e2e/ui-shell-redesign.spec.ts).
+// Customers, then Bookings. These three must remain in this order to avoid
+// e2e regression (tests/e2e/ui-shell-redesign.spec.ts).
 const navItems = [
+  // DASHBOARD
   { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-  { id: "customers", label: "All Customers", icon: Contact, group: "customers" },
+
+  // CUSTOMERS: All customer-related operations (inquiries, leads, followups, self-drive)
+  { id: "customers", label: "Customer Database", icon: Contact, group: "customers" },
   { id: "customers-add", label: "Add Customer", icon: UserRoundPlus, group: "customers" },
-  { id: "self-drive", label: "Self Drive", icon: KeySquare, group: "customers" },
-  { id: "bookings", label: "Add Booking", icon: Calendar, group: "bookings" },
+  { id: "inquiries", label: "Inquiries", icon: PhoneIncoming, group: "customers" },
+  { id: "leads", label: "Leads", icon: GitBranch, group: "customers" },
+  { id: "followups", label: "Follow-ups", icon: ListChecks, group: "customers" },
+  { id: "self-drive", label: "Self Drive Bookings", icon: KeySquare, group: "customers" },
+  { id: "after-sales", label: "After-Sales", icon: HeartHandshake, group: "customers", restrictedForManagers: true },
+  { id: "campaigns", label: "Campaigns", icon: Megaphone, group: "customers", restrictedForManagers: true },
+  { id: "rewards-referrals", label: "Rewards & Referrals", icon: Gift, group: "customers", restrictedForManagers: true },
+
+  // BOOKINGS: All booking-related operations (create, view, schedule, payment)
+  { id: "bookings", label: "Create Booking", icon: Calendar, group: "bookings" },
   { id: "live-bookings", label: "Live Bookings", icon: Radio, group: "bookings" },
   { id: "live-operations", label: "Vehicles on Booking", icon: Car, group: "bookings" },
   { id: "upcoming-bookings", label: "Upcoming Bookings", icon: CalendarClock, group: "bookings" },
   { id: "booking-queues", label: "Booking Queues", icon: ListFilter, group: "bookings" },
-  { id: "payment-dues", label: "Payment Collection", icon: Wallet, group: "bookings" },
   { id: "history", label: "Booking History", icon: History, group: "bookings" },
-  { id: "inquiries", label: "Inquiries", icon: PhoneIncoming },
-  { id: "leads", label: "Leads", icon: GitBranch },
-  { id: "followups", label: "Follow-ups", icon: ListChecks },
+  { id: "payment-dues", label: "Payment Collection", icon: Wallet, group: "bookings" },
+
+  // DRIVERS: All driver-related operations (schedule, duties, compliance, performance)
   // Every driver-related destination lives inside this ONE group — never
   // add a driver-* item outside it (that re-creates the scattered-sidebar
   // problem this grouping removed; see docs/final-ui driver report).
-  { id: "drivers", label: "All Drivers", icon: Users, group: "drivers", restrictedForManagers: true },
+  { id: "drivers", label: "Driver Database", icon: Users, group: "drivers", restrictedForManagers: true },
   { id: "drivers-add", label: "Add Driver", icon: UserRoundPlus, group: "drivers", restrictedForManagers: true },
   { id: "driver-attendance", label: "Attendance", icon: ClipboardCheck, group: "drivers", restrictedForManagers: true },
   { id: "driver-leave", label: "Leave Calendar", icon: UserX, group: "drivers", restrictedForManagers: true },
   { id: "driver-performance", label: "Performance", icon: Gauge, group: "drivers", restrictedForManagers: true },
-  { id: "fleet", label: "View Fleet", icon: Car },
-  { id: "gps-tracking", label: "GPS Tracking", icon: Satellite },
-  { id: "vehicle-performance", label: "Vehicle Performance", icon: Wrench, restrictedForManagers: true },
-  { id: "after-sales", label: "After-Sales", icon: HeartHandshake, restrictedForManagers: true },
-  { id: "campaigns", label: "Campaigns", icon: Megaphone, restrictedForManagers: true },
-  { id: "rewards-referrals", label: "Rewards & Referrals", icon: Gift, restrictedForManagers: true },
-  { id: "vendors", label: "Vendors", icon: Building2, restrictedForManagers: true },
-  { id: "revenue", label: "Revenue Report", icon: TrendingUp, restrictedForManagers: true },
-  { id: "vendor-settlement", label: "Vendor Settlement", icon: Building2, restrictedForManagers: true },
-  { id: "expenses", label: "Manage Expenses", icon: ReceiptIcon },
-  { id: "salary", label: "Salary", icon: Banknote },
-  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
-  { id: "users", label: "Manage Users", icon: UserPlus, adminOnly: true },
-  { id: "profile", label: "Profile", icon: Shield },
+
+  // FLEET: All vehicle and fleet operations (vehicles, GPS, maintenance, fuel)
+  { id: "fleet", label: "Fleet Overview", icon: Car, group: "fleet" },
+  { id: "gps-tracking", label: "GPS Tracking", icon: Satellite, group: "fleet" },
+  { id: "vehicle-performance", label: "Vehicle Performance", icon: Wrench, group: "fleet", restrictedForManagers: true },
+
+  // VENDORS: All vendor-related operations (vendor mgmt, rates, settlements)
+  { id: "vendors", label: "Vendors", icon: Building2, group: "vendors", restrictedForManagers: true },
+  { id: "vendor-settlement", label: "Vendor Settlement", icon: Repeat2, group: "vendors", restrictedForManagers: true },
+
+  // FINANCE/PAYMENTS: All financial operations (revenue, expenses, salary)
+  { id: "revenue", label: "Revenue Report", icon: TrendingUp, group: "finance", restrictedForManagers: true },
+  { id: "expenses", label: "Manage Expenses", icon: ReceiptIcon, group: "finance" },
+  { id: "salary", label: "Salary", icon: Banknote, group: "finance" },
+
+  // COMMUNICATION: WhatsApp and messaging
+  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle, group: "communication" },
+
+  // ADMIN: User management and settings (adminOnly)
+  { id: "users", label: "Manage Users", icon: UserPlus, group: "admin", adminOnly: true },
+  { id: "profile", label: "Profile", icon: Shield, group: "admin" },
 ];
 
 const NAV_GROUPS: Record<string, { label: string; icon: typeof Calendar }> = {
   customers: { label: "Customers", icon: Users2 },
   bookings: { label: "Bookings", icon: Calendar },
   drivers: { label: "Drivers", icon: Users },
+  fleet: { label: "Fleet", icon: Car },
+  vendors: { label: "Vendors", icon: Building2 },
+  finance: { label: "Finance / Payments", icon: DollarSign },
+  communication: { label: "Communication", icon: MessageCircle },
+  admin: { label: "Admin", icon: Shield },
 };
 
 // Identical markup/behavior shared by top-level and grouped items so the
@@ -110,9 +134,13 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle, o
   const { logout, user } = useAuth();
   // Customers and Bookings start expanded — they are the primary
   // operational functions and must be visible without an extra click.
-  // Drivers starts collapsed to keep the sidebar compact (it has five
-  // children); an active driver child still forces it open below.
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set(["drivers"]));
+  // Other groups start collapsed to keep the sidebar compact; an active
+  // child still forces its parent open (see below).
+  // WAVE 1: Start Customers, Bookings expanded. Drivers, Fleet, Vendors,
+  // Finance, Communication collapsed. Admin hidden until needed.
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
+    new Set(["drivers", "fleet", "vendors", "finance", "communication", "admin"])
+  );
 
   // Filter navigation items based on user role
   const visibleNavItems = navItems.filter(item => {
