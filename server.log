@@ -9,8 +9,10 @@
 ✅ Using existing secure admin credentials
 🚨 Creating emergency admin user from environment variables
 ⚠️  Emergency admin user already exists
-12:49:26 AM [express] MongoDB connected - starting background job
+1:03:36 AM [express] MongoDB connected - starting background job
 [operations] booking-end reminder scheduler started (every 60000ms)
-12:49:26 AM [express] 🔒 serving HTTPS on 0.0.0.0:5050
-✅ Secure login: user=democlient, role=client, ip=127.0.0.1, time=2026-08-09T19:19:36.484Z
-12:49:36 AM [express] POST /api/auth/login 200 in 214ms :: {"user":{"id":"6a75ea6fc4ea664be337cc40","…
+1:03:36 AM [express] 🔒 serving HTTPS on 0.0.0.0:5050
+✅ Secure login: user=shyam_admin, role=admin, ip=127.0.0.1, time=2026-08-09T19:33:38.232Z
+1:03:38 AM [express] POST /api/auth/login 200 in 215ms :: {"user":{"id":"6a78c46c5139eb0eb260e251","…
+✅ Secure login: user=shyam.qa, role=admin, ip=127.0.0.1, time=2026-08-09T19:33:38.447Z
+1:03:38 AM [express] POST /api/auth/login 200 in 207ms :: {"user":{"id":"6a78c8726f1c464f49141542","…
