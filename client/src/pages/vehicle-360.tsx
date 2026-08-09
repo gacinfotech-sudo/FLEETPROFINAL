@@ -2,6 +2,7 @@ import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
+import Sidebar from "@/components/layout/sidebar";
 import { VehicleSummaryHeader } from "@/components/fleet/vehicle-360/summary-header";
 import { OverviewTab } from "@/components/fleet/vehicle-360/tabs/overview-tab";
 import { ComplianceTab } from "@/components/fleet/vehicle-360/tabs/compliance-tab";
@@ -48,59 +49,64 @@ export default function Vehicle360Page() {
   }
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 max-w-full overflow-x-hidden">
-      <div>
-        <h1 className="text-xl font-semibold truncate">{vehicle.make} {vehicle.vehicleModel} — {vehicle.licensePlate ?? 'No plate'}</h1>
-        <p className="text-sm text-muted-foreground">Vehicle 360</p>
-      </div>
+    <div className="flex h-screen bg-background">
+      <Sidebar />
+      <div className="flex-1 overflow-auto">
+        <div className="space-y-6 p-4 sm:p-6 max-w-full overflow-x-hidden">
+          <div>
+            <h1 className="text-xl font-semibold truncate">{vehicle.make} {vehicle.vehicleModel} — {vehicle.licensePlate ?? 'No plate'}</h1>
+            <p className="text-sm text-muted-foreground">Vehicle 360</p>
+          </div>
 
-      <VehicleSummaryHeader vehicle={vehicle} />
+          <VehicleSummaryHeader vehicle={vehicle} />
 
-      <Tabs defaultValue="overview" className="w-full">
-        <div className="overflow-x-auto">
-          <TabsList className="inline-flex w-max min-w-full sm:w-auto flex-nowrap">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="compliance">Documents & Compliance</TabsTrigger>
-            <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
-            <TabsTrigger value="inspections">Daily Inspections</TabsTrigger>
-            <TabsTrigger value="tyres">Tyres</TabsTrigger>
-            <TabsTrigger value="battery">Battery</TabsTrigger>
-            <TabsTrigger value="fuel">Fuel/CNG/EV</TabsTrigger>
-            <TabsTrigger value="expenses">Expenses</TabsTrigger>
-            <TabsTrigger value="fastag">FASTag/Toll</TabsTrigger>
-            <TabsTrigger value="gps">GPS & Telematics</TabsTrigger>
-            <TabsTrigger value="drivers">Driver Assignments</TabsTrigger>
-            <TabsTrigger value="bookings">Bookings & Trips</TabsTrigger>
-            <TabsTrigger value="handover">Handover & Return</TabsTrigger>
-            <TabsTrigger value="breakdowns">Breakdowns</TabsTrigger>
-            <TabsTrigger value="accidents">Accidents</TabsTrigger>
-            <TabsTrigger value="challans">Challans</TabsTrigger>
-            <TabsTrigger value="inventory">Accessories & Inventory</TabsTrigger>
-            <TabsTrigger value="profitability">Revenue & Profitability</TabsTrigger>
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-          </TabsList>
+          <Tabs defaultValue="overview" className="w-full">
+            <div className="overflow-x-auto">
+              <TabsList className="inline-flex w-max min-w-full sm:w-auto flex-nowrap">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="compliance">Documents & Compliance</TabsTrigger>
+                <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+                <TabsTrigger value="inspections">Daily Inspections</TabsTrigger>
+                <TabsTrigger value="tyres">Tyres</TabsTrigger>
+                <TabsTrigger value="battery">Battery</TabsTrigger>
+                <TabsTrigger value="fuel">Fuel/CNG/EV</TabsTrigger>
+                <TabsTrigger value="expenses">Expenses</TabsTrigger>
+                <TabsTrigger value="fastag">FASTag/Toll</TabsTrigger>
+                <TabsTrigger value="gps">GPS & Telematics</TabsTrigger>
+                <TabsTrigger value="drivers">Driver Assignments</TabsTrigger>
+                <TabsTrigger value="bookings">Bookings & Trips</TabsTrigger>
+                <TabsTrigger value="handover">Handover & Return</TabsTrigger>
+                <TabsTrigger value="breakdowns">Breakdowns</TabsTrigger>
+                <TabsTrigger value="accidents">Accidents</TabsTrigger>
+                <TabsTrigger value="challans">Challans</TabsTrigger>
+                <TabsTrigger value="inventory">Accessories & Inventory</TabsTrigger>
+                <TabsTrigger value="profitability">Revenue & Profitability</TabsTrigger>
+                <TabsTrigger value="timeline">Timeline</TabsTrigger>
+              </TabsList>
+            </div>
+
+            <TabsContent value="overview"><OverviewTab vehicle={vehicle} /></TabsContent>
+            <TabsContent value="compliance"><ComplianceTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="maintenance"><MaintenanceTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="inspections"><DailyInspectionsTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="tyres"><TyresTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="battery"><BatteryTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="fuel"><FuelTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="expenses"><ExpensesTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="fastag"><FastagTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="gps"><GpsTelematicsTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="drivers"><DriverAssignmentsTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="bookings"><BookingsTripsTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="handover"><HandoverReturnTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="breakdowns"><BreakdownsTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="accidents"><AccidentsTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="challans"><ChallansTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="inventory"><InventoryTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="profitability"><ProfitabilityTab vehicleId={vehicle._id} /></TabsContent>
+            <TabsContent value="timeline"><TimelineTab vehicleId={vehicle._id} /></TabsContent>
+          </Tabs>
         </div>
-
-        <TabsContent value="overview"><OverviewTab vehicle={vehicle} /></TabsContent>
-        <TabsContent value="compliance"><ComplianceTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="maintenance"><MaintenanceTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="inspections"><DailyInspectionsTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="tyres"><TyresTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="battery"><BatteryTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="fuel"><FuelTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="expenses"><ExpensesTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="fastag"><FastagTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="gps"><GpsTelematicsTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="drivers"><DriverAssignmentsTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="bookings"><BookingsTripsTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="handover"><HandoverReturnTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="breakdowns"><BreakdownsTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="accidents"><AccidentsTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="challans"><ChallansTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="inventory"><InventoryTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="profitability"><ProfitabilityTab vehicleId={vehicle._id} /></TabsContent>
-        <TabsContent value="timeline"><TimelineTab vehicleId={vehicle._id} /></TabsContent>
-      </Tabs>
+      </div>
     </div>
   );
 }
