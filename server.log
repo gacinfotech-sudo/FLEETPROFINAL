@@ -1428,3 +1428,2144 @@ User loaded by sessionId: {
 }
 User authenticated: { userId: 'ram', role: 'client' }
 1:10:33 AM [express] GET /api/root/support-access/status 403 in 15ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:10:48 AM [express] GET /api/operations/alerts 200 in 18ms :: []
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:10:48 AM [express] GET /api/root/support-access/status 403 in 13ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:10:55 AM [express] GET /api/leads 200 in 22ms :: {"rows":[{"createdBy":{"userId":"ram","role":"cli…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:10:58 AM [express] GET /api/followups 200 in 39ms :: [{"createdBy":{"userId":"ram","role":"client"…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:00 AM [express] GET /api/follow-ups 200 in 37ms :: [{"createdBy":{"userId":"ram","role":"client…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:03 AM [express] GET /api/root/support-access/status 403 in 14ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:03 AM [express] GET /api/campaigns 200 in 24ms :: [{"createdBy":{"userId":"ram","role":"client"…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:08 AM [express] GET /api/inquiries 200 in 23ms :: {"rows":[{"createdBy":{"userId":"ram","role":…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:10 AM [express] GET /api/operations/live-bookings 200 in 30ms :: {"generatedAt":"2026-08-09T19:…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:13 AM [express] GET /api/operations/upcoming-bookings 200 in 30ms :: [{"date":"2026-08-10","lab…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:14 AM [express] GET /api/bookings/queues/needs-attention 200 in 39ms :: {"items":[{"id":"6a77a2…
+1:11:14 AM [express] GET /api/bookings/queues/most-recent 200 in 39ms :: {"items":[{"id":"6a78d4f9f9…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:14 AM [express] GET /api/bookings/queues/follow-up-due 200 in 32ms :: {"items":[]}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:14 AM [express] GET /api/bookings/queues/tentative 200 in 27ms :: {"items":[]}
+1:11:14 AM [express] GET /api/bookings/queues/date-pending 200 in 36ms :: {"items":[{"id":"6a77a2622…
+1:11:14 AM [express] GET /api/bookings/queues/needs-attention 200 in 36ms :: {"items":[{"id":"6a77a2…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:18 AM [express] GET /api/operations/alerts 200 in 15ms :: []
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:18 AM [express] GET /api/root/support-access/status 403 in 13ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:48 AM [express] GET /api/operations/alerts 200 in 31ms :: []
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:48 AM [express] GET /api/root/support-access/status 403 in 10ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:59 AM [express] GET /api/auth/me 200 in 13ms :: {"user":{"id":"6a7617d841d6ae595bc7a113","userI…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:59 AM [express] GET /api/root/support-access/status 403 in 28ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:59 AM [express] GET /api/operations/alerts 200 in 64ms :: []
+1:11:59 AM [express] GET /api/operations/self-drive/kpis 200 in 64ms :: {"refundPendingCount":0,"ref…
+1:11:59 AM [express] GET /api/operations/live-vehicles 200 in 73ms :: {"generatedAt":"2026-08-09T19:…
+1:11:59 AM [express] GET /api/dashboard/overview 200 in 77ms :: {"periodDays":30,"kpis":{"revenue":{…
+1:11:59 AM [express] GET /api/dashboard/upcoming-bookings 200 in 76ms :: {"today":[{"_id":"6a783b691…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:59 AM [express] GET /api/operations/live-bookings 200 in 67ms :: {"generatedAt":"2026-08-09T19:…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:11:59 AM [express] GET /api/drivers 200 in 40ms :: [{"_id":"6a78d4f9f9e38cc57db73f4b","tenantId":"…
+1:11:59 AM [express] GET /api/vehicles 200 in 44ms :: [{"isDraft":false,"_id":"6a78d4f9f9e38cc57db73…
+1:11:59 AM [express] GET /api/users/sub-users 200 in 44ms :: [{"deviceInfo":{"userAgent":"Mozilla/5.…
+1:11:59 AM [express] GET /api/operations/upcoming-bookings 200 in 44ms :: [{"date":"2026-08-10","lab…
+1:11:59 AM [express] GET /api/bookings 200 in 47ms :: [{"_id":"6a78c8726f1c464f49141532","tenantId":…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:12:07 AM [express] GET /api/operations/live-bookings 200 in 27ms :: {"generatedAt":"2026-08-09T19:…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:12:14 AM [express] GET /api/root/support-access/status 403 in 13ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:12:29 AM [express] GET /api/root/support-access/status 403 in 18ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:12:29 AM [express] GET /api/operations/alerts 200 in 12ms :: []
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:12:44 AM [express] GET /api/root/support-access/status 403 in 15ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:12:47 AM [express] GET /api/vendors 200 in 22ms :: [{"createdBy":{"userId":"ram","role":"client"},…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:12:48 AM [express] GET /api/vendors/6a772c8d76d5775c1c69a70e 200 in 16ms :: {"createdBy":{"userId"…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:12:50 AM [express] GET /api/vendors/6a761d2f1090318e5018c39b 200 in 13ms :: {"createdBy":{"userId"…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:12:52 AM [express] GET /api/vendors/settlement 200 in 24ms :: {"vendors":[{"vendorName":"Indore se…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:13:29 AM [express] GET /api/root/support-access/status 403 in 25ms :: {"message":"Platform access …
+1:13:29 AM [express] GET /api/operations/alerts 200 in 30ms :: []
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:13:41 AM [express] GET /api/driver-leaves 200 in 19ms :: [{"requestedBy":{"userId":"ram","role":"c…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:13:44 AM [express] GET /api/root/support-access/status 403 in 15ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:13:54 AM [express] GET /api/auth/me 200 in 31ms :: {"user":{"id":"6a7617d841d6ae595bc7a113","userI…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:13:54 AM [express] GET /api/root/support-access/status 403 in 38ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:13:54 AM [express] GET /api/operations/alerts 200 in 44ms :: []
+1:13:54 AM [express] GET /api/operations/self-drive/kpis 200 in 44ms :: {"refundPendingCount":0,"ref…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:13:54 AM [express] GET /api/operations/live-vehicles 200 in 77ms :: {"generatedAt":"2026-08-09T19:…
+1:13:54 AM [express] GET /api/dashboard/overview 200 in 74ms :: {"periodDays":30,"kpis":{"revenue":{…
+1:13:54 AM [express] GET /api/dashboard/upcoming-bookings 200 in 74ms :: {"today":[{"_id":"6a783b691…
+1:13:54 AM [express] GET /api/vehicles 200 in 45ms :: [{"isDraft":false,"_id":"6a78d4f9f9e38cc57db73…
+1:13:54 AM [express] GET /api/drivers 200 in 39ms :: [{"_id":"6a78d4f9f9e38cc57db73f4b","tenantId":"…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:13:54 AM [express] GET /api/operations/live-bookings 200 in 65ms :: {"generatedAt":"2026-08-09T19:…
+1:13:54 AM [express] GET /api/users/sub-users 200 in 27ms :: [{"deviceInfo":{"userAgent":"Mozilla/5.…
+1:13:54 AM [express] GET /api/bookings 200 in 29ms :: [{"_id":"6a78c8726f1c464f49141532","tenantId":…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:14:40 AM [express] GET /api/auth/me 200 in 24ms :: {"user":{"id":"6a7617d841d6ae595bc7a113","userI…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:14:40 AM [express] GET /api/root/support-access/status 403 in 26ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:14:40 AM [express] GET /api/operations/alerts 200 in 38ms :: []
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:14:40 AM [express] GET /api/operations/live-vehicles 200 in 41ms :: {"generatedAt":"2026-08-09T19:…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:14:40 AM [express] GET /api/operations/self-drive/kpis 200 in 47ms :: {"refundPendingCount":0,"ref…
+1:14:40 AM [express] GET /api/dashboard/overview 200 in 50ms :: {"periodDays":30,"kpis":{"revenue":{…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:14:40 AM [express] GET /api/dashboard/upcoming-bookings 200 in 51ms :: {"today":[{"_id":"6a783b691…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:14:40 AM [express] GET /api/operations/live-bookings 200 in 52ms :: {"generatedAt":"2026-08-09T19:…
+1:14:40 AM [express] GET /api/vehicles 200 in 38ms :: [{"isDraft":false,"_id":"6a78d4f9f9e38cc57db73…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:14:40 AM [express] GET /api/drivers 200 in 49ms :: [{"_id":"6a78d4f9f9e38cc57db73f4b","tenantId":"…
+1:14:40 AM [express] GET /api/users/sub-users 200 in 38ms :: [{"deviceInfo":{"userAgent":"Mozilla/5.…
+1:14:40 AM [express] GET /api/bookings 200 in 47ms :: [{"_id":"6a78c8726f1c464f49141532","tenantId":…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:14:46 AM [express] GET /api/vendors 200 in 21ms :: [{"createdBy":{"userId":"ram","role":"client"},…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:07 AM [express] GET /api/auth/me 200 in 28ms :: {"user":{"id":"6a7617d841d6ae595bc7a113","userI…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:07 AM [express] GET /api/root/support-access/status 403 in 43ms :: {"message":"Platform access …
+1:15:07 AM [express] GET /api/operations/alerts 200 in 48ms :: []
+1:15:07 AM [express] GET /api/operations/self-drive/kpis 200 in 48ms :: {"refundPendingCount":0,"ref…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:08 AM [express] GET /api/operations/live-vehicles 200 in 62ms :: {"generatedAt":"2026-08-09T19:…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:08 AM [express] GET /api/dashboard/overview 200 in 73ms :: {"periodDays":30,"kpis":{"revenue":{…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:08 AM [express] GET /api/dashboard/upcoming-bookings 200 in 64ms :: {"today":[{"_id":"6a783b691…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:08 AM [express] GET /api/vehicles 200 in 43ms :: [{"isDraft":false,"_id":"6a78d4f9f9e38cc57db73…
+1:15:08 AM [express] GET /api/drivers 200 in 46ms :: [{"_id":"6a78d4f9f9e38cc57db73f4b","tenantId":"…
+1:15:08 AM [express] GET /api/operations/live-bookings 200 in 59ms :: {"generatedAt":"2026-08-09T19:…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:08 AM [express] GET /api/users/sub-users 200 in 34ms :: [{"deviceInfo":{"userAgent":"Mozilla/5.…
+1:15:08 AM [express] GET /api/bookings 200 in 49ms :: [{"_id":"6a78c8726f1c464f49141532","tenantId":…
+1:15:08 AM [express] GET /api/vendors 200 in 27ms :: [{"createdBy":{"userId":"ram","role":"client"},…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:09 AM [express] GET /api/vendors/settlement 200 in 33ms :: {"vendors":[{"vendorName":"Indore se…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:13 AM [express] GET /api/gps/vehicles/latest-states 200 in 36ms
+1:15:13 AM [express] GET /api/gps/connections 200 in 38ms :: [{"id":"6a76183e41d6ae595bc7a17f","conn…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:14 AM [express] GET /api/reports/vehicle-performance 200 in 34ms :: {"month":"2026-08","vehicle…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:23 AM [express] GET /api/root/support-access/status 403 in 17ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:38 AM [express] GET /api/operations/alerts 200 in 16ms :: []
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:38 AM [express] GET /api/root/support-access/status 403 in 10ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:15:53 AM [express] GET /api/root/support-access/status 403 in 19ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:16:08 AM [express] GET /api/operations/alerts 200 in 17ms :: []
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:16:08 AM [express] GET /api/root/support-access/status 403 in 16ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:16:23 AM [express] GET /api/root/support-access/status 403 in 24ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:16:24 AM [express] GET /api/auth/me 200 in 11ms :: {"user":{"id":"6a7617d841d6ae595bc7a113","userI…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:16:24 AM [express] GET /api/root/support-access/status 403 in 40ms :: {"message":"Platform access …
+1:16:24 AM [express] GET /api/operations/alerts 200 in 43ms :: []
+1:16:24 AM [express] GET /api/operations/self-drive/kpis 200 in 45ms :: {"refundPendingCount":0,"ref…
+1:16:24 AM [express] GET /api/operations/live-vehicles 200 in 52ms :: {"generatedAt":"2026-08-09T19:…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:16:24 AM [express] GET /api/dashboard/overview 200 in 72ms :: {"periodDays":30,"kpis":{"revenue":{…
+1:16:24 AM [express] GET /api/dashboard/upcoming-bookings 200 in 66ms :: {"today":[{"_id":"6a783b691…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:16:24 AM [express] GET /api/drivers 200 in 27ms :: [{"_id":"6a78d4f9f9e38cc57db73f4b","tenantId":"…
+1:16:24 AM [express] GET /api/operations/live-bookings 200 in 37ms :: {"generatedAt":"2026-08-09T19:…
+1:16:24 AM [express] GET /api/vehicles 200 in 33ms :: [{"isDraft":false,"_id":"6a78d4f9f9e38cc57db73…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+1:16:24 AM [express] GET /api/bookings 200 in 37ms :: [{"_id":"6a78c8726f1c464f49141532","tenantId":…
+1:16:24 AM [express] GET /api/users/sub-users 200 in 23ms :: [{"deviceInfo":{"userAgent":"Mozilla/5.…
+1:16:24 AM [express] GET /api/vendors 200 in 23ms :: [{"createdBy":{"userId":"ram","role":"client"},…

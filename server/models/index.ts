@@ -4135,4 +4135,72 @@ ItinerarySchema.pre('save', function (next) {
   next();
 });
 
+// VendorFinancialLedger
+export interface IVendorFinancialLedger extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  vendorId: mongoose.Types.ObjectId;
+  transactionType: 'service_charge' | 'commission' | 'payment' | 'refund';
+  amount: number;
+  dutyId?: mongoose.Types.ObjectId;
+  paymentMethod?: 'cash' | 'bank_transfer' | 'wallet';
+  status: 'pending' | 'completed';
+  notes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const VendorFinancialLedgerSchema = new Schema<IVendorFinancialLedger>({
+  tenantId: { type: Schema.Types.ObjectId, required: true },
+  vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  transactionType: { type: String, enum: ['service_charge', 'commission', 'payment', 'refund'], required: true },
+  amount: { type: Number, required: true },
+  dutyId: { type: Schema.Types.ObjectId, ref: 'VendorDuty' },
+  paymentMethod: { type: String, enum: ['cash', 'bank_transfer', 'wallet'] },
+  status: { type: String, enum: ['pending', 'completed'], default: 'pending' },
+  notes: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+VendorFinancialLedgerSchema.index({ tenantId: 1, vendorId: 1 });
+VendorFinancialLedgerSchema.index({ tenantId: 1, transactionType: 1 });
+VendorFinancialLedgerSchema.index({ dutyId: 1 });
+VendorFinancialLedgerSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const VendorFinancialLedger = mongoose.model<IVendorFinancialLedger>('VendorFinancialLedger', VendorFinancialLedgerSchema);
+
+// VendorRating
+export interface IVendorRating extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  vendorId: mongoose.Types.ObjectId;
+  customerId: mongoose.Types.ObjectId;
+  dutyId?: mongoose.Types.ObjectId;
+  rating: number;
+  timeliness: number;
+  vehicleCondition: number;
+  driverBehavior: number;
+  feedback?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const VendorRatingSchema = new Schema<IVendorRating>({
+  tenantId: { type: Schema.Types.ObjectId, required: true },
+  vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  customerId: { type: Schema.Types.ObjectId, ref: 'Customer', required: true },
+  dutyId: { type: Schema.Types.ObjectId, ref: 'VendorDuty' },
+  rating: { type: Number, min: 1, max: 5, required: true },
+  timeliness: { type: Number, min: 1, max: 5 },
+  vehicleCondition: { type: Number, min: 1, max: 5 },
+  driverBehavior: { type: Number, min: 1, max: 5 },
+  feedback: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+VendorRatingSchema.index({ tenantId: 1, vendorId: 1 });
+VendorRatingSchema.index({ tenantId: 1, customerId: 1 });
+VendorRatingSchema.index({ dutyId: 1 });
+VendorRatingSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const VendorRating = mongoose.model<IVendorRating>('VendorRating', VendorRatingSchema);
+
 export const Itinerary = mongoose.model<IItinerary>('Itinerary', ItinerarySchema);

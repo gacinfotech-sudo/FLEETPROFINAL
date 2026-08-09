@@ -63,7 +63,7 @@ import { buildPaymentDues } from "./services/paymentDues";
 import { whatsappProvider } from "./whatsapp/index";
 import { buildMessage, type MessageType } from "./whatsapp/templates";
 import { normalizeIndianPhone } from "./whatsapp/phone";
-import { WhatsAppMessage, Booking, VehicleType } from "./models/index";
+import { WhatsAppMessage, Booking, VehicleType, Vendor, VendorDriver, VendorVehicle, VendorSourcingRequest, VendorDuty, VendorFinancialLedger, VendorRating } from "./models/index";
 import { sendBookingMessage } from "./whatsapp/sendBookingMessage";
 import { buildCustomerTemplatePreviews, CUSTOMER_TEMPLATE_KEYS, type CustomerTemplateKey } from "./whatsapp/customerTemplates";
 import { findVehicleConflicts, checkDriverAvailability, combineDateTime } from "./services/availability";
@@ -8437,6 +8437,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Outstanding analysis error:', error?.message);
       res.status(500).json({ message: "Failed to fetch outstanding data" });
+    }
+  });
+
+  // ============ VENDOR ENDPOINTS ============
+
+  // Get all vendors
+  app.get("/api/vendors", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const vendors = await Vendor.find({ tenantId: req.tenantId }).sort({ createdAt: -1 });
+      res.json(vendors);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch vendors" });
+    }
+  });
+
+  // Get vendor by ID
+  app.get("/api/vendors/:id", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const vendor = await Vendor.findOne({ _id: new mongoose.Types.ObjectId(req.params.id), tenantId: req.tenantId });
+      if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+      res.json(vendor);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch vendor" });
+    }
+  });
+
+  // Get vendor drivers
+  app.get("/api/vendors/:id/drivers", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const drivers = await VendorDriver.find({ vendorId: new mongoose.Types.ObjectId(req.params.id), tenantId: req.tenantId });
+      res.json(drivers);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch vendor drivers" });
+    }
+  });
+
+  // Get vendor vehicles
+  app.get("/api/vendors/:id/vehicles", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const vehicles = await VendorVehicle.find({ vendorId: new mongoose.Types.ObjectId(req.params.id), tenantId: req.tenantId });
+      res.json(vehicles);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch vendor vehicles" });
+    }
+  });
+
+  // Get vendor sourcing requests
+  app.get("/api/vendors/:id/sourcing-requests", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const requests = await VendorSourcingRequest.find({ vendorId: new mongoose.Types.ObjectId(req.params.id), tenantId: req.tenantId });
+      res.json(requests);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch sourcing requests" });
+    }
+  });
+
+  // Get vendor duties
+  app.get("/api/vendors/:id/duties", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const duties = await VendorDuty.find({ vendorId: new mongoose.Types.ObjectId(req.params.id), tenantId: req.tenantId });
+      res.json(duties);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch vendor duties" });
+    }
+  });
+
+  // Get vendor financial ledger
+  app.get("/api/vendors/:id/ledger", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const ledger = await VendorFinancialLedger.find({ vendorId: new mongoose.Types.ObjectId(req.params.id), tenantId: req.tenantId });
+      res.json(ledger);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch financial ledger" });
+    }
+  });
+
+  // Get vendor ratings
+  app.get("/api/vendors/:id/ratings", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const ratings = await VendorRating.find({ vendorId: new mongoose.Types.ObjectId(req.params.id), tenantId: req.tenantId });
+      res.json(ratings);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch vendor ratings" });
     }
   });
 
