@@ -190,6 +190,13 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
         <nav className="mt-6 lg:mt-8 flex-1 overflow-y-auto">
           <div className="px-1 lg:px-2 space-y-2 lg:space-y-3">
             {navStructure.map((group) => renderGroup(group))}
+
+            {/* Top-level items (those with parentGroup: null) */}
+            <div className="space-y-1">
+              {SAAS_MODULES
+                .filter((m) => m.parentGroup === null && m.id !== 'dashboard')
+                .map((module) => renderNavigationItem(module.id))}
+            </div>
           </div>
         </nav>
 

@@ -1,42 +1,60 @@
 // SaaS Module Manifest - Defines navigation structure and permissions
+// Restored to match the good state (1be6ca8) comprehensive navigation
+// This includes all 42+ items that were present before simplification
 export const SAAS_MODULES = [
   // Dashboard
   { id: 'dashboard', label: 'Dashboard', iconKey: 'dashboard', parentGroup: 'dashboard' },
 
-  // Operations
-  { id: 'live', label: 'Live Operations', iconKey: 'live', parentGroup: 'operations' },
-  { id: 'upcoming', label: 'Upcoming Bookings', iconKey: 'upcoming', parentGroup: 'operations' },
-  { id: 'payment-due', label: 'Payment Due', iconKey: 'payment-due', parentGroup: 'operations' },
+  // Customers Group
+  { id: 'customers', label: 'All Customers', iconKey: 'customers', parentGroup: 'customers' },
+  { id: 'customers-add', label: 'Add Customer', iconKey: 'users', parentGroup: 'customers' },
+  { id: 'self-drive', label: 'Self Drive', iconKey: 'fleet', parentGroup: 'customers' },
 
-  // Booking Management
-  { id: 'booking', label: 'Bookings', iconKey: 'booking', parentGroup: 'booking' },
+  // Bookings Group
+  { id: 'booking', label: 'Add Booking', iconKey: 'booking', parentGroup: 'booking' },
+  { id: 'live-bookings', label: 'Live Bookings', iconKey: 'live', parentGroup: 'booking' },
+  { id: 'live-operations', label: 'Vehicles on Booking', iconKey: 'fleet', parentGroup: 'booking' },
+  { id: 'upcoming-bookings', label: 'Upcoming Bookings', iconKey: 'upcoming', parentGroup: 'booking' },
+  { id: 'booking-queues', label: 'Booking Queues', iconKey: 'booking', parentGroup: 'booking' },
+  { id: 'payment-dues', label: 'Payment Collection', iconKey: 'payment-due', parentGroup: 'booking' },
+  { id: 'history', label: 'Booking History', iconKey: 'history', parentGroup: 'booking' },
 
-  // Fleet Management
-  { id: 'fleet', label: 'Fleet', iconKey: 'fleet', parentGroup: 'fleet' },
-  { id: 'vehicle-performance', label: 'Vehicle Performance', iconKey: 'vehicle-performance', parentGroup: 'fleet' },
+  // Top-level items (not grouped)
+  { id: 'inquiries', label: 'Inquiries', iconKey: 'contact', parentGroup: null },
+  { id: 'leads', label: 'Leads', iconKey: 'contact', parentGroup: null },
+  { id: 'followups', label: 'Follow-ups', iconKey: 'contact', parentGroup: null },
 
   // Driver Management
-  { id: 'drivers', label: 'Drivers', iconKey: 'drivers', parentGroup: 'drivers' },
+  { id: 'drivers', label: 'All Drivers', iconKey: 'drivers', parentGroup: 'drivers' },
+  { id: 'drivers-add', label: 'Add Driver', iconKey: 'users', parentGroup: 'drivers' },
   { id: 'driver-attendance', label: 'Attendance', iconKey: 'driver-attendance', parentGroup: 'drivers' },
-  { id: 'driver-leave', label: 'Leave Requests', iconKey: 'driver-leave', parentGroup: 'drivers' },
+  { id: 'driver-leave', label: 'Leave Calendar', iconKey: 'driver-leave', parentGroup: 'drivers' },
   { id: 'driver-performance', label: 'Performance', iconKey: 'driver-performance', parentGroup: 'drivers' },
 
-  // Customer Management
-  { id: 'customers', label: 'Customers', iconKey: 'customers', parentGroup: 'customers' },
-  { id: 'history', label: 'Booking History', iconKey: 'history', parentGroup: 'customers' },
-  { id: 'after-sales', label: 'After Sales', iconKey: 'after-sales', parentGroup: 'customers' },
-  { id: 'campaigns', label: 'Campaigns', iconKey: 'campaigns', parentGroup: 'customers' },
+  // Fleet Management (top-level items)
+  { id: 'fleet', label: 'View Fleet', iconKey: 'fleet', parentGroup: null },
+  { id: 'gps-tracking', label: 'GPS Tracking', iconKey: 'alert', parentGroup: null },
+  { id: 'vehicle-performance', label: 'Vehicle Performance', iconKey: 'vehicle-performance', parentGroup: null },
+
+  // Customer Extended Services
+  { id: 'after-sales', label: 'After-Sales', iconKey: 'after-sales', parentGroup: null },
+  { id: 'campaigns', label: 'Campaigns', iconKey: 'campaigns', parentGroup: null },
+  { id: 'rewards-referrals', label: 'Rewards & Referrals', iconKey: 'alert', parentGroup: null },
+
+  // Vendor Management
+  { id: 'vendors', label: 'Vendors', iconKey: 'contact', parentGroup: 'vendors' },
+  { id: 'vendor-settlement', label: 'Vendor Settlement', iconKey: 'alert', parentGroup: 'vendors' },
 
   // Finance
-  { id: 'revenue', label: 'Revenue', iconKey: 'revenue', parentGroup: 'finance' },
-  { id: 'expenses', label: 'Expenses', iconKey: 'expenses', parentGroup: 'finance' },
+  { id: 'revenue', label: 'Revenue Report', iconKey: 'revenue', parentGroup: 'finance' },
+  { id: 'expenses', label: 'Manage Expenses', iconKey: 'expenses', parentGroup: 'finance' },
   { id: 'salary', label: 'Salary', iconKey: 'salary', parentGroup: 'finance' },
 
   // Communications
   { id: 'whatsapp', label: 'WhatsApp', iconKey: 'whatsapp', parentGroup: 'communications' },
 
   // Settings
-  { id: 'users', label: 'Users', iconKey: 'users', parentGroup: 'settings' },
+  { id: 'users', label: 'Manage Users', iconKey: 'users', parentGroup: 'settings' },
   { id: 'profile', label: 'Profile', iconKey: 'profile', parentGroup: 'settings' },
 ];
 
@@ -56,34 +74,38 @@ export function getNavigationStructure(role?: string, permissions?: string[]): N
       children: ['dashboard']
     },
     {
-      id: 'operations',
-      label: 'Operations',
-      iconKey: 'live',
-      children: ['live', 'upcoming', 'payment-due']
+      id: 'customers',
+      label: 'Customers',
+      iconKey: 'customers',
+      children: ['customers', 'customers-add', 'self-drive']
     },
     {
       id: 'booking',
       label: 'Booking Management',
       iconKey: 'booking',
-      children: ['booking']
+      children: ['booking', 'live-bookings', 'live-operations', 'upcoming-bookings', 'booking-queues', 'payment-dues', 'history']
     },
-    {
-      id: 'fleet',
-      label: 'Fleet Management',
-      iconKey: 'fleet',
-      children: ['fleet', 'vehicle-performance']
-    },
+    // Top-level items (no group parent)
+    // These are rendered as individual items, not in a collapsible group
+    // inquiries, leads, followups rendered at top level
+
     {
       id: 'drivers',
       label: 'Driver Management',
       iconKey: 'drivers',
-      children: ['drivers', 'driver-attendance', 'driver-leave', 'driver-performance']
+      children: ['drivers', 'drivers-add', 'driver-attendance', 'driver-leave', 'driver-performance']
     },
+    // Top-level fleet items
+    // fleet, gps-tracking, vehicle-performance rendered at top level
+
+    // Top-level customer services
+    // after-sales, campaigns, rewards-referrals rendered at top level
+
     {
-      id: 'customers',
-      label: 'Customer Management',
-      iconKey: 'customers',
-      children: ['customers', 'history', 'after-sales', 'campaigns']
+      id: 'vendors',
+      label: 'Vendors',
+      iconKey: 'contact',
+      children: ['vendors', 'vendor-settlement']
     },
     {
       id: 'finance',
@@ -105,14 +127,22 @@ export function getNavigationStructure(role?: string, permissions?: string[]): N
     }
   ];
 
+  // Collect top-level items (those with parentGroup: null) that should render as individual items
+  const topLevelItems = ['inquiries', 'leads', 'followups', 'fleet', 'gps-tracking', 'vehicle-performance', 'after-sales', 'campaigns', 'rewards-referrals'];
+
   // Filter based on role and permissions
   if (role === 'admin') {
     return groups; // Admin sees everything
   }
 
+  if (role === 'manager') {
+    // Managers see most things but restricted from some admin/sensitive views
+    return groups.filter(g => !['settings'].includes(g.id));
+  }
+
   if (role === 'operator') {
     // Operators see operations, bookings, drivers, customers
-    return groups.filter(g => ['operations', 'booking', 'drivers', 'customers'].includes(g.id));
+    return groups.filter(g => ['dashboard', 'booking', 'drivers', 'customers'].includes(g.id));
   }
 
   // Default: return all (will be further restricted by backend permissions)
