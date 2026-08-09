@@ -64,6 +64,14 @@ function AuthenticatedApp() {
       <Route path="/driver-login" component={DriverLoginPage} />
       <Route path="/driver" component={DriverPortalPage} />
 
+      {/* Vehicle 360 (TASK-VEHICLE-360-UI-06) — must come BEFORE /dashboard
+          to avoid being caught by dashboard's :section? param */}
+      <Route path="/vehicles/:vehicleId">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <Vehicle360Page />
+        </ProtectedRoute>
+      </Route>
+
       {/* Dashboard */}
       <Route path="/dashboard/:section?">
         <ProtectedRoute allowedRoles={["client", "manager"]}>
@@ -72,13 +80,6 @@ function AuthenticatedApp() {
           ) : (
             <Dashboard key={user?.userId} />
           )}
-        </ProtectedRoute>
-      </Route>
-      
-      {/* Vehicle 360 (TASK-VEHICLE-360-UI-06) */}
-      <Route path="/vehicles/:vehicleId">
-        <ProtectedRoute allowedRoles={["client", "manager"]}>
-          <Vehicle360Page />
         </ProtectedRoute>
       </Route>
 
