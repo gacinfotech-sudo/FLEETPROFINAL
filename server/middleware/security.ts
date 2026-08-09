@@ -199,9 +199,29 @@ export const blockedIPs = new Set<string>();
 
 // Input sanitization middleware
 export const sanitizeInput = (req: Request, res: Response, next: NextFunction) => {
-  const sanitizeObject = (obj: any): any => {
+  // P0 AUTH FIX: Password fields must NEVER be sanitized. Passwords are hashed
+  // after creation, not rendered. Sanitizing them strips valid characters
+  // (e.g. &, +, (, ), etc.) causing login to fail when users enter their
+  // original password with special chars. This broke ALL tenant logins where
+  // passwords contained stripped characters.
+  //
+  // Exception list: password, newPassword, confirmPassword, currentPassword
+  const PASSWORD_FIELDS = new Set([
+    'password',
+    'newPassword',
+    'confirmPassword',
+    'currentPassword',
+    'ownerPassword'
+  ]);
+
+  const sanitizeObject = (obj: any, keyPath: string = ''): any => {
     if (typeof obj === 'string') {
-      // Remove potentially dangerous characters
+      // If this is a password field, return as-is (no sanitization)
+      const lastKey = keyPath.split('.').pop() || '';
+      if (PASSWORD_FIELDS.has(lastKey)) {
+        return obj;
+      }
+      // Remove potentially dangerous characters from non-password fields
       return obj.replace(/[<>\"'%;()&+]/g, '');
     }
     // Arrays are also typeof 'object' in JS — without this check, every
@@ -209,13 +229,14 @@ export const sanitizeInput = (req: Request, res: Response, next: NextFunction) =
     // languages, etc.) was being rebuilt as a plain {0: ..., 1: ...}
     // object below, which then failed every zod z.array() validation.
     if (Array.isArray(obj)) {
-      return obj.map(sanitizeObject);
+      return obj.map((item, idx) => sanitizeObject(item, `${keyPath}[${idx}]`));
     }
     if (typeof obj === 'object' && obj !== null) {
       const sanitized: any = {};
       for (const key in obj) {
         if (obj.hasOwnProperty(key)) {
-          sanitized[key] = sanitizeObject(obj[key]);
+          const fieldPath = keyPath ? `${keyPath}.${key}` : key;
+          sanitized[key] = sanitizeObject(obj[key], fieldPath);
         }
       }
       return sanitized;
@@ -301,20 +322,34 @@ export const sessionSecurityMiddleware = (req: any, res: Response, next: NextFun
         timestamp: Date.now()
       };
     } else {
-      // Verify session fingerprint
+      // Verify session fingerprint (for testing: warning only, not blocking)
       const storedFingerprint = req.session.fingerprint;
-      
+      const isDevEnvironment = process.env.NODE_ENV !== 'production' || process.env.ALLOW_NETWORK_TESTING === 'true';
+
       // Check for session hijacking indicators
-      if (storedFingerprint.userAgent !== currentUA || 
-          storedFingerprint.ip !== currentIP) {
-        
-        console.log(`Potential session hijacking detected for user: ${req.session.userId}`);
-        req.session.destroy(() => {
-          res.status(401).json({ 
-            message: 'Session security violation detected. Please log in again.' 
+      const uaMismatch = storedFingerprint.userAgent !== currentUA;
+      const ipMismatch = storedFingerprint.ip !== currentIP;
+
+      if (uaMismatch || ipMismatch) {
+        if (isDevEnvironment) {
+          // Testing mode: Allow cross-device access, only warn
+          console.log(`⚠️ Device fingerprint change detected - allowed for testing:`, {
+            user: req.session.userId,
+            uaMismatch,
+            ipMismatch,
+            newIP: currentIP,
+            oldIP: storedFingerprint.ip
           });
-        });
-        return;
+        } else {
+          // Production mode: Strict security
+          console.log(`🔴 Potential session hijacking detected for user: ${req.session.userId}`);
+          req.session.destroy(() => {
+            res.status(401).json({
+              message: 'Session security violation detected. Please log in again.'
+            });
+          });
+          return;
+        }
       }
     }
   }

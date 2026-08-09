@@ -34,6 +34,9 @@ if (process.env.NODE_ENV === 'development') {
 }
 
 import path from "path";
+import fs from "fs";
+import https from "https";
+import { fileURLToPath } from "url";
 import express, { type Request, Response, NextFunction } from "express";
 import compression from "compression";
 import { registerRoutes, getSessionMiddleware } from "./routes";
@@ -50,6 +53,7 @@ import { startOperationsReminderScheduler, stopOperationsReminderScheduler } fro
 // route/error path runs. See docs/root-control-plane/ROOT-INTEGRATION-report.md.
 import { correlationIdMiddleware } from "./root/middleware/correlationId";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 // Trust only the known number of reverse-proxy hops. `true` trusts arbitrary
 // X-Forwarded-For input when the app is directly reachable, allowing an
@@ -246,13 +250,30 @@ app.use((req, res, next) => {
   const port = Number(process.env.PORT) || 5000;
   const host = process.env.HOST || "0.0.0.0";
 
-  // Use HTTP (SSL certs not available in this environment)
-  server.listen({
-    port,
-    host,
-  }, () => {
-    log(`serving HTTP on ${host}:${port}`);
-  });
+  // Use HTTPS if SSL certs exist, otherwise HTTP
+  const certPath = path.join(__dirname, '../ssl/cert.pem');
+  const keyPath = path.join(__dirname, '../ssl/key.pem');
+  const useSSL = fs.existsSync(certPath) && fs.existsSync(keyPath);
+
+  if (useSSL) {
+    const options = {
+      cert: fs.readFileSync(certPath),
+      key: fs.readFileSync(keyPath),
+    };
+    https.createServer(options, app).listen({
+      port,
+      host,
+    }, () => {
+      log(`🔒 serving HTTPS on ${host}:${port}`);
+    });
+  } else {
+    server.listen({
+      port,
+      host,
+    }, () => {
+      log(`serving HTTP on ${host}:${port}`);
+    });
+  }
 
   // P1 FIX: background job must not be re-registered on every 'connected'
   // event (e.g. reconnect after a network blip), which previously stacked
