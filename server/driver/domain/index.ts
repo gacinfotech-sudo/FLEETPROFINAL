@@ -24,4 +24,9 @@ export {
   deactivateEmploymentHistoryEntry,
   DriverNotFoundError as EmploymentHistoryDriverNotFoundError,
 } from './employmentHistoryService';
+export {
+  computeDriverCompleteness, registerCompletenessSection,
+  DriverNotFoundError as CompletenessDriverNotFoundError,
+} from './completenessService';
+export type { CompletenessSection, CompletenessSectionCheck, DriverCompleteness } from './completenessService';
 export { registerDriverDomainRoutes } from './routes';
