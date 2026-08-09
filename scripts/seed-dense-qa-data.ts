@@ -138,7 +138,18 @@ async function seedDrivers(ctx: SeederContext) {
   console.log('\n[Drivers]');
 
   const driverCount = 20;
-  const statuses = ['available', 'on_duty', 'inactive'];
+  const statuses = ['available', 'on_duty', 'inactive', 'suspended'];
+  const lifecycleStages = ['approved', 'active', 'on_leave', 'suspended', 'offboarding'];
+  const maritalStatuses = ['single', 'married', 'divorced', 'widowed'];
+  const languageOptions = [
+    ['Hindi', 'English'],
+    ['Hindi', 'English', 'Marathi'],
+    ['Hindi', 'English', 'Gujarati'],
+    ['Hindi', 'Marathi'],
+    ['English', 'Hindi', 'Punjabi'],
+    ['Hindi'],
+    ['English', 'Hindi', 'Kannada']
+  ];
 
   for (let i = 1; i <= driverCount; i++) {
     const driver = {
@@ -147,63 +158,95 @@ async function seedDrivers(ctx: SeederContext) {
       phone: `98${String(i).padStart(8, '0')}`,
       email: `driver${i}@${ctx.tenantName}.local`,
       licenseNumber: `DL-${ctx.tenantName.toUpperCase()}-${String(i).padStart(4, '0')}`,
-      experience: Math.floor(Math.random() * 10) + 1,
+      experience: Math.floor(Math.random() * 15) + 1,
       rating: (Math.random() * 2 + 3).toFixed(1),
       status: statuses[Math.floor(Math.random() * statuses.length)],
-      lifecycleStage: 'active',
-      languages: ['Hindi', 'English'],
-      createdAt: new Date(),
-      dateOfJoining: new Date(TEST_WINDOW_START.getTime() - Math.random() * 365 * 24 * 60 * 60 * 1000)
+      lifecycleStage: lifecycleStages[Math.floor(Math.random() * lifecycleStages.length)],
+      languages: languageOptions[Math.floor(Math.random() * languageOptions.length)],
+      // HR/Staff Fields (5-7 options)
+      permanentAddress: `Address ${i}, ${ctx.tenantName.toUpperCase()}, Indore - 452001`,
+      currentAddress: `Current Address ${i}, ${ctx.tenantName.toUpperCase()}, Indore - 452001`,
+      maritalStatus: maritalStatuses[Math.floor(Math.random() * maritalStatuses.length)],
+      aadharNumber: `${String(Math.floor(Math.random() * 1000000000000)).padStart(12, '0')}`,
+      panNumber: `${ctx.tenantName.toUpperCase()}${String(i).padStart(6, '0')}A`,
+      dateOfJoining: new Date(TEST_WINDOW_START.getTime() - Math.random() * 730 * 24 * 60 * 60 * 1000),
+      createdAt: new Date()
     };
 
     await ctx.db.collection('drivers').insertOne(driver);
     ctx.drivers.push(driver);
   }
 
-  console.log(`  ✓ Created ${driverCount} drivers`);
+  console.log(`  ✓ Created ${driverCount} drivers with HR fields (5-7 options each)`);
 }
 
 async function seedVehicles(ctx: SeederContext) {
   console.log('\n[Vehicles]');
 
-  const vehicles = [
+  const vehicleMakes = [
     'Crysta', 'Ertiga', 'Rumion', 'Dzire', 'Glanza', 'Ciaz', 'Baleno', 'Tempo Traveller',
     'Innova', 'Fortuner', 'Legender', 'Fortuner Legender', 'XUV700', 'Thar', 'Creta'
   ];
 
-  const statuses = ['available', 'on_trip', 'maintenance', 'RESERVED', 'ASSIGNED'];
-  const fuelTypes = ['Petrol', 'Diesel', 'CNG'];
+  const statuses = ['available', 'on_trip', 'maintenance', 'RESERVED', 'ASSIGNED', 'BREAKDOWN', 'ACCIDENT_HOLD'];
+  const fuelTypes = ['Petrol', 'Diesel', 'CNG', 'Hybrid'];
+  const transmissions = ['Manual', 'Automatic', 'CVT'];
+  const vehicleCategories = ['Sedan', 'SUV', 'Hatchback', 'MUV', 'MPV', 'Coupe', 'Convertible'];
+  const transportClassifications = ['transport', 'non_transport'];
+  const ownershipTypes = ['owned', 'leased', 'financed', 'rented'];
+  const colors = ['White', 'Black', 'Silver', 'Blue', 'Red', 'Gray', 'Gold'];
 
   const now = Date.now();
   for (let i = 1; i <= 20; i++) {
     const vehicle = {
       tenantId: new ObjectId(ctx.tenantId),
-      make: vehicles[i % vehicles.length],
-      vehicleModel: vehicles[(i + 1) % vehicles.length],
-      year: 2024 - (i % 5),
+      // Basic Details
+      make: vehicleMakes[i % vehicleMakes.length],
+      vehicleModel: vehicleMakes[(i + 1) % vehicleMakes.length],
+      year: 2024 - (i % 6),
       licensePlate: `QA${now}${String(i).padStart(2, '0')}`,
       normalizedLicensePlate: `QA${now}${String(i).padStart(2, '0')}`,
-      capacity: (i % 3 === 0) ? 8 : 4,
-      type: ['economy', 'standard', 'premium'][i % 3],
+      capacity: [4, 4, 7, 8, 4, 7][i % 6],
+      type: ['economy', 'standard', 'premium', 'luxury', 'suv', 'sedan'][i % 6],
       status: statuses[Math.floor(Math.random() * statuses.length)],
-      features: ['AC', 'PowerSteering', 'GPS', 'WiFi'],
+
+      // Features & Pricing
+      features: ['AC', 'PowerSteering', 'GPS', 'WiFi', 'AudioSystem', 'SeatBelt', 'AirBag'][Math.floor(Math.random() * 7)],
       pricePerDay: 1500 + (i % 10) * 500,
       pricePerHour: 300 + (i % 5) * 100,
       pricePerKm: 25 + (i % 5) * 5,
-      color: ['White', 'Black', 'Silver', 'Blue'][i % 4],
-      fuelType: fuelTypes[i % 3],
-      transmission: i % 2 === 0 ? 'Automatic' : 'Manual',
-      createdAt: new Date(),
-      currentOdometer: 50000 + Math.random() * 50000,
-      ownershipType: 'owned',
-      status: statuses[Math.floor(Math.random() * statuses.length)]
+
+      // Physical Attributes (5-7 options)
+      color: colors[i % colors.length],
+      fuelType: fuelTypes[i % fuelTypes.length],
+      transmission: transmissions[i % transmissions.length],
+
+      // Vehicle 360 Fields (5-7 options each)
+      vehicleCategory: vehicleCategories[i % vehicleCategories.length],
+      variant: `Variant ${(i % 5) + 1}`,
+      registrationDate: new Date(2020 + (i % 4), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1),
+      transportClassification: transportClassifications[i % 2],
+      vin: `VIN${ctx.tenantName.toUpperCase()}${String(i).padStart(10, '0')}`,
+      chassisNumber: `CH${String(i).padStart(12, '0')}`,
+      engineNumber: `ENG${String(i).padStart(10, '0')}`,
+      currentOdometer: 50000 + Math.random() * 100000,
+      engineHours: Math.floor(Math.random() * 5000),
+
+      // Ownership & Location
+      ownershipType: ownershipTypes[i % ownershipTypes.length],
+      acquisitionDate: new Date(2020 + (i % 4), Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1),
+      purchaseValue: 800000 + Math.random() * 2000000,
+      branch: `Branch-${(i % 5) + 1}`,
+      baseLocation: `Location-${ctx.tenantName.toUpperCase()}-${(i % 4) + 1}`,
+
+      createdAt: new Date()
     };
 
     await ctx.db.collection('vehicles').insertOne(vehicle);
     ctx.vehicles.push(vehicle);
   }
 
-  console.log(`  ✓ Created 20 vehicles`);
+  console.log(`  ✓ Created 20 vehicles with 5-7 field options each`);
 }
 
 async function seedCustomers(ctx: SeederContext) {
