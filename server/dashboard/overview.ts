@@ -99,8 +99,8 @@ export function registerDashboardOverviewRoute(app: Express) {
         Booking.find({
           tenantId,
           status: "completed",
-          returnDate: { $gte: periodStart, $lte: now },
-        }).select("totalAmount returnDate").lean(),
+          createdAt: { $gte: periodStart, $lte: now },
+        }).select("totalAmount createdAt").lean(),
         PaymentTransaction.find({
           tenantId,
           status: "completed",
@@ -144,7 +144,7 @@ export function registerDashboardOverviewRoute(app: Express) {
         trendByDay.set(key, { date: key, revenue: 0, collections: 0 });
       }
       for (const b of completedInPeriod) {
-        const key = localDayKey(new Date(b.returnDate as any));
+        const key = localDayKey(new Date(b.createdAt as any));
         const bucket = trendByDay.get(key);
         if (bucket) bucket.revenue += (b as any).totalAmount || 0;
       }
