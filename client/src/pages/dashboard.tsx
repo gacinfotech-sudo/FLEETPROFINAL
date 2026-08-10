@@ -488,14 +488,22 @@ export default function Dashboard() {
       case "bookings": {
         const { __leadId, ...formPrefill } = bookingPrefill || {};
         return (
-          <div>
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Create Booking</h1>
+          <div className="space-y-6">
+            {/* Beautiful Header */}
+            <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+              <div>
+                <h1 className="text-3xl font-bold">📝 Create New Booking</h1>
+                <p className="text-indigo-100 mt-1">Quick & easy booking entry • Fill in the details below</p>
+              </div>
             </div>
-            <EnhancedBookingForm
-              onSuccess={bookingPrefill ? handleBookingCreatedFromLead : () => setCurrentView("dashboard")}
-              initialValues={bookingPrefill ? formPrefill : undefined}
-            />
+
+            {/* Form Wrapper */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+              <EnhancedBookingForm
+                onSuccess={bookingPrefill ? handleBookingCreatedFromLead : () => setCurrentView("dashboard")}
+                initialValues={bookingPrefill ? formPrefill : undefined}
+              />
+            </div>
           </div>
         );
       }
@@ -1056,9 +1064,39 @@ export default function Dashboard() {
 
         try {
           return (
-            <div>
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Booking History</h1>
+            <div className="space-y-6">
+              {/* Beautiful Header */}
+              <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg">
+                <h1 className="text-3xl font-bold">📋 Booking History</h1>
+                <p className="text-purple-100 mt-1">Complete record of all bookings • Search, filter & export</p>
+              </div>
+
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+                  <CardContent className="p-4">
+                    <p className="text-sm text-gray-600 font-medium">📊 TOTAL</p>
+                    <p className="text-2xl font-bold text-purple-600 mt-2">{validBookings.length}</p>
+                    <p className="text-xs text-gray-500 mt-1">All bookings</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+                  <CardContent className="p-4">
+                    <p className="text-sm text-gray-600 font-medium">✅ COMPLETED</p>
+                    <p className="text-2xl font-bold text-green-600 mt-2">{validBookings.filter((b: any) => b.status === 'completed').length}</p>
+                    <p className="text-xs text-gray-500 mt-1">Successfully completed</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+                  <CardContent className="p-4">
+                    <p className="text-sm text-gray-600 font-medium">📋 ACTIVE</p>
+                    <p className="text-2xl font-bold text-blue-600 mt-2">{validBookings.filter((b: any) => b.status === 'confirmed').length}</p>
+                    <p className="text-xs text-gray-500 mt-1">Confirmed & active</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger className="w-full sm:w-40">
