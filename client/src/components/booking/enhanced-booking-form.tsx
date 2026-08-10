@@ -1282,10 +1282,10 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   in Step 2 below (untouched by this task) — the two are
                   only combined for display, in the Review step's summary
                   line. */}
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                  <Calendar className="w-5 h-5 mr-2 text-blue-500" />
-                  How certain is the travel date?
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                  <Calendar className="w-4 h-4 mr-2 text-blue-500" />
+                  Travel Date Certainty
                 </h3>
                 <FormField
                   control={form.control}
@@ -1293,7 +1293,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <div role="radiogroup" aria-label="How certain is the travel date?" className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div role="radiogroup" aria-label="Travel date certainty" className="grid grid-cols-3 gap-2">
                           {DATE_CERTAINTY_OPTIONS.map((option) => (
                             <div
                               key={option.value}
@@ -1309,15 +1309,14 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                                   field.onChange(option.value);
                                 }
                               }}
-                              className={`min-w-0 p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
+                              className={`p-2 border rounded cursor-pointer transition-all hover:shadow-sm focus:outline-none ${
                                 field.value === option.value
-                                  ? 'border-blue-500 bg-blue-50 shadow-lg'
+                                  ? 'border-blue-500 bg-blue-50'
                                   : 'border-gray-200 hover:border-gray-300'
                               }`}
                             >
-                              <option.icon className={`w-5 h-5 mb-1.5 ${field.value === option.value ? 'text-blue-600' : 'text-gray-400'}`} />
-                              <div className="font-medium text-xs sm:text-sm break-words">{option.label}</div>
-                              <div className="text-xs text-gray-500 mt-0.5 break-words hidden sm:block">{option.desc}</div>
+                              <option.icon className={`w-4 h-4 mb-1 ${field.value === option.value ? 'text-blue-600' : 'text-gray-400'}`} />
+                              <div className="font-medium text-xs">{option.label}</div>
                             </div>
                           ))}
                         </div>
@@ -1328,55 +1327,45 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                 />
               </div>
 
-              <Separator className="my-8" />
+              <Separator className="my-6" />
 
-              {/* Date & Time Section — only when the date is actually
-                  confirmed (travelDateStatus === 'confirmed', the
-                  default). Unchanged fields/validation for that case. */}
               {watchedValues.travelDateStatus === "confirmed" && (
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                  <Calendar className="w-5 h-5 mr-2 text-blue-500" />
-                  When do you need the vehicle?
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                  <Calendar className="w-4 h-4 mr-2 text-blue-500" />
+                  When do you need it?
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="pickupDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center text-sm font-medium text-gray-700">
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Pickup Date
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="date"
-                              {...field}
-                              min={new Date().toISOString().split('T')[0]}
-                              className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="pickupTime"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center text-sm font-medium text-gray-700">
-                            <Clock className="w-4 h-4 mr-2" />
-                            Pickup Time
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="time"
-                              {...field}
-                              className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
-                            />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="pickupDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-semibold text-gray-700">Pickup Date</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            {...field}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="h-9 text-sm border border-gray-300 focus:border-blue-500"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="pickupTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-semibold text-gray-700">Pickup Time</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="time"
+                            {...field}
+                            className="h-9 text-sm border border-gray-300 focus:border-blue-500"
+                          />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -1426,7 +1415,6 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                         </FormItem>
                       )}
                     />
-                  </div>
                 </div>
               </div>
               )}
