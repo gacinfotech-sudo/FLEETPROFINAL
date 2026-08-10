@@ -476,7 +476,14 @@ export default function Dashboard() {
       case "dashboard":
         return (
           <div className="space-y-6">
-            <PremiumDashboard
+            {/* Best View - Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg px-6 py-3 text-white flex items-center gap-2">
+              <span className="text-xl">⭐</span>
+              <span className="font-semibold">Best View</span>
+            </div>
+
+            {/* Main Dashboard - Best View */}
+            <DashboardOverview
               onNavigate={(view) => handleViewChange(view as ViewType)}
               onViewBooking={(booking) => openBooking(booking)}
               onSelectCustomer={handleSelectCustomerFromSearch}
