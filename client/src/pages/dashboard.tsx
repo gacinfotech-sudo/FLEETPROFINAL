@@ -1045,93 +1045,105 @@ export default function Dashboard() {
         return <VendorsPage />;
 
       case "history":
-        return (
-          <div>
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Booking History</h1>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-40">
-                    <SelectValue placeholder="Filter by Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Bookings</SelectItem>
-                    <SelectItem value="confirmed">Confirmed</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-full sm:w-40">
-                    <SelectValue placeholder="Filter by Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="self_drive">Self Drive</SelectItem>
-                    <SelectItem value="with_driver">With Driver</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+        // Defensive: ensure bookings is a valid array with required fields
+        const validBookings = Array.isArray(bookings)
+          ? bookings.filter((b: any) => {
+              try {
+                return b && typeof b === 'object' && b.bookingId && b.customerName && b.status !== undefined;
+              } catch {
+                return false;
+              }
+            })
+          : [];
 
-            <Card>
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-lg sm:text-xl">All Bookings</CardTitle>
-                    {(statusFilter !== "all" || typeFilter !== "all" || sourceFilter !== "all") && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-sm text-gray-500">Filters active:</span>
-                        {statusFilter !== "all" && <Badge variant="secondary" className="text-xs">{statusFilter}</Badge>}
-                        {typeFilter !== "all" && <Badge variant="secondary" className="text-xs">{typeFilter.replace('_', ' ')}</Badge>}
-                        {sourceFilter !== "all" && <Badge variant="secondary" className="text-xs capitalize">{sourceFilter.replace(/_/g, ' ')}</Badge>}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {setStatusFilter("all"); setTypeFilter("all"); setSourceFilter("all");}}
-                          className="text-xs text-blue-600 hover:text-blue-700"
-                        >
-                          Clear filters
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Input
-                      placeholder="Search bookings..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full sm:w-48 lg:w-64"
-                    />
-                    <BookingHistoryPDF 
-                      bookings={bookings as any[]} 
-                      vehicles={vehicles as any[]} 
-                      drivers={drivers as any[]} 
-                    />
-                  </div>
+        try {
+          return (
+            <div>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Booking History</h1>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Filter by Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Bookings</SelectItem>
+                      <SelectItem value="confirmed">Confirmed</SelectItem>
+                      <SelectItem value="completed">Completed</SelectItem>
+                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={typeFilter} onValueChange={setTypeFilter}>
+                    <SelectTrigger className="w-full sm:w-40">
+                      <SelectValue placeholder="Filter by Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      <SelectItem value="self_drive">Self Drive</SelectItem>
+                      <SelectItem value="with_driver">With Driver</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Booking ID</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead>Customer</TableHead>
-                      <TableHead>Vehicle</TableHead>
-                      <TableHead>Route</TableHead>
-                      <TableHead>Driver</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Created By</TableHead>
-                      <TableHead>Created At</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {/* Show all bookings (filtered by search term if any) */}
-                    {(bookings as any[])
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-lg sm:text-xl">All Bookings</CardTitle>
+                      {(statusFilter !== "all" || typeFilter !== "all" || sourceFilter !== "all") && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-sm text-gray-500">Filters active:</span>
+                          {statusFilter !== "all" && <Badge variant="secondary" className="text-xs">{statusFilter}</Badge>}
+                          {typeFilter !== "all" && <Badge variant="secondary" className="text-xs">{typeFilter.replace('_', ' ')}</Badge>}
+                          {sourceFilter !== "all" && <Badge variant="secondary" className="text-xs capitalize">{sourceFilter.replace(/_/g, ' ')}</Badge>}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {setStatusFilter("all"); setTypeFilter("all"); setSourceFilter("all");}}
+                            className="text-xs text-blue-600 hover:text-blue-700"
+                          >
+                            Clear filters
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Input
+                        placeholder="Search bookings..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full sm:w-48 lg:w-64"
+                      />
+                      <BookingHistoryPDF
+                        bookings={validBookings as any[]}
+                        vehicles={vehicles as any[]}
+                        drivers={drivers as any[]}
+                      />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Booking ID</TableHead>
+                        <TableHead>Source</TableHead>
+                        <TableHead>Customer</TableHead>
+                        <TableHead>Vehicle</TableHead>
+                        <TableHead>Route</TableHead>
+                        <TableHead>Driver</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created By</TableHead>
+                        <TableHead>Created At</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {/* Show all bookings (filtered by search term if any) */}
+                      {(validBookings as any[])
                       .filter((booking: any) => {
                         // Search filter
                         const matchesSearch = searchTerm === "" ||
@@ -1428,7 +1440,21 @@ export default function Dashboard() {
               </Card>
             </div>
           </div>
-        );
+          );
+        } catch (error) {
+          console.error('History render error:', error);
+          return (
+            <Card className="border-red-200 bg-red-50">
+              <CardHeader>
+                <CardTitle className="text-red-800">Error Loading Booking History</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-red-700">
+                <p>An error occurred while rendering the booking history page.</p>
+                <p className="mt-2 text-xs font-mono">{String(error)}</p>
+              </CardContent>
+            </Card>
+          );
+        }
 
       case "revenue":
         return <RevenueReport />;

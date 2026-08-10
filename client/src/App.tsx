@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
 import { BookingWorkspaceProvider } from "@/components/booking/booking-workspace-context";
 import { OfflineNotification } from "@/components/offline-notification";
+import ErrorBoundary from "@/components/error-boundary";
 import LandingPage from "./pages/landing";
 import LoginPage from "./pages/login";
 import AdminPanel from "./pages/admin-panel";
@@ -198,6 +199,14 @@ function AuthenticatedApp() {
   );
 }
 
+function ProtectedRouterShell() {
+  return (
+    <ErrorBoundary>
+      <AuthenticatedApp />
+    </ErrorBoundary>
+  );
+}
+
 function Router() {
   return (
     <AuthProvider>
@@ -205,7 +214,7 @@ function Router() {
           surface (queues, upcoming, live, history, Customer 360, dashboard,
           search, Vehicle 360) opens the same canonical editor through it. */}
       <BookingWorkspaceProvider>
-        <AuthenticatedApp />
+        <ProtectedRouterShell />
       </BookingWorkspaceProvider>
     </AuthProvider>
   );
