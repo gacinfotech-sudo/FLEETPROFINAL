@@ -199,10 +199,49 @@ export default function LeadsPage({ onConvertToBooking, initialLeadId }: LeadsPa
   const rows = data?.rows || [];
 
   return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Leads</h1>
-        <p className="text-sm text-gray-500">Leads are created from qualified Inquiries — see the Inquiries page to convert one.</p>
+    <div className="space-y-6">
+      {/* Beautiful Header */}
+      <div className="bg-gradient-to-r from-amber-600 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+        <h1 className="text-3xl font-bold">🎯 Leads</h1>
+        <p className="text-amber-100 mt-1">Qualified leads converted from inquiries • Track conversion to booking</p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-600 font-medium">📊 TOTAL</p>
+            <p className="text-2xl font-bold text-amber-600 mt-2">{leads?.length || 0}</p>
+            <p className="text-xs text-gray-500 mt-1">All leads</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-600 font-medium">🔄 OPEN</p>
+            <p className="text-2xl font-bold text-yellow-600 mt-2">
+              {leads?.filter((l: any) => l.status === 'open').length || 0}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">Active leads</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-600 font-medium">✅ CONVERTED</p>
+            <p className="text-2xl font-bold text-green-600 mt-2">
+              {leads?.filter((l: any) => l.status === 'converted_to_booking').length || 0}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">To bookings</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-600 font-medium">❌ CLOSED</p>
+            <p className="text-2xl font-bold text-red-600 mt-2">
+              {leads?.filter((l: any) => l.status === 'closed' || l.status === 'lost').length || 0}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">Closed/lost</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
