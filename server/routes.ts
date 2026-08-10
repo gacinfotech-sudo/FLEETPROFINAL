@@ -3006,6 +3006,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin: Recalculate customer stats (totalBookings, completedBookings, etc.) from actual bookings
+  app.post("/api/admin/fix-customer-stats", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const customers = await Customer.find({ tenantId: req.tenantId });
+
+      let fixed = 0;
+      for (const customer of customers) {
+        try {
+          await recomputeCustomerStats(customer._id);
+          fixed++;
+        } catch (err) {
+          console.error(`Failed to update customer ${customer._id}:`, err);
+        }
+      }
+
+      res.json({ message: `Recalculated stats for ${fixed}/${customers.length} customers` });
+    } catch (error) {
+      console.error('Fix customer stats error:', error);
+      res.status(500).json({ message: "Failed to fix customer stats" });
+    }
+  });
+
   app.get("/api/bookings/upcoming", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const bookings = await storage.getUpcomingBookings(req.tenantId!);
