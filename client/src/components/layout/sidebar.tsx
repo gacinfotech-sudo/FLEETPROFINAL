@@ -180,12 +180,20 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex items-center justify-center h-16 bg-blue-600">
+        <button
+          onClick={() => {
+            onViewChange('dashboard');
+            if (window.innerWidth < 1024) {
+              setTimeout(() => onToggle(), 200);
+            }
+          }}
+          className="flex items-center justify-center h-16 bg-blue-600 hover:bg-blue-700 transition-colors w-full cursor-pointer"
+        >
           <div className="flex items-center">
             <Car className="text-white text-2xl mr-3" size={32} />
             <span className="text-white text-xl font-bold">FleetPro</span>
           </div>
-        </div>
+        </button>
 
         <nav className="mt-6 lg:mt-8 flex-1 overflow-y-auto">
           <div className="px-1 lg:px-2 space-y-2 lg:space-y-3">
