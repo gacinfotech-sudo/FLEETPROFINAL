@@ -22,21 +22,28 @@ export default function UpcomingBookings() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Upcoming Bookings</h1>
-        <p className="text-sm text-gray-500">Today, tomorrow and the day after — sorted by pickup time.</p>
+      {/* Beautiful Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
+        <div>
+          <h1 className="text-3xl font-bold">📅 Upcoming Bookings</h1>
+          <p className="text-blue-100 mt-1">Today, tomorrow and the day after — sorted by pickup time</p>
+        </div>
       </div>
 
       {isLoading && <p className="text-sm text-gray-500">Loading...</p>}
       {isError && <p className="text-sm text-red-600">Failed to load upcoming bookings.</p>}
 
-      {days.map((day) => (
-        <Card key={day.date}>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              {day.label}
-              <Badge variant="secondary">{day.bookings.length}</Badge>
-              <span className="text-xs font-normal text-gray-400">{day.date}</span>
+      {days.map((day, idx) => {
+        const colors = ["from-green-50 to-emerald-50 border-green-200", "from-blue-50 to-cyan-50 border-blue-200", "from-purple-50 to-pink-50 border-purple-200"];
+        const colorClass = colors[idx % colors.length];
+        return (
+        <Card key={day.date} className={`bg-gradient-to-br ${colorClass}`}>
+          <CardHeader className="bg-white/50">
+            <CardTitle className="text-base flex items-center gap-3">
+              <span className="text-2xl">{idx === 0 ? "📍" : idx === 1 ? "🔜" : "📌"}</span>
+              <span className="font-bold text-gray-900">{day.label}</span>
+              <Badge className="bg-blue-100 text-blue-700 font-bold">{day.bookings.length} bookings</Badge>
+              <span className="text-xs font-normal text-gray-500 ml-auto">{day.date}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -58,48 +65,131 @@ export default function UpcomingBookings() {
                 </TableHeader>
                 <TableBody>
                   {day.bookings.map((b: any) => (
-                    <TableRow key={b.id} className="cursor-pointer hover:bg-gray-50" onClick={() => openBooking(b.id)}>
-                      <TableCell className="font-mono text-xs">
-                        <button type="button" className="text-blue-700 hover:underline" onClick={(e) => { e.stopPropagation(); openBooking(b.id); }}>
-                          {b.bookingId}
+                    <TableRow
+                      key={b.id}
+                      className="cursor-pointer hover:bg-white/60 transition-all"
+                      onClick={() => openBooking(b.id)}
+                    >
+                      <TableCell className="font-mono text-xs font-bold">
+                        <button
+                          type="button"
+                          className="text-blue-700 hover:underline font-bold"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openBooking(b.id);
+                          }}
+                        >
+                          #{b.bookingId}
                         </button>
                       </TableCell>
-                      <TableCell>{b.customerName}</TableCell>
-                      <TableCell>{b.pickupTime || "-"}</TableCell>
-                      <TableCell className="text-sm">{b.pickupLocation}{b.dropoffLocation ? ` → ${b.dropoffLocation}` : ""}</TableCell>
+                      <TableCell className="font-medium">{b.customerName}</TableCell>
+                      <TableCell className="font-semibold text-blue-600">🕐 {b.pickupTime || "-"}</TableCell>
+                      <TableCell className="text-sm">
+                        <span className="font-medium">
+                          {b.pickupLocation}
+                          {b.dropoffLocation && (
+                            <>
+                              <br />
+                              <span className="text-gray-500">→ {b.dropoffLocation}</span>
+                            </>
+                          )}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-sm">
                         {b.fulfilmentType === "vendor" ? (
-                          <Badge variant="secondary">Vendor: {b.vendorName || "unnamed"}</Badge>
+                          <Badge className="bg-purple-100 text-purple-700">🏢 {b.vendorName || "unnamed"}</Badge>
                         ) : (
                           <>
-                            {b.vehicle ? `${b.vehicle.make} (${b.vehicle.registrationNumber || "-"})` : "No vehicle"}
-                            <br />
-                            {b.driver ? b.driver.name : "No driver"}
+                            <div className="font-medium">🚗 {b.vehicle ? `${b.vehicle.make} (${b.vehicle.registrationNumber || "-"})` : "❌ No vehicle"}</div>
+                            <div className="text-xs text-gray-600">👤 {b.driver ? b.driver.name : "❌ No driver"}</div>
                           </>
                         )}
                       </TableCell>
                       <TableCell>
-                        {fmtMoney(b.advanceReceived)} / {fmtMoney(b.totalAmount)}
-                        {b.remainingBalance > 0 && (
-                          <div className="text-xs text-red-600">Due {fmtMoney(b.remainingBalance)}</div>
-                        )}
+                        <div className="text-sm">
+                          <span className="font-medium text-green-600">✅ {fmtMoney(b.advanceReceived)}</span>
+                          <span className="text-gray-500"> / {fmtMoney(b.totalAmount)}</span>
+                          {b.remainingBalance > 0 && (
+                            <div className="text-xs text-red-600 font-bold mt-1">❌ Due {fmtMoney(b.remainingBalance)}</div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          {/* Flags are quick fixes — each opens the workspace on the section that resolves it (§59) */}
-                          {b.flags?.driverNotAssigned && <button type="button" className="flex items-center text-xs text-amber-600 hover:underline" onClick={(e) => { e.stopPropagation(); openBooking(b.id, { focus: "allocation" }); }}><AlertTriangle className="w-3 h-3 mr-1" />No driver</button>}
-                          {b.flags?.vehicleNotAssigned && <button type="button" className="flex items-center text-xs text-amber-600 hover:underline" onClick={(e) => { e.stopPropagation(); openBooking(b.id, { focus: "allocation" }); }}><AlertTriangle className="w-3 h-3 mr-1" />No vehicle</button>}
-                          {b.flags?.invalidCustomerPhone && <button type="button" className="flex items-center text-xs text-red-600 hover:underline" onClick={(e) => { e.stopPropagation(); openBooking(b.id, { focus: "customer" }); }}><AlertTriangle className="w-3 h-3 mr-1" />Bad phone</button>}
+                          {b.flags?.driverNotAssigned && (
+                            <button
+                              type="button"
+                              className="flex items-center text-xs text-amber-600 hover:underline font-medium"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openBooking(b.id, { focus: "allocation" });
+                              }}
+                            >
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              No driver
+                            </button>
+                          )}
+                          {b.flags?.vehicleNotAssigned && (
+                            <button
+                              type="button"
+                              className="flex items-center text-xs text-amber-600 hover:underline font-medium"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openBooking(b.id, { focus: "allocation" });
+                              }}
+                            >
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              No vehicle
+                            </button>
+                          )}
+                          {b.flags?.invalidCustomerPhone && (
+                            <button
+                              type="button"
+                              className="flex items-center text-xs text-red-600 hover:underline font-medium"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openBooking(b.id, { focus: "customer" });
+                              }}
+                            >
+                              <AlertTriangle className="w-3 h-3 mr-1" />
+                              Bad phone
+                            </button>
+                          )}
+                          {!b.flags?.driverNotAssigned && !b.flags?.vehicleNotAssigned && !b.flags?.invalidCustomerPhone && (
+                            <span className="text-xs text-green-600 font-medium">✅ All OK</span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
-                          <Button variant="outline" size="sm" className="h-7" onClick={() => openBooking(b.id)}>Open</Button>
+                          <Button
+                            size="sm"
+                            className="h-8 bg-blue-600 hover:bg-blue-700 text-white"
+                            onClick={() => openBooking(b.id)}
+                          >
+                            Open
+                          </Button>
                           <a href={`tel:${b.customerPhone}`}>
-                            <Button variant="ghost" size="icon"><Phone className="w-4 h-4" /></Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-blue-600 hover:bg-blue-50"
+                            >
+                              <Phone className="w-4 h-4" />
+                            </Button>
                           </a>
-                          <a href={`https://wa.me/${(b.customerPhone || "").replace(/\D/g, "")}`} target="_blank" rel="noreferrer">
-                            <Button variant="ghost" size="icon"><MessageCircle className="w-4 h-4" /></Button>
+                          <a
+                            href={`https://wa.me/${(b.customerPhone || "").replace(/\D/g, "")}`}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-green-600 hover:bg-green-50"
+                            >
+                              <MessageCircle className="w-4 h-4" />
+                            </Button>
                           </a>
                         </div>
                       </TableCell>
@@ -110,7 +200,8 @@ export default function UpcomingBookings() {
             )}
           </CardContent>
         </Card>
-      ))}
+      );
+      })}
     </div>
   );
 }
