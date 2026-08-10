@@ -1582,18 +1582,37 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   </div>
                 </div>
 
+                {/* Popular Destinations */}
+                <div className="mb-6">
+                  <p className="text-xs font-medium text-gray-500 mb-3">Popular Destinations</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {["Ujjain", "Omkareshwar", "Mandu", "Indore", "Bhopal", "Khajuraho", "Jabalpur", "Goa"].map((loc) => (
+                      <button
+                        key={loc}
+                        type="button"
+                        onClick={() => form.setValue("pickupLocation", loc)}
+                        className="px-3 py-2 text-xs font-medium bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all text-gray-700"
+                      >
+                        📍 {loc}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <FormField
                     control={form.control}
                     name="pickupLocation"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium text-gray-700">From (Pickup Location)</FormLabel>
+                        <FormLabel className="text-sm font-semibold text-gray-800">
+                          <MapPin className="inline w-4 h-4 mr-1" />From (Pickup)
+                        </FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="e.g., Indore Railway Station" 
+                          <Input
+                            placeholder="Enter pickup location..."
                             {...field}
-                            className="h-12 border-2 border-gray-200 focus:border-green-500 rounded-lg"
+                            className="h-10 border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-lg"
                           />
                         </FormControl>
                         <FormMessage />
@@ -1607,12 +1626,14 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                       name="dropoffLocation"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-medium text-gray-700">To (Drop-off Location)</FormLabel>
+                          <FormLabel className="text-sm font-semibold text-gray-800">
+                            <MapPin className="inline w-4 h-4 mr-1" />To (Drop-off)
+                          </FormLabel>
                           <FormControl>
-                            <Input 
-                              placeholder="e.g., Omkareshwar Temple" 
+                            <Input
+                              placeholder="Enter destination..."
                               {...field}
-                              className="h-12 border-2 border-gray-200 focus:border-green-500 rounded-lg"
+                              className="h-10 border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-lg"
                             />
                           </FormControl>
                           <FormMessage />
@@ -1622,9 +1643,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   )}
 
                   {routeType !== "custom" && (
-                    <div className="flex items-center justify-center h-12 bg-green-50 border-2 border-green-200 rounded-lg">
-                      <span className="text-green-700 font-medium">
-                        {routeType === "local" ? "📍 Local Trip" : "🤔 Destination Not Decided"}
+                    <div className="flex items-center justify-center h-10 bg-blue-50 border border-blue-200 rounded-lg">
+                      <span className="text-blue-700 font-medium text-sm">
+                        {routeType === "local" ? "📍 Local Trip" : "🤔 Not Decided"}
                       </span>
                     </div>
                   )}
