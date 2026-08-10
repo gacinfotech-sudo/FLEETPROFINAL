@@ -97,6 +97,11 @@ const bookingSchema = z.object({
   petrolCharges: z.number().min(0, "Petrol charges must be 0 or greater").optional(),
   dieselCharges: z.number().min(0, "Diesel charges must be 0 or greater").optional(),
   cngCharges: z.number().min(0, "CNG charges must be 0 or greater").optional(),
+  // Self-drive pickup & drop service charges (REQ-5)
+  pickupServiceRequired: z.boolean().optional(),
+  pickupServiceCharge: z.number().min(0, "Pickup charge must be 0 or greater").optional(),
+  dropServiceRequired: z.boolean().optional(),
+  dropServiceCharge: z.number().min(0, "Drop charge must be 0 or greater").optional(),
   miscellaneousAmount: z.number().min(0, "Miscellaneous amount must be 0 or greater").optional(),
   miscellaneousDescription: z.string().optional(),
   pricingType: z.enum(["day", "km"]).optional(),
@@ -333,6 +338,10 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       petrolCharges: 0,
       dieselCharges: 0,
       cngCharges: 0,
+      pickupServiceRequired: false,
+      pickupServiceCharge: 0,
+      dropServiceRequired: false,
+      dropServiceCharge: 0,
       miscellaneousAmount: 0,
       miscellaneousDescription: "",
       pricingType: "day",
@@ -742,7 +751,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       // Calculate final total amount: base + toll + parking + misc - fuel
       // NOTE: Third-party driver charges are NOT deducted from the base amount
       // They are stored separately for revenue calculation
-      const finalAmount = (data.amount || 0) + (data.tollCharges || 0) + (data.parkingCharges || 0) + (data.miscellaneousAmount || 0) - totalFuelCost;
+      const finalAmount = (data.amount || 0) + (data.tollCharges || 0) + (data.parkingCharges || 0) + (data.pickupServiceCharge || 0) + (data.dropServiceCharge || 0) + (data.miscellaneousAmount || 0) - totalFuelCost;
       
       // Send data with the calculated final amount
       const bookingData = {
@@ -1080,7 +1089,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
     // An advance larger than the booking's own final total is an entry
     // mistake (extra collections belong in the ledger later, not here) —
     // catch it before submit so the money state can never start invalid.
-    const finalTotal = (data.amount || 0) + (data.tollCharges || 0) + (data.parkingCharges || 0) + (data.miscellaneousAmount || 0)
+    const finalTotal = (data.amount || 0) + (data.tollCharges || 0) + (data.parkingCharges || 0) + (data.pickupServiceCharge || 0) + (data.dropServiceCharge || 0) + (data.miscellaneousAmount || 0)
       - (data.petrolCharges || 0) - (data.dieselCharges || 0) - (data.cngCharges || 0);
     if ((data.advanceReceived || 0) > finalTotal) {
       toast({
@@ -3082,7 +3091,89 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                             )}
                           />
                         </div>
-                        
+
+                        {/* Self-Drive Pickup & Drop Service (REQ-5) */}
+                        {form.getValues('bookingType') === 'self_drive' && (
+                          <div className="grid grid-cols-2 gap-4 mb-4 p-3 bg-blue-50 rounded">
+                            <FormField
+                              control={form.control}
+                              name="pickupServiceRequired"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <div className="flex items-center space-x-2">
+                                    <input
+                                      type="checkbox"
+                                      id="pickup-service"
+                                      checked={field.value || false}
+                                      onChange={(e) => field.onChange(e.target.checked)}
+                                      className="w-4 h-4 border border-gray-300 rounded"
+                                    />
+                                    <FormLabel className="text-sm text-gray-600 cursor-pointer">Pickup Service</FormLabel>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            {form.getValues('pickupServiceRequired') && (
+                              <FormField
+                                control={form.control}
+                                name="pickupServiceCharge"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs text-gray-600">Pickup Charge (₹)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        placeholder="0"
+                                        value={field.value ? field.value : ""}
+                                        onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                        className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+                            <FormField
+                              control={form.control}
+                              name="dropServiceRequired"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <div className="flex items-center space-x-2">
+                                    <input
+                                      type="checkbox"
+                                      id="drop-service"
+                                      checked={field.value || false}
+                                      onChange={(e) => field.onChange(e.target.checked)}
+                                      className="w-4 h-4 border border-gray-300 rounded"
+                                    />
+                                    <FormLabel className="text-sm text-gray-600 cursor-pointer">Drop Service</FormLabel>
+                                  </div>
+                                </FormItem>
+                              )}
+                            />
+                            {form.getValues('dropServiceRequired') && (
+                              <FormField
+                                control={form.control}
+                                name="dropServiceCharge"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-xs text-gray-600">Drop Charge (₹)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        placeholder="0"
+                                        value={field.value ? field.value : ""}
+                                        onChange={(e) => field.onChange(e.target.value === "" ? 0 : parseFloat(e.target.value) || 0)}
+                                        className="h-10 text-sm border border-gray-300 focus:border-orange-500 rounded"
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            )}
+                          </div>
+                        )}
+
                         {/* Fuel deductions + misc. expenses are normally
                             settled at trip-end, not at booking time — kept
                             out of the daily-use path by default, per spec's
