@@ -231,26 +231,34 @@ export default function RootTenant360() {
   }
 
   return (
-    <div className="p-6 space-y-4" data-testid="root-tenant-360-page">
-      <Button variant="ghost" size="sm" onClick={() => setLocation("/root/tenants")} data-testid="button-back-to-tenants">
-        <ArrowLeft className="h-4 w-4 mr-1" /> Back to Tenant Database
-      </Button>
+    <div className="space-y-4" data-testid="root-tenant-360-page">
+      <div className="p-6">
+        <Button variant="ghost" size="sm" onClick={() => setLocation("/root/tenants")} data-testid="button-back-to-tenants">
+          <ArrowLeft className="h-4 w-4 mr-1" /> Back to Tenant Database
+        </Button>
+      </div>
 
       {isLoading || !tenant360 ? (
-        <Skeleton className="h-20" />
+        <div className="p-6"><Skeleton className="h-20" /></div>
       ) : error ? (
-        <p className="text-destructive">Failed to load tenant. {(error as Error).message}</p>
+        <div className="p-6 text-destructive">Failed to load tenant. {(error as Error).message}</div>
       ) : (
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{tenant360.tenant.businessName || tenant360.tenant.name}</h1>
-            <p className="text-sm text-muted-foreground">{tenant360.tenant.email} {tenant360.tenant.phone ? `· ${tenant360.tenant.phone}` : ""}</p>
+        <>
+          {/* Beautiful Gradient Header */}
+          <div className="bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl mx-6 p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold">👁️ {tenant360.tenant.businessName || tenant360.tenant.name}</h1>
+                <p className="text-violet-100 mt-1">{tenant360.tenant.email} {tenant360.tenant.phone ? `· ${tenant360.tenant.phone}` : ""}</p>
+              </div>
+              <Badge className={tenant360.tenant.status === 'active' ? 'bg-green-500' : tenant360.tenant.status === 'trial' ? 'bg-blue-500' : tenant360.tenant.status === 'suspended' ? 'bg-red-500' : 'bg-gray-500'}>{tenant360.tenant.status}</Badge>
+            </div>
           </div>
-          <Badge variant="outline">{tenant360.tenant.status}</Badge>
-        </div>
+        </>
       )}
 
       {tenant360 && (
+        <div className="px-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="flex flex-wrap h-auto justify-start gap-1">
             {DATA_TABS.map((t) => <TabsTrigger key={t.value} value={t.value} data-testid={`tab-${t.value}`}>{t.label}</TabsTrigger>)}
@@ -280,6 +288,7 @@ export default function RootTenant360() {
             </TabsContent>
           ))}
         </Tabs>
+        </div>
       )}
     </div>
   );

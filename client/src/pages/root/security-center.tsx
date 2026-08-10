@@ -128,15 +128,14 @@ export default function SecurityCenter() {
   });
 
   return (
-    <div className="space-y-6 p-6" data-testid="page-security-center">
-      <div>
-        <h1 className="text-2xl font-bold">Security Command Center</h1>
-        <p className="text-sm text-muted-foreground">
-          Extends the existing security-stats endpoint with break-glass tracking, active-session count, and MFA
-          status.
-        </p>
+    <div className="space-y-6" data-testid="page-security-center">
+      {/* Beautiful Gradient Header */}
+      <div className="bg-gradient-to-r from-red-600 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+        <h1 className="text-3xl font-bold">🔒 Security Command Center</h1>
+        <p className="text-red-100 mt-1">Break-glass access • Active sessions • Failed logins tracking</p>
       </div>
 
+      <div className="p-6">
       {error && (
         <Card>
           <CardContent className="pt-6 text-sm text-destructive">Failed to load security events.</CardContent>
@@ -350,6 +349,7 @@ export default function SecurityCenter() {
           </Table>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

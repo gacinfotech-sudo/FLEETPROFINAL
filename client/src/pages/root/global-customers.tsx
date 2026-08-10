@@ -74,14 +74,14 @@ export default function RootGlobalCustomers() {
   const hasAnyFilter = Object.values(debounced).some(Boolean);
 
   return (
-    <div className="p-6 space-y-4" data-testid="root-global-customers-page">
-      <div>
-        <h1 className="text-2xl font-bold">Global Customer Database</h1>
-        <p className="text-muted-foreground text-sm flex items-center gap-1">
-          <EyeOff className="h-3.5 w-3.5" /> Phone and email are masked by default across every tenant.
-        </p>
+    <div className="space-y-6" data-testid="root-global-customers-page">
+      {/* Beautiful Gradient Header */}
+      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+        <h1 className="text-3xl font-bold">🌍 Global Customer Database</h1>
+        <p className="text-cyan-100 mt-1">Cross-tenant search • PII masked by default for privacy</p>
       </div>
 
+      <div className="px-6">
       <Card>
         <CardHeader>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -154,6 +154,7 @@ export default function RootGlobalCustomers() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

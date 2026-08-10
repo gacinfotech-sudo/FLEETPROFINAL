@@ -87,12 +87,14 @@ export default function RootTenants() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / pageSize)) : 1;
 
   return (
-    <div className="p-6 space-y-4" data-testid="root-tenants-page">
-      <div>
-        <h1 className="text-2xl font-bold">Tenant Master Database</h1>
-        <p className="text-muted-foreground text-sm">All tenants on the platform. Click a row to open Tenant 360.</p>
+    <div className="space-y-6" data-testid="root-tenants-page">
+      {/* Beautiful Gradient Header */}
+      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
+        <h1 className="text-3xl font-bold">🏢 Tenant Master Database</h1>
+        <p className="text-purple-100 mt-1">All tenants on the platform • Click a row to open Tenant 360</p>
       </div>
 
+      <div className="px-6">
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row gap-3">
@@ -207,6 +209,7 @@ export default function RootTenants() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

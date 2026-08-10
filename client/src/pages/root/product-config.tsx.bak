@@ -144,7 +144,6 @@ export default function ProductConfigPage() {
           </div>
         </CardContent>
       </Card>
-      </div>
     </div>
   );
 }

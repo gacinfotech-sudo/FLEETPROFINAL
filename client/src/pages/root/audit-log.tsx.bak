@@ -67,6 +67,8 @@ export default function AuditLogPage() {
       </div>
 
       <div className="p-6">
+      </div>
+
       {error && (
         <Card>
           <CardContent className="pt-6 text-sm text-destructive">Failed to load audit log.</CardContent>
@@ -177,7 +179,6 @@ export default function AuditLogPage() {
           </div>
         </CardContent>
       </Card>
-      </div>
     </div>
   );
 }

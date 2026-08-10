@@ -59,12 +59,14 @@ export default function ErrorCenterPage() {
   });
 
   return (
-    <div className="p-6 space-y-6" data-testid="page-root-error-center">
-      <div className="flex items-center gap-2">
-        <AlertTriangle className="h-6 w-6" />
-        <h1 className="text-2xl font-bold">Error Center</h1>
+    <div className="space-y-6" data-testid="page-root-error-center">
+      {/* Beautiful Gradient Header */}
+      <div className="bg-gradient-to-r from-rose-600 to-red-600 rounded-xl p-6 text-white shadow-lg">
+        <h1 className="text-3xl font-bold">⚠️ Error Center</h1>
+        <p className="text-rose-100 mt-1">Platform error aggregation • Track and resolve issues</p>
       </div>
 
+      <div className="p-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Filters</CardTitle>
@@ -178,6 +180,7 @@ export default function ErrorCenterPage() {
           )}
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

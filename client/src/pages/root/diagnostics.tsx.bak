@@ -177,7 +177,6 @@ export default function DiagnosticsPage() {
           </Card>
         </div>
       )}
-      </div>
     </div>
   );
 }
