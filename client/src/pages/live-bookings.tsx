@@ -10,6 +10,7 @@ import { Phone, MessageCircle, RefreshCw, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useBookingWorkspace } from "@/components/booking/booking-workspace-context";
+import { SkipToMainContent, LoadingAnnouncement, DynamicContentAnnouncement } from "@/components/accessibility-helpers";
 
 export type Bucket = "startDue" | "startDelayed" | "startingSoon" | "ongoing" | "endingSoon" | "completionOverdue" | "paymentPending" | "completedToday" | "delayed" | "unassigned" | "cancelled";
 
@@ -99,18 +100,28 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
 
   return (
     <div className="space-y-6">
+      <SkipToMainContent />
+      <LoadingAnnouncement isLoading={isLoading} message="Loading live bookings..." />
+
       {/* Beautiful Header */}
-      <div className="gradient-header bg-gradient-to-r from-blue-600 via-blue-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-blue-600 via-blue-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg" role="region" aria-label="Page header">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">🚗 Live Bookings</h1>
-            <p className="text-blue-100 mt-1">
+            <p className="text-blue-100 mt-1" aria-live="polite">
               Real-time booking management • {(data as any)?.generatedAt ? `Updated ${new Date((data as any).generatedAt).toLocaleTimeString()}` : "Loading..."}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" role="group" aria-label="Booking window filters">
+            <label htmlFor="starting-window" className="sr-only">Starting window</label>
             <Select value={startingWindow} onValueChange={setStartingWindow}>
-              <SelectTrigger className="w-40 bg-white/20 border-white/30 text-white"><SelectValue placeholder="Starting window" /></SelectTrigger>
+              <SelectTrigger
+                id="starting-window"
+                className="w-40 bg-white/20 border-white/30 text-white"
+                aria-label="Filter bookings by starting window"
+              >
+                <SelectValue placeholder="Starting window" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="1h">Next 1 hour</SelectItem>
                 <SelectItem value="3h">Next 3 hours</SelectItem>
@@ -118,8 +129,15 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
                 <SelectItem value="tomorrow">Tomorrow</SelectItem>
               </SelectContent>
             </Select>
+            <label htmlFor="ending-window" className="sr-only">Ending window</label>
             <Select value={endingWindow} onValueChange={setEndingWindow}>
-              <SelectTrigger className="w-40 bg-white/20 border-white/30 text-white"><SelectValue placeholder="Ending window" /></SelectTrigger>
+              <SelectTrigger
+                id="ending-window"
+                className="w-40 bg-white/20 border-white/30 text-white"
+                aria-label="Filter bookings by ending window"
+              >
+                <SelectValue placeholder="Ending window" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="1h">Next 1 hour</SelectItem>
                 <SelectItem value="3h">Next 3 hours</SelectItem>
@@ -139,29 +157,33 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="stat-card card-hover bg-gradient-to-br from-red-50 to-pink-50 border-red-200">
+      <div
+        className="grid grid-cols-1 md:grid-cols-3 gap-4"
+        role="region"
+        aria-label="Live bookings summary statistics"
+      >
+        <Card className="stat-card card-hover bg-gradient-to-br from-red-50 to-pink-50 border-red-200 focus-ring">
           <CardContent className="p-4">
-            <p className="text-sm text-gray-600 font-medium">🔴 URGENT</p>
-            <p className="text-2xl font-bold text-red-600">
+            <p className="text-sm text-gray-600 font-medium" id="urgent-label">🔴 URGENT</p>
+            <p className="text-2xl font-bold text-red-600" aria-labelledby="urgent-label">
               {((data as any)?.startDelayed || []).length + ((data as any)?.completionOverdue || []).length}
             </p>
             <p className="text-xs text-gray-500 mt-1">Delayed or Overdue</p>
           </CardContent>
         </Card>
-        <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200 focus-ring">
           <CardContent className="p-4">
-            <p className="text-sm text-gray-600 font-medium">🔵 ACTIVE</p>
-            <p className="text-2xl font-bold text-blue-600">
+            <p className="text-sm text-gray-600 font-medium" id="active-label">🔵 ACTIVE</p>
+            <p className="text-2xl font-bold text-blue-600" aria-labelledby="active-label">
               {((data as any)?.ongoing || []).length}
             </p>
             <p className="text-xs text-gray-500 mt-1">Currently On Trip</p>
           </CardContent>
         </Card>
-        <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 focus-ring">
           <CardContent className="p-4">
-            <p className="text-sm text-gray-600 font-medium">✅ COMPLETED</p>
-            <p className="text-2xl font-bold text-green-600">
+            <p className="text-sm text-gray-600 font-medium" id="completed-label">✅ COMPLETED</p>
+            <p className="text-2xl font-bold text-green-600" aria-labelledby="completed-label">
               {((data as any)?.completedToday || []).length}
             </p>
             <p className="text-xs text-gray-500 mt-1">Completed Today</p>
@@ -169,31 +191,32 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
         </Card>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as Bucket)}>
-        <TabsList className="flex-wrap h-auto">
-          {TABS.map((t) => (
-            <TabsTrigger key={t.key} value={t.key}>
-              {t.label}
-              {data ? <Badge variant="secondary" className="ml-2">{((data as any)[t.key] || []).length}</Badge> : null}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <main id="main-content" className="space-y-4">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as Bucket)}>
+          <TabsList className="flex-wrap h-auto" role="tablist" aria-label="Booking status filters">
+            {TABS.map((t) => (
+              <TabsTrigger key={t.key} value={t.key} role="tab">
+                {t.label}
+                {data ? <Badge variant="secondary" className="ml-2" aria-label={`${((data as any)[t.key] || []).length} bookings`}>{((data as any)[t.key] || []).length}</Badge> : null}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-        {TABS.map((t) => (
-          <TabsContent key={t.key} value={t.key}>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">{t.label}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <p className="text-sm text-gray-500">Loading...</p>
-                ) : isError ? (
-                  <p className="text-sm text-red-600">Failed to load live bookings.</p>
-                ) : rows.length === 0 ? (
-                  <p className="text-sm text-gray-500 py-6 text-center">No bookings in this bucket.</p>
-                ) : (
-                  <Table>
+          {TABS.map((t) => (
+            <TabsContent key={t.key} value={t.key} role="tabpanel" aria-labelledby={`tab-${t.key}`}>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base" id={`tab-${t.key}`}>{t.label}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <p className="text-sm text-gray-500" role="status" aria-live="polite">Loading...</p>
+                  ) : isError ? (
+                    <p className="text-sm text-red-600" role="alert">Failed to load live bookings.</p>
+                  ) : rows.length === 0 ? (
+                    <p className="text-sm text-gray-500 py-6 text-center" role="status">No bookings in this bucket.</p>
+                  ) : (
+                    <Table role="grid" aria-label={`${t.label} bookings table`}>
                     <TableHeader>
                       <TableRow>
                         <TableCell>Booking</TableCell>
@@ -309,6 +332,7 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
           </TabsContent>
         ))}
       </Tabs>
+      </main>
     </div>
   );
 }
