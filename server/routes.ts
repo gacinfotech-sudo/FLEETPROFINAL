@@ -116,6 +116,7 @@ import { registerGpsVehicleStateRoutes } from "./gps/routes/vehicleState";
 import { registerGpsWebhookRoutes } from "./gps/ingestion/webhookRoute";
 import { registerGpsBillingRoutes } from "./gps/billing/routes";
 import { registerDashboardOverviewRoute } from "./dashboard/overview";
+import { registerTenantDashboardRoute } from "./dashboard/tenantDashboard";
 import { registerBookingQueuesRoutes } from "./booking/queues";
 import { registerDriverDomainRoutes } from "./driver/domain/routes";
 import { registerDriverDocumentModule } from "./driver/documents/index";
@@ -493,6 +494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerGpsBillingRoutes(app);
   registerBookingQueuesRoutes(app);
   registerDashboardOverviewRoute(app);
+  registerTenantDashboardRoute(app);
   registerDriverDomainRoutes(app);
   registerDriverDocumentModule(app);
   registerVehicleHandoverRoutes(app);

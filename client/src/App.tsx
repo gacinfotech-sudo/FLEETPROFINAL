@@ -11,6 +11,7 @@ import LandingPage from "./pages/landing";
 import LoginPage from "./pages/login";
 import AdminPanel from "./pages/admin-panel";
 import Dashboard from "./pages/dashboard";
+import TenantDashboard360 from "./pages/tenant-360";
 import Vehicle360Page from "./pages/vehicle-360";
 import ForcedPasswordResetPage from "./pages/forced-password-reset";
 import NotFound from "@/pages/not-found";
@@ -167,6 +168,13 @@ function AuthenticatedApp() {
       <Route path="/vehicles/:vehicleId">
         <ProtectedRoute allowedRoles={["client", "manager"]}>
           <Vehicle360Page />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Tenant Dashboard 360 */}
+      <Route path="/tenant-360">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <TenantDashboard360 />
         </ProtectedRoute>
       </Route>
 
