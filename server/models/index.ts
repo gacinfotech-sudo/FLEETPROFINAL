@@ -4310,3 +4310,295 @@ VendorRatingSchema.pre('save', function (next) { (this as any).updatedAt = new D
 export const VendorRating = mongoose.model<IVendorRating>('VendorRating', VendorRatingSchema);
 
 export const Itinerary = mongoose.model<IItinerary>('Itinerary', ItinerarySchema);
+
+// DriverSalaryMaster — Salary configuration per driver
+export interface IDriverSalaryMaster extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  driverId: mongoose.Types.ObjectId;
+  name: string;
+  mobile: string;
+  joiningDate: Date;
+  salaryType: 'fixed_monthly' | 'daily' | 'per_trip' | 'fixed_incentive' | 'custom';
+  baseSalary: number;
+  perDaySalary?: number;
+  perTripSalary?: number;
+  kmIncentivePerKm?: number;
+  nightAllowancePerNight?: number;
+  outstationAllowancePerDay?: number;
+  foodAllowance?: number;
+  overtimeRatePerHour?: number;
+  extraDutyRate?: number;
+  weeklyOffDays?: number[];
+  weeklyOffLeaveType?: 'paid' | 'unpaid' | 'compensatory';
+  salaryStartDate: Date;
+  bankName?: string;
+  accountNumber?: string;
+  ifscCode?: string;
+  upiId?: string;
+  status: 'active' | 'inactive';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const DriverSalaryMasterSchema = new Schema<IDriverSalaryMaster>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  driverId: { type: Schema.Types.ObjectId, ref: 'Driver', required: true },
+  name: { type: String, required: true },
+  mobile: { type: String, required: true },
+  joiningDate: { type: Date, required: true },
+  salaryType: {
+    type: String,
+    enum: ['fixed_monthly', 'daily', 'per_trip', 'fixed_incentive', 'custom'],
+    required: true
+  },
+  baseSalary: { type: Number, required: true, default: 0 },
+  perDaySalary: { type: Number },
+  perTripSalary: { type: Number },
+  kmIncentivePerKm: { type: Number },
+  nightAllowancePerNight: { type: Number },
+  outstationAllowancePerDay: { type: Number },
+  foodAllowance: { type: Number },
+  overtimeRatePerHour: { type: Number },
+  extraDutyRate: { type: Number },
+  weeklyOffDays: [{ type: Number }],
+  weeklyOffLeaveType: { type: String, enum: ['paid', 'unpaid', 'compensatory'] },
+  salaryStartDate: { type: Date, required: true },
+  bankName: { type: String },
+  accountNumber: { type: String },
+  ifscCode: { type: String },
+  upiId: { type: String },
+  status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+DriverSalaryMasterSchema.index({ tenantId: 1, driverId: 1 }, { unique: true });
+DriverSalaryMasterSchema.index({ tenantId: 1, status: 1 });
+DriverSalaryMasterSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const DriverSalaryMaster = mongoose.model<IDriverSalaryMaster>('DriverSalaryMaster', DriverSalaryMasterSchema);
+
+// DriverAdvance — Driver advance requests and tracking
+export interface IDriverAdvance extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  driverId: mongoose.Types.ObjectId;
+  amount: number;
+  requestDate: Date;
+  status: 'requested' | 'approved' | 'paid' | 'closed';
+  approvalDate?: Date;
+  approvedBy?: { userId: string; role: string };
+  paymentDate?: Date;
+  paidBy?: { userId: string; role: string };
+  paymentMode?: 'cash' | 'bank_transfer' | 'upi';
+  transactionReference?: string;
+  deductionMode: 'full_next_salary' | 'emi' | 'manual';
+  emiInstallments?: number;
+  emiAmount?: number;
+  totalDeducted: number;
+  remaining: number;
+  reason?: string;
+  approvalNotes?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const DriverAdvanceSchema = new Schema<IDriverAdvance>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  driverId: { type: Schema.Types.ObjectId, ref: 'Driver', required: true },
+  amount: { type: Number, required: true },
+  requestDate: { type: Date, required: true, default: Date.now },
+  status: { type: String, enum: ['requested', 'approved', 'paid', 'closed'], default: 'requested' },
+  approvalDate: { type: Date },
+  approvedBy: { userId: { type: String }, role: { type: String }, _id: false },
+  paymentDate: { type: Date },
+  paidBy: { userId: { type: String }, role: { type: String }, _id: false },
+  paymentMode: { type: String, enum: ['cash', 'bank_transfer', 'upi'] },
+  transactionReference: { type: String },
+  deductionMode: { type: String, enum: ['full_next_salary', 'emi', 'manual'], default: 'full_next_salary' },
+  emiInstallments: { type: Number },
+  emiAmount: { type: Number },
+  totalDeducted: { type: Number, default: 0 },
+  remaining: { type: Number, required: true },
+  reason: { type: String },
+  approvalNotes: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+DriverAdvanceSchema.index({ tenantId: 1, driverId: 1 });
+DriverAdvanceSchema.index({ tenantId: 1, status: 1 });
+DriverAdvanceSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const DriverAdvance = mongoose.model<IDriverAdvance>('DriverAdvance', DriverAdvanceSchema);
+
+// DriverSalaryLedger — Immutable ledger for driver salary transactions
+export interface IDriverSalaryLedger extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  driverId: mongoose.Types.ObjectId;
+  driverName: string;
+  month: number;
+  year: number;
+  transactionType: 'base_salary' | 'attendance_bonus' | 'trip_incentive' | 'km_incentive' |
+    'night_allowance' | 'outstation_allowance' | 'food_allowance' | 'overtime_earning' | 'bonus' | 'manual_incentive' |
+    'absence_deduction' | 'advance_recovery' | 'loan_recovery' | 'penalty' | 'damage_recovery' | 'challan_recovery' |
+    'cash_shortage' | 'fuel_excess' | 'other_deduction';
+  amount: number;
+  reason?: string;
+  referenceType?: 'booking_id' | 'advance_id' | 'trip_id' | 'deduction_id' | 'manual';
+  referenceId?: mongoose.Types.ObjectId;
+  basis?: { type: string; value: number };
+  createdBy: { userId: string; role: string };
+  createdAt: Date;
+  closingBalance?: number;
+}
+
+const DriverSalaryLedgerSchema = new Schema<IDriverSalaryLedger>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  driverId: { type: Schema.Types.ObjectId, ref: 'Driver', required: true },
+  driverName: { type: String, required: true },
+  month: { type: Number, required: true, min: 1, max: 12 },
+  year: { type: Number, required: true },
+  transactionType: {
+    type: String,
+    enum: ['base_salary', 'attendance_bonus', 'trip_incentive', 'km_incentive', 'night_allowance', 'outstation_allowance',
+      'food_allowance', 'overtime_earning', 'bonus', 'manual_incentive', 'absence_deduction', 'advance_recovery',
+      'loan_recovery', 'penalty', 'damage_recovery', 'challan_recovery', 'cash_shortage', 'fuel_excess', 'other_deduction'],
+    required: true
+  },
+  amount: { type: Number, required: true },
+  reason: { type: String },
+  referenceType: { type: String, enum: ['booking_id', 'advance_id', 'trip_id', 'deduction_id', 'manual'] },
+  referenceId: { type: Schema.Types.ObjectId },
+  basis: { type: { type: String }, value: { type: Number }, _id: false },
+  createdBy: { userId: { type: String, required: true }, role: { type: String, required: true }, _id: false },
+  createdAt: { type: Date, default: Date.now },
+  closingBalance: { type: Number }
+});
+
+DriverSalaryLedgerSchema.index({ tenantId: 1, driverId: 1 });
+DriverSalaryLedgerSchema.index({ tenantId: 1, driverId: 1, month: 1, year: 1 });
+DriverSalaryLedgerSchema.index({ tenantId: 1, month: 1, year: 1 });
+export const DriverSalaryLedger = mongoose.model<IDriverSalaryLedger>('DriverSalaryLedger', DriverSalaryLedgerSchema);
+
+// MonthlyPayroll — Monthly salary calculation and payment tracking
+export interface IMonthlyPayroll extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  month: number;
+  year: number;
+  status: 'draft' | 'calculated' | 'under_review' | 'approved' | 'partially_paid' | 'paid' | 'closed' | 'on_hold';
+  driverCount: number;
+  totalGrossSalary: number;
+  totalDeductions: number;
+  totalNetSalary: number;
+  totalPaid: number;
+  totalPending: number;
+  driverPayrolls: Array<{
+    driverId: mongoose.Types.ObjectId;
+    driverName: string;
+    baseSalary: number;
+    attendanceBonus?: number;
+    tripIncentive?: number;
+    kmIncentive?: number;
+    nightAllowance?: number;
+    outstationAllowance?: number;
+    foodAllowance?: number;
+    overtimeEarnings?: number;
+    bonusAmount?: number;
+    manualIncentive?: number;
+    grossSalary: number;
+    absenceDeduction?: number;
+    advanceRecovery?: number;
+    loanRecovery?: number;
+    penaltyDeduction?: number;
+    damageRecovery?: number;
+    challanRecovery?: number;
+    cashShortage?: number;
+    fuelExcessRecovery?: number;
+    otherDeductions?: number;
+    totalDeductions: number;
+    netSalary: number;
+    paymentStatus: 'not_paid' | 'partially_paid' | 'paid' | 'on_hold';
+    payments: Array<{
+      paidAmount: number;
+      paymentDate: Date;
+      paymentMode: 'cash' | 'bank_transfer' | 'upi' | 'split';
+      transactionReference?: string;
+      paidBy: { userId: string; role: string };
+    }>;
+    totalPaid: number;
+    remainingAmount: number;
+    calculatedBy?: { userId: string; role: string };
+    calculatedAt?: Date;
+    approvedBy?: { userId: string; role: string };
+    approvedAt?: Date;
+    approvalNotes?: string;
+    paidAt?: Date;
+  }>;
+  createdAt: Date;
+  updatedAt: Date;
+  closedAt?: Date;
+}
+
+const MonthlyPayrollSchema = new Schema<IMonthlyPayroll>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  month: { type: Number, required: true, min: 1, max: 12 },
+  year: { type: Number, required: true },
+  status: { type: String, enum: ['draft', 'calculated', 'under_review', 'approved', 'partially_paid', 'paid', 'closed', 'on_hold'], default: 'draft' },
+  driverCount: { type: Number, default: 0 },
+  totalGrossSalary: { type: Number, default: 0 },
+  totalDeductions: { type: Number, default: 0 },
+  totalNetSalary: { type: Number, default: 0 },
+  totalPaid: { type: Number, default: 0 },
+  totalPending: { type: Number, default: 0 },
+  driverPayrolls: [{
+    driverId: { type: Schema.Types.ObjectId, required: true },
+    driverName: { type: String, required: true },
+    baseSalary: { type: Number, default: 0 },
+    attendanceBonus: { type: Number },
+    tripIncentive: { type: Number },
+    kmIncentive: { type: Number },
+    nightAllowance: { type: Number },
+    outstationAllowance: { type: Number },
+    foodAllowance: { type: Number },
+    overtimeEarnings: { type: Number },
+    bonusAmount: { type: Number },
+    manualIncentive: { type: Number },
+    grossSalary: { type: Number, default: 0 },
+    absenceDeduction: { type: Number },
+    advanceRecovery: { type: Number },
+    loanRecovery: { type: Number },
+    penaltyDeduction: { type: Number },
+    damageRecovery: { type: Number },
+    challanRecovery: { type: Number },
+    cashShortage: { type: Number },
+    fuelExcessRecovery: { type: Number },
+    otherDeductions: { type: Number },
+    totalDeductions: { type: Number, default: 0 },
+    netSalary: { type: Number, default: 0 },
+    paymentStatus: { type: String, enum: ['not_paid', 'partially_paid', 'paid', 'on_hold'], default: 'not_paid' },
+    payments: [{
+      paidAmount: { type: Number, required: true },
+      paymentDate: { type: Date, required: true },
+      paymentMode: { type: String, enum: ['cash', 'bank_transfer', 'upi', 'split'], required: true },
+      transactionReference: { type: String },
+      paidBy: { userId: { type: String, required: true }, role: { type: String, required: true } },
+      _id: false
+    }],
+    totalPaid: { type: Number, default: 0 },
+    remainingAmount: { type: Number, default: 0 },
+    calculatedBy: { userId: { type: String }, role: { type: String }, _id: false },
+    calculatedAt: { type: Date },
+    approvedBy: { userId: { type: String }, role: { type: String }, _id: false },
+    approvedAt: { type: Date },
+    approvalNotes: { type: String },
+    paidAt: { type: Date },
+    _id: false
+  }],
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  closedAt: { type: Date }
+});
+
+MonthlyPayrollSchema.index({ tenantId: 1, month: 1, year: 1 }, { unique: true });
+MonthlyPayrollSchema.index({ tenantId: 1, status: 1 });
+MonthlyPayrollSchema.index({ tenantId: 1, month: 1, year: 1, 'driverPayrolls.driverId': 1 });
+MonthlyPayrollSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const MonthlyPayroll = mongoose.model<IMonthlyPayroll>('MonthlyPayroll', MonthlyPayrollSchema);
