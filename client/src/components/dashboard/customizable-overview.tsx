@@ -32,17 +32,21 @@ export default function CustomizableOverview({
 
   const enabledWidgets = getEnabledWidgets();
 
-  const handleDragStart = (id: string) => {
+  const handleDragStart = (e: React.DragEvent, id: string) => {
+    e.stopPropagation();
     setDraggedId(id);
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = "move";
     dragOverIndex.current = index;
   };
 
   const handleDrop = (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
+    e.stopPropagation();
     if (!draggedId) return;
 
     const draggedIndex = enabledWidgets.findIndex((w) => w.id === draggedId);
@@ -53,7 +57,8 @@ export default function CustomizableOverview({
     dragOverIndex.current = null;
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (e: React.DragEvent) => {
+    e.preventDefault();
     setDraggedId(null);
     dragOverIndex.current = null;
   };
@@ -102,6 +107,7 @@ export default function CustomizableOverview({
             key={widget.id}
             onDragOver={(e) => isEditMode && handleDragOver(e, index)}
             onDrop={(e) => isEditMode && handleDrop(e, index)}
+            onDragLeave={(e) => e.preventDefault()}
             className={isEditMode ? "group" : ""}
           >
             <DraggableWidget
@@ -110,7 +116,7 @@ export default function CustomizableOverview({
               size={widget.size}
               isDragging={draggedId === widget.id}
               isDragEnabled={isEditMode}
-              onDragStart={() => handleDragStart(widget.id)}
+              onDragStart={(e) => handleDragStart(e, widget.id)}
               onDragEnd={handleDragEnd}
               onRemove={isEditMode ? () => toggleWidget(widget.id) : undefined}
               onResize={isEditMode ? (size) => resizeWidget(widget.id, size) : undefined}

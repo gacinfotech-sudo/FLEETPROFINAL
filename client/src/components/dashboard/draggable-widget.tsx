@@ -9,8 +9,8 @@ interface DraggableWidgetProps {
   size: "small" | "medium" | "large";
   isDragging: boolean;
   isDragEnabled: boolean;
-  onDragStart: () => void;
-  onDragEnd: () => void;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragEnd: (e: React.DragEvent) => void;
   onRemove?: () => void;
   onResize?: (size: "small" | "medium" | "large") => void;
   children: React.ReactNode;
@@ -34,9 +34,9 @@ export default function DraggableWidget({
   const dragRef = useRef<HTMLDivElement>(null);
 
   const sizeClasses = {
-    small: "lg:col-span-4",
-    medium: "lg:col-span-6",
-    large: "lg:col-span-12",
+    small: "col-span-4",
+    medium: "col-span-6",
+    large: "col-span-12",
   };
 
   const nextSize: Record<string, "small" | "medium" | "large"> = {
@@ -45,20 +45,33 @@ export default function DraggableWidget({
     large: "small",
   };
 
+  const handleDragStart = (e: React.DragEvent) => {
+    if (!isDragEnabled) {
+      e.preventDefault();
+      return;
+    }
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/html", e.currentTarget.innerHTML);
+    onDragStart(e);
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    onDragEnd(e);
+  };
+
   return (
     <div
       ref={dragRef}
       draggable={isDragEnabled}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(false)}
       className={cn(
-        "col-span-12",
         sizeClasses[size],
         "transition-all duration-200 rounded-lg",
         isDragging && "opacity-50 scale-95",
-        isDragEnabled && "cursor-move",
+        isDragEnabled && "cursor-grab active:cursor-grabbing",
         className
       )}
     >
