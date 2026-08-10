@@ -56,18 +56,62 @@ export default function DriverAttendancePage() {
     onError: (err: any) => toast({ title: "Could not mark attendance", description: err.message, variant: "destructive" }),
   });
 
+  const stats = {
+    present: drivers.filter((d: any) => d.status === 'present' || d.status === 'on_duty').length,
+    late: drivers.filter((d: any) => d.status === 'late').length,
+    absent: drivers.filter((d: any) => d.status === 'absent').length,
+    onLeave: drivers.filter((d: any) => d.status === 'paid_leave' || d.status === 'unpaid_leave' || d.status === 'weekly_off').length,
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Driver Attendance</h1>
-          <p className="text-sm text-gray-500">Marked automatically when a trip starts — manual marking is for non-duty days only.</p>
-        </div>
-        <div>
-          <Label className="text-xs">Date</Label>
-          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40" />
+      {/* Beautiful Header */}
+      <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">📋 Driver Attendance</h1>
+            <p className="text-purple-100 mt-1">Auto-marked on trip start • Manual override for non-duty days</p>
+          </div>
+          <div className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
+            <Label className="text-xs text-white">Date</Label>
+            <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-40 bg-white/10 border-white/30 text-white" />
+          </div>
         </div>
       </div>
+
+      {/* Stats Cards */}
+      {!isLoading && !isError && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <CardContent className="p-4">
+              <p className="text-sm text-gray-600 font-medium">✅ PRESENT</p>
+              <p className="text-2xl font-bold text-green-600 mt-2">{stats.present}</p>
+              <p className="text-xs text-gray-500 mt-1">On duty</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
+            <CardContent className="p-4">
+              <p className="text-sm text-gray-600 font-medium">⏱️ LATE</p>
+              <p className="text-2xl font-bold text-yellow-600 mt-2">{stats.late}</p>
+              <p className="text-xs text-gray-500 mt-1">Delayed arrival</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
+            <CardContent className="p-4">
+              <p className="text-sm text-gray-600 font-medium">❌ ABSENT</p>
+              <p className="text-2xl font-bold text-red-600 mt-2">{stats.absent}</p>
+              <p className="text-xs text-gray-500 mt-1">Not marked</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+            <CardContent className="p-4">
+              <p className="text-sm text-gray-600 font-medium">🏖️ ON LEAVE</p>
+              <p className="text-2xl font-bold text-blue-600 mt-2">{stats.onLeave}</p>
+              <p className="text-xs text-gray-500 mt-1">Leave approved</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Card>
         <CardHeader><CardTitle className="text-base">{drivers.length} driver{drivers.length === 1 ? "" : "s"}</CardTitle></CardHeader>
