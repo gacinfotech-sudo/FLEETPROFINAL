@@ -392,21 +392,35 @@ export default function LiveOperations({ initialTab }: { initialTab?: OpsTab } =
   ] : [];
 
   return (
-    <div data-testid="live-operations-page">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Vehicles on Booking</h1>
-          <p className="text-sm text-gray-500">Every vehicle currently out — who has it, when it returns, what's due.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => { apiRequest("POST", "/api/operations/reminders/run", {}).finally(() => refetch()); }}>
-            <RefreshCw size={14} className="mr-1" />Refresh
-          </Button>
-          {user?.role === "client" && (
-            <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)} data-testid="reminder-settings-button">
-              <Settings size={14} className="mr-1" />Reminders
+    <div data-testid="live-operations-page" className="space-y-6">
+      {/* Beautiful Header */}
+      <div className="bg-gradient-to-r from-red-600 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">🚗 Vehicles on Booking</h1>
+            <p className="text-red-100 mt-1">Live fleet status • Current locations & return schedules</p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/20"
+              onClick={() => { apiRequest("POST", "/api/operations/reminders/run", {}).finally(() => refetch()); }}
+            >
+              <RefreshCw size={14} className="mr-1" />Refresh
             </Button>
-          )}
+            {user?.role === "client" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white hover:bg-white/20"
+                onClick={() => setSettingsOpen(true)}
+                data-testid="reminder-settings-button"
+              >
+                <Settings size={14} className="mr-1" />Reminders
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

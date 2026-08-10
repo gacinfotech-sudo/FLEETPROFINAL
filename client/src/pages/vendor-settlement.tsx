@@ -48,10 +48,21 @@ export default function VendorSettlementPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Building2 className="h-6 w-6" /> Vendor Settlement</h1>
-        <p className="text-sm text-gray-500">Outstanding balance owed to each vendor across their outsourced bookings.</p>
+      {/* Beautiful Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
+        <h1 className="text-3xl font-bold">🏢 Vendor Settlement</h1>
+        <p className="text-blue-100 mt-1">Outstanding payments owed to vendors • Outsourced bookings tracked</p>
       </div>
+
+      {/* Summary Card */}
+      {!isLoading && !isError && data && (
+        <Card className="bg-gradient-to-br from-red-50 to-orange-50 border-red-200">
+          <CardContent className="py-4 flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-600">Total Outstanding to {vendors.length} Vendor{vendors.length === 1 ? "" : "s"}</span>
+            <span className="text-3xl font-bold text-red-600">{fmtMoney(data?.totalOutstanding)}</span>
+          </CardContent>
+        </Card>
+      )}
 
       {isError ? (
         <p className="text-sm text-red-600">Could not load vendor settlement data.</p>

@@ -201,16 +201,18 @@ export default function SelfDrivePage() {
     .filter((b) => matches([b.customerName, b.customerPhone, b.bookingId]));
 
   return (
-    <div data-testid="self-drive-page">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Self Drive</h1>
-          <p className="text-sm text-gray-500">Active vehicles, overdue returns and security-deposit refunds — one queue.</p>
-        </div>
+    <div data-testid="self-drive-page" className="space-y-6">
+      {/* Beautiful Header */}
+      <div className="bg-gradient-to-r from-orange-600 to-amber-600 rounded-xl p-6 text-white shadow-lg">
+        <h1 className="text-3xl font-bold">🚗 Self Drive</h1>
+        <p className="text-orange-100 mt-1">Active vehicles • Overdue returns • Security deposit refunds</p>
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <Input placeholder="Search customer / phone / booking / vehicle…" className="sm:w-80" value={search} onChange={(e) => setSearch(e.target.value)} data-testid="sd-search" />
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
           { label: "Active", value: kpi.active, tab: "active" as SdTab },
           { label: "Overdue", value: kpi.overdue, tab: "overdue" as SdTab, danger: kpi.overdue > 0 },
