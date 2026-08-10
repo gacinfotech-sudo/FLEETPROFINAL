@@ -6,6 +6,7 @@ import Sidebar from "../components/layout/sidebar";
 import DashboardOverview from "../components/dashboard/overview";
 import CustomizableOverview from "../components/dashboard/customizable-overview";
 import PremiumDashboard from "../components/dashboard/premium-dashboard";
+import BeautifulDashboard from "../components/dashboard/beautiful-dashboard";
 import EnhancedBookingForm from "../components/booking/enhanced-booking-form";
 import VehicleForm from "../components/fleet/vehicle-form";
 import VehicleFeedbackProfile from "../components/fleet/vehicle-feedback-profile";
@@ -476,14 +477,8 @@ export default function Dashboard() {
       case "dashboard":
         return (
           <div className="space-y-6">
-            {/* Best View - Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg px-6 py-3 text-white flex items-center gap-2">
-              <span className="text-xl">⭐</span>
-              <span className="font-semibold">Best View</span>
-            </div>
-
-            {/* Main Dashboard - Best View */}
-            <DashboardOverview
+            {/* Beautiful Dashboard with Enhanced Charts */}
+            <BeautifulDashboard
               onNavigate={(view) => handleViewChange(view as ViewType)}
               onViewBooking={(booking) => openBooking(booking)}
               onSelectCustomer={handleSelectCustomerFromSearch}
