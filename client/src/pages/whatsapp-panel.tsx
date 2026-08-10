@@ -90,12 +90,10 @@ export default function WhatsAppPanel() {
 
   return (
     <div className="space-y-6 max-w-xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">WhatsApp</h1>
-        <p className="text-sm text-gray-500">
-          Link your business's WhatsApp number by scanning the QR code below with WhatsApp on your phone
-          (Settings → Linked Devices → Link a Device).
-        </p>
+      {/* Beautiful Header */}
+      <div className="bg-gradient-to-r from-green-600 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
+        <h1 className="text-3xl font-bold">💬 WhatsApp Integration</h1>
+        <p className="text-green-100 mt-1">Link your business number • Send messages to customers</p>
       </div>
 
       <Alert variant="destructive">
