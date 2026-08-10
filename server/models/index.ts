@@ -890,6 +890,15 @@ const BookingSchema = new Schema<IBooking>({
   petrolCharges: { type: Number, default: 0 },
   dieselCharges: { type: Number, default: 0 },
   cngCharges: { type: Number, default: 0 },
+  // Self-drive pickup & drop service charges (REQ-5)
+  pickupServiceRequired: { type: Boolean, default: false },
+  pickupServiceCharge: { type: Number, default: 0 },
+  pickupServiceLocation: { type: String },
+  pickupServiceDateTime: { type: Date },
+  dropServiceRequired: { type: Boolean, default: false },
+  dropServiceCharge: { type: Number, default: 0 },
+  dropServiceLocation: { type: String },
+  dropServiceDateTime: { type: Date },
   miscellaneousAmount: { type: Number, default: 0 },
   miscellaneousDescription: { type: String },
   cancellationReason: { type: String },
@@ -1877,6 +1886,91 @@ BookingSchema.index({ tenantId: 1, vehicleId: 1, actualStartDateTime: 1, actualE
 // full-table poll (spec §66). The existing {tenantId, status} index can't
 // serve the end-time range efficiently once booking history grows.
 BookingSchema.index({ tenantId: 1, status: 1, scheduledEndDateTime: 1 });
+
+// Self-drive vehicle inspection (REQ-8, REQ-9)
+export interface IVehicleInspection extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  bookingId: mongoose.Types.ObjectId;
+  vehicleId: mongoose.Types.ObjectId;
+  driverId: mongoose.Types.ObjectId;
+  inspectionType: 'pre_handover' | 'post_return';
+  frontBody: 'ok' | 'issue' | 'n/a';
+  rearBody: 'ok' | 'issue' | 'n/a';
+  leftSide: 'ok' | 'issue' | 'n/a';
+  rightSide: 'ok' | 'issue' | 'n/a';
+  windshield: 'ok' | 'issue' | 'n/a';
+  mirrors: 'ok' | 'issue' | 'n/a';
+  headlights: 'ok' | 'issue' | 'n/a';
+  taillights: 'ok' | 'issue' | 'n/a';
+  tires: 'ok' | 'issue' | 'n/a';
+  stepney: 'ok' | 'issue' | 'n/a';
+  interior: 'ok' | 'issue' | 'n/a';
+  seats: 'ok' | 'issue' | 'n/a';
+  acControls: 'ok' | 'issue' | 'n/a';
+  odometerReading: number;
+  fuelLevel: 'empty' | 'quarter' | 'half' | 'threequarter' | 'full';
+  notes: string;
+  photosCapture: {
+    front?: string;
+    rear?: string;
+    left?: string;
+    right?: string;
+    interior?: string;
+    odometer?: string;
+    fuelMeter?: string;
+    stepney?: string;
+    [key: string]: string | undefined;
+  };
+  issuesFound: {
+    category: 'scratch' | 'dent' | 'damage' | 'puncture' | 'missing' | 'other';
+    location: string;
+    description: string;
+    photoReference?: string;
+  }[];
+  createdBy: {
+    driverId: mongoose.Types.ObjectId;
+    timestamp: Date;
+  };
+  createdAt: Date;
+}
+const VehicleInspectionSchema = new Schema<IVehicleInspection>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
+  vehicleId: { type: Schema.Types.ObjectId, ref: 'Vehicle', required: true },
+  driverId: { type: Schema.Types.ObjectId, ref: 'Driver', required: true },
+  inspectionType: { type: String, enum: ['pre_handover', 'post_return'], required: true },
+  frontBody: { type: String, enum: ['ok', 'issue', 'n/a'], required: true },
+  rearBody: { type: String, enum: ['ok', 'issue', 'n/a'], required: true },
+  leftSide: { type: String, enum: ['ok', 'issue', 'n/a'], required: true },
+  rightSide: { type: String, enum: ['ok', 'issue', 'n/a'], required: true },
+  windshield: { type: String, enum: ['ok', 'issue', 'n/a'], required: true },
+  mirrors: { type: String, enum: ['ok', 'issue', 'n/a'], required: true },
+  headlights: { type: String, enum: ['ok', 'issue', 'n/a'], required: true },
+  taillights: { type: String, enum: ['ok', 'issue', 'n/a'], required: true },
+  tires: { type: String, enum: ['ok', 'issue', 'n/a'], required: true },
+  stepney: { type: String, enum: ['ok', 'issue', 'n/a'], required: true },
+  interior: { type: String, enum: ['ok', 'issue', 'n/a'], required: true },
+  seats: { type: String, enum: ['ok', 'issue', 'n/a'], required: true },
+  acControls: { type: String, enum: ['ok', 'issue', 'n/a'], required: true },
+  odometerReading: { type: Number, required: true },
+  fuelLevel: { type: String, enum: ['empty', 'quarter', 'half', 'threequarter', 'full'], required: true },
+  notes: { type: String },
+  photosCapture: { type: Schema.Types.Mixed, default: {} },
+  issuesFound: [{
+    category: { type: String, enum: ['scratch', 'dent', 'damage', 'puncture', 'missing', 'other'], required: true },
+    location: { type: String, required: true },
+    description: { type: String, required: true },
+    photoReference: { type: String },
+  }],
+  createdBy: {
+    driverId: { type: Schema.Types.ObjectId, ref: 'Driver', required: true },
+    timestamp: { type: Date, default: Date.now },
+  },
+  createdAt: { type: Date, default: Date.now },
+});
+VehicleInspectionSchema.index({ tenantId: 1, bookingId: 1 });
+VehicleInspectionSchema.index({ tenantId: 1, vehicleId: 1, inspectionType: 1 });
+
 ExpenseSchema.index({ tenantId: 1, date: 1 });
 ExpenseSchema.index({ tenantId: 1, vehicleId: 1 });
 // Backs the Trip Cost Summary's per-booking expense lookup.
@@ -1888,6 +1982,7 @@ export const Customer = mongoose.model<ICustomer>('Customer', CustomerSchema);
 export const RewardRule = mongoose.model<IRewardRule>('RewardRule', RewardRuleSchema);
 export const RewardTransaction = mongoose.model<IRewardTransaction>('RewardTransaction', RewardTransactionSchema);
 export const LoyaltyTier = mongoose.model<ILoyaltyTier>('LoyaltyTier', LoyaltyTierSchema);
+export const VehicleInspection = mongoose.model<IVehicleInspection>('VehicleInspection', VehicleInspectionSchema);
 
 // Tag history — who added/removed each tag and when. Customer.tags (the
 // array) is the fast-read "current state"; this is the append-only audit
