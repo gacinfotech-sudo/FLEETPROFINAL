@@ -20,6 +20,13 @@ export default function UpcomingBookings() {
 
   const days: any[] = (data as any[]) || [];
 
+  // Calculate totals across all days
+  const todayCount = days[0]?.bookings?.length || 0;
+  const tomorrowCount = days[1]?.bookings?.length || 0;
+  const dayAfterCount = days[2]?.bookings?.length || 0;
+  const totalBookings = todayCount + tomorrowCount + dayAfterCount;
+  const totalRevenue = days.flatMap((d: any) => d.bookings || []).reduce((sum: number, b: any) => sum + (b.totalAmount || 0), 0);
+
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
@@ -29,6 +36,40 @@ export default function UpcomingBookings() {
           <p className="text-blue-100 mt-1">Today, tomorrow and the day after — sorted by pickup time</p>
         </div>
       </div>
+
+      {/* Summary Stats Cards */}
+      {!isLoading && !isError && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <CardContent className="p-4">
+              <p className="text-sm text-gray-600 font-medium">📍 TODAY</p>
+              <p className="text-2xl font-bold text-green-600 mt-2">{todayCount}</p>
+              <p className="text-xs text-gray-500 mt-1">bookings</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+            <CardContent className="p-4">
+              <p className="text-sm text-gray-600 font-medium">🔜 TOMORROW</p>
+              <p className="text-2xl font-bold text-blue-600 mt-2">{tomorrowCount}</p>
+              <p className="text-xs text-gray-500 mt-1">bookings</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+            <CardContent className="p-4">
+              <p className="text-sm text-gray-600 font-medium">📌 DAY AFTER</p>
+              <p className="text-2xl font-bold text-purple-600 mt-2">{dayAfterCount}</p>
+              <p className="text-xs text-gray-500 mt-1">bookings</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+            <CardContent className="p-4">
+              <p className="text-sm text-gray-600 font-medium">💰 REVENUE</p>
+              <p className="text-2xl font-bold text-amber-600 mt-2">{fmtMoney(totalRevenue)}</p>
+              <p className="text-xs text-gray-500 mt-1">3 days total</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {isLoading && <p className="text-sm text-gray-500">Loading...</p>}
       {isError && <p className="text-sm text-red-600">Failed to load upcoming bookings.</p>}
