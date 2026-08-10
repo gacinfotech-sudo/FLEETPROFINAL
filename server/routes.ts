@@ -3213,6 +3213,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!bookingData.sourceContact) bookingData.sourceContact = sourceVendor.primaryMobile;
       }
 
+      // BUG-015 FIX: Check for same-day double-booking BEFORE creation
+      // Prevent driver/vehicle from being overbooked on the same day
+      if (bookingData.pickupDate && (bookingData.driverId || bookingData.vehicleId)) {
+        const pickupDate = new Date(bookingData.pickupDate);
+        const dayStart = new Date(pickupDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(pickupDate);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        const conflicts: any = {};
+
+        if (bookingData.vehicleId) {
+          const vehicleConflicts = await findVehicleConflicts(req.tenantId!, bookingData.vehicleId, dayStart, dayEnd, undefined);
+          if (vehicleConflicts.length > 0) {
+            conflicts.vehicle = vehicleConflicts;
+          }
+        }
+
+        if (bookingData.driverId) {
+          const driverConflicts = await checkDriverAvailability(req.tenantId!, bookingData.driverId, dayStart, dayEnd, undefined);
+          if (driverConflicts && driverConflicts.conflicts && driverConflicts.conflicts.length > 0) {
+            conflicts.driver = driverConflicts.conflicts;
+          }
+        }
+
+        if (Object.keys(conflicts).length > 0) {
+          return res.status(409).json({
+            message: "Driver or vehicle is already assigned for this date. Choose different resources or override if authorized.",
+            code: 'SAME_DAY_CONFLICT',
+            conflicts
+          });
+        }
+      }
+
       // Customer Database linking — resolved BEFORE the booking is
       // created (not after) so an "Apply Reward Points" redemption can be
       // validated against a real customer/balance and its discount
@@ -7022,6 +7056,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Rewards/Referral dashboard error:', error?.message || error);
       res.status(500).json({ message: "Failed to build rewards/referral dashboard" });
+    }
+  });
+
+  // BUG-014 FIX: Standard /api/rewards alias
+  // Reward endpoints were previously nested under /api/customers/:id/rewards
+  // Add top-level aggregation endpoint for dashboard consistency
+  app.get("/api/rewards", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REFERRAL_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const filter: any = { tenantId: req.tenantId };
+      const customerId = req.query.customerId as string | undefined;
+      if (customerId) {
+        filter.customerId = customerId;
+      }
+      const rows = await RewardTransaction.find(filter).sort({ createdAt: -1 }).limit(200)
+        .populate('customerId', 'name primaryMobile');
+      res.json(rows);
+    } catch (error) {
+      console.error('Reward list error:', error);
+      res.status(500).json({ message: 'Failed to fetch rewards' });
+    }
+  });
+
+  // BUG-014 FIX: Standard /api/referrals alias
+  // Referral endpoints were previously nested under /api/customers/:id/referrals
+  app.get("/api/referrals", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REFERRAL_VIEW), async (req: AuthRequest, res) => {
+    try {
+      const referrals = await Referral.find({ tenantId: req.tenantId })
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .populate('customerId', 'name primaryMobile')
+        .populate('referredCustomerId', 'name primaryMobile');
+      res.json(referrals);
+    } catch (error) {
+      console.error('Referral list error:', error);
+      res.status(500).json({ message: 'Failed to fetch referrals' });
     }
   });
 
