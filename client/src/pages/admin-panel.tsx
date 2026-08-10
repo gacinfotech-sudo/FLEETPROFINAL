@@ -265,23 +265,23 @@ export default function AdminPanel() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      {/* Beautiful Gradient Header */}
+      <header className="bg-gradient-to-r from-red-600 to-rose-600 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+          <div className="flex justify-between items-center py-6">
             <div className="flex items-center">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+              <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center mr-3">
                 <Shield className="text-white" size={20} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
-                <p className="text-sm text-gray-500">Super Administrator</p>
+                <h1 className="text-2xl font-bold text-white">🔐 Admin Panel</h1>
+                <p className="text-sm text-red-100">Super Administrator • System Control</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
               <Dialog open={showClientForm} onOpenChange={setShowClientForm}>
                 <DialogTrigger asChild>
-                  <Button className="bg-blue-600 hover:bg-blue-700">
+                  <Button className="bg-white text-red-600 hover:bg-red-50 font-semibold">
                     <Plus className="mr-2" size={16} />
                     Add Client
                   </Button>
@@ -301,7 +301,7 @@ export default function AdminPanel() {
                   />
                 </DialogContent>
               </Dialog>
-              <Button variant="ghost" onClick={handleLogout}>
+              <Button className="bg-white/20 text-white hover:bg-white/30 border border-white/30" onClick={handleLogout}>
                 <LogOut className="mr-2" size={16} />
                 Logout
               </Button>
