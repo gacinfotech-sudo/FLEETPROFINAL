@@ -155,9 +155,10 @@ export default function Dashboard() {
   const { canManageFleet, canManageDrivers, canViewRevenue, canDeleteBooking, canGenerateInvoice } = usePermissions();
 
   // Sync URL with current view on mount with role-based access control
+  // ONLY reads from URL params and updates state — does NOT call setLocation
+  // (routing is handled by handleViewChange to avoid race conditions)
   useEffect(() => {
     const section = params.section as ViewType;
-    console.log("📍 URL section param:", section, "currentView:", currentView);
     const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "live-operations", "self-drive", "upcoming-bookings", "booking-queues", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "drivers-add", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "customers-add", "after-sales", "campaigns", "rewards-referrals", "vendors", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile", "gps-tracking"];
 
     // Add "users" section only for admin and client roles
@@ -176,21 +177,14 @@ export default function Dashboard() {
       });
     }
 
+    // If URL param is valid, update view. If not, default to dashboard
+    // (but don't redirect — let handleViewChange manage navigation)
     if (section && allowedSections.includes(section)) {
-      console.log("✅ Section allowed, setting view to:", section);
       setCurrentView(section);
-    } else if (!section) {
-      console.log("⚠️  No section, redirecting to dashboard");
-      setCurrentView("dashboard");
-      // Redirect to /dashboard/dashboard if no section is specified
-      setLocation("/dashboard/dashboard");
     } else {
-      // If user tries to access unauthorized section, redirect to dashboard
-      console.log("❌ Section not allowed:", section, "allowed:", allowedSections);
       setCurrentView("dashboard");
-      setLocation("/dashboard/dashboard");
     }
-  }, [params.section, setLocation, user?.role]);
+  }, [params.section, user?.role]);
 
   // Check if onboarding should be shown for client users
   useEffect(() => {
@@ -214,10 +208,6 @@ export default function Dashboard() {
     }
   }, [currentView]);
 
-  // DEBUG: Log currentView changes
-  useEffect(() => {
-    console.log("🔄 currentView changed to:", currentView);
-  }, [currentView]);
 
   // Update URL when view changes
   const handleViewChange = (view: ViewType) => {
@@ -497,7 +487,6 @@ export default function Dashboard() {
         );
 
       case "bookings": {
-        console.log("🎯 Rendering BOOKINGS form, prefill:", !!bookingPrefill);
         const { __leadId, ...formPrefill } = bookingPrefill || {};
         return (
           <div>
