@@ -178,13 +178,13 @@ export default function DashboardOverview({ onNavigate, onViewBooking, onSelectC
         <p className="text-sm text-muted-foreground mt-0.5">Live overview of your fleet operations</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" className="h-10" onClick={() => onNavigate("customers-add")}>
+        <Button variant="outline" className="h-10" onClick={() => { console.log("Add Customer clicked"); onNavigate("customers-add"); }}>
           <UserRoundPlus className="mr-1.5 h-4 w-4" /> Add Customer
         </Button>
-        <Button className="h-10 bg-blue-600 hover:bg-blue-700" onClick={() => onNavigate("bookings")}>
+        <Button className="h-10 bg-blue-600 hover:bg-blue-700" onClick={() => { console.log("Create Booking clicked, navigating to bookings"); onNavigate("bookings"); }}>
           <CalendarPlus className="mr-1.5 h-4 w-4" /> Create Booking
         </Button>
-        <Button variant="outline" className="h-10" onClick={() => onNavigate("fleet")}>
+        <Button variant="outline" className="h-10" onClick={() => { console.log("Manage Fleet clicked"); onNavigate("fleet"); }}>
           <Car className="mr-1.5 h-4 w-4" /> Manage Fleet
         </Button>
       </div>

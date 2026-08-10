@@ -157,13 +157,14 @@ export default function Dashboard() {
   // Sync URL with current view on mount with role-based access control
   useEffect(() => {
     const section = params.section as ViewType;
+    console.log("📍 URL section param:", section, "currentView:", currentView);
     const allowedSections = ["dashboard", "inquiries", "leads", "followups", "live-bookings", "live-operations", "self-drive", "upcoming-bookings", "booking-queues", "payment-dues", "bookings", "fleet", "vehicle-performance", "drivers", "drivers-add", "driver-leave", "driver-performance", "driver-attendance", "history", "customers", "customers-add", "after-sales", "campaigns", "rewards-referrals", "vendors", "revenue", "vendor-settlement", "expenses", "salary", "whatsapp", "profile", "gps-tracking"];
-    
+
     // Add "users" section only for admin and client roles
     if (user?.role === 'admin' || user?.role === 'client') {
       allowedSections.push("users");
     }
-    
+
     // Remove restricted sections for manager roles
     if (user?.role === 'manager') {
       const restrictedSections = ["revenue", "vendor-settlement", "drivers", "drivers-add", "driver-leave", "driver-performance", "vehicle-performance", "driver-attendance", "after-sales", "campaigns", "rewards-referrals", "vendors"];
@@ -174,15 +175,18 @@ export default function Dashboard() {
         }
       });
     }
-    
+
     if (section && allowedSections.includes(section)) {
+      console.log("✅ Section allowed, setting view to:", section);
       setCurrentView(section);
     } else if (!section) {
+      console.log("⚠️  No section, redirecting to dashboard");
       setCurrentView("dashboard");
       // Redirect to /dashboard/dashboard if no section is specified
       setLocation("/dashboard/dashboard");
     } else {
       // If user tries to access unauthorized section, redirect to dashboard
+      console.log("❌ Section not allowed:", section, "allowed:", allowedSections);
       setCurrentView("dashboard");
       setLocation("/dashboard/dashboard");
     }
@@ -208,6 +212,11 @@ export default function Dashboard() {
       setEditingDriver(null);
       setShowDriverForm(true);
     }
+  }, [currentView]);
+
+  // DEBUG: Log currentView changes
+  useEffect(() => {
+    console.log("🔄 currentView changed to:", currentView);
   }, [currentView]);
 
   // Update URL when view changes
@@ -488,6 +497,7 @@ export default function Dashboard() {
         );
 
       case "bookings": {
+        console.log("🎯 Rendering BOOKINGS form, prefill:", !!bookingPrefill);
         const { __leadId, ...formPrefill } = bookingPrefill || {};
         return (
           <div>
