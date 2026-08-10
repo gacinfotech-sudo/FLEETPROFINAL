@@ -510,100 +510,82 @@ export default function Dashboard() {
 
       case "fleet":
         return (
-          <div>
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Fleet Management</h1>
-              {canManageFleet() && (
-                <Dialog open={showVehicleForm} onOpenChange={(open) => {
-                  setShowVehicleForm(open);
-                  if (!open) {
-                    setEditingVehicle(null); // Reset editing state when dialog closes
-                  }
-                }}>
-                  <DialogTrigger asChild>
-                    <Button 
-                      className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
-                      onClick={() => setEditingVehicle(null)} // Reset editing state when adding new vehicle
-                    >
-                      Add Vehicle
-                    </Button>
-                  </DialogTrigger>
-                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>{editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}</DialogTitle>
-                  </DialogHeader>
-                  <VehicleForm 
-                    vehicle={editingVehicle} 
-                    onSuccess={() => {
-                      setShowVehicleForm(false);
+          <div className="space-y-6">
+            {/* Beautiful Header */}
+            <div className="bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <h1 className="text-3xl font-bold">🚗 Fleet Management</h1>
+                  <p className="text-cyan-100 mt-1">Monitor vehicle status • Manage your fleet operations</p>
+                </div>
+                {canManageFleet() && (
+                  <Dialog open={showVehicleForm} onOpenChange={(open) => {
+                    setShowVehicleForm(open);
+                    if (!open) {
                       setEditingVehicle(null);
-                    }} 
-                  />
-                </DialogContent>
-                </Dialog>
-              )}
+                    }
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button
+                        className="bg-white text-cyan-600 hover:bg-cyan-50 font-semibold"
+                        onClick={() => setEditingVehicle(null)}
+                      >
+                        ➕ Add Vehicle
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>{editingVehicle ? 'Edit Vehicle' : 'Add New Vehicle'}</DialogTitle>
+                      </DialogHeader>
+                      <VehicleForm
+                        vehicle={editingVehicle}
+                        onSuccess={() => {
+                          setShowVehicleForm(false);
+                          setEditingVehicle(null);
+                        }}
+                      />
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <span className="text-blue-600">🚗</span>
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-2xl font-bold text-gray-900">{vehicles.length}</h3>
-                      <p className="text-gray-600">Total Vehicles</p>
-                    </div>
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 font-medium">🚗 TOTAL</p>
+                  <p className="text-2xl font-bold text-blue-600 mt-2">{vehicles.length}</p>
+                  <p className="text-xs text-gray-500 mt-1">Fleet size</p>
                 </CardContent>
               </Card>
-              
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                      <span className="text-green-600">✓</span>
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-2xl font-bold text-gray-900">
-                        {vehicles.filter((v: any) => v.status === "available").length}
-                      </h3>
-                      <p className="text-gray-600">Available</p>
-                    </div>
-                  </div>
+
+              <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 font-medium">✅ AVAILABLE</p>
+                  <p className="text-2xl font-bold text-green-600 mt-2">
+                    {vehicles.filter((v: any) => v.status === "available").length}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Ready to book</p>
                 </CardContent>
               </Card>
-              
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                      <span className="text-yellow-600">⏰</span>
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-2xl font-bold text-gray-900">
-                        {vehicles.filter((v: any) => v.status === "on_trip").length}
-                      </h3>
-                      <p className="text-gray-600">On Trip</p>
-                    </div>
-                  </div>
+
+              <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 font-medium">🚙 ON TRIP</p>
+                  <p className="text-2xl font-bold text-amber-600 mt-2">
+                    {vehicles.filter((v: any) => v.status === "on_trip").length}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Currently active</p>
                 </CardContent>
               </Card>
-              
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                      <span className="text-red-600">🔧</span>
-                    </div>
-                    <div className="ml-4">
-                      <h3 className="text-2xl font-bold text-gray-900">
-                        {vehicles.filter((v: any) => v.status === "maintenance").length}
-                      </h3>
-                      <p className="text-gray-600">Maintenance</p>
-                    </div>
-                  </div>
+
+              <Card className="bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 font-medium">🔧 MAINTENANCE</p>
+                  <p className="text-2xl font-bold text-red-600 mt-2">
+                    {vehicles.filter((v: any) => v.status === "maintenance").length}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Under service</p>
                 </CardContent>
               </Card>
             </div>
@@ -795,44 +777,87 @@ export default function Dashboard() {
       case "drivers-add":
       case "drivers":
         return (
-          <div>
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Driver Management</h1>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleViewChange("driver-attendance")}>
-                  Attendance
-                </Button>
-                <Button variant="outline" className="w-full sm:w-auto" onClick={() => handleViewChange("driver-leave")}>
-                  Leave
-                </Button>
-              <Dialog open={showDriverForm} onOpenChange={(open) => {
-                setShowDriverForm(open);
-                if (!open) {
-                  setEditingDriver(null); // Reset editing state when dialog closes
-                }
-              }}>
-                <DialogTrigger asChild>
-                  <Button 
-                    className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
-                    onClick={() => setEditingDriver(null)} // Reset editing state when adding new driver
+          <div className="space-y-6">
+            {/* Beautiful Header */}
+            <div className="bg-gradient-to-r from-orange-600 to-red-600 rounded-xl p-6 text-white shadow-lg">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <h1 className="text-3xl font-bold">👤 Driver Management</h1>
+                  <p className="text-orange-100 mt-1">Manage drivers • Track attendance & performance</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    className="text-white hover:bg-white/20 border border-white/30"
+                    onClick={() => handleViewChange("driver-attendance")}
                   >
-                    Add Driver
+                    📅 Attendance
                   </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>{editingDriver ? 'Edit Driver' : 'Add New Driver'}</DialogTitle>
-                  </DialogHeader>
-                  <DriverForm
-                    driver={editingDriver}
-                    onSuccess={() => {
-                      setShowDriverForm(false);
+                  <Button
+                    variant="ghost"
+                    className="text-white hover:bg-white/20 border border-white/30"
+                    onClick={() => handleViewChange("driver-leave")}
+                  >
+                    🏖️ Leave
+                  </Button>
+                  <Dialog open={showDriverForm} onOpenChange={(open) => {
+                    setShowDriverForm(open);
+                    if (!open) {
                       setEditingDriver(null);
-                    }}
-                  />
-                </DialogContent>
-              </Dialog>
+                    }
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button
+                        className="bg-white text-orange-600 hover:bg-orange-50 font-semibold"
+                        onClick={() => setEditingDriver(null)}
+                      >
+                        ➕ Add Driver
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>{editingDriver ? 'Edit Driver' : 'Add New Driver'}</DialogTitle>
+                      </DialogHeader>
+                      <DriverForm
+                        driver={editingDriver}
+                        onSuccess={() => {
+                          setShowDriverForm(false);
+                          setEditingDriver(null);
+                        }}
+                      />
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <Card className="bg-gradient-to-br from-orange-50 to-red-50 border-orange-200">
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 font-medium">👥 TOTAL</p>
+                  <p className="text-2xl font-bold text-orange-600 mt-2">{drivers.length}</p>
+                  <p className="text-xs text-gray-500 mt-1">All drivers</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 font-medium">✅ AVAILABLE</p>
+                  <p className="text-2xl font-bold text-green-600 mt-2">
+                    {drivers.filter((d: any) => d.status === "available").length}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Ready for duty</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+                <CardContent className="p-4">
+                  <p className="text-sm text-gray-600 font-medium">🚗 ON DUTY</p>
+                  <p className="text-2xl font-bold text-blue-600 mt-2">
+                    {drivers.filter((d: any) => d.status === "on_duty").length}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">Currently working</p>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Daily operational info first: who is on leave today (same
