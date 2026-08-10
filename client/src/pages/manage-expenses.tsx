@@ -228,33 +228,62 @@ export default function ManageExpenses() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <ReceiptIcon className="w-7 h-7 text-blue-600" />
-            Manage Expenses
-          </h1>
-          <p className="text-gray-600 mt-1">Track vehicle expenses and maintenance costs</p>
+      {/* Beautiful Header */}
+      <div className="bg-gradient-to-r from-rose-600 to-red-600 rounded-xl p-6 text-white shadow-lg">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">💸 Manage Expenses</h1>
+            <p className="text-rose-100 mt-1">Track vehicle maintenance • Monitor all costs</p>
+          </div>
+          <Button
+            onClick={() => {
+              setShowForm(true);
+              setEditingExpense(null);
+              setFormData({
+                vehicleId: '',
+                category: '',
+                amount: '',
+                date: new Date().toISOString().split('T')[0],
+                description: '',
+                attachmentUrl: ''
+              });
+            }}
+            className="bg-white text-rose-600 hover:bg-rose-50 font-semibold"
+          >
+            ➕ Add Expense
+          </Button>
         </div>
-        <Button 
-          onClick={() => {
-            setShowForm(true);
-            setEditingExpense(null);
-            setFormData({
-              vehicleId: '',
-              category: '',
-              amount: '',
-              date: new Date().toISOString().split('T')[0],
-              description: '',
-              attachmentUrl: ''
-            });
-          }}
-          className="flex items-center gap-2"
-        >
-          <PlusCircle className="w-4 h-4" />
-          Add Expense
-        </Button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-gradient-to-br from-rose-50 to-red-50 border-rose-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-600 font-medium">📊 TOTAL EXPENSES</p>
+            <p className="text-2xl font-bold text-rose-600 mt-2">
+              ₹{expenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString('en-IN')}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">{expenses.length} entries</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-600 font-medium">🔧 MAINTENANCE</p>
+            <p className="text-2xl font-bold text-amber-600 mt-2">
+              ₹{expenses.filter(e => e.category === 'maintenance').reduce((sum, e) => sum + e.amount, 0).toLocaleString('en-IN')}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">{expenses.filter(e => e.category === 'maintenance').length} records</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-600 font-medium">⛽ FUEL</p>
+            <p className="text-2xl font-bold text-blue-600 mt-2">
+              ₹{expenses.filter(e => e.category === 'fuel').reduce((sum, e) => sum + e.amount, 0).toLocaleString('en-IN')}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">{expenses.filter(e => e.category === 'fuel').length} records</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Add/Edit Expense Form */}
