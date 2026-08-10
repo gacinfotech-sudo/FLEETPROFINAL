@@ -41,10 +41,11 @@ export default function GpsSettingsPage() {
   }
 
   return (
-    <div className="space-y-4" data-testid="gps-settings-page">
-      <div>
-        <h1 className="text-2xl font-semibold">GPS Fleet Tracking</h1>
-        <p className="text-sm text-muted-foreground">Live vehicle positions, device mapping, and provider connections.</p>
+    <div className="space-y-6" data-testid="gps-settings-page">
+      {/* Beautiful Header */}
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-xl p-6 text-white shadow-lg">
+        <h1 className="text-3xl font-bold">📍 GPS Fleet Tracking</h1>
+        <p className="text-emerald-100 mt-1">Real-time vehicle locations • Device mapping & provider connections</p>
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as GpsTab)}>

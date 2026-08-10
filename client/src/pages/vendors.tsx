@@ -86,13 +86,52 @@ export default function VendorsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Vendor Database</h1>
-          <p className="text-sm text-gray-500">Taxi vendors, fleet owners, travel agents — booking source and/or fulfilment partners.</p>
+      {/* Beautiful Header */}
+      <div className="bg-gradient-to-r from-slate-600 to-gray-600 rounded-xl p-6 text-white shadow-lg">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">🏢 Vendor Database</h1>
+            <p className="text-slate-100 mt-1">Partner network • Taxi vendors, fleet owners, travel agents</p>
+          </div>
+          <Button
+            onClick={() => setShowCreate(true)}
+            className="bg-white text-slate-600 hover:bg-slate-50 font-semibold"
+          >
+            ➕ New Vendor
+          </Button>
         </div>
-        <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4 mr-1.5" />New Vendor</Button>
       </div>
+
+      {/* Stats */}
+      {!isLoading && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-gradient-to-br from-slate-50 to-gray-50 border-slate-200">
+            <CardContent className="p-4">
+              <p className="text-sm text-gray-600 font-medium">🏢 TOTAL</p>
+              <p className="text-2xl font-bold text-slate-600 mt-2">{(vendors || []).length}</p>
+              <p className="text-xs text-gray-500 mt-1">All vendors</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+            <CardContent className="p-4">
+              <p className="text-sm text-gray-600 font-medium">✅ ACTIVE</p>
+              <p className="text-2xl font-bold text-green-600 mt-2">
+                {(vendors || []).filter((v: any) => v.status === 'active').length}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Ready to book</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+            <CardContent className="p-4">
+              <p className="text-sm text-gray-600 font-medium">📋 DRAFT</p>
+              <p className="text-2xl font-bold text-amber-600 mt-2">
+                {(vendors || []).filter((v: any) => v.status === 'draft').length}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Awaiting approval</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="relative w-full sm:w-80">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
