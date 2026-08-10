@@ -82,15 +82,22 @@ export default function DriverPortalPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="bg-blue-600 text-white px-4 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Car className="h-5 w-5" />
+      {/* Beautiful Header */}
+      <div className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-4 py-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="bg-white/20 p-2 rounded-lg">
+            <Car className="h-6 w-6" />
+          </div>
           <div>
-            <p className="font-semibold leading-tight">{meQuery.data.name}</p>
-            <p className="text-xs text-blue-100 leading-tight">{meQuery.data.phone}</p>
+            <p className="font-semibold text-lg leading-tight">👤 {meQuery.data.name}</p>
+            <p className="text-xs text-orange-100 leading-tight">📱 {meQuery.data.phone}</p>
           </div>
         </div>
-        <Button size="sm" variant="secondary" onClick={() => logoutMutation.mutate()}>
+        <Button
+          size="sm"
+          className="bg-white text-orange-600 hover:bg-orange-50 font-semibold"
+          onClick={() => logoutMutation.mutate()}
+        >
           <LogOut className="h-4 w-4 mr-1" /> Logout
         </Button>
       </div>
