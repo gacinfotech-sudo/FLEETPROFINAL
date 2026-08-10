@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Phone, MessageCircle, IndianRupee } from "lucide-react";
 import { useBookingWorkspace } from "@/components/booking/booking-workspace-context";
+import { SkipToMainContent, LoadingAnnouncement } from "@/components/accessibility-helpers";
 
 function fmtMoney(n?: number) {
   if (n === undefined || n === null) return "-";
@@ -22,9 +23,12 @@ export default function PaymentDues() {
   const totalDue = rows.reduce((sum, r) => sum + (r.remainingBalance || 0), 0);
 
   return (
-    <div className="space-y-6">
-      {/* Beautiful Header */}
-      <div className="gradient-header bg-gradient-to-r from-red-600 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+    <>
+      <SkipToMainContent />
+      <main id="main-content" className="space-y-6">
+        <LoadingAnnouncement isLoading={isLoading} message="Loading payment dues" />
+        {/* Beautiful Header */}
+        <div className="gradient-header bg-gradient-to-r from-red-600 to-orange-600 rounded-xl p-6 text-white shadow-lg" role="region" aria-label="Page header">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">💰 Payment Collection Due</h1>
@@ -38,11 +42,11 @@ export default function PaymentDues() {
       </div>
 
       {/* Stats Card */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="stat-card card-hover bg-gradient-to-br from-orange-50 to-red-50 border-orange-200">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4" role="region" aria-label="Payment collection summary">
+        <Card className="stat-card card-hover bg-gradient-to-br from-orange-50 to-red-50 border-orange-200" role="status">
           <CardContent className="p-4">
-            <p className="text-sm text-gray-600 font-medium">📊 BOOKINGS</p>
-            <p className="text-2xl font-bold text-orange-600 mt-2">{rows.length}</p>
+            <p className="text-sm text-gray-600 font-medium" id="bookings-label">📊 BOOKINGS</p>
+            <p className="text-2xl font-bold text-orange-600 mt-2" aria-labelledby="bookings-label">{rows.length}</p>
             <p className="text-xs text-gray-500 mt-1">With outstanding balance</p>
           </CardContent>
         </Card>
@@ -74,26 +78,27 @@ export default function PaymentDues() {
           ) : rows.length === 0 ? (
             <p className="text-sm text-gray-500 py-6 text-center">Nothing outstanding.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableCell>Booking</TableCell>
-                  <TableCell>Customer</TableCell>
-                  <TableCell>Pickup Date</TableCell>
-                  <TableCell>Total</TableCell>
-                  <TableCell>Received</TableCell>
-                  <TableCell>Due</TableCell>
-                  <TableCell>Days</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Actions</TableCell>
+            <Table role="grid" aria-label="Payment due details">
+              <TableHeader role="rowgroup">
+                <TableRow role="row">
+                  <TableCell role="columnheader">Booking</TableCell>
+                  <TableCell role="columnheader">Customer</TableCell>
+                  <TableCell role="columnheader">Pickup Date</TableCell>
+                  <TableCell role="columnheader">Total</TableCell>
+                  <TableCell role="columnheader">Received</TableCell>
+                  <TableCell role="columnheader">Due</TableCell>
+                  <TableCell role="columnheader">Days</TableCell>
+                  <TableCell role="columnheader">Status</TableCell>
+                  <TableCell role="columnheader">Actions</TableCell>
                 </TableRow>
               </TableHeader>
-              <TableBody>
+              <TableBody role="rowgroup">
                 {rows.map((r) => {
                   const isOverdue = r.daysOverdue > 0;
                   return (
                     <TableRow
                       key={r.id}
+                      role="row"
                       className={`cursor-pointer transition-all ${
                         isOverdue
                           ? "bg-red-50 hover:bg-red-100"
@@ -177,6 +182,7 @@ export default function PaymentDues() {
           )}
         </CardContent>
       </Card>
-    </div>
+      </main>
+    </>
   );
 }

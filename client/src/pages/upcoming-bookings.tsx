@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Phone, MessageCircle, AlertTriangle } from "lucide-react";
 import { useBookingWorkspace } from "@/components/booking/booking-workspace-context";
+import { SkipToMainContent, LoadingAnnouncement } from "@/components/accessibility-helpers";
 
 function fmtMoney(n?: number) {
   if (n === undefined || n === null) return "-";
@@ -28,22 +29,25 @@ export default function UpcomingBookings() {
   const totalRevenue = days.flatMap((d: any) => d.bookings || []).reduce((sum: number, b: any) => sum + (b.totalAmount || 0), 0);
 
   return (
-    <div className="space-y-6">
-      {/* Beautiful Header */}
-      <div className="gradient-header bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
-        <div>
-          <h1 className="text-3xl font-bold">📅 Upcoming Bookings</h1>
+    <>
+      <SkipToMainContent />
+      <main id="main-content" className="space-y-6">
+        <LoadingAnnouncement isLoading={isLoading} message="Loading upcoming bookings" />
+        {/* Beautiful Header */}
+        <div className="gradient-header bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg" role="region" aria-label="Page header">
+          <div>
+            <h1 className="text-3xl font-bold">📅 Upcoming Bookings</h1>
           <p className="text-blue-100 mt-1">Today, tomorrow and the day after — sorted by pickup time</p>
         </div>
       </div>
 
-      {/* Summary Stats Cards */}
-      {!isLoading && !isError && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-            <CardContent className="p-4">
-              <p className="text-sm text-gray-600 font-medium">📍 TODAY</p>
-              <p className="text-2xl font-bold text-green-600 mt-2">{todayCount}</p>
+        {/* Summary Stats Cards */}
+        {!isLoading && !isError && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4" role="region" aria-label="Upcoming bookings summary">
+            <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200" role="status">
+              <CardContent className="p-4">
+                <p className="text-sm text-gray-600 font-medium" id="today-label">📍 TODAY</p>
+                <p className="text-2xl font-bold text-green-600 mt-2" aria-labelledby="today-label">{todayCount}</p>
               <p className="text-xs text-gray-500 mt-1">bookings</p>
             </CardContent>
           </Card>
@@ -243,6 +247,7 @@ export default function UpcomingBookings() {
         </Card>
       );
       })}
-    </div>
+      </main>
+    </>
   );
 }
