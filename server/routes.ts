@@ -1856,7 +1856,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Dashboard Layout - Get user's custom dashboard layout
+  app.get("/api/user/dashboard-layout", authenticateUser, async (req: AuthRequest, res) => {
+    try {
+      const user = await storage.getUserById(req.userId!);
+      const layout = user?.preferences?.dashboardLayout;
+      res.json(layout || []);
+    } catch (error) {
+      console.error("Error fetching dashboard layout:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard layout" });
+    }
+  });
 
+  // Dashboard Layout - Save user's custom dashboard layout
+  app.post("/api/user/dashboard-layout", authenticateUser, async (req: AuthRequest, res) => {
+    try {
+      const layout = req.body;
+      if (!Array.isArray(layout)) {
+        return res.status(400).json({ message: "Layout must be an array" });
+      }
+
+      const user = await storage.getUserById(req.userId!);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      user.preferences = user.preferences || {};
+      user.preferences.dashboardLayout = layout;
+      await user.save();
+
+      res.json({ message: "Dashboard layout saved successfully" });
+    } catch (error) {
+      console.error("Error saving dashboard layout:", error);
+      res.status(500).json({ message: "Failed to save dashboard layout" });
+    }
+  });
 
   app.delete("/api/users/sub-users/:userId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
