@@ -11,7 +11,7 @@ export const SAAS_MODULES = [
   { id: 'self-drive', label: 'Self Drive', iconKey: 'fleet', parentGroup: 'customers' },
 
   // Bookings Group
-  { id: 'booking', label: 'Add Booking', iconKey: 'booking', parentGroup: 'booking' },
+  { id: 'bookings', label: 'Add Booking', iconKey: 'booking', parentGroup: 'booking' },
   { id: 'live-bookings', label: 'Live Bookings', iconKey: 'live', parentGroup: 'booking' },
   { id: 'live-operations', label: 'Vehicles on Booking', iconKey: 'fleet', parentGroup: 'booking' },
   { id: 'upcoming-bookings', label: 'Upcoming Bookings', iconKey: 'upcoming', parentGroup: 'booking' },
@@ -83,7 +83,7 @@ export function getNavigationStructure(role?: string, permissions?: string[]): N
       id: 'booking',
       label: 'Booking Management',
       iconKey: 'booking',
-      children: ['booking', 'live-bookings', 'live-operations', 'upcoming-bookings', 'booking-queues', 'payment-dues', 'history']
+      children: ['bookings', 'live-bookings', 'live-operations', 'upcoming-bookings', 'booking-queues', 'payment-dues', 'history']
     },
     {
       id: 'sales',
