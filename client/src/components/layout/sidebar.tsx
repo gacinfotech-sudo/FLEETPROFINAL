@@ -100,8 +100,10 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
         key={module.id}
         variant="ghost"
         className={cn(
-          "w-full justify-start px-3 lg:px-4 py-2 lg:py-2 text-sm lg:text-base text-gray-700 hover:bg-gray-100 transition-all duration-200 hover:scale-[1.01] active:scale-[0.98] h-10 lg:h-auto",
-          isActive && "bg-blue-50 border-r-4 border-blue-600 text-blue-700 shadow-sm"
+          "w-full justify-start px-3 lg:px-4 py-2 lg:py-2 text-sm lg:text-base text-gray-700 transition-all duration-200 hover:scale-[1.02] active:scale-[0.97] h-10 lg:h-auto group rounded-md ml-2 mr-2",
+          isActive
+            ? "bg-gradient-to-r from-blue-50 to-transparent border-r-4 border-blue-600 text-blue-700 shadow-sm"
+            : "hover:bg-gray-100 hover:shadow-sm"
         )}
         onClick={() => {
           onViewChange(module.id);
@@ -110,8 +112,9 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
           }
         }}
       >
-        {Icon && <Icon className="mr-2 lg:mr-3" size={16} />}
-        {module.label}
+        {Icon && <Icon className={cn("mr-2 lg:mr-3", isActive ? "text-blue-600" : "text-gray-500 group-hover:text-gray-700")} size={16} />}
+        <span className="flex-1 text-left">{module.label}</span>
+        {isActive && <div className="w-1.5 h-1.5 rounded-full bg-blue-600 ml-auto" />}
       </Button>
     );
   };
@@ -133,8 +136,10 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
         <Button
           variant="ghost"
           className={cn(
-            "w-full justify-between px-3 lg:px-4 py-2 lg:py-2 text-sm lg:text-base font-medium text-gray-700 hover:bg-gray-100 transition-all duration-200 h-10 lg:h-auto",
-            hasActiveChild && "text-blue-700 bg-blue-50"
+            "w-full justify-between px-3 lg:px-4 py-2 lg:py-2 text-sm lg:text-base font-medium text-gray-700 transition-all duration-200 h-10 lg:h-auto group rounded-md ml-2 mr-2",
+            hasActiveChild
+              ? "text-blue-700 bg-gradient-to-r from-blue-50 to-transparent shadow-sm"
+              : "hover:bg-gray-100 hover:shadow-sm"
           )}
           onClick={() => toggleGroup(group.id)}
         >
@@ -142,15 +147,15 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
             {icons[group.iconKey as keyof typeof icons] &&
               (() => {
                 const Icon = icons[group.iconKey as keyof typeof icons];
-                return <Icon className="mr-2 lg:mr-3" size={16} />;
+                return <Icon className={cn("mr-2 lg:mr-3", hasActiveChild ? "text-blue-600" : "text-gray-500 group-hover:text-gray-700")} size={16} />;
               })()
             }
             {group.label}
           </div>
           {isExpanded ? (
-            <ChevronDown className="w-4 h-4" />
+            <ChevronDown className="w-4 h-4 transition-transform duration-200" />
           ) : (
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-4 h-4 transition-transform duration-200" />
           )}
         </Button>
 
@@ -234,10 +239,10 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
         <div className="p-3 lg:p-4 border-t border-gray-200">
           <Button
             variant="ghost"
-            className="w-full justify-start px-3 lg:px-4 py-3 text-sm lg:text-base text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] h-12 lg:h-auto"
+            className="w-full justify-start px-3 lg:px-4 py-3 text-sm lg:text-base text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-200 hover:scale-[1.02] active:scale-[0.97] h-12 lg:h-auto group rounded-md hover:shadow-sm"
             onClick={handleLogout}
           >
-            <LogOut className="mr-2 lg:mr-3" size={18} />
+            <LogOut className="mr-2 lg:mr-3 group-hover:animate-pulse" size={18} />
             Logout
           </Button>
         </div>

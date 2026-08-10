@@ -74,7 +74,7 @@ function DashCard({ title, subtitle, action, children, className }: {
   className?: string;
 }) {
   return (
-    <Card className={`shadow-sm ${className || ""}`}>
+    <Card className={`shadow-sm border-gray-200 transition-all duration-300 hover:shadow-md hover:border-blue-200 ${className || ""} page-transition`}>
       {title && (
         <CardHeader className="pb-3 flex flex-row items-start justify-between space-y-0 gap-2">
           <div className="min-w-0">
@@ -82,8 +82,13 @@ function DashCard({ title, subtitle, action, children, className }: {
             {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
           </div>
           {action && (
-            <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700 shrink-0 -mr-2" onClick={action.onClick}>
-              {action.label} <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 shrink-0 -mr-2 transition-all duration-200 hover:translate-x-1"
+              onClick={action.onClick}
+            >
+              {action.label} <ArrowRight className="ml-1 h-3.5 w-3.5 transition-transform duration-200" />
             </Button>
           )}
         </CardHeader>
@@ -271,7 +276,7 @@ export default function DashboardOverview({ onNavigate, onViewBooking, onSelectC
           <Button size="sm" variant="outline" onClick={() => onNavigate("bookings")}>Create Booking</Button>
         </div>
       ) : (
-        <div className="h-56">
+        <div className="h-56 chart-container">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={trend} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
@@ -287,9 +292,9 @@ export default function DashboardOverview({ onNavigate, onViewBooking, onSelectC
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
               <XAxis dataKey="date" tickFormatter={shortDay} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} minTickGap={28} />
               <YAxis tickFormatter={(v) => inrCompact(v)} tick={{ fontSize: 11, fill: "#94a3b8" }} tickLine={false} axisLine={false} width={52} />
-              <Tooltip content={<ChartTooltip money />} labelFormatter={shortDay} />
-              <Area type="monotone" dataKey="revenue" name="Revenue" stroke={CHART.revenue} strokeWidth={2} fill="url(#revFill)" dot={false} activeDot={{ r: 4 }} />
-              <Area type="monotone" dataKey="collections" name="Collections" stroke={CHART.collections} strokeWidth={2} fill="url(#colFill)" dot={false} activeDot={{ r: 4 }} />
+              <Tooltip content={<ChartTooltip money />} labelFormatter={shortDay} cursor={{ fill: "rgba(37, 99, 235, 0.05)" }} />
+              <Area type="monotone" dataKey="revenue" name="Revenue" stroke={CHART.revenue} strokeWidth={2.5} fill="url(#revFill)" dot={false} activeDot={{ r: 5, fill: CHART.revenue }} />
+              <Area type="monotone" dataKey="collections" name="Collections" stroke={CHART.collections} strokeWidth={2.5} fill="url(#colFill)" dot={false} activeDot={{ r: 5, fill: CHART.collections }} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -341,13 +346,13 @@ export default function DashboardOverview({ onNavigate, onViewBooking, onSelectC
           <Button size="sm" variant="outline" onClick={() => onNavigate("bookings")}>Create Booking</Button>
         </div>
       ) : (
-        <div className="h-44">
+        <div className="h-44 chart-container">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={bookingBars} layout="vertical" margin={{ top: 0, right: 36, left: 0, bottom: 0 }} barCategoryGap={8}>
               <XAxis type="number" hide />
               <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: "#475569" }} tickLine={false} axisLine={false} width={78} />
-              <Tooltip content={<ChartTooltip />} cursor={{ fill: "#f8fafc" }} />
-              <Bar dataKey="value" name="Bookings" fill={CHART.neutralBar} radius={[0, 4, 4, 0]} maxBarSize={18}>
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(37, 99, 235, 0.08)" }} />
+              <Bar dataKey="value" name="Bookings" fill={CHART.neutralBar} radius={[0, 6, 6, 0]} maxBarSize={20} animationDuration={400}>
                 <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: "#334155", fontWeight: 600 }} />
               </Bar>
             </BarChart>
@@ -401,16 +406,18 @@ export default function DashboardOverview({ onNavigate, onViewBooking, onSelectC
               key={item.id}
               type="button"
               onClick={() => onNavigate(item.view)}
-              className={`w-full text-left flex items-center gap-3 rounded-lg border p-3 transition-colors ${
-                item.severity === "critical" ? "border-red-200 bg-red-50 hover:bg-red-100" : "border-amber-200 bg-amber-50 hover:bg-amber-100"
+              className={`w-full text-left flex items-center gap-3 rounded-lg border p-3 transition-all duration-200 hover:shadow-md hover:scale-[1.01] ${
+                item.severity === "critical"
+                  ? "border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300"
+                  : "border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-300"
               }`}
             >
-              <AlertTriangle className={`h-4 w-4 shrink-0 ${item.severity === "critical" ? "text-red-600" : "text-amber-600"}`} />
+              <AlertTriangle className={`h-4 w-4 shrink-0 transition-transform duration-200 ${item.severity === "critical" ? "text-red-600" : "text-amber-600"}`} />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-gray-900 truncate">{item.label}</div>
                 <div className="text-xs text-gray-600 truncate">{item.detail}</div>
               </div>
-              <Badge variant="secondary" className={`shrink-0 ${item.severity === "critical" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+              <Badge variant="secondary" className={`shrink-0 transition-transform duration-200 ${item.severity === "critical" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
                 {item.count}
               </Badge>
             </button>
@@ -460,20 +467,20 @@ export default function DashboardOverview({ onNavigate, onViewBooking, onSelectC
                 key={booking._id || booking.id}
                 type="button"
                 onClick={() => onViewBooking(booking)}
-                className="w-full text-left flex items-center gap-3 rounded-lg border border-gray-100 p-3 hover:bg-gray-50 transition-colors"
+                className="w-full text-left flex items-center gap-3 rounded-lg border border-gray-100 p-3 transition-all duration-200 hover:border-blue-200 hover:bg-blue-50 hover:shadow-sm hover:scale-[1.01] group"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900 truncate">{booking.customerName}</span>
-                    <span className="text-xs text-muted-foreground">{booking.bookingCode || booking.bookingId}</span>
+                    <span className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-700">{booking.customerName}</span>
+                    <span className="text-xs text-muted-foreground group-hover:text-blue-600">{booking.bookingCode || booking.bookingId}</span>
                   </div>
-                  <div className="text-xs text-gray-600 truncate mt-0.5">
+                  <div className="text-xs text-gray-600 truncate mt-0.5 group-hover:text-gray-700">
                     {new Date(booking.pickupDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                     {booking.pickupTime ? ` · ${booking.pickupTime}` : ""}
                     {vehicle ? ` · ${[vehicle.make, vehicle.model].filter(Boolean).join(" ")}` : " · Vehicle unassigned"}
                   </div>
                 </div>
-                <Badge variant="secondary" className="shrink-0 capitalize">{String(booking.status || "").replace(/_/g, " ")}</Badge>
+                <Badge variant="secondary" className="shrink-0 capitalize transition-all duration-200 group-hover:bg-blue-100 group-hover:text-blue-700">{String(booking.status || "").replace(/_/g, " ")}</Badge>
               </button>
             );
           })}
@@ -515,13 +522,13 @@ export default function DashboardOverview({ onNavigate, onViewBooking, onSelectC
                 key={key}
                 type="button"
                 onClick={() => onNavigate("live-bookings")}
-                className={`text-left rounded-lg border p-3 flex items-center gap-3 transition-colors ${
-                  isCritical ? "border-red-200 bg-red-50 hover:bg-red-100" : "border-gray-100 hover:bg-gray-50"
+                className={`text-left rounded-lg border p-3 flex items-center gap-3 transition-all duration-200 hover:shadow-md hover:scale-[1.02] hover:-translate-y-1 ${
+                  isCritical ? "border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-300" : "border-gray-100 hover:bg-blue-50 hover:border-blue-200"
                 }`}
               >
-                <Icon className={`h-4 w-4 ${isCritical ? "text-red-600" : "text-gray-400"}`} />
+                <Icon className={`h-5 w-5 transition-colors duration-200 ${isCritical ? "text-red-600" : "text-blue-600"}`} />
                 <div>
-                  <div className={`text-xl font-bold ${isCritical ? "text-red-700" : "text-gray-900"}`}>{count}</div>
+                  <div className={`text-xl font-bold transition-colors duration-200 ${isCritical ? "text-red-700" : "text-gray-900"}`}>{count}</div>
                   <div className="text-xs text-gray-600">{label}</div>
                 </div>
               </button>
@@ -667,12 +674,12 @@ function KpiCard({ icon, iconBg, label, value, sub, onClick, aria }: {
       role="button" tabIndex={0} aria-label={aria}
       onClick={onClick}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
-      className="shadow-sm cursor-pointer transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      className="shadow-sm cursor-pointer transition-all duration-300 hover:shadow-lg hover:scale-[1.02] hover:-translate-y-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 border-gray-200 hover:border-blue-200 page-transition"
     >
       <CardContent className="p-4 lg:p-5">
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</span>
-          <div className={`w-8 h-8 rounded-lg ${iconBg} flex items-center justify-center shrink-0`}>{icon}</div>
+          <div className={`w-9 h-9 rounded-lg ${iconBg} flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-110`}>{icon}</div>
         </div>
         <div className="text-2xl font-bold text-gray-900 tabular-nums truncate">{value}</div>
         <p className="text-xs text-muted-foreground mt-1 truncate">{sub}</p>
@@ -715,8 +722,8 @@ function StatusDonut({ loading, data, total, totalLabel, emptyText, emptyAction,
   }
   const nonZero = data.filter((d) => d.value > 0);
   return (
-    <div className="flex items-center gap-4">
-      <div className="relative h-36 w-36 shrink-0" aria-hidden="true">
+    <div className="flex items-center gap-4 chart-container">
+      <div className="relative h-36 w-36 shrink-0 transition-transform duration-300 hover:scale-105" aria-hidden="true">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -728,28 +735,26 @@ function StatusDonut({ loading, data, total, totalLabel, emptyText, emptyAction,
             >
               {nonZero.map((d) => <Cell key={d.name} fill={d.color} />)}
             </Pie>
-            <Tooltip content={<ChartTooltip />} />
+            <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(59, 130, 246, 0.05)" }} />
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-2xl font-bold text-gray-900 tabular-nums">{total}</span>
+          <span className="text-3xl font-bold text-gray-900 tabular-nums">{total}</span>
           <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{totalLabel}</span>
         </div>
       </div>
       <div className="flex-1 min-w-0 space-y-0.5">
         {data.map((d) => (
-          // The legend is the accessible, keyboard-focusable path to the
-          // same drill-down the donut segments offer on click.
           <button
             key={d.name}
             type="button"
             disabled={!onSegmentClick}
             onClick={() => onSegmentClick?.(d)}
-            className="w-full flex items-center justify-between gap-2 text-sm rounded-md px-1.5 py-1 enabled:hover:bg-gray-50 enabled:cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="w-full flex items-center justify-between gap-2 text-sm rounded-md px-2 py-1.5 transition-all duration-200 enabled:hover:bg-blue-50 enabled:cursor-pointer enabled:hover:shadow-sm enabled:hover:border-l-4 enabled:hover:border-l-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
             <span className="flex items-center gap-2 text-gray-700 min-w-0">
-              <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: d.color }} />
-              <span className="truncate">{d.name}</span>
+              <span className="w-3 h-3 rounded-full shrink-0 transition-transform duration-200" style={{ background: d.color }} />
+              <span className="truncate font-medium">{d.name}</span>
             </span>
             <span className="font-semibold text-gray-900 tabular-nums">{d.value}</span>
           </button>

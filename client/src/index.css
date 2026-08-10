@@ -95,6 +95,29 @@
     font-family: 'Inter', system-ui, sans-serif;
   }
 
+  /* Page transition animations */
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
   /* Enhanced toast animations */
   @keyframes slide-in-from-top-full {
     from {
@@ -127,6 +150,16 @@
     }
   }
 
+  /* Chart animation */
+  @keyframes chart-appear {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
   /* Smooth transition for toast elements */
   [data-state="open"] {
     animation: slide-in-from-top-full 0.3s ease-out;
@@ -134,5 +167,48 @@
 
   [data-state="closed"] {
     animation: slide-out-to-top-full 0.2s ease-in, fade-out-80 0.2s ease-in;
+  }
+}
+
+/* Global page transition utility */
+.page-transition {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Card elevation and hover effects */
+.card-hover {
+  @apply transition-all duration-200 hover:shadow-md hover:scale-[1.01] active:scale-[0.99];
+}
+
+.card-elevated {
+  @apply shadow-md border border-gray-200;
+}
+
+/* Chart container animations */
+.chart-container {
+  animation: chart-appear 0.4s ease-out;
+}
+
+/* Button hover states */
+.btn-hover-lift {
+  @apply transition-all duration-150 hover:shadow-md hover:translate-y-[-2px] active:translate-y-[0] active:shadow-sm;
+}
+
+/* Mobile-first responsive utilities */
+@media (max-width: 640px) {
+  .sm-hide {
+    @apply hidden;
+  }
+
+  .sm-full-width {
+    @apply w-full;
+  }
+
+  .sm-px-2 {
+    @apply px-2;
+  }
+
+  .sm-gap-2 {
+    @apply gap-2;
   }
 }
