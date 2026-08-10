@@ -2023,6 +2023,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // BUG-009 FIX: Standard /api/vendor-settlement alias
+  // Previously only at /api/vendors/settlement (namespace inconsistency)
+  app.get("/api/vendor-settlement", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
+    try {
+      const bookings = await Booking.find({
+        tenantId: req.tenantId,
+        fulfilmentType: 'vendor',
+        vendorName: { $exists: true, $ne: '' },
+      })
+        .select('bookingId vendorName vendorContactPhone vendorAgreedRate vendorAdvancePaid pickupDate pickupLocation dropoffLocation status')
+        .sort({ pickupDate: -1 });
+
+      const byVendor = new Map<string, {
+        vendorName: string;
+        vendorContactPhone: string;
+        totalRate: number;
+        paid: number;
+        due: number;
+        bookings: any[];
+      }>();
+
+      for (const booking of bookings) {
+        const key = (booking as any).vendorName;
+        if (!byVendor.has(key)) {
+          byVendor.set(key, {
+            vendorName: (booking as any).vendorName,
+            vendorContactPhone: (booking as any).vendorContactPhone || '',
+            totalRate: 0,
+            paid: 0,
+            due: 0,
+            bookings: [],
+          });
+        }
+        const vendor = byVendor.get(key)!;
+        const rate = (booking as any).vendorAgreedRate || 0;
+        const advance = (booking as any).vendorAdvancePaid || 0;
+        vendor.totalRate += rate;
+        vendor.paid += advance;
+        vendor.due += Math.max(0, rate - advance);
+        vendor.bookings.push({
+          bookingId: (booking as any).bookingId,
+          route: `${(booking as any).pickupLocation} → ${(booking as any).dropoffLocation}`,
+          date: (booking as any).pickupDate,
+          rate,
+          paid: advance,
+          due: Math.max(0, rate - advance),
+          status: (booking as any).status,
+        });
+      }
+      res.json(Array.from(byVendor.values()));
+    } catch (error: any) {
+      console.error('Vendor settlement error:', error?.message || error);
+      res.status(500).json({ message: "Failed to compute vendor settlement" });
+    }
+  });
+
   // Vehicle Routes
   app.get("/api/vehicles", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
@@ -2728,6 +2784,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/operations/payment-dues", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const bookings = await storage.getBookingsByTenant(req.tenantId!);
+      res.json(buildPaymentDues(bookings, new Date()));
+    } catch (error) {
+      console.error('Payment dues error:', error);
+      res.status(500).json({ message: "Failed to load payment dues" });
+    }
+  });
+
+  // BUG-005 FIX: Standard /api/payment-dues alias for consistency
+  // Previously only at /api/operations/payment-dues (namespace inconsistency)
+  app.get("/api/payment-dues", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const bookings = await storage.getBookingsByTenant(req.tenantId!);
       res.json(buildPaymentDues(bookings, new Date()));
@@ -7754,6 +7822,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Vehicle performance report error:', error?.message || error);
       res.status(500).json({ message: "Failed to build vehicle performance report" });
+    }
+  });
+
+  // BUG-007 FIX: Standard /api/driver-performance alias
+  // Previously only at /api/reports/driver-performance (namespace inconsistency)
+  app.get("/api/driver-performance", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
+    try {
+      const monthParam = req.query.month as string | undefined;
+      const now = new Date();
+      const [year, month] = monthParam
+        ? monthParam.split('-').map(Number)
+        : [now.getFullYear(), now.getMonth() + 1];
+      const monthStart = new Date(year, month - 1, 1);
+      const monthEnd = new Date(year, month, 1);
+
+      const bookings = await storage.getBookingsByTenant(req.tenantId!);
+      const { buildDriverPerformance } = await import("./services/driverPerformance");
+      const driverPerf = buildDriverPerformance(bookings, monthStart, monthEnd);
+      res.json({ month: `${year}-${String(month).padStart(2, '0')}`, drivers: driverPerf });
+    } catch (error: any) {
+      console.error('Driver performance error:', error?.message || error);
+      res.status(500).json({ message: "Failed to build driver performance" });
     }
   });
 

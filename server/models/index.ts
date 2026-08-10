@@ -1059,6 +1059,17 @@ const ExpenseSchema = new Schema<IExpense>({
   approvedAt: { type: Date },
 });
 
+// BUG-006 FIX: Add validation to prevent dual-linkage of expenses
+// Expenses should be linked to exactly ONE entity (booking, driver, or vehicle-only)
+// to prevent double-counting in profitability calculations
+ExpenseSchema.pre('save', function(next) {
+  const linkedCount = [this.bookingId, this.driverId].filter(id => id !== null && id !== undefined).length;
+  if (linkedCount > 1) {
+    return next(new Error('Expense cannot be linked to both booking and driver simultaneously. Link to exactly one entity to prevent double-counting in profitability.'));
+  }
+  next();
+});
+
 export interface IWhatsAppMessage extends Document {
   tenantId: mongoose.Types.ObjectId;
   customerId?: mongoose.Types.ObjectId;
