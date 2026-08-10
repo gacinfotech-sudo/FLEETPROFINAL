@@ -124,6 +124,12 @@ app.use((req, res, next) => {
     // Silently continue if emergency admin creation fails
   }
   
+  // Dashboard route - serve dashboard.html directly
+  app.get('/dashboard.html', (req, res) => {
+    const dashboardPath = path.join(__dirname, '../public/dashboard.html');
+    res.sendFile(dashboardPath);
+  });
+
   const server = await registerRoutes(app);
 
   // Store server instance globally for notifications
