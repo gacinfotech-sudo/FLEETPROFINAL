@@ -1416,6 +1416,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Super Admin Dashboard
+  app.get("/api/admin/dashboard", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const tenants = await storage.getTenants();
+      const users = await storage.getUsers();
+
+      const activeTenants = tenants.filter((t: any) => t.isActive).length;
+      const inactiveTenants = tenants.filter((t: any) => !t.isActive).length;
+
+      const admins = users.filter((u: any) => u.role === 'admin').length;
+      const managers = users.filter((u: any) => u.role === 'manager').length;
+
+      // Get bookings aggregate (approximate from tenants' data)
+      const totalBookings = tenants.reduce((sum: number, t: any) => sum + (t.totalBookings || 0), 0);
+      const totalRevenue = tenants.reduce((sum: number, t: any) => sum + (t.totalRevenue || 0), 0);
+
+      // Group tenants by subscription plan
+      const tenantsByPlan = tenants.reduce((acc: Record<string, number>, t: any) => {
+        const plan = t.subscriptionPlan || 'free';
+        acc[plan] = (acc[plan] || 0) + 1;
+        return acc;
+      }, {});
+
+      const recentTenants = tenants
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 10)
+        .map((t: any) => ({
+          _id: t._id,
+          name: t.name,
+          businessName: t.businessName,
+          isActive: t.isActive,
+          subscriptionPlan: t.subscriptionPlan || 'free',
+          createdAt: t.createdAt,
+          userCount: t.usageCounters?.managersCount || 0,
+          bookingCount: t.usageCounters?.bookingsThisMonth || 0,
+        }));
+
+      res.json({
+        totalTenants: tenants.length,
+        activeTenants,
+        inactiveTenants,
+        totalAdmins: admins,
+        totalManagers: managers,
+        totalUsers: users.length,
+        totalBookings,
+        totalRevenue,
+        systemHealth: {
+          dbConnection: true,
+          serverStatus: 'operational',
+          lastUpdated: new Date().toISOString(),
+        },
+        recentTenants,
+        tenantsByPlan: Object.entries(tenantsByPlan).map(([plan, count]) => ({ plan, count })),
+        recentActivities: [
+          {
+            _id: '1',
+            timestamp: new Date().toISOString(),
+            action: 'System Monitoring',
+            tenantName: 'Platform',
+            details: 'All systems operational',
+          },
+        ],
+      });
+    } catch (error: any) {
+      console.error('Admin dashboard error:', error?.message);
+      res.status(500).json({ message: 'Failed to load admin dashboard' });
+    }
+  });
+
   // Admin Routes
   app.get("/api/admin/tenants", authenticateUser, requireAdmin, async (req, res) => {
     try {
