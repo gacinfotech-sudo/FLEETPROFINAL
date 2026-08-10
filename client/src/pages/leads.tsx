@@ -211,7 +211,7 @@ export default function LeadsPage({ onConvertToBooking, initialLeadId }: LeadsPa
         <Card className="stat-card card-hover bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">📊 TOTAL</p>
-            <p className="text-2xl font-bold text-amber-600 mt-2">{leads?.length || 0}</p>
+            <p className="text-2xl font-bold text-amber-600 mt-2">{rows?.length || 0}</p>
             <p className="text-xs text-gray-500 mt-1">All leads</p>
           </CardContent>
         </Card>
@@ -219,7 +219,7 @@ export default function LeadsPage({ onConvertToBooking, initialLeadId }: LeadsPa
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">🔄 OPEN</p>
             <p className="text-2xl font-bold text-yellow-600 mt-2">
-              {leads?.filter((l: any) => l.status === 'open').length || 0}
+              {rows?.filter((l: any) => l.status === 'open').length || 0}
             </p>
             <p className="text-xs text-gray-500 mt-1">Active leads</p>
           </CardContent>
@@ -228,7 +228,7 @@ export default function LeadsPage({ onConvertToBooking, initialLeadId }: LeadsPa
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">✅ CONVERTED</p>
             <p className="text-2xl font-bold text-green-600 mt-2">
-              {leads?.filter((l: any) => l.status === 'converted_to_booking').length || 0}
+              {rows?.filter((l: any) => l.status === 'converted_to_booking').length || 0}
             </p>
             <p className="text-xs text-gray-500 mt-1">To bookings</p>
           </CardContent>
@@ -237,7 +237,7 @@ export default function LeadsPage({ onConvertToBooking, initialLeadId }: LeadsPa
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">❌ CLOSED</p>
             <p className="text-2xl font-bold text-red-600 mt-2">
-              {leads?.filter((l: any) => l.status === 'closed' || l.status === 'lost').length || 0}
+              {rows?.filter((l: any) => l.status === 'closed' || l.status === 'lost').length || 0}
             </p>
             <p className="text-xs text-gray-500 mt-1">Closed/lost</p>
           </CardContent>

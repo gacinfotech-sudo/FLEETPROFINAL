@@ -140,7 +140,7 @@ export default function InquiriesPage({ initialInquiryId }: InquiriesPageProps =
         <Card className="stat-card card-hover bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">📊 TOTAL</p>
-            <p className="text-2xl font-bold text-indigo-600 mt-2">{inquiries?.length || 0}</p>
+            <p className="text-2xl font-bold text-indigo-600 mt-2">{rows?.length || 0}</p>
             <p className="text-xs text-gray-500 mt-1">All inquiries</p>
           </CardContent>
         </Card>
@@ -148,7 +148,7 @@ export default function InquiriesPage({ initialInquiryId }: InquiriesPageProps =
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">✨ NEW</p>
             <p className="text-2xl font-bold text-blue-600 mt-2">
-              {inquiries?.filter((i: any) => i.status === 'new').length || 0}
+              {rows?.filter((i: any) => i.status === 'new').length || 0}
             </p>
             <p className="text-xs text-gray-500 mt-1">Uncontacted</p>
           </CardContent>
@@ -157,7 +157,7 @@ export default function InquiriesPage({ initialInquiryId }: InquiriesPageProps =
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">🎯 CONVERTED</p>
             <p className="text-2xl font-bold text-green-600 mt-2">
-              {inquiries?.filter((i: any) => i.status === 'converted_to_lead').length || 0}
+              {rows?.filter((i: any) => i.status === 'converted_to_lead').length || 0}
             </p>
             <p className="text-xs text-gray-500 mt-1">To leads</p>
           </CardContent>
@@ -166,7 +166,7 @@ export default function InquiriesPage({ initialInquiryId }: InquiriesPageProps =
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">❌ LOST</p>
             <p className="text-2xl font-bold text-red-600 mt-2">
-              {inquiries?.filter((i: any) => i.status === 'lost').length || 0}
+              {rows?.filter((i: any) => i.status === 'lost').length || 0}
             </p>
             <p className="text-xs text-gray-500 mt-1">Lost opportunities</p>
           </CardContent>
