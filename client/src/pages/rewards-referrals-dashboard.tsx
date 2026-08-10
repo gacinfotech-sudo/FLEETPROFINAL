@@ -97,7 +97,7 @@ export default function RewardsReferralsDashboard() {
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-pink-600 to-rose-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-pink-600 to-rose-600 rounded-xl p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold">🎁 Rewards & Referrals</h1>
         <p className="text-pink-100 mt-1">Customer loyalty program • Points, rewards, and referral tracking</p>
       </div>

@@ -89,7 +89,7 @@ export default function RootTenants() {
   return (
     <div className="space-y-6" data-testid="root-tenants-page">
       {/* Beautiful Gradient Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold">🏢 Tenant Master Database</h1>
         <p className="text-purple-100 mt-1">All tenants on the platform • Click a row to open Tenant 360</p>
       </div>

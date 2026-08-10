@@ -100,7 +100,7 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-blue-600 via-blue-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">🚗 Live Bookings</h1>
@@ -140,7 +140,7 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-red-50 to-pink-50 border-red-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-red-50 to-pink-50 border-red-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">🔴 URGENT</p>
             <p className="text-2xl font-bold text-red-600">
@@ -149,7 +149,7 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
             <p className="text-xs text-gray-500 mt-1">Delayed or Overdue</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">🔵 ACTIVE</p>
             <p className="text-2xl font-bold text-blue-600">
@@ -158,7 +158,7 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
             <p className="text-xs text-gray-500 mt-1">Currently On Trip</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">✅ COMPLETED</p>
             <p className="text-2xl font-bold text-green-600">

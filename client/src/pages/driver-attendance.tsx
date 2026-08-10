@@ -66,7 +66,7 @@ export default function DriverAttendancePage() {
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">📋 Driver Attendance</h1>
@@ -82,28 +82,28 @@ export default function DriverAttendancePage() {
       {/* Stats Cards */}
       {!isLoading && !isError && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">✅ PRESENT</p>
               <p className="text-2xl font-bold text-green-600 mt-2">{stats.present}</p>
               <p className="text-xs text-gray-500 mt-1">On duty</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">⏱️ LATE</p>
               <p className="text-2xl font-bold text-yellow-600 mt-2">{stats.late}</p>
               <p className="text-xs text-gray-500 mt-1">Delayed arrival</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">❌ ABSENT</p>
               <p className="text-2xl font-bold text-red-600 mt-2">{stats.absent}</p>
               <p className="text-xs text-gray-500 mt-1">Not marked</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">🏖️ ON LEAVE</p>
               <p className="text-2xl font-bold text-blue-600 mt-2">{stats.onLeave}</p>

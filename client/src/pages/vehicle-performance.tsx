@@ -35,7 +35,7 @@ export default function VehiclePerformancePage() {
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-cyan-600 to-teal-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-cyan-600 to-teal-600 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">🚗 Vehicle Performance</h1>
@@ -51,21 +51,21 @@ export default function VehiclePerformancePage() {
       {/* Stats Cards */}
       {!isLoading && !isError && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-br from-cyan-50 to-teal-50 border-cyan-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-cyan-50 to-teal-50 border-cyan-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">🚗 VEHICLES</p>
               <p className="text-2xl font-bold text-cyan-600 mt-2">{vehicles.length}</p>
               <p className="text-xs text-gray-500 mt-1">Active this month</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">📊 TRIPS</p>
               <p className="text-2xl font-bold text-blue-600 mt-2">{stats.totalTrips}</p>
               <p className="text-xs text-gray-500 mt-1">Total completed</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">💰 REVENUE</p>
               <p className="text-2xl font-bold text-green-600 mt-2">{fmtMoney(stats.totalRevenue)}</p>

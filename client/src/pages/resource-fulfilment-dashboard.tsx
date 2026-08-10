@@ -64,7 +64,7 @@ export default function ResourceFulfilmentDashboard() {
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-fuchsia-600 to-purple-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-fuchsia-600 to-purple-600 rounded-xl p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold">⚙️ Resource Fulfilment</h1>
         <p className="text-fuchsia-100 mt-1">Vendor fulfillment tracking • Resource allocation metrics</p>
       </div>

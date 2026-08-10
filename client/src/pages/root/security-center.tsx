@@ -130,7 +130,7 @@ export default function SecurityCenter() {
   return (
     <div className="space-y-6" data-testid="page-security-center">
       {/* Beautiful Gradient Header */}
-      <div className="bg-gradient-to-r from-red-600 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-red-600 to-orange-600 rounded-xl p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold">🔒 Security Command Center</h1>
         <p className="text-red-100 mt-1">Break-glass access • Active sessions • Failed logins tracking</p>
       </div>

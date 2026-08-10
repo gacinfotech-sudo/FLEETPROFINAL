@@ -245,7 +245,7 @@ export default function RootTenant360() {
       ) : (
         <>
           {/* Beautiful Gradient Header */}
-          <div className="bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl mx-6 p-6 text-white shadow-lg">
+          <div className="gradient-header bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl mx-6 p-6 text-white shadow-lg">
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold">👁️ {tenant360.tenant.businessName || tenant360.tenant.name}</h1>

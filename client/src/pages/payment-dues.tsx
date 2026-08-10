@@ -24,7 +24,7 @@ export default function PaymentDues() {
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-red-600 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-red-600 to-orange-600 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">💰 Payment Collection Due</h1>
@@ -39,21 +39,21 @@ export default function PaymentDues() {
 
       {/* Stats Card */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-orange-50 to-red-50 border-orange-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-orange-50 to-red-50 border-orange-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">📊 BOOKINGS</p>
             <p className="text-2xl font-bold text-orange-600 mt-2">{rows.length}</p>
             <p className="text-xs text-gray-500 mt-1">With outstanding balance</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-red-50 to-pink-50 border-red-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-red-50 to-pink-50 border-red-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">⏰ OVERDUE</p>
             <p className="text-2xl font-bold text-red-600 mt-2">{rows.filter(r => r.daysOverdue > 0).length}</p>
             <p className="text-xs text-gray-500 mt-1">Days past due</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">🎯 UPCOMING</p>
             <p className="text-2xl font-bold text-green-600 mt-2">{rows.filter(r => r.daysOverdue <= 0).length}</p>
@@ -63,7 +63,7 @@ export default function PaymentDues() {
       </div>
 
       <Card className="border-gray-200">
-        <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100">
+        <CardHeader className="gradient-header bg-gradient-to-r from-gray-50 to-gray-100">
           <CardTitle className="text-lg">{rows.length} booking{rows.length === 1 ? "" : "s"} with dues</CardTitle>
         </CardHeader>
         <CardContent>

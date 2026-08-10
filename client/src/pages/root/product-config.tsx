@@ -67,7 +67,7 @@ export default function ProductConfigPage() {
   return (
     <div className="space-y-6">
       {/* Beautiful Gradient Header */}
-      <div className="bg-gradient-to-r from-teal-600 to-green-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-teal-600 to-green-600 rounded-xl p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold">⚙️ Product Configuration</h1>
         <p className="text-teal-100 mt-1">Global branding, support contacts, and plan catalog</p>
       </div>

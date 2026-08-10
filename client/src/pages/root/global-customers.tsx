@@ -76,7 +76,7 @@ export default function RootGlobalCustomers() {
   return (
     <div className="space-y-6" data-testid="root-global-customers-page">
       {/* Beautiful Gradient Header */}
-      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold">🌍 Global Customer Database</h1>
         <p className="text-cyan-100 mt-1">Cross-tenant search • PII masked by default for privacy</p>
       </div>

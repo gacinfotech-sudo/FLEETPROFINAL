@@ -61,7 +61,7 @@ export default function AuditLogPage() {
   return (
     <div className="space-y-6" data-testid="page-audit-log">
       {/* Beautiful Gradient Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold">📋 Platform Audit Log</h1>
         <p className="text-blue-100 mt-1">Immutable root events • Login, PII unmask, support access, break-glass</p>
       </div>

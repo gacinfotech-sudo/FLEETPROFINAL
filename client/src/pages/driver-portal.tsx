@@ -83,7 +83,7 @@ export default function DriverPortalPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-orange-600 to-red-600 text-white px-4 py-6 flex items-center justify-between">
+      <div className="gradient-header bg-gradient-to-r from-orange-600 to-red-600 text-white px-4 py-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="bg-white/20 p-2 rounded-lg">
             <Car className="h-6 w-6" />

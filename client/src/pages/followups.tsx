@@ -27,14 +27,14 @@ export default function FollowUpsPage() {
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-sky-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-sky-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold">📞 Follow-ups</h1>
         <p className="text-sky-100 mt-1">Pending sales follow-ups across all leads • Schedule and track progress</p>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">🔴 OVERDUE</p>
             <p className="text-2xl font-bold text-red-600 mt-2">
@@ -49,7 +49,7 @@ export default function FollowUpsPage() {
             <p className="text-xs text-gray-500 mt-1">Urgent action</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">📅 DUE TODAY</p>
             <p className="text-2xl font-bold text-amber-600 mt-2">
@@ -64,7 +64,7 @@ export default function FollowUpsPage() {
             <p className="text-xs text-gray-500 mt-1">Today's tasks</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">🔜 UPCOMING</p>
             <p className="text-2xl font-bold text-blue-600 mt-2">
@@ -79,7 +79,7 @@ export default function FollowUpsPage() {
             <p className="text-xs text-gray-500 mt-1">Future scheduled</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-sky-50 to-blue-50 border-sky-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-sky-50 to-blue-50 border-sky-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">📊 TOTAL</p>
             <p className="text-2xl font-bold text-sky-600 mt-2">{followUps.length}</p>

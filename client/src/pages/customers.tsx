@@ -93,7 +93,7 @@ export default function CustomersPage({ onEditBooking, onNewBooking, initialCust
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold">👥 Customer Database</h1>
         <p className="text-violet-100 mt-1">Complete customer profiles • Auto-linked from bookings • No duplicates</p>
       </div>

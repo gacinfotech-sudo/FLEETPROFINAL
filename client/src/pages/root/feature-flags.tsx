@@ -65,7 +65,7 @@ export default function FeatureFlagsPage({ tenantId }: { tenantId: string }) {
   return (
     <div className="space-y-6">
       {/* Beautiful Gradient Header */}
-      <div className="bg-gradient-to-r from-yellow-600 to-amber-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-yellow-600 to-amber-600 rounded-xl p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold">🚩 Tenant Feature Flags</h1>
         <p className="text-yellow-100 mt-1">Control module access • Disabling never deletes data</p>
       </div>

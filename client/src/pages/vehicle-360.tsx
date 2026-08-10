@@ -99,7 +99,7 @@ export default function Vehicle360({ onViewChange }: Vehicle360Props) {
   return (
     <div className="space-y-6 p-6">
       {/* Beautiful Gradient Header */}
-      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold">🚗 Vehicle 360</h1>
         <p className="text-cyan-100 mt-1">Complete fleet analytics • Real-time monitoring & insights</p>
       </div>

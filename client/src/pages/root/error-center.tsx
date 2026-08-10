@@ -61,7 +61,7 @@ export default function ErrorCenterPage() {
   return (
     <div className="space-y-6" data-testid="page-root-error-center">
       {/* Beautiful Gradient Header */}
-      <div className="bg-gradient-to-r from-rose-600 to-red-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-rose-600 to-red-600 rounded-xl p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold">⚠️ Error Center</h1>
         <p className="text-rose-100 mt-1">Platform error aggregation • Track and resolve issues</p>
       </div>

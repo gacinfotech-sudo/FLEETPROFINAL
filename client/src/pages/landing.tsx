@@ -146,7 +146,7 @@ export default function LandingPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Notification Banner */}
       {showBanner && (
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 relative z-50">
+        <div className="gradient-header bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 relative z-50">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center space-x-2 text-sm sm:text-base">
               <span className="text-lg">🎉</span>

@@ -203,7 +203,7 @@ export default function SelfDrivePage() {
   return (
     <div data-testid="self-drive-page" className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-orange-600 to-amber-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-orange-600 to-amber-600 rounded-xl p-6 text-white shadow-lg">
         <h1 className="text-3xl font-bold">🚗 Self Drive</h1>
         <p className="text-orange-100 mt-1">Active vehicles • Overdue returns • Security deposit refunds</p>
       </div>

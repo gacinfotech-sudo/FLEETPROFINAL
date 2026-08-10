@@ -490,7 +490,7 @@ export default function Dashboard() {
         return (
           <div className="space-y-6">
             {/* Beautiful Header */}
-            <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+            <div className="gradient-header bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
               <div>
                 <h1 className="text-3xl font-bold">📝 Create New Booking</h1>
                 <p className="text-indigo-100 mt-1">Quick & easy booking entry • Fill in the details below</p>
@@ -512,7 +512,7 @@ export default function Dashboard() {
         return (
           <div className="space-y-6">
             {/* Beautiful Header */}
-            <div className="bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+            <div className="gradient-header bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
                   <h1 className="text-3xl font-bold">🚗 Fleet Management</h1>
@@ -551,7 +551,7 @@ export default function Dashboard() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+              <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
                 <CardContent className="p-4">
                   <p className="text-sm text-gray-600 font-medium">🚗 TOTAL</p>
                   <p className="text-2xl font-bold text-blue-600 mt-2">{vehicles.length}</p>
@@ -559,7 +559,7 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+              <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
                 <CardContent className="p-4">
                   <p className="text-sm text-gray-600 font-medium">✅ AVAILABLE</p>
                   <p className="text-2xl font-bold text-green-600 mt-2">
@@ -569,7 +569,7 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+              <Card className="stat-card card-hover bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
                 <CardContent className="p-4">
                   <p className="text-sm text-gray-600 font-medium">🚙 ON TRIP</p>
                   <p className="text-2xl font-bold text-amber-600 mt-2">
@@ -579,7 +579,7 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
+              <Card className="stat-card card-hover bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
                 <CardContent className="p-4">
                   <p className="text-sm text-gray-600 font-medium">🔧 MAINTENANCE</p>
                   <p className="text-2xl font-bold text-red-600 mt-2">
@@ -779,7 +779,7 @@ export default function Dashboard() {
         return (
           <div className="space-y-6">
             {/* Beautiful Header */}
-            <div className="bg-gradient-to-r from-orange-600 to-red-600 rounded-xl p-6 text-white shadow-lg">
+            <div className="gradient-header bg-gradient-to-r from-orange-600 to-red-600 rounded-xl p-6 text-white shadow-lg">
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
                   <h1 className="text-3xl font-bold">👤 Driver Management</h1>
@@ -833,14 +833,14 @@ export default function Dashboard() {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Card className="bg-gradient-to-br from-orange-50 to-red-50 border-orange-200">
+              <Card className="stat-card card-hover bg-gradient-to-br from-orange-50 to-red-50 border-orange-200">
                 <CardContent className="p-4">
                   <p className="text-sm text-gray-600 font-medium">👥 TOTAL</p>
                   <p className="text-2xl font-bold text-orange-600 mt-2">{drivers.length}</p>
                   <p className="text-xs text-gray-500 mt-1">All drivers</p>
                 </CardContent>
               </Card>
-              <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+              <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
                 <CardContent className="p-4">
                   <p className="text-sm text-gray-600 font-medium">✅ AVAILABLE</p>
                   <p className="text-2xl font-bold text-green-600 mt-2">
@@ -849,7 +849,7 @@ export default function Dashboard() {
                   <p className="text-xs text-gray-500 mt-1">Ready for duty</p>
                 </CardContent>
               </Card>
-              <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+              <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
                 <CardContent className="p-4">
                   <p className="text-sm text-gray-600 font-medium">🚗 ON DUTY</p>
                   <p className="text-2xl font-bold text-blue-600 mt-2">
@@ -1091,28 +1091,28 @@ export default function Dashboard() {
           return (
             <div className="space-y-6">
               {/* Beautiful Header */}
-              <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg">
+              <div className="gradient-header bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg">
                 <h1 className="text-3xl font-bold">📋 Booking History</h1>
                 <p className="text-purple-100 mt-1">Complete record of all bookings • Search, filter & export</p>
               </div>
 
               {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+                <Card className="stat-card card-hover bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
                   <CardContent className="p-4">
                     <p className="text-sm text-gray-600 font-medium">📊 TOTAL</p>
                     <p className="text-2xl font-bold text-purple-600 mt-2">{validBookings.length}</p>
                     <p className="text-xs text-gray-500 mt-1">All bookings</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+                <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
                   <CardContent className="p-4">
                     <p className="text-sm text-gray-600 font-medium">✅ COMPLETED</p>
                     <p className="text-2xl font-bold text-green-600 mt-2">{validBookings.filter((b: any) => b.status === 'completed').length}</p>
                     <p className="text-xs text-gray-500 mt-1">Successfully completed</p>
                   </CardContent>
                 </Card>
-                <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+                <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
                   <CardContent className="p-4">
                     <p className="text-sm text-gray-600 font-medium">📋 ACTIVE</p>
                     <p className="text-2xl font-bold text-blue-600 mt-2">{validBookings.filter((b: any) => b.status === 'confirmed').length}</p>
@@ -1650,7 +1650,7 @@ export default function Dashboard() {
 
                     {/* Upgrade Section */}
                     <div className="space-y-4">
-                      <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-200">
+                      <div className="stat-card card-hover bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-200">
                         <h4 className="text-md font-semibold text-gray-900 mb-2">Need More Resources?</h4>
                         <p className="text-sm text-gray-600 mb-4">
                           Upgrade your plan to get more vehicles, drivers, and advanced features.

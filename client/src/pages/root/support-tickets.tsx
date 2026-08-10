@@ -147,7 +147,7 @@ export default function SupportTicketsPage() {
   return (
     <div className="space-y-6" data-testid="page-root-support-tickets">
       {/* Beautiful Gradient Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">🆘 Support Center</h1>
           <Dialog open={showCreate} onOpenChange={setShowCreate}>

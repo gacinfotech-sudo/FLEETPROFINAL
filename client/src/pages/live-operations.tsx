@@ -394,7 +394,7 @@ export default function LiveOperations({ initialTab }: { initialTab?: OpsTab } =
   return (
     <div data-testid="live-operations-page" className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-red-600 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-red-600 to-orange-600 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">🚗 Vehicles on Booking</h1>

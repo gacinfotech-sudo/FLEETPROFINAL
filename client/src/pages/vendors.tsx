@@ -87,7 +87,7 @@ export default function VendorsPage() {
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-slate-600 to-gray-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-slate-600 to-gray-600 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">🏢 Vendor Database</h1>
@@ -105,14 +105,14 @@ export default function VendorsPage() {
       {/* Stats */}
       {!isLoading && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-gradient-to-br from-slate-50 to-gray-50 border-slate-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-slate-50 to-gray-50 border-slate-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">🏢 TOTAL</p>
               <p className="text-2xl font-bold text-slate-600 mt-2">{(vendors || []).length}</p>
               <p className="text-xs text-gray-500 mt-1">All vendors</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">✅ ACTIVE</p>
               <p className="text-2xl font-bold text-green-600 mt-2">
@@ -121,7 +121,7 @@ export default function VendorsPage() {
               <p className="text-xs text-gray-500 mt-1">Ready to book</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">📋 DRAFT</p>
               <p className="text-2xl font-bold text-amber-600 mt-2">

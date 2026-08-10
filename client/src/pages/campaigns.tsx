@@ -81,7 +81,7 @@ export default function CampaignsPage() {
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">📢 Campaigns & Offers</h1>
@@ -98,14 +98,14 @@ export default function CampaignsPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-violet-50 to-purple-50 border-violet-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-violet-50 to-purple-50 border-violet-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">📊 TOTAL CAMPAIGNS</p>
             <p className="text-2xl font-bold text-violet-600 mt-2">{(campaigns || []).length}</p>
             <p className="text-xs text-gray-500 mt-1">Active & drafts</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">✅ COMPLETED</p>
             <p className="text-2xl font-bold text-green-600 mt-2">
@@ -114,7 +114,7 @@ export default function CampaignsPage() {
             <p className="text-xs text-gray-500 mt-1">Sent campaigns</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">📝 DRAFT</p>
             <p className="text-2xl font-bold text-amber-600 mt-2">

@@ -120,7 +120,7 @@ export default function InquiriesPage({ initialInquiryId }: InquiriesPageProps =
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">💬 Inquiries</h1>
@@ -137,14 +137,14 @@ export default function InquiriesPage({ initialInquiryId }: InquiriesPageProps =
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">📊 TOTAL</p>
             <p className="text-2xl font-bold text-indigo-600 mt-2">{inquiries?.length || 0}</p>
             <p className="text-xs text-gray-500 mt-1">All inquiries</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">✨ NEW</p>
             <p className="text-2xl font-bold text-blue-600 mt-2">
@@ -153,7 +153,7 @@ export default function InquiriesPage({ initialInquiryId }: InquiriesPageProps =
             <p className="text-xs text-gray-500 mt-1">Uncontacted</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">🎯 CONVERTED</p>
             <p className="text-2xl font-bold text-green-600 mt-2">
@@ -162,7 +162,7 @@ export default function InquiriesPage({ initialInquiryId }: InquiriesPageProps =
             <p className="text-xs text-gray-500 mt-1">To leads</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">❌ LOST</p>
             <p className="text-2xl font-bold text-red-600 mt-2">

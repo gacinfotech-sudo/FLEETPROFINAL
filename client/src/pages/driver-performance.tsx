@@ -34,7 +34,7 @@ export default function DriverPerformancePage() {
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-indigo-600 to-blue-600 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">📊 Driver Performance</h1>
@@ -50,28 +50,28 @@ export default function DriverPerformancePage() {
       {/* Stats Cards */}
       {!isLoading && !isError && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">👥 DRIVERS</p>
               <p className="text-2xl font-bold text-indigo-600 mt-2">{drivers.length}</p>
               <p className="text-xs text-gray-500 mt-1">Active this month</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">🚗 TRIPS</p>
               <p className="text-2xl font-bold text-blue-600 mt-2">{stats.totalTrips}</p>
               <p className="text-xs text-gray-500 mt-1">Total assigned</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">✅ COMPLETED</p>
               <p className="text-2xl font-bold text-green-600 mt-2">{stats.completed}</p>
               <p className="text-xs text-gray-500 mt-1">Successfully done</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">⭐ AVG RATING</p>
               <p className="text-2xl font-bold text-yellow-600 mt-2">{stats.avgRating}</p>

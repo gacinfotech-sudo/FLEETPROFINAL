@@ -63,7 +63,7 @@ export default function AfterSalesPage() {
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-teal-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-teal-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">✅ After-Sales</h1>
@@ -83,14 +83,14 @@ export default function AfterSalesPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-teal-50 to-cyan-50 border-teal-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-teal-50 to-cyan-50 border-teal-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">📋 TOTAL TASKS</p>
             <p className="text-2xl font-bold text-teal-600 mt-2">{tasks.length}</p>
             <p className="text-xs text-gray-500 mt-1">All follow-ups</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">⚠️ OVERDUE</p>
             <p className="text-2xl font-bold text-red-600 mt-2">
@@ -105,7 +105,7 @@ export default function AfterSalesPage() {
             <p className="text-xs text-gray-500 mt-1">Need immediate attention</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">✔️ RESOLVED</p>
             <p className="text-2xl font-bold text-green-600 mt-2">

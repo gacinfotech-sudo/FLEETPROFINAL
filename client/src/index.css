@@ -160,6 +160,52 @@
     }
   }
 
+  /* Gradient header slide in */
+  @keyframes header-slide-in {
+    from {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Stat card pop in */
+  @keyframes stat-card-pop {
+    from {
+      opacity: 0;
+      transform: scale(0.95) translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+
+  /* Table row fade in */
+  @keyframes row-fade-in {
+    from {
+      opacity: 0;
+      transform: translateX(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Pulse animation for urgent items */
+  @keyframes pulse-subtle {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
+  }
+
   /* Smooth transition for toast elements */
   [data-state="open"] {
     animation: slide-in-from-top-full 0.3s ease-out;
@@ -173,6 +219,41 @@
 /* Global page transition utility */
 .page-transition {
   animation: fade-in 0.3s ease-out;
+}
+
+/* Gradient header animation */
+.gradient-header {
+  animation: header-slide-in 0.5s ease-out;
+}
+
+/* Stat card animations */
+.stat-card {
+  animation: stat-card-pop 0.4s ease-out backwards;
+}
+
+.stat-card:nth-child(1) { animation-delay: 0.05s; }
+.stat-card:nth-child(2) { animation-delay: 0.1s; }
+.stat-card:nth-child(3) { animation-delay: 0.15s; }
+.stat-card:nth-child(4) { animation-delay: 0.2s; }
+
+/* Table row animations */
+.table-row {
+  animation: row-fade-in 0.3s ease-out;
+}
+
+/* Urgent item pulse */
+.urgent-item {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* Hover effects */
+.card-hover {
+  transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
 }
 
 /* Card elevation and hover effects */

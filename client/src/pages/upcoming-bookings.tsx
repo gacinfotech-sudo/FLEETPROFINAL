@@ -30,7 +30,7 @@ export default function UpcomingBookings() {
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
         <div>
           <h1 className="text-3xl font-bold">📅 Upcoming Bookings</h1>
           <p className="text-blue-100 mt-1">Today, tomorrow and the day after — sorted by pickup time</p>
@@ -40,28 +40,28 @@ export default function UpcomingBookings() {
       {/* Summary Stats Cards */}
       {!isLoading && !isError && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">📍 TODAY</p>
               <p className="text-2xl font-bold text-green-600 mt-2">{todayCount}</p>
               <p className="text-xs text-gray-500 mt-1">bookings</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">🔜 TOMORROW</p>
               <p className="text-2xl font-bold text-blue-600 mt-2">{tomorrowCount}</p>
               <p className="text-xs text-gray-500 mt-1">bookings</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">📌 DAY AFTER</p>
               <p className="text-2xl font-bold text-purple-600 mt-2">{dayAfterCount}</p>
               <p className="text-xs text-gray-500 mt-1">bookings</p>
             </CardContent>
           </Card>
-          <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+          <Card className="stat-card card-hover bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
             <CardContent className="p-4">
               <p className="text-sm text-gray-600 font-medium">💰 REVENUE</p>
               <p className="text-2xl font-bold text-amber-600 mt-2">{fmtMoney(totalRevenue)}</p>

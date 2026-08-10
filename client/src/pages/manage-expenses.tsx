@@ -229,7 +229,7 @@ export default function ManageExpenses() {
   return (
     <div className="space-y-6">
       {/* Beautiful Header */}
-      <div className="bg-gradient-to-r from-rose-600 to-red-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="gradient-header bg-gradient-to-r from-rose-600 to-red-600 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold">💸 Manage Expenses</h1>
@@ -257,7 +257,7 @@ export default function ManageExpenses() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-gradient-to-br from-rose-50 to-red-50 border-rose-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-rose-50 to-red-50 border-rose-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">📊 TOTAL EXPENSES</p>
             <p className="text-2xl font-bold text-rose-600 mt-2">
@@ -266,7 +266,7 @@ export default function ManageExpenses() {
             <p className="text-xs text-gray-500 mt-1">{expenses.length} entries</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">🔧 MAINTENANCE</p>
             <p className="text-2xl font-bold text-amber-600 mt-2">
@@ -275,7 +275,7 @@ export default function ManageExpenses() {
             <p className="text-xs text-gray-500 mt-1">{expenses.filter(e => e.category === 'maintenance').length} records</p>
           </CardContent>
         </Card>
-        <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
+        <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600 font-medium">⛽ FUEL</p>
             <p className="text-2xl font-bold text-blue-600 mt-2">
