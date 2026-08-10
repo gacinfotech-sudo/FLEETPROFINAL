@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import GlobalCustomerSearch from "@/components/customers/global-customer-search";
+import { ThemeToggle } from "@/components/theme-toggle";
 // The final-canonical merge brought back this manifest-driven sidebar but
 // dropped the import that feeds it.
 import { SAAS_MODULES, getNavigationStructure } from "@/modules/manifest";
@@ -235,11 +236,15 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
           </div>
         )}
 
-        {/* Logout Button */}
-        <div className="p-3 lg:p-4 border-t border-gray-200">
+        {/* Theme Toggle & Logout */}
+        <div className="p-3 lg:p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+          <div className="flex items-center gap-1 px-1">
+            <span className="text-xs text-gray-500 dark:text-gray-400 flex-1">Theme</span>
+            <ThemeToggle />
+          </div>
           <Button
             variant="ghost"
-            className="w-full justify-start px-3 lg:px-4 py-3 text-sm lg:text-base text-red-600 hover:bg-red-50 hover:text-red-700 transition-all duration-200 hover:scale-[1.02] active:scale-[0.97] h-12 lg:h-auto group rounded-md hover:shadow-sm"
+            className="w-full justify-start px-3 lg:px-4 py-3 text-sm lg:text-base text-red-600 hover:bg-red-50 dark:hover:bg-red-950 hover:text-red-700 transition-all duration-200 hover:scale-[1.02] active:scale-[0.97] h-12 lg:h-auto group rounded-md hover:shadow-sm"
             onClick={handleLogout}
           >
             <LogOut className="mr-2 lg:mr-3 group-hover:animate-pulse" size={18} />
