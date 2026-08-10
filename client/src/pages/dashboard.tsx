@@ -4,9 +4,6 @@ import { usePermissions } from "../hooks/use-permissions";
 import { useLocation, useParams, Link } from "wouter";
 import Sidebar from "../components/layout/sidebar";
 import DashboardOverview from "../components/dashboard/overview";
-import CustomizableOverview from "../components/dashboard/customizable-overview";
-import PremiumDashboard from "../components/dashboard/premium-dashboard";
-import BeautifulDashboard from "../components/dashboard/beautiful-dashboard";
 import EnhancedBookingForm from "../components/booking/enhanced-booking-form";
 import VehicleForm from "../components/fleet/vehicle-form";
 import VehicleFeedbackProfile from "../components/fleet/vehicle-feedback-profile";
@@ -477,8 +474,7 @@ export default function Dashboard() {
       case "dashboard":
         return (
           <div className="space-y-6">
-            {/* Beautiful Dashboard with Enhanced Charts */}
-            <BeautifulDashboard
+            <DashboardOverview
               onNavigate={(view) => handleViewChange(view as ViewType)}
               onViewBooking={(booking) => openBooking(booking)}
               onSelectCustomer={handleSelectCustomerFromSearch}
