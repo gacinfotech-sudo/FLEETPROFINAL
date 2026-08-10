@@ -80,12 +80,49 @@ export default function CampaignsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Campaigns & Offers</h1>
-          <p className="text-sm text-gray-500">WhatsApp outreach to a customer segment or tag — consent and Do Not Contact are always enforced at send time.</p>
+      {/* Beautiful Header */}
+      <div className="bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl p-6 text-white shadow-lg">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">📢 Campaigns & Offers</h1>
+            <p className="text-violet-100 mt-1">WhatsApp outreach to customer segments • Consent-enforced delivery</p>
+          </div>
+          <Button
+            onClick={() => setShowCreate(true)}
+            className="bg-white text-violet-600 hover:bg-violet-50 font-semibold"
+          >
+            ➕ New Campaign
+          </Button>
         </div>
-        <Button onClick={() => setShowCreate(true)}><Plus className="w-4 h-4 mr-1.5" />New Campaign</Button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-gradient-to-br from-violet-50 to-purple-50 border-violet-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-600 font-medium">📊 TOTAL CAMPAIGNS</p>
+            <p className="text-2xl font-bold text-violet-600 mt-2">{(campaigns || []).length}</p>
+            <p className="text-xs text-gray-500 mt-1">Active & drafts</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-600 font-medium">✅ COMPLETED</p>
+            <p className="text-2xl font-bold text-green-600 mt-2">
+              {(campaigns || []).filter((c: any) => c.status === 'completed').length}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">Sent campaigns</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-600 font-medium">📝 DRAFT</p>
+            <p className="text-2xl font-bold text-amber-600 mt-2">
+              {(campaigns || []).filter((c: any) => c.status === 'draft').length}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">Ready to send</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>

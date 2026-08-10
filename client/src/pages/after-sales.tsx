@@ -62,18 +62,58 @@ export default function AfterSalesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">After-Sales</h1>
-          <p className="text-sm text-gray-500">Auto-created for every completed trip — confirm safe completion, ask for feedback, follow up.</p>
+      {/* Beautiful Header */}
+      <div className="bg-gradient-to-r from-teal-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold">✅ After-Sales</h1>
+            <p className="text-teal-100 mt-1">Auto-created post-trip tasks • Feedback, safety checks, follow-ups</p>
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-48 bg-white/20 border-white/30 text-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Tasks</SelectItem>
+              {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-48"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Tasks</SelectItem>
-            {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s.replace(/_/g, ' ')}</SelectItem>)}
-          </SelectContent>
-        </Select>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="bg-gradient-to-br from-teal-50 to-cyan-50 border-teal-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-600 font-medium">📋 TOTAL TASKS</p>
+            <p className="text-2xl font-bold text-teal-600 mt-2">{tasks.length}</p>
+            <p className="text-xs text-gray-500 mt-1">All follow-ups</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-red-50 to-rose-50 border-red-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-600 font-medium">⚠️ OVERDUE</p>
+            <p className="text-2xl font-bold text-red-600 mt-2">
+              {tasks.filter((t: any) => {
+                const due = new Date(t.dueDate);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                due.setHours(0, 0, 0, 0);
+                return t.status === 'pending' && due.getTime() < today.getTime();
+              }).length}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">Need immediate attention</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
+          <CardContent className="p-4">
+            <p className="text-sm text-gray-600 font-medium">✔️ RESOLVED</p>
+            <p className="text-2xl font-bold text-green-600 mt-2">
+              {tasks.filter((t: any) => t.status === 'resolved').length}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">Completed</p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
