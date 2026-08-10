@@ -37,7 +37,7 @@ export default function UpcomingBookings() {
         const colors = ["from-green-50 to-emerald-50 border-green-200", "from-blue-50 to-cyan-50 border-blue-200", "from-purple-50 to-pink-50 border-purple-200"];
         const colorClass = colors[idx % colors.length];
         return (
-        <Card key={day.date} className={`bg-gradient-to-br ${colorClass}`}>
+          <Card key={day.date} className={`bg-gradient-to-br ${colorClass}`}>
           <CardHeader className="bg-white/50">
             <CardTitle className="text-base flex items-center gap-3">
               <span className="text-2xl">{idx === 0 ? "📍" : idx === 1 ? "🔜" : "📌"}</span>
