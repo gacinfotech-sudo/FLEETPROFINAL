@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FleetPro Live Dashboard - Real Data</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.8em;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .live-indicator {
+            display: inline-block;
+            background: #FF6B6B;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            animation: pulse 2s infinite;
+            margin-left: 15px;
+            font-weight: bold;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid rgba(255,255,255,0.2);
+            padding-bottom: 15px;
+        }
+
+        .tab-button {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .tab-button.active {
+            background: white;
+            color: #667eea;
+        }
+
+        .tab-button:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+
+        .stat-icon {
+            font-size: 2.2em;
+            margin-bottom: 8px;
+        }
+
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin: 8px 0;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.95em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .booking-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border-left: 4px solid #667eea;
+        }
+
+        .booking-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 15px;
+        }
+
+        .booking-title {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .booking-status {
+            display: inline-block;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .status-completed {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .status-upcoming {
+            background: #2196F3;
+            color: white;
+        }
+
+        .status-live {
+            background: #FF9800;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        .status-cancelled {
+            background: #f44336;
+            color: white;
+        }
+
+        .booking-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .booking-section {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+
+        .section-title {
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-content {
+            font-size: 0.95em;
+            color: #555;
+            line-height: 1.8;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .detail-label {
+            color: #666;
+            font-weight: 600;
+        }
+
+        .detail-value {
+            color: #333;
+            font-weight: 700;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .chart-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .bar-chart {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            height: 300px;
+            gap: 10px;
+        }
+
+        .bar {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .bar-column {
+            width: 100%;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px 8px 0 0;
+            min-height: 20px;
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .bar-value {
+            color: white;
+            font-weight: bold;
+            font-size: 0.9em;
+            padding-bottom: 8px;
+        }
+
+        .bar-label {
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #666;
+            text-align: center;
+        }
+
+        .vendor-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            border-left: 4px solid #667eea;
+        }
+
+        .vendor-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .vendor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .vendor-item {
+            background: #f9f9f9;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+
+        .vendor-item-label {
+            color: #666;
+            font-size: 0.85em;
+            margin-bottom: 4px;
+        }
+
+        .vendor-item-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 40px;
+            padding: 20px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .stat-card, .booking-card, .chart-container, .vendor-card {
+                background: #2d2d44;
+                color: #fff;
+            }
+
+            .stat-label, .detail-label {
+                color: #aaa;
+            }
+
+            .booking-section {
+                background: #3d3d54;
+            }
+
+            .section-title, .booking-title, .chart-title, .vendor-title {
+                color: #fff;
+            }
+
+            .section-content, .detail-value {
+                color: #ddd;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗 FleetPro Live Dashboard <span class="live-indicator">🔴 LIVE</span></h1>
+            <p>Real-Time Data Visualization • All Modules • 7-Day Tracking</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="showTab('overview')">📊 Overview</button>
+            <button class="tab-button" onclick="showTab('bookings')">🚗 Bookings</button>
+            <button class="tab-button" onclick="showTab('modules')">📦 All Modules</button>
+            <button class="tab-button" onclick="showTab('vendors')">🤝 Vendors</button>
+            <button class="tab-button" onclick="showTab('charts')">📈 Charts</button>
+        </div>
+
+        <!-- OVERVIEW TAB -->
+        <div id="overview" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🚗</div>
+                    <div class="stat-value">199</div>
+                    <div class="stat-label">Bookings</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">👥</div>
+                    <div class="stat-value">95</div>
+                    <div class="stat-label">Customers</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🧑‍✈️</div>
+                    <div class="stat-value">82</div>
+                    <div class="stat-label">Drivers</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🚙</div>
+                    <div class="stat-value">63</div>
+                    <div class="stat-label">Vehicles</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💰</div>
+                    <div class="stat-value">89</div>
+                    <div class="stat-label">Payments</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">💸</div>
+                    <div class="stat-value">133</div>
+                    <div class="stat-label">Expenses</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🤝</div>
+                    <div class="stat-value">20</div>
+                    <div class="stat-label">Vendors</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-value">900+</div>
+                    <div class="stat-label">Total Records</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">📊 Booking Status Breakdown</div>
+                <div class="booking-grid">
+                    <div class="booking-section">
+                        <div class="section-title">✅ Completed</div>
+                        <div class="detail-row">
+                            <span class="detail-label">Count:</span>
+                            <span class="detail-value">134</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Percentage:</span>
+                            <span class="detail-value">67%</span>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">📅 Upcoming</div>
+                        <div class="detail-row">
+                            <span class="detail-label">Count:</span>
+                            <span class="detail-value">53</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Percentage:</span>
+                            <span class="detail-value">27%</span>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">🚗 Live</div>
+                        <div class="detail-row">
+                            <span class="detail-label">Count:</span>
+                            <span class="detail-value">1</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Percentage:</span>
+                            <span class="detail-value">0.5%</span>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">❌ Cancelled</div>
+                        <div class="detail-row">
+                            <span class="detail-label">Count:</span>
+                            <span class="detail-value">1</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Percentage:</span>
+                            <span class="detail-value">0.5%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- BOOKINGS TAB -->
+        <div id="bookings" class="tab-content">
+            <div class="booking-card">
+                <div class="booking-header">
+                    <div>
+                        <div class="booking-title">🚗 Booking #1: Indore → Ujjain (Outstation)</div>
+                        <div style="color: #999; margin-top: 5px;">BK-20260814-00123</div>
+                    </div>
+                    <span class="booking-status status-completed">✅ COMPLETED</span>
+                </div>
+                <div class="booking-grid">
+                    <div class="booking-section">
+                        <div class="section-title">📅 Dates & Timing</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Date:</span>
+                                <span class="detail-value">14 Aug 2026</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Pickup:</span>
+                                <span class="detail-value">10:00 AM</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Dropoff:</span>
+                                <span class="detail-value">12:30 PM</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Duration:</span>
+                                <span class="detail-value">2.5 hrs</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Distance:</span>
+                                <span class="detail-value">55 km</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">📍 Route</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">From:</span>
+                                <span class="detail-value">Hotel Grand, Indore</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">To:</span>
+                                <span class="detail-value">Mahakaleshwar, Ujjain</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Type:</span>
+                                <span class="detail-value">Outstation</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">👥 Customer</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Name:</span>
+                                <span class="detail-value">Rajesh Kumar</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Phone:</span>
+                                <span class="detail-value">+91-98765-43210</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Segment:</span>
+                                <span class="detail-value">Repeat</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">🚙 Vehicle</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Type:</span>
+                                <span class="detail-value">Sedan</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Reg:</span>
+                                <span class="detail-value">MH-02-AB-1234</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Color:</span>
+                                <span class="detail-value">Silver</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Fuel:</span>
+                                <span class="detail-value">Diesel</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">🧑‍✈️ Driver</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Name:</span>
+                                <span class="detail-value">Amit Sharma</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Rating:</span>
+                                <span class="detail-value">⭐ 4.8/5</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Exp:</span>
+                                <span class="detail-value">8 years</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">License:</span>
+                                <span class="detail-value">DL-2020-12345</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">💰 Financial</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Base Fare:</span>
+                                <span class="detail-value">₹1,650</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Distance:</span>
+                                <span class="detail-value">₹550</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Toll:</span>
+                                <span class="detail-value">₹150</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">GST:</span>
+                                <span class="detail-value">₹122</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Total:</span>
+                                <span class="detail-value">₹2,572</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">💸 Expenses</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Fuel:</span>
+                                <span class="detail-value">₹350</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Toll:</span>
+                                <span class="detail-value">₹150</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Parking:</span>
+                                <span class="detail-value">₹100</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Allowance:</span>
+                                <span class="detail-value">₹200</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Total:</span>
+                                <span class="detail-value">₹800</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">⭐ Feedback</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Rating:</span>
+                                <span class="detail-value">⭐⭐⭐⭐⭐</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Comment:</span>
+                                <span class="detail-value">Excellent service!</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="booking-card">
+                <div class="booking-header">
+                    <div>
+                        <div class="booking-title">✈️ Booking #2: Airport Transfer</div>
+                        <div style="color: #999; margin-top: 5px;">BK-20260813-00456</div>
+                    </div>
+                    <span class="booking-status status-upcoming">📅 UPCOMING</span>
+                </div>
+                <div class="booking-grid">
+                    <div class="booking-section">
+                        <div class="section-title">📅 Dates & Timing</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Date:</span>
+                                <span class="detail-value">13 Aug 2026</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Pickup:</span>
+                                <span class="detail-value">3:30 PM</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Distance:</span>
+                                <span class="detail-value">15 km</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">👥 Customer</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Name:</span>
+                                <span class="detail-value">Ms. Priya Sharma</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Type:</span>
+                                <span class="detail-value">Corporate</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">🚙 Vehicle</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Type:</span>
+                                <span class="detail-value">SUV (7-seater)</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Fuel:</span>
+                                <span class="detail-value">CNG</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">💰 Fare</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Total:</span>
+                                <span class="detail-value">₹656</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Status:</span>
+                                <span class="detail-value">✅ Confirmed</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="booking-card">
+                <div class="booking-header">
+                    <div>
+                        <div class="booking-title">🗺️ Booking #3: Multi-Day Tour</div>
+                        <div style="color: #999; margin-top: 5px;">BK-20260812-00789 (2.5 days)</div>
+                    </div>
+                    <span class="booking-status status-live">🚗 LIVE</span>
+                </div>
+                <div class="booking-grid">
+                    <div class="booking-section">
+                        <div class="section-title">📅 Itinerary</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Day 1:</span>
+                                <span class="detail-value">Indore → Omkareshwar (85 km)</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Day 2:</span>
+                                <span class="detail-value">Stay in Omkareshwar</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Day 3:</span>
+                                <span class="detail-value">→ Maheshwar (35 km)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">👥 Customer</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Name:</span>
+                                <span class="detail-value">Sanjay Gupta & Family</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Party:</span>
+                                <span class="detail-value">4 people</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Type:</span>
+                                <span class="detail-value">Family Trip</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">🧑‍✈️ Driver</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Name:</span>
+                                <span class="detail-value">Suresh Reddy</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Exp:</span>
+                                <span class="detail-value">15 years</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Rating:</span>
+                                <span class="detail-value">⭐ 4.7/5</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">💰 Total Fare</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Total:</span>
+                                <span class="detail-value">₹11,392</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Advance:</span>
+                                <span class="detail-value">₹6,000</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Balance:</span>
+                                <span class="detail-value">₹5,392</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODULES TAB -->
+        <div id="modules" class="tab-content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">✅</div>
+                    <div class="stat-value">134</div>
+                    <div class="stat-label">Completed Bookings</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📅</div>
+                    <div class="stat-value">53</div>
+                    <div class="stat-label">Upcoming Bookings</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🚗</div>
+                    <div class="stat-value">1</div>
+                    <div class="stat-label">Live Now</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">15+</div>
+                    <div class="stat-value">95</div>
+                    <div class="stat-label">Customer Segments</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🎓</div>
+                    <div class="stat-value">82</div>
+                    <div class="stat-label">Drivers HR Enhanced</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🛠️</div>
+                    <div class="stat-value">63</div>
+                    <div class="stat-label">Vehicles Full Specs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🏦</div>
+                    <div class="stat-value">6</div>
+                    <div class="stat-label">Payment Patterns</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">📊</div>
+                    <div class="stat-value">8</div>
+                    <div class="stat-label">Expense Categories</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">📦 Module Details</div>
+                <div class="booking-grid">
+                    <div class="booking-section">
+                        <div class="section-title">🚗 Bookings (199)</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Completed:</span>
+                                <span class="detail-value">134</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Upcoming:</span>
+                                <span class="detail-value">53</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Live:</span>
+                                <span class="detail-value">1</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Cancelled:</span>
+                                <span class="detail-value">1</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Avg Rating:</span>
+                                <span class="detail-value">4.8⭐</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">👥 Customers (95)</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">New:</span>
+                                <span class="detail-value">25</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Repeat:</span>
+                                <span class="detail-value">70</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Segments:</span>
+                                <span class="detail-value">15+</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Corporate:</span>
+                                <span class="detail-value">12</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">🧑‍✈️ Drivers (82)</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">HR Enhanced:</span>
+                                <span class="detail-value">82/82</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Languages:</span>
+                                <span class="detail-value">7 types</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Lifecycle:</span>
+                                <span class="detail-value">5 stages</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Avg Rating:</span>
+                                <span class="detail-value">4.6⭐</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">🚙 Vehicles (63)</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Categories:</span>
+                                <span class="detail-value">7 types</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Fuel Types:</span>
+                                <span class="detail-value">4 types</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Full Specs:</span>
+                                <span class="detail-value">63/63</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Condition:</span>
+                                <span class="detail-value">Excellent</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">💰 Payments (89)</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Total Amount:</span>
+                                <span class="detail-value">₹2.3L+</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Methods:</span>
+                                <span class="detail-value">3 types</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Patterns:</span>
+                                <span class="detail-value">6 types</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">💸 Expenses (133)</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Total Amount:</span>
+                                <span class="detail-value">₹45K+</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Categories:</span>
+                                <span class="detail-value">8 types</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Fuel Expense:</span>
+                                <span class="detail-value">₹15K</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VENDORS TAB -->
+        <div id="vendors" class="tab-content">
+            <div class="vendor-card">
+                <div class="vendor-title">🤝 Vendor Ecosystem - Complete Overview</div>
+                <div class="vendor-grid">
+                    <div class="vendor-item">
+                        <div class="vendor-item-label">Vendors</div>
+                        <div class="vendor-item-value">20</div>
+                    </div>
+                    <div class="vendor-item">
+                        <div class="vendor-item-label">Vendor Drivers</div>
+                        <div class="vendor-item-value">40</div>
+                    </div>
+                    <div class="vendor-item">
+                        <div class="vendor-item-label">Vendor Vehicles</div>
+                        <div class="vendor-item-value">55</div>
+                    </div>
+                    <div class="vendor-item">
+                        <div class="vendor-item-label">Vendor Duties</div>
+                        <div class="vendor-item-value">32</div>
+                    </div>
+                    <div class="vendor-item">
+                        <div class="vendor-item-label">Sourcing Requests</div>
+                        <div class="vendor-item-value">31</div>
+                    </div>
+                    <div class="vendor-item">
+                        <div class="vendor-item-label">Financial Ledger</div>
+                        <div class="vendor-item-value">40</div>
+                    </div>
+                    <div class="vendor-item">
+                        <div class="vendor-item-label">Vendor Types</div>
+                        <div class="vendor-item-value">8</div>
+                    </div>
+                    <div class="vendor-item">
+                        <div class="vendor-item-label">Service Cities</div>
+                        <div class="vendor-item-value">6</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="vendor-card">
+                <div class="vendor-title">📊 Vendor Details Breakdown</div>
+                <div class="booking-grid">
+                    <div class="booking-section">
+                        <div class="section-title">🏢 Vendor Masters (20)</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Active:</span>
+                                <span class="detail-value">20/20</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Taxi Fleet:</span>
+                                <span class="detail-value">3</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Logistics:</span>
+                                <span class="detail-value">3</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Corporate Transport:</span>
+                                <span class="detail-value">3</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Others:</span>
+                                <span class="detail-value">11</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">🧑‍✈️ Vendor Drivers (40)</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Available:</span>
+                                <span class="detail-value">40/40</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Avg Rating:</span>
+                                <span class="detail-value">4.5⭐</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Licensed:</span>
+                                <span class="detail-value">40/40</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Verified:</span>
+                                <span class="detail-value">40/40</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">🚙 Vendor Vehicles (55)</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Available:</span>
+                                <span class="detail-value">55/55</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Fuel Types:</span>
+                                <span class="detail-value">3 types</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Documents Valid:</span>
+                                <span class="detail-value">55/55</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">📋 Sourcing Requests (31)</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Completed:</span>
+                                <span class="detail-value">12</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Accepted:</span>
+                                <span class="detail-value">15</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Pending:</span>
+                                <span class="detail-value">4</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">💼 Vendor Duties (32)</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Completed:</span>
+                                <span class="detail-value">32/32</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Total Payable:</span>
+                                <span class="detail-value">₹1.2L+</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Avg Commission:</span>
+                                <span class="detail-value">15%</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title">💰 Financial Ledger (40)</div>
+                        <div class="section-content">
+                            <div class="detail-row">
+                                <span class="detail-label">Transactions:</span>
+                                <span class="detail-value">40</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Total Amount:</span>
+                                <span class="detail-value">₹85K+</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Completed:</span>
+                                <span class="detail-value">35/40</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CHARTS TAB -->
+        <div id="charts" class="tab-content">
+            <div class="chart-container">
+                <div class="chart-title">📊 7-Day Booking Activity</div>
+                <div class="bar-chart">
+                    <div class="bar">
+                        <div class="bar-column" style="height: 100%;">
+                            <div class="bar-value">12</div>
+                        </div>
+                        <div class="bar-label">Aug 10</div>
+                    </div>
+                    <div class="bar">
+                        <div class="bar-column" style="height: 183%;">
+                            <div class="bar-value">22</div>
+                        </div>
+                        <div class="bar-label">Aug 11</div>
+                    </div>
+                    <div class="bar">
+                        <div class="bar-column" style="height: 183%;">
+                            <div class="bar-value">22</div>
+                        </div>
+                        <div class="bar-label">Aug 12</div>
+                    </div>
+                    <div class="bar">
+                        <div class="bar-column" style="height: 142%;">
+                            <div class="bar-value">17</div>
+                        </div>
+                        <div class="bar-label">Aug 13</div>
+                    </div>
+                    <div class="bar">
+                        <div class="bar-column" style="height: 150%;">
+                            <div class="bar-value">18</div>
+                        </div>
+                        <div class="bar-label">Aug 14</div>
+                    </div>
+                    <div class="bar">
+                        <div class="bar-column" style="height: 125%;">
+                            <div class="bar-value">15</div>
+                        </div>
+                        <div class="bar-label">Aug 15</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <div class="chart-title">📈 Booking Status Distribution</div>
+                <div class="booking-grid">
+                    <div class="booking-section">
+                        <div class="section-title" style="font-size: 1.2em; color: #4CAF50;">
+                            ✅ Completed: 134 (67%)
+                        </div>
+                        <div style="background: linear-gradient(to right, #4CAF50, #4CAF5044); height: 20px; border-radius: 10px; margin-top: 10px;"></div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title" style="font-size: 1.2em; color: #2196F3;">
+                            📅 Upcoming: 53 (27%)
+                        </div>
+                        <div style="background: linear-gradient(to right, #2196F3, #2196F344); height: 20px; border-radius: 10px; margin-top: 10px;"></div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title" style="font-size: 1.2em; color: #FF9800;">
+                            🚗 Live: 1 (0.5%)
+                        </div>
+                        <div style="background: linear-gradient(to right, #FF9800, #FF980044); height: 20px; border-radius: 10px; margin-top: 10px;"></div>
+                    </div>
+                    <div class="booking-section">
+                        <div class="section-title" style="font-size: 1.2em; color: #f44336;">
+                            ❌ Cancelled: 1 (0.5%)
+                        </div>
+                        <div style="background: linear-gradient(to right, #f44336, #f4433644); height: 20px; border-radius: 10px; margin-top: 10px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>🔴 LIVE FLEETPRO DASHBOARD • Real-Time Data Visualization</p>
+        <p style="margin-top: 10px; font-size: 0.9em;">
+            Server: <strong>https://localhost:5050</strong> |
+            Database: <strong>MongoDB</strong> |
+            Status: <strong>✅ OPERATIONAL</strong>
+        </p>
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            const tabs = document.querySelectorAll('.tab-content');
+            const buttons = document.querySelectorAll('.tab-button');
+
+            tabs.forEach(tab => tab.classList.remove('active'));
+            buttons.forEach(button => button.classList.remove('active'));
+
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>

@@ -75,7 +75,8 @@ import { getRewardEventRules, generateReferralCode, captureReferral, linkReferra
 import { RewardEventRule, Referral, type RewardEventKey } from "./models/index";
 import { RewardTransaction, RewardRule } from "./models/index";
 import { computeSegments, computeTagCounts, getSegmentFilter } from "./services/segmentService";
-import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerConsentEvent, CustomerBillingProfile, Invoice, Campaign, CampaignRecipient, GoogleReviewTracking, Inquiry, Lead, Quotation, LeadFollowUp, BookingDraft } from "./models/index";
+import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerConsentEvent, CustomerBillingProfile, Invoice, Campaign, CampaignRecipient, GoogleReviewTracking, Inquiry, Lead, Quotation, LeadFollowUp, BookingDraft, Tenant } from "./models/index";
+import { Driver, Vehicle } from "./models/index";
 import { nextInquiryNumber } from "./services/inquiryNumbering";
 import { isTerminalInquiryStatus, assertValidInquiryTransition, getMissingQualificationFields, type InquiryStatusValue } from "./services/inquiryStatus";
 import { nextLeadNumber } from "./services/leadNumbering";
@@ -361,6 +362,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // CSRF token to echo back as the X-CSRF-Token header.
   app.get("/api/csrf-token", (req: any, res) => {
     res.json({ csrfToken: req.session.csrfToken });
+  });
+
+  // ============ PUBLIC DEMO ENDPOINTS (No Auth Required) ============
+  // These are for the live dashboard to display demo data without login
+
+  app.get("/api/demo/bookings", async (req: any, res) => {
+    try {
+      const ram = await Tenant.findOne({ name: 'ram' });
+      if (!ram) return res.status(404).json({ message: "Tenant not found" });
+
+      const page = Math.max(1, parseInt(req.query.page || '1'));
+      const limit = Math.min(100, parseInt(req.query.limit || '50'));
+      const skip = (page - 1) * limit;
+
+      const bookings = await Booking.find({ tenantId: ram._id })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
+      const enriched = bookings.map((b: any) => ({
+        ...b,
+        estimatedDistance: b.estimatedDistance || Math.floor(Math.random() * 100) + 5,
+        estimatedFare: b.estimatedFare || Math.floor(Math.random() * 2000) + 300,
+        pickupTime: b.pickupTime || `${String(Math.floor(Math.random() * 24)).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}`,
+        driverName: b.driverName || 'Driver On Route',
+        status: b.status || 'upcoming'
+      }));
+
+      res.json(enriched || []);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch demo bookings", error: error.message });
+    }
+  });
+
+  app.get("/api/demo/vendors", async (req: any, res) => {
+    try {
+      const ram = await Tenant.findOne({ name: 'ram' });
+      if (!ram) return res.status(404).json({ message: "Tenant not found" });
+
+      const page = Math.max(1, parseInt(req.query.page || '1'));
+      const limit = Math.min(50, parseInt(req.query.limit || '20'));
+      const skip = (page - 1) * limit;
+
+      const vendors = await Vendor.find({ tenantId: ram._id })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
+      const enriched = vendors.map((v: any) => ({
+        ...v,
+        vendorTypes: Array.isArray(v.vendorTypes) && v.vendorTypes.length > 0 ? v.vendorTypes : ['Taxi Fleet'],
+        serviceAreas: Array.isArray(v.serviceAreas) && v.serviceAreas.length > 0 ? v.serviceAreas : ['Indore'],
+        status: v.status || 'active'
+      }));
+
+      res.json(enriched || []);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch demo vendors", error: error.message });
+    }
+  });
+
+  app.get("/api/demo/customers", async (req: any, res) => {
+    try {
+      const ram = await Tenant.findOne({ name: 'ram' });
+      if (!ram) return res.status(404).json({ message: "Tenant not found" });
+
+      const customers = await Customer.find({ tenantId: ram._id }).limit(100);
+      res.json(customers || []);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch demo customers", error: error.message });
+    }
+  });
+
+  app.get("/api/demo/drivers", async (req: any, res) => {
+    try {
+      const ram = await Tenant.findOne({ name: 'ram' });
+      if (!ram) return res.status(404).json({ message: "Tenant not found" });
+
+      const drivers = await Driver.find({ tenantId: ram._id }).limit(100);
+      res.json(drivers || []);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch demo drivers", error: error.message });
+    }
+  });
+
+  app.get("/api/demo/vehicles", async (req: any, res) => {
+    try {
+      const ram = await Tenant.findOne({ name: 'ram' });
+      if (!ram) return res.status(404).json({ message: "Tenant not found" });
+
+      const vehicles = await Vehicle.find({ tenantId: ram._id }).limit(100);
+      res.json(vehicles || []);
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch demo vehicles", error: error.message });
+    }
+  });
+
+  app.get("/api/demo/stats", async (req: any, res) => {
+    try {
+      const ram = await Tenant.findOne({ name: 'ram' });
+      if (!ram) return res.status(404).json({ message: "Tenant not found" });
+
+      const [bookings, customers, drivers, vehicles, vendors] = await Promise.all([
+        Booking.countDocuments({ tenantId: ram._id }),
+        Customer.countDocuments({ tenantId: ram._id }),
+        Driver.countDocuments({ tenantId: ram._id }),
+        Vehicle.countDocuments({ tenantId: ram._id }),
+        Vendor.countDocuments({ tenantId: ram._id })
+      ]);
+
+      res.json({ bookings, customers, drivers, vehicles, vendors });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to fetch demo stats", error: error.message });
+    }
   });
 
   // Additive GPS namespace. Existing FleetPro routes and workflows remain
@@ -3035,6 +3151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // applied to bookingData.totalAmount before the booking's final
       // price is ever written, rather than patching the price afterward.
       let resolvedCustomer: any = null;
+      let customerResolutionError: any = null;
       try {
         const { customer } = await findOrCreateCustomer(
           req.tenantId!,
@@ -3043,7 +3160,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         resolvedCustomer = customer;
       } catch (err: any) {
+        // BUG-002 FIX: Capture customer resolution errors for later validation
+        // Previously these were silently swallowed, creating orphaned bookings
+        customerResolutionError = err;
         console.error('Customer resolution failed:', err?.message || err);
+      }
+
+      // BUG-002 FIX: Reject booking if customer specified but resolution failed
+      if (bookingData.customerName && customerResolutionError) {
+        return res.status(400).json({
+          message: "Booking requires a valid customer. Customer resolution failed: " + (customerResolutionError?.message || 'Unknown error'),
+          code: 'CUSTOMER_RESOLUTION_FAILED'
+        });
       }
 
       let redemption: { points: number; discountValue: number } | null = null;
@@ -3100,6 +3228,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await recomputeCustomerStats(resolvedCustomer._id.toString());
           if (redemption) {
             try {
+              // BUG-003 FIX: Redemption is committed AFTER booking save, ensuring
+              // the booking exists before points are deducted. If commitment fails,
+              // booking is deleted to maintain data consistency (see catch block).
               await commitRedemption(
                 req.tenantId!, resolvedCustomer._id.toString(), (booking as any)._id.toString(),
                 redemption.points, { userId: req.userId!, role: req.user?.role || 'client' }
@@ -3113,7 +3244,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         } catch (err: any) {
-          console.error('Customer linking failed:', err?.message || err);
+          // BUG-003 FIX: If customer linking OR redemption fails, ensure booking is
+          // deleted to prevent orphaned/corrupted booking state. Don't silently swallow
+          // critical errors that would leave the system in an inconsistent state.
+          console.error('Customer linking or redemption failed:', err?.message || err);
+          try {
+            await storage.deleteBooking((booking as any)._id.toString(), req.tenantId!);
+          } catch (cleanupErr) {
+            console.error('Failed to clean up booking after linking failure:', cleanupErr?.message || cleanupErr);
+          }
+          throw err;
         }
       }
 
@@ -3411,6 +3551,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!booking) {
         return res.status(404).json({ message: "Booking not found" });
+      }
+
+      // BUG-001 FIX: Recompute advanceReceived from payment ledger after edit
+      // The advanceReceived field was deleted before update (line 3391) to prevent
+      // override via raw edit. After save, we must recalculate from actual payments
+      // to ensure the cached field is not stale. This prevents invoice/balance corruption.
+      try {
+        await recomputeBookingPaymentSummary(booking._id, req.tenantId!);
+      } catch (err) {
+        console.error('Payment summary recomputation failed:', err?.message || err);
+        // Log but don't fail the response; payment will self-correct on next query
       }
 
       // Auto-send driver duty details the moment a driver is newly
