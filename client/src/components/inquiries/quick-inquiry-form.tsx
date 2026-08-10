@@ -11,6 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { AlertCircle } from "lucide-react";
+import { useFormAutoSave, FormSubmitStatus, FormSection } from "@/components/forms/form-enhancements";
+import { ValidationRules, IndianValidators } from "@/components/forms/validation-rules";
 import VehicleSelector from "./vehicle-selector";
 
 const SOURCE_OPTIONS = [
@@ -65,6 +67,9 @@ export default function QuickInquiryForm({ onSuccess, onCancel, initialMobile }:
   const [syncWhatsapp, setSyncWhatsapp] = useState(true);
   const [mobileError, setMobileError] = useState<string>("");
 
+  // Form auto-save
+  const { save: autoSave } = useFormAutoSave("quick-inquiry-form", form, 2000);
+
   const lookupMutation = useMutation({
     mutationFn: async (phone: string) => {
       const res = await apiRequest("GET", `/api/customers/lookup?phone=${encodeURIComponent(phone)}`);
@@ -84,6 +89,11 @@ export default function QuickInquiryForm({ onSuccess, onCancel, initialMobile }:
     const digits = (initialMobile || "").replace(/\D/g, "");
     if (digits.length >= 10) lookupMutation.mutate(initialMobile!);
   }, []);
+
+  // Auto-save form progress
+  useEffect(() => {
+    autoSave();
+  }, [form, autoSave]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -186,6 +196,12 @@ export default function QuickInquiryForm({ onSuccess, onCancel, initialMobile }:
 
   return (
     <div className="space-y-4">
+      <FormSubmitStatus
+        status={createMutation.isPending ? "loading" : createMutation.isSuccess ? "success" : createMutation.isError ? "error" : "idle"}
+        successMessage="Inquiry created successfully!"
+        errorMessage={createMutation.error?.message || "Failed to create inquiry"}
+      />
+
       <div className="border-b pb-4">
         <h3 className="font-semibold text-gray-900 mb-4">Customer Details</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

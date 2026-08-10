@@ -8,6 +8,7 @@ import { apiRequest } from "../../lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useFormAutoSave, FormSubmitStatus, FormSection } from "@/components/forms/form-enhancements";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -302,6 +303,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   const queryClient = useQueryClient();
   
   const totalSteps = 4;
+  const { save: autoSaveBooking } = useFormAutoSave("enhanced-booking-form", {}, 3000);
 
   const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),

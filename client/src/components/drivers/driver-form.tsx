@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { FormSubmitStatus, FormSection } from "@/components/forms/form-enhancements";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
@@ -220,6 +221,12 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
 
   return (
     <div className="space-y-5">
+      <FormSubmitStatus
+        status={mutation.isPending ? "loading" : mutation.isSuccess ? "success" : mutation.isError ? "error" : "idle"}
+        successMessage="Driver saved successfully!"
+        errorMessage={mutation.error?.message || "Failed to save driver"}
+      />
+
       {/* Step navigator */}
       <div className="overflow-x-auto -mx-1 px-1">
         <div className="flex items-center gap-1.5 w-max">
