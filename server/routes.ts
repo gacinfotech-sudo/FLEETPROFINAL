@@ -48,6 +48,7 @@ import yieldManagementRouter from "./routes/yield-management";
 import orchestrationRouter from "./routes/orchestration";
 import fraudDetectionRouter from "./routes/fraud-detection";
 import supportRouter from "./routes/support";
+import feedbackRouter from "./routes/feedback";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -9035,6 +9036,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register support API routes
   app.use("/api/support", supportRouter);
+
+  // Register feedback API routes
+  app.use("/api/feedback", feedbackRouter);
 
   const httpServer = createServer(app);
 
