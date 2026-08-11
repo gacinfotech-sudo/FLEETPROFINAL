@@ -207,6 +207,15 @@ app.use((req, res, next) => {
     log2.error('Failed to start notification webhook manager', { error });
   }
 
+  // Start notification batch processor
+  try {
+    const { notificationBatchProcessor } = await import('./utils/notificationBatchProcessor');
+    await notificationBatchProcessor.start();
+    log2.info('Notification batch processor started');
+  } catch (error) {
+    log2.error('Failed to start notification batch processor', { error });
+  }
+
   // Integrator addition (TASK-02 telephony real-time hand-off — see
   // .claude/tasks/reports/TASK-02-report.md "Proposed WebSocket bootstrap
   // + room design"). No WebSocket/Socket.IO layer existed anywhere in this

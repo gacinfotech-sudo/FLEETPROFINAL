@@ -53,6 +53,7 @@ import notificationRetryRouter from "./routes/notification-retry";
 import notificationHealthRouter from "./routes/notification-health";
 import notificationRateLimitRouter from "./routes/notification-rate-limit";
 import notificationWebhooksRouter from "./routes/notification-webhooks";
+import notificationBatchRouter from "./routes/notification-batch";
 import mlModelsRouter from "./routes/ml-models";
 import resourceAllocationRouter from "./routes/resource-allocation";
 import competitiveIntelligenceRouter from "./routes/competitive-intelligence";
@@ -9105,6 +9106,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register notification webhooks API routes
   app.use("/api/notification-webhooks", notificationWebhooksRouter);
+
+  // Register notification batch API routes
+  app.use("/api/notification-batch", notificationBatchRouter);
 
   // Register ML models API routes
   app.use("/api/ml", mlModelsRouter);
