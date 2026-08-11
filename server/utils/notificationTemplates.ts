@@ -180,25 +180,99 @@ class TemplateManager {
     }
   }
 
-  async listTemplates(tenantId: string, page: number = 1, limit: number = 50): Promise<{ templates: NotificationTemplate[]; total: number }> {
+  async listTemplates(category?: string, page: number = 1, limit: number = 50): Promise<NotificationTemplate[]> {
     try {
       const collection = this.db.collection('notification_templates');
+      const filter: any = { status: 'active' };
 
-      const total = await collection.countDocuments({ tenantId });
+      if (category) {
+        filter.category = category;
+      }
 
       const templates = await collection
-        .find({ tenantId })
+        .find(filter)
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .toArray() as any;
 
-      return { templates, total };
+      return templates;
     } catch (error) {
       log.error('Failed to list templates', { error });
-      return { templates: [], total: 0 };
+      return [];
+    }
+  }
+
+  async getTemplateByName(name: string): Promise<NotificationTemplate | null> {
+    try {
+      const collection = this.db.collection('notification_templates');
+      return await collection.findOne({ name, status: 'active' }) as any;
+    } catch (error) {
+      log.error('Failed to get template by name', { name, error });
+      return null;
+    }
+  }
+
+  renderTemplate(template: NotificationTemplate, data: Record<string, any>): { title: string; body: string } {
+    let title = template.title;
+    let body = template.body;
+
+    if (template.variables) {
+      for (const variable of template.variables) {
+        const value = data[variable] || '';
+        const regex = new RegExp(`{{${variable}}}`, 'g');
+        title = title.replace(regex, String(value));
+        body = body.replace(regex, String(value));
+      }
+    }
+
+    return { title, body };
+  }
+
+  async searchTemplates(query: string): Promise<NotificationTemplate[]> {
+    try {
+      const collection = this.db.collection('notification_templates');
+
+      return await collection
+        .find({
+          $or: [
+            { name: { $regex: query, $options: 'i' } },
+            { description: { $regex: query, $options: 'i' } },
+            { tags: { $in: [new RegExp(query, 'i')] } }
+          ],
+          status: 'active'
+        })
+        .toArray() as any;
+    } catch (error) {
+      log.error('Failed to search templates', { query, error });
+      return [];
+    }
+  }
+
+  async getTemplateStats(): Promise<Record<string, any>> {
+    try {
+      const collection = this.db.collection('notification_templates');
+
+      const total = await collection.countDocuments();
+      const active = await collection.countDocuments({ status: 'active' });
+
+      const byCategory = await collection
+        .aggregate([
+          { $match: { status: 'active' } },
+          { $group: { _id: '$category', count: { $sum: 1 } } }
+        ])
+        .toArray();
+
+      return {
+        total,
+        active,
+        byCategory: Object.fromEntries(byCategory.map(b => [b._id || 'uncategorized', b.count]))
+      };
+    } catch (error) {
+      log.error('Failed to get template stats', { error });
+      return { total: 0, active: 0, byCategory: {} };
     }
   }
 }
 
-export const templateManager = new TemplateManager();
+export const notificationTemplateManager = new TemplateManager();

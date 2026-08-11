@@ -14,7 +14,7 @@ router.get('/list', authenticateUser, async (req: Request, res: Response) => {
     const { category } = req.query;
 
     const templates = await notificationTemplateManager.listTemplates(
-      category as TemplateCategory
+      category as string | undefined
     );
 
     log.info('Templates listed', { count: templates.length, category });
@@ -150,7 +150,7 @@ router.put('/:templateId', authenticateUser, requireAdmin, async (req: Request, 
     const { templateId } = req.params;
     const { name, description, title, body, icon, badge, tags, variables, previewData, metadata } = req.body;
 
-    const success = await notificationTemplateManager.updateTemplate(templateId, {
+    await notificationTemplateManager.updateTemplate(templateId, {
       name,
       description,
       title,
@@ -163,13 +163,6 @@ router.put('/:templateId', authenticateUser, requireAdmin, async (req: Request, 
       metadata
     });
 
-    if (!success) {
-      return res.status(404).json({
-        error: 'Not found',
-        message: 'Template not found'
-      });
-    }
-
     log.info('Template updated via API', { templateId });
 
     res.json({
@@ -178,9 +171,9 @@ router.put('/:templateId', authenticateUser, requireAdmin, async (req: Request, 
       templateId,
       timestamp: new Date().toISOString()
     });
-  } catch (error) {
+  } catch (error: any) {
     log.error('Failed to update template', { error });
-    res.status(500).json({
+    res.status(error.message?.includes('not found') ? 404 : 500).json({
       error: 'Failed to update template',
       message: (error as Error).message
     });
@@ -193,14 +186,7 @@ router.delete('/:templateId', authenticateUser, requireAdmin, async (req: Reques
   try {
     const { templateId } = req.params;
 
-    const success = await notificationTemplateManager.deleteTemplate(templateId);
-
-    if (!success) {
-      return res.status(404).json({
-        error: 'Not found',
-        message: 'Template not found'
-      });
-    }
+    await notificationTemplateManager.deleteTemplate(templateId);
 
     log.info('Template archived via API', { templateId });
 
@@ -210,9 +196,9 @@ router.delete('/:templateId', authenticateUser, requireAdmin, async (req: Reques
       templateId,
       timestamp: new Date().toISOString()
     });
-  } catch (error) {
+  } catch (error: any) {
     log.error('Failed to delete template', { error });
-    res.status(500).json({
+    res.status(error.message?.includes('not found') ? 404 : 500).json({
       error: 'Failed to archive template',
       message: (error as Error).message
     });

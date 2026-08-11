@@ -1,6 +1,6 @@
 // Notification System Health & Monitoring - Phase 40
 import express, { Request, Response } from 'express';
-import { requireAuth, requireTenant } from '../middleware/auth';
+import { authenticateUser, requireTenant } from '../middleware/auth';
 import mongoose from 'mongoose';
 import { createLogger } from '../utils/logger';
 import { metricsCollector } from '../utils/productionHardening';
@@ -29,7 +29,7 @@ let lastHealthCheckTime = 0;
 const HEALTH_CHECK_TTL = 60 * 1000; // 1 minute cache
 
 // Health Check Endpoint
-router.get('/api/notification-health/status', requireAuth, async (req: Request, res: Response) => {
+router.get('/api/notification-health/status', authenticateUser, async (req: Request, res: Response) => {
   try {
     // Return cached if fresh
     if (lastHealthCheck && Date.now() - lastHealthCheckTime < HEALTH_CHECK_TTL) {
@@ -73,7 +73,7 @@ router.get('/api/notification-health/status', requireAuth, async (req: Request, 
 });
 
 // Detailed Component Status
-router.get('/api/notification-health/components', requireAuth, async (req: Request, res: Response) => {
+router.get('/api/notification-health/components', authenticateUser, async (req: Request, res: Response) => {
   try {
     const db = mongoose.connection.db!;
 
@@ -113,7 +113,7 @@ router.get('/api/notification-health/metrics', (req: Request, res: Response) => 
 });
 
 // SLA Status
-router.get('/api/notification-health/sla', requireAuth, async (req: Request, res: Response) => {
+router.get('/api/notification-health/sla', authenticateUser, async (req: Request, res: Response) => {
   try {
     const db = mongoose.connection.db!;
     const analyticsCollection = db.collection('notification_analytics');
