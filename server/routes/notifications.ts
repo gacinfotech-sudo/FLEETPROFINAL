@@ -1,364 +1,356 @@
-import express from "express";
-import { notificationEngine, type NotificationPreferences } from "../services/notificationEngine";
-import { authenticateUser, requireTenant } from "../middleware/auth";
+// Push Notifications API Endpoints
+import express, { Request, Response } from 'express';
+import { ObjectId } from 'mongodb';
+import mongoose from 'mongoose';
+import { vapidManager } from '../utils/vapidConfig';
+import { createLogger } from '../utils/logger';
+import { authenticateUser, requireAdmin } from '../middleware/auth';
 
+const log = createLogger('NotificationsAPI');
 const router = express.Router();
 
-// POST /api/notifications/create - Create a new notification
-router.post("/create", authenticateUser, requireTenant, (req: any, res) => {
-  try {
-    const { userId, title, message, category, priority, channels, actionUrl, metadata } =
-      req.body;
+export interface PushSubscription {
+  endpoint: string;
+  expirationTime: number | null;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+}
 
-    if (!userId || !title || !message || !category || !priority) {
+// GET /api/notifications/config
+// Returns VAPID public key for client subscription
+router.get('/config', (_req: Request, res: Response) => {
+  const publicKey = vapidManager.getPublicKey();
+
+  if (!publicKey) {
+    return res.status(503).json({
+      error: 'Push notifications not configured',
+      message: 'VAPID keys are not set up on the server',
+    });
+  }
+
+  res.json({ publicKey });
+  log.info('VAPID config requested');
+});
+
+// POST /api/notifications/subscribe
+// Save push subscription for authenticated user
+router.post('/subscribe', authenticateUser, async (req: Request, res: Response) => {
+  try {
+    const { endpoint, keys } = req.body as PushSubscription;
+    const userId = (req as any).userId;
+
+    if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
       return res.status(400).json({
-        success: false,
-        error: "userId, title, message, category, and priority are required",
+        error: 'Invalid subscription data',
+        message: 'endpoint and keys (p256dh, auth) are required',
       });
     }
 
-    const notification = notificationEngine.createNotification({
+    const usersCollection = mongoose.connection.db!.collection('users');
+
+    // Update user with push subscription
+    const result = await usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      {
+        $set: {
+          pushSubscription: {
+            endpoint,
+            keys: {
+              p256dh: keys.p256dh,
+              auth: keys.auth,
+            },
+            subscribedAt: new Date(),
+          },
+          notificationsEnabled: true,
+        },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    log.info('Push subscription registered', {
       userId,
-      title,
-      message,
-      category,
-      priority,
-      channels,
-      actionUrl,
-      metadata,
+      endpoint: endpoint.substring(0, 50) + '...',
     });
 
     res.json({
       success: true,
-      data: notification,
+      message: 'Subscription saved successfully',
     });
-  } catch (error: any) {
-    console.error("Error creating notification:", error);
+  } catch (error) {
+    log.error('Failed to save subscription', { error });
     res.status(500).json({
-      success: false,
-      error: error.message || "Failed to create notification",
+      error: 'Failed to save subscription',
+      message: (error as Error).message,
     });
   }
 });
 
-// POST /api/notifications/from-template - Create notification from template
-router.post("/from-template", authenticateUser, requireTenant, (req: any, res) => {
+// POST /api/notifications/unsubscribe
+// Remove push subscription for authenticated user
+router.post('/unsubscribe', authenticateUser, async (req: Request, res: Response) => {
   try {
-    const { userId, templateId, variables } = req.body;
+    const userId = (req as any).userId;
 
-    if (!userId || !templateId || !variables) {
+    const usersCollection = mongoose.connection.db!.collection('users');
+
+    const result = await usersCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      {
+        $unset: { pushSubscription: 1 },
+        $set: { notificationsEnabled: false },
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    log.info('Push subscription removed', { userId });
+
+    res.json({
+      success: true,
+      message: 'Unsubscribed successfully',
+    });
+  } catch (error) {
+    log.error('Failed to unsubscribe', { error });
+    res.status(500).json({
+      error: 'Failed to unsubscribe',
+      message: (error as Error).message,
+    });
+  }
+});
+
+// POST /api/notifications/send
+// Send push notification to specific users (admin only)
+router.post('/send', authenticateUser, requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { userIds, title, body, icon, badge, tag, data } = req.body;
+    const userId = (req as any).userId;
+
+    const usersCollection = mongoose.connection.db!.collection('users');
+
+    // Check if requester is admin
+    const requester = await usersCollection.findOne({ _id: new ObjectId(userId) });
+
+    if (!requester || requester.role !== 'admin') {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Only admins can send push notifications',
+      });
+    }
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
       return res.status(400).json({
-        success: false,
-        error: "userId, templateId, and variables are required",
+        error: 'Invalid request',
+        message: 'userIds array is required',
       });
     }
 
-    const notification = notificationEngine.createFromTemplate({
-      userId,
-      templateId,
-      variables,
-    });
-
-    if (!notification) {
-      return res.status(404).json({
-        success: false,
-        error: "Template not found",
-      });
-    }
-
-    res.json({
-      success: true,
-      data: notification,
-    });
-  } catch (error: any) {
-    console.error("Error creating notification from template:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to create notification from template",
-    });
-  }
-});
-
-// GET /api/notifications/user/:userId - Get user notifications
-router.get("/user/:userId", authenticateUser, requireTenant, (req: any, res) => {
-  try {
-    const limit = req.query.limit ? parseInt(req.query.limit) : 50;
-    const notifications = notificationEngine.getUserNotifications(req.params.userId, limit);
-
-    res.json({
-      success: true,
-      data: notifications,
-      count: notifications.length,
-    });
-  } catch (error: any) {
-    console.error("Error fetching notifications:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to fetch notifications",
-    });
-  }
-});
-
-// GET /api/notifications/user/:userId/unread - Get unread notifications
-router.get("/user/:userId/unread", authenticateUser, requireTenant, (req: any, res) => {
-  try {
-    const notifications = notificationEngine.getUnreadNotifications(req.params.userId);
-
-    res.json({
-      success: true,
-      data: notifications,
-      count: notifications.length,
-    });
-  } catch (error: any) {
-    console.error("Error fetching unread notifications:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to fetch unread notifications",
-    });
-  }
-});
-
-// POST /api/notifications/:notificationId/read - Mark notification as read
-router.post("/:notificationId/read", authenticateUser, requireTenant, (req: any, res) => {
-  try {
-    const success = notificationEngine.markAsRead(req.params.notificationId);
-
-    if (!success) {
-      return res.status(404).json({
-        success: false,
-        error: "Notification not found",
-      });
-    }
-
-    res.json({
-      success: true,
-      message: "Notification marked as read",
-    });
-  } catch (error: any) {
-    console.error("Error marking notification as read:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to mark notification as read",
-    });
-  }
-});
-
-// POST /api/notifications/preferences - Set user preferences
-router.post("/preferences", authenticateUser, requireTenant, (req: any, res) => {
-  try {
-    const { userId, channels, categories, quiet_hours, batching_enabled, batching_interval } =
-      req.body;
-
-    if (!userId) {
+    if (!title || !body) {
       return res.status(400).json({
-        success: false,
-        error: "userId is required",
+        error: 'Invalid request',
+        message: 'title and body are required',
       });
     }
 
-    const preferences: NotificationPreferences = {
-      userId,
-      channels: channels || {
-        in_app: true,
-        email: true,
-        sms: true,
-        whatsapp: true,
-        push: true,
-      },
-      categories: categories || {},
-      quiet_hours,
-      batching_enabled: batching_enabled || false,
-      batching_interval: batching_interval || 15,
+    // Find all subscriptions for target users
+    const objectIds = userIds.map((id: string) => new ObjectId(id));
+
+    const users = await usersCollection
+      .find({
+        _id: { $in: objectIds },
+        pushSubscription: { $exists: true },
+        notificationsEnabled: true,
+      })
+      .toArray();
+
+    if (users.length === 0) {
+      return res.status(400).json({
+        error: 'No valid subscriptions found',
+        message: 'No users have active push subscriptions',
+      });
+    }
+
+    const subscriptions = users.map((user: any) => user.pushSubscription);
+
+    // Prepare notification payload
+    const payload = {
+      title: title || 'FleetPro Notification',
+      body,
+      icon: icon || '/icons/icon-192x192.png',
+      badge: badge || '/icons/icon-192x192.png',
+      tag: tag || 'fleetpro-notification',
+      data: data || {},
+      vibrate: [200, 100, 200],
     };
 
-    notificationEngine.setUserPreferences(preferences);
+    // Send notifications
+    const results = await vapidManager.sendBulkPushNotifications(subscriptions, payload);
 
-    res.json({
-      success: true,
-      data: preferences,
-    });
-  } catch (error: any) {
-    console.error("Error setting preferences:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to set preferences",
-    });
-  }
-});
+    // Mark invalid subscriptions for cleanup
+    if (results.invalidated.length > 0) {
+      await usersCollection.updateMany(
+        { 'pushSubscription.endpoint': { $in: results.invalidated } },
+        { $unset: { pushSubscription: 1 } }
+      );
 
-// GET /api/notifications/preferences/:userId - Get user preferences
-router.get("/preferences/:userId", authenticateUser, requireTenant, (req: any, res) => {
-  try {
-    const preferences = notificationEngine.getUserPreferences(req.params.userId);
-
-    if (!preferences) {
-      return res.status(404).json({
-        success: false,
-        error: "Preferences not found",
+      log.info('Cleaned up invalid subscriptions', {
+        count: results.invalidated.length,
       });
     }
 
+    log.info('Push notifications sent', {
+      requested: userIds.length,
+      found: users.length,
+      ...results,
+    });
+
     res.json({
       success: true,
-      data: preferences,
+      message: 'Notifications sent',
+      results: {
+        requested: userIds.length,
+        found: users.length,
+        sent: results.sent,
+        failed: results.failed,
+      },
     });
-  } catch (error: any) {
-    console.error("Error fetching preferences:", error);
+  } catch (error) {
+    log.error('Failed to send notifications', { error });
     res.status(500).json({
-      success: false,
-      error: error.message || "Failed to fetch preferences",
+      error: 'Failed to send notifications',
+      message: (error as Error).message,
     });
   }
 });
 
-// GET /api/notifications/templates - Get all templates
-router.get("/templates", authenticateUser, requireTenant, (req: any, res) => {
+// POST /api/notifications/broadcast
+// Send push notification to all users (admin only)
+router.post('/broadcast', authenticateUser, requireAdmin, async (req: Request, res: Response) => {
   try {
-    const templates = notificationEngine.getAllTemplates();
+    const { title, body, icon, badge, tag, data, targetRole } = req.body;
+    const userId = (req as any).userId;
 
-    res.json({
-      success: true,
-      data: templates,
-      count: templates.length,
-    });
-  } catch (error: any) {
-    console.error("Error fetching templates:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to fetch templates",
-    });
-  }
-});
+    const usersCollection = mongoose.connection.db!.collection('users');
 
-// GET /api/notifications/templates/:templateId - Get specific template
-router.get("/templates/:templateId", authenticateUser, requireTenant, (req: any, res) => {
-  try {
-    const template = notificationEngine.getTemplate(req.params.templateId);
+    // Check if requester is admin
+    const requester = await usersCollection.findOne({ _id: new ObjectId(userId) });
 
-    if (!template) {
-      return res.status(404).json({
-        success: false,
-        error: "Template not found",
+    if (!requester || requester.role !== 'admin') {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Only admins can broadcast notifications',
       });
     }
 
-    res.json({
-      success: true,
-      data: template,
-    });
-  } catch (error: any) {
-    console.error("Error fetching template:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to fetch template",
-    });
-  }
-});
-
-// GET /api/notifications/stats - Get delivery statistics
-router.get("/stats", authenticateUser, requireTenant, (req: any, res) => {
-  try {
-    const stats = notificationEngine.getDeliveryStats();
-
-    res.json({
-      success: true,
-      data: stats,
-    });
-  } catch (error: any) {
-    console.error("Error fetching stats:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to fetch stats",
-    });
-  }
-});
-
-// POST /api/notifications/cleanup - Cleanup expired notifications
-router.post("/cleanup", authenticateUser, requireTenant, (req: any, res) => {
-  try {
-    const removed = notificationEngine.cleanupExpiredNotifications();
-
-    res.json({
-      success: true,
-      message: `Cleaned up ${removed} expired notifications`,
-    });
-  } catch (error: any) {
-    console.error("Error cleaning up notifications:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to cleanup notifications",
-    });
-  }
-});
-
-// POST /api/notifications/test - Test notification engine
-router.post("/test", (req: any, res) => {
-  try {
-    // Create test notifications
-    const notif1 = notificationEngine.createNotification({
-      userId: "TEST-USER-001",
-      title: "🎉 Test Notification 1",
-      message: "This is a test notification for booking confirmed",
-      category: "booking",
-      priority: "high",
-      channels: ["in_app", "sms"],
-    });
-
-    const notif2 = notificationEngine.createFromTemplate({
-      userId: "TEST-USER-001",
-      templateId: "payment_received",
-      variables: { amount: "2500", bookingId: "BK-12345" },
-    });
-
-    const notif3 = notificationEngine.createFromTemplate({
-      userId: "TEST-USER-001",
-      templateId: "driver_assigned",
-      variables: { driverName: "Rajesh", eta: "5" },
-    });
-
-    // Set user preferences
-    notificationEngine.setUserPreferences({
-      userId: "TEST-USER-001",
-      channels: {
-        in_app: true,
-        email: true,
-        sms: true,
-        whatsapp: true,
-        push: true,
-      },
-      categories: {},
-      batching_enabled: false,
-      batching_interval: 15,
-    });
-
-    // Mark one as read
-    if (notif1) {
-      notificationEngine.markAsRead(notif1.id);
+    if (!title || !body) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        message: 'title and body are required',
+      });
     }
 
-    const stats = notificationEngine.getDeliveryStats();
-    const userNotifs = notificationEngine.getUserNotifications("TEST-USER-001");
-    const unreadNotifs = notificationEngine.getUnreadNotifications("TEST-USER-001");
-    const templates = notificationEngine.getAllTemplates();
+    // Build filter
+    const filter: any = {
+      pushSubscription: { $exists: true },
+      notificationsEnabled: true,
+    };
+
+    if (targetRole) {
+      filter.role = targetRole;
+    }
+
+    // Find all subscriptions
+    const users = await usersCollection.find(filter).toArray();
+
+    if (users.length === 0) {
+      return res.status(400).json({
+        error: 'No valid subscriptions found',
+        message: 'No users have active push subscriptions',
+      });
+    }
+
+    const subscriptions = users.map((user: any) => user.pushSubscription);
+
+    // Prepare notification payload
+    const payload = {
+      title: title || 'FleetPro Notification',
+      body,
+      icon: icon || '/icons/icon-192x192.png',
+      badge: badge || '/icons/icon-192x192.png',
+      tag: tag || 'fleetpro-broadcast',
+      data: data || {},
+      vibrate: [200, 100, 200],
+    };
+
+    // Send notifications
+    const results = await vapidManager.sendBulkPushNotifications(subscriptions, payload);
+
+    // Mark invalid subscriptions for cleanup
+    if (results.invalidated.length > 0) {
+      await usersCollection.updateMany(
+        { 'pushSubscription.endpoint': { $in: results.invalidated } },
+        { $unset: { pushSubscription: 1 } }
+      );
+    }
+
+    log.info('Broadcast notification sent', {
+      total: users.length,
+      targetRole: targetRole || 'all',
+      ...results,
+    });
 
     res.json({
       success: true,
-      createdNotifications: [notif1, notif2, notif3].filter(Boolean),
-      stats,
-      userNotifications: userNotifs,
-      unreadCount: unreadNotifs.length,
-      templateCount: templates.length,
-      summary: {
-        totalCreated: 3,
-        totalNotifications: stats.totalNotifications,
-        deliveryRate: stats.deliveryRate,
+      message: 'Broadcast notification sent',
+      results: {
+        total: users.length,
+        targetRole: targetRole || 'all',
+        sent: results.sent,
+        failed: results.failed,
       },
     });
-  } catch (error: any) {
-    console.error("Error testing notification engine:", error);
+  } catch (error) {
+    log.error('Failed to broadcast notification', { error });
     res.status(500).json({
-      success: false,
-      error: error.message || "Failed to test notification engine",
+      error: 'Failed to broadcast notification',
+      message: (error as Error).message,
+    });
+  }
+});
+
+// GET /api/notifications/status
+// Get push notification status for authenticated user
+router.get('/status', authenticateUser, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).userId;
+
+    const usersCollection = mongoose.connection.db!.collection('users');
+
+    const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      notificationsEnabled: user.notificationsEnabled || false,
+      subscribed: !!user.pushSubscription,
+      subscribedAt: user.pushSubscription?.subscribedAt || null,
+      vpaidConfigured: !!vapidManager.isConfigured(),
+    });
+
+    log.info('Notification status requested', { userId });
+  } catch (error) {
+    log.error('Failed to get notification status', { error });
+    res.status(500).json({
+      error: 'Failed to get status',
+      message: (error as Error).message,
     });
   }
 });
