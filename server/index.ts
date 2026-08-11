@@ -153,6 +153,15 @@ app.use((req, res, next) => {
   // Store server instance globally for notifications
   (global as any).notificationServer = server;
 
+  // Ensure notification system indexes
+  try {
+    const { notificationIndexManager } = await import('./utils/notificationIndexes');
+    await notificationIndexManager.ensureIndexes();
+    log2.info('Notification indexes verified');
+  } catch (error) {
+    log2.error('Failed to ensure notification indexes', { error });
+  }
+
   // Start notification scheduler
   try {
     const { notificationScheduler } = await import('./utils/notificationScheduler');
