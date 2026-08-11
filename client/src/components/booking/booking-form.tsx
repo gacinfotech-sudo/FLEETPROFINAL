@@ -156,57 +156,22 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
   ];
 
   const renderProgressBar = () => (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Create New Booking</h2>
-        <Badge variant="outline" className="text-sm">
-          Step {step} of 4
-        </Badge>
-      </div>
-      
-      <div className="flex items-center justify-between">
-        {stepConfig.map((config, index) => {
-          const Icon = config.icon;
-          const isActive = step === config.number;
-          const isCompleted = step > config.number;
-          
-          return (
-            <div key={config.number} className="flex items-center">
-              <div className="flex flex-col items-center">
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                    isCompleted
-                      ? 'bg-green-500 border-green-500 text-white'
-                      : isActive
-                      ? `${config.color} border-transparent text-white shadow-lg scale-110`
-                      : 'bg-gray-100 border-gray-300 text-gray-400'
-                  }`}
-                >
-                  {isCompleted ? (
-                    <Check size={20} />
-                  ) : (
-                    <Icon size={20} />
-                  )}
-                </div>
-                <div className="mt-2 text-center">
-                  <div className={`text-sm font-medium ${isActive ? 'text-gray-900' : 'text-gray-500'}`}>
-                    {config.title}
-                  </div>
-                </div>
-              </div>
-              
-              {index < stepConfig.length - 1 && (
-                <div className="flex-1 mx-4">
-                  <div
-                    className={`h-1 rounded-full transition-all duration-300 ${
-                      step > config.number ? 'bg-green-500' : 'bg-gray-200'
-                    }`}
-                  />
-                </div>
-              )}
-            </div>
-          );
-        })}
+    <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-xl border border-blue-200 dark:border-blue-700 p-3 md:p-4 mb-6">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h2 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white">📝 Create Booking</h2>
+          <p className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Step {step} of {totalSteps}</p>
+        </div>
+        <div className="flex gap-1">
+          {stepConfig.map((config) => (
+            <div
+              key={config.number}
+              className={`h-2 flex-1 rounded-full transition-all ${
+                step > config.number ? 'bg-green-500' : step === config.number ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'
+              }`}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -215,115 +180,106 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
     switch (step) {
       case 1:
         return (
-          <Card>
-            <CardHeader>
-              <CardTitle>Step 1: Select Dates</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="pickupDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Pickup Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} min={new Date().toISOString().split('T')[0]} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4 md:p-6">
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                  <FormField
+                    control={form.control}
+                    name="pickupDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs md:text-sm">📅 Pickup</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} min={new Date().toISOString().split('T')[0]} className="text-sm h-9 md:h-10" />
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="returnDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs md:text-sm">📅 Return</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} min={watchedValues.pickupDate || new Date().toISOString().split('T')[0]} className="text-sm h-9 md:h-10" />
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-                <FormField
-                  control={form.control}
-                  name="returnDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Return Date</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="date" 
-                          {...field} 
-                          min={watchedValues.pickupDate || new Date().toISOString().split('T')[0]} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                  <FormField
+                    control={form.control}
+                    name="pickupTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs md:text-sm">⏰ Time</FormLabel>
+                        <FormControl>
+                          <Input type="time" {...field} className="text-sm h-9 md:h-10" />
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="returnTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs md:text-sm">⏰ Return</FormLabel>
+                        <FormControl>
+                          <Input type="time" {...field} className="text-sm h-9 md:h-10" />
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                <FormField
-                  control={form.control}
-                  name="pickupTime"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Pickup Time</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                  <FormField
+                    control={form.control}
+                    name="pickupLocation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs md:text-sm">📍 From</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Pickup location" {...field} className="text-sm h-9 md:h-10" />
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="dropoffLocation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs md:text-sm">📍 To</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Drop-off location" {...field} className="text-sm h-9 md:h-10" />
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-                <FormField
-                  control={form.control}
-                  name="returnTime"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Return Time</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                <FormField
-                  control={form.control}
-                  name="pickupLocation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>From (Pickup Location)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="e.g., Indore" 
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="dropoffLocation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>To (Drop-off Location)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="e.g., Omkareshwar" 
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="mt-6 flex justify-end">
-                <Button onClick={handleDateSelection} disabled={!watchedValues.pickupDate || !watchedValues.returnDate || !watchedValues.pickupLocation || !watchedValues.dropoffLocation}>
-                  Next: Select Vehicle
-                </Button>
+                <div className="flex gap-2 justify-end pt-2">
+                  <Button
+                    size="sm"
+                    onClick={handleDateSelection}
+                    disabled={!watchedValues.pickupDate || !watchedValues.returnDate || !watchedValues.pickupLocation || !watchedValues.dropoffLocation}
+                    className="text-xs md:text-sm"
+                  >
+                    Next <ArrowRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -331,42 +287,37 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
 
       case 2:
         return (
-          <Card>
-            <CardHeader>
-              <CardTitle>Step 2: Select Vehicle</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4 md:p-6">
               {availableVehicles.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">No vehicles available for selected dates</p>
-                  <Button variant="outline" onClick={() => setStep(1)} className="mt-4">
-                    Change Dates
+                <div className="text-center py-6">
+                  <p className="text-gray-600 dark:text-gray-300 text-sm md:text-base">No vehicles available</p>
+                  <Button size="sm" variant="outline" onClick={() => setStep(1)} className="mt-3">
+                    <ArrowLeft className="w-4 h-4 mr-1" /> Change Dates
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {availableVehicles.map((vehicle: any) => (
-                    <Card 
-                      key={vehicle.id} 
-                      className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-blue-500"
+                    <div
+                      key={vehicle.id}
                       onClick={() => handleVehicleSelection(vehicle.id)}
+                      className="p-3 md:p-4 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-lg border border-blue-200 dark:border-blue-700 cursor-pointer hover:shadow-md hover:border-blue-400 transition-all"
                     >
-                      <CardContent className="p-4">
-                        <div className="text-center">
-                          <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                            <span className="text-blue-600 text-2xl">🚗</span>
-                          </div>
-                          <h3 className="font-semibold text-gray-900">{vehicle.make} {vehicle.model}</h3>
-                          <p className="text-sm text-gray-600">{vehicle.registrationNumber}</p>
-                          <div className="flex justify-between items-center mt-3">
-                            <span className="text-lg font-bold text-gray-900">₹{vehicle.ratePerDay}/day</span>
-                            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                              Available
-                            </span>
-                          </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-semibold text-gray-900 dark:text-white text-sm md:text-base">
+                            {vehicle.make} {vehicle.model}
+                          </h3>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">{vehicle.registrationNumber}</p>
                         </div>
-                      </CardContent>
-                    </Card>
+                        <span className="text-2xl">🚗</span>
+                      </div>
+                      <div className="flex justify-between items-center mt-2">
+                        <span className="font-bold text-blue-600 dark:text-blue-400 text-sm">₹{vehicle.ratePerDay}/day</span>
+                        <Badge className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">✓</Badge>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -376,73 +327,57 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
 
       case 3:
         return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Step 3: Customer Info</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6">
-              <div className="space-y-4 sm:space-y-6">
-                <FormField
-                  control={form.control}
-                  name="bookingType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Booking Type</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-6"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="self_drive" id="self_drive" />
-                            <Label htmlFor="self_drive">Self Drive</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="with_driver" id="with_driver" />
-                            <Label htmlFor="with_driver">With Driver</Label>
-                          </div>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+          <Card className="border-0 shadow-sm">
+            <CardContent className="p-4 md:p-6">
+              <div className="space-y-3 md:space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="bookingType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs md:text-sm">👤 Type</FormLabel>
+                        <FormControl>
+                          <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex gap-2 mt-1">
+                            <div className="flex items-center space-x-1 flex-1 p-2 border rounded text-xs">
+                              <RadioGroupItem value="self_drive" id="self_drive" />
+                              <Label htmlFor="self_drive" className="text-xs cursor-pointer">Self</Label>
+                            </div>
+                            <div className="flex items-center space-x-1 flex-1 p-2 border rounded text-xs">
+                              <RadioGroupItem value="with_driver" id="with_driver" />
+                              <Label htmlFor="with_driver" className="text-xs cursor-pointer">Driver</Label>
+                            </div>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
 
-                <FormField
-                  control={form.control}
-                  name="tripType"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Trip Type</FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="grid grid-cols-2 sm:grid-cols-4 gap-3"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="one_way" id="one_way" />
-                            <Label htmlFor="one_way" className="text-sm">One Way</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="round_trip" id="round_trip" />
-                            <Label htmlFor="round_trip" className="text-sm">Round Trip</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="local" id="local" />
-                            <Label htmlFor="local" className="text-sm">Local</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="airport" id="airport" />
-                            <Label htmlFor="airport" className="text-sm">Airport</Label>
-                          </div>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="tripType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs md:text-sm">🗺️ Trip</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="text-xs h-9 md:h-10">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="one_way">One Way</SelectItem>
+                            <SelectItem value="round_trip">Round</SelectItem>
+                            <SelectItem value="local">Local</SelectItem>
+                            <SelectItem value="airport">Airport</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 {watchedValues.bookingType === "with_driver" && (
                   <FormField
@@ -450,52 +385,51 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                     name="driverId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Select Driver</FormLabel>
+                        <FormLabel className="text-xs md:text-sm">🚕 Driver</FormLabel>
                         <Select onValueChange={(value) => field.onChange(parseInt(value))}>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Choose a driver" />
+                            <SelectTrigger className="text-xs h-9 md:h-10">
+                              <SelectValue placeholder="Select driver" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             {availableDrivers.map((driver: any) => (
                               <SelectItem key={driver.id} value={driver.id.toString()}>
-                                {driver.name} - {driver.licenseNumber}
+                                {driver.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-                        <FormMessage />
+                        <FormMessage className="text-xs" />
                       </FormItem>
                     )}
                   />
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <FormField
                     control={form.control}
                     name="customerName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium">Customer Name</FormLabel>
+                        <FormLabel className="text-xs md:text-sm">👤 Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter customer name" {...field} className="h-10" />
+                          <Input placeholder="Name" {...field} className="text-xs h-9 md:h-10" />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-xs" />
                       </FormItem>
                     )}
                   />
-
                   <FormField
                     control={form.control}
                     name="customerPhone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium">Customer Phone</FormLabel>
+                        <FormLabel className="text-xs md:text-sm">📱 Phone</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter phone number" {...field} className="h-10" />
+                          <Input placeholder="Phone" {...field} className="text-xs h-9 md:h-10" />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-xs" />
                       </FormItem>
                     )}
                   />
@@ -506,11 +440,11 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                   name="customerEmail"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium">Customer Email (Optional)</FormLabel>
+                      <FormLabel className="text-xs md:text-sm">📧 Email (Optional)</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="Enter email address" {...field} className="h-10" />
+                        <Input type="email" placeholder="Email" {...field} className="text-xs h-9 md:h-10" />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs" />
                     </FormItem>
                   )}
                 />
@@ -520,11 +454,11 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium">Total Amount</FormLabel>
+                      <FormLabel className="text-xs md:text-sm">💰 Amount</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value))} className="h-10" />
+                        <Input type="number" placeholder="Amount" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value))} className="text-xs h-9 md:h-10" />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs" />
                     </FormItem>
                   )}
                 />
@@ -534,25 +468,27 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                   name="notes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-sm font-medium">Notes (Optional)</FormLabel>
+                      <FormLabel className="text-xs md:text-sm">📝 Notes</FormLabel>
                       <FormControl>
-                        <Input placeholder="Any additional notes" {...field} className="h-10" />
+                        <Input placeholder="Notes (optional)" {...field} className="text-xs h-9 md:h-10" />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs" />
                     </FormItem>
                   )}
                 />
 
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-between pt-2">
-                  <Button variant="outline" onClick={() => setStep(2)} className="w-full sm:w-auto">
-                    Back
+                <div className="flex gap-2 justify-end pt-2">
+                  <Button size="sm" variant="outline" onClick={() => setStep(2)} className="text-xs md:text-sm">
+                    <ArrowLeft className="w-3 h-3 md:w-4 md:h-4 mr-1" /> Back
                   </Button>
-                  <Button 
+                  <Button
+                    size="sm"
                     onClick={form.handleSubmit(onSubmit)}
                     disabled={createBookingMutation.isPending}
-                    className="w-full sm:w-auto"
+                    className="text-xs md:text-sm"
                   >
-                    {createBookingMutation.isPending ? "Creating..." : "Create Booking"}
+                    {createBookingMutation.isPending ? "Creating..." : "Create"}
+                    <Check className="w-3 h-3 md:w-4 md:h-4 ml-1" />
                   </Button>
                 </div>
               </div>
