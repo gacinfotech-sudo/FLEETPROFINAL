@@ -1,23 +1,106 @@
-// Integrations Index - Central export point for all third-party integrations
+/**
+ * Universal Integration Hub - Main Index
+ * Central export point for all integration infrastructure
+ * Supports: WhatsApp, Calling, GPS, KYC/DigiLocker, eSign, and custom providers
+ *
+ * PHASE 1: Core Infrastructure
+ * - Models (IntegrationProvider, ProviderConnection, IntegrationAuditLog)
+ * - Types (canonical type definitions)
+ * - Adapters (base provider adapter)
+ * - Registry (provider discovery and registration)
+ *
+ * PHASE 2-7: Provider Implementation
+ * - WhatsApp adapter
+ * - Calling adapter
+ * - GPS adapter
+ * - KYC/DigiLocker adapter
+ * - eSign adapter
+ * - Payment adapter
+ * - Analytics adapter
+ */
+
+// PHASE 1: Core Infrastructure Exports
+
+// Types
+export type {
+  IntegrationCategory,
+  ProviderHealthStatus,
+  ProviderConnectionStatus,
+  IntegrationRole,
+  AuditActionType,
+  AuditResultStatus,
+  WebhookEventType,
+  ProviderConfig,
+  EncryptedCredentials,
+  HealthCheckResult,
+  AdapterRequest,
+  AdapterResponse,
+  WebhookEventPayload,
+  RateLimitState,
+  TenantContext,
+  AdapterOptions,
+  ProviderMetadata,
+} from './types';
+
+export {
+  IntegrationError,
+  ProviderNotFoundError,
+  ConnectionNotFoundError,
+  AuthenticationError,
+  AuthorizationError,
+  RateLimitError,
+  ConfigurationError,
+  WebhookVerificationError,
+} from './types';
+
+// Models
+export {
+  IntegrationProvider,
+  ProviderConnection,
+  IntegrationAuditLog,
+  type IIntegrationProvider,
+  type IProviderConnection,
+  type IIntegrationAuditLog,
+} from './models';
+
+// Adapters
+export { BaseProviderAdapter } from './adapters';
+
+// Registry
+export { ProviderRegistry, getProviderRegistry } from './config';
+
+// Legacy Email/SMS Providers (backward compatibility)
 export { emailProvider, type EmailConfig, type EmailMessage, type EmailDeliveryResult } from './emailProvider';
 export { smsProvider, type SmsConfig, type SmsMessage, type SmsDeliveryResult } from './smsProvider';
 
-// Initialize providers based on environment configuration
+// Imports for initialization
 import { emailProvider } from './emailProvider';
 import { smsProvider } from './smsProvider';
 import { createLogger } from '../utils/logger';
+import { getProviderRegistry } from './config';
 
 const log = createLogger('Integrations');
 
 /**
- * Initialize all third-party providers based on environment variables
- * This should be called during application startup
+ * Initialize integration hub
+ * Called during application startup
+ * Loads provider registry and configures legacy providers
  */
-export async function initializeProviders(): Promise<void> {
+export async function initializeIntegrationHub(): Promise<void> {
   try {
-    log.info('Initializing third-party providers...');
+    log.info('🚀 Initializing Universal Integration Hub');
 
-    // Configure Email Provider
+    // Initialize provider registry
+    const registry = getProviderRegistry();
+    await registry.initialize();
+
+    const stats = registry.getStatistics();
+    log.info(`✓ Provider registry initialized`, {
+      totalProviders: stats.totalProviders,
+      byCategory: stats.byCategory,
+    });
+
+    // Initialize legacy email provider
     const emailProviderType = process.env.EMAIL_PROVIDER || 'mock';
     log.info(`Configuring email provider: ${emailProviderType}`);
 
@@ -33,10 +116,9 @@ export async function initializeProviders(): Promise<void> {
       replyTo: process.env.EMAIL_REPLY_TO,
       rateLimitPerMinute: process.env.EMAIL_RATE_LIMIT
         ? parseInt(process.env.EMAIL_RATE_LIMIT)
-        : 100
+        : 100,
     });
 
-    // Test email provider connection
     const emailConnected = await emailProvider.testConnection();
     if (emailConnected) {
       log.info('✓ Email provider initialized and connected');
@@ -44,7 +126,7 @@ export async function initializeProviders(): Promise<void> {
       log.warn('⚠ Email provider initialized but connection test failed');
     }
 
-    // Configure SMS Provider
+    // Initialize legacy SMS provider
     const smsProviderType = process.env.SMS_PROVIDER || 'mock';
     log.info(`Configuring SMS provider: ${smsProviderType}`);
 
@@ -58,10 +140,9 @@ export async function initializeProviders(): Promise<void> {
       awsSecretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
       rateLimitPerMinute: process.env.SMS_RATE_LIMIT
         ? parseInt(process.env.SMS_RATE_LIMIT)
-        : 100
+        : 100,
     });
 
-    // Test SMS provider connection
     const smsConnected = await smsProvider.testConnection();
     if (smsConnected) {
       log.info('✓ SMS provider initialized and connected');
@@ -69,11 +150,19 @@ export async function initializeProviders(): Promise<void> {
       log.warn('⚠ SMS provider initialized but connection test failed');
     }
 
-    log.info('✓ All third-party providers initialized');
+    log.info('✅ Universal Integration Hub initialized successfully');
   } catch (error) {
-    log.error('Failed to initialize providers', { error });
+    log.error('Failed to initialize integration hub', error as Error);
     throw error;
   }
+}
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated Use initializeIntegrationHub instead
+ */
+export async function initializeProviders(): Promise<void> {
+  await initializeIntegrationHub();
 }
 
 /**
@@ -84,30 +173,21 @@ export async function getProvidersHealthStatus(): Promise<Record<string, any>> {
     email: {
       provider: emailProvider.getConfig().provider,
       configured: emailProvider.getConfig().provider !== 'mock',
-      connected: await emailProvider.testConnection()
+      connected: await emailProvider.testConnection(),
     },
     sms: {
       provider: smsProvider.getConfig().provider,
       configured: smsProvider.getConfig().provider !== 'mock',
-      connected: await smsProvider.testConnection()
-    }
+      connected: await smsProvider.testConnection(),
+    },
   };
 
   return status;
 }
 
-/**
- * Production-ready initialization code pattern
- * Add to your server/index.ts or startup sequence:
- *
- * import { initializeProviders } from './integrations';
- *
- * async function startServer() {
- *   // ... other initialization code ...
- *
- *   // Initialize third-party integrations
- *   await initializeProviders();
- *
- *   // ... rest of server startup ...
- * }
- */
+export default {
+  initializeIntegrationHub,
+  initializeProviders,
+  getProvidersHealthStatus,
+  getProviderRegistry,
+};
