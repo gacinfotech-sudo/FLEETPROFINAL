@@ -1276,83 +1276,49 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
               <p className="text-blue-100 text-xs sm:text-sm">Tell us when and where you need to go</p>
             </CardHeader>
             <CardContent className="p-4 sm:p-8">
-              {/* Date-Certainty Section (TASK-BOOKING-UI-04) — positioned
-                  before the date-entry section below, per spec. Three
-                  states only, matching travelDateStatus exactly
-                  (TASK-BOOKING-DOMAIN-02's real field/values). This is an
-                  independent axis from the resource-fulfilment selection
-                  in Step 2 below (untouched by this task) — the two are
-                  only combined for display, in the Review step's summary
-                  line. */}
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-                  <Calendar className="w-4 h-4 mr-2 text-blue-500" />
-                  Travel Date Certainty
-                </h3>
+              {/* Date-Certainty Section - Compact */}
+              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
                 <FormField
                   control={form.control}
                   name="travelDateStatus"
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <div role="radiogroup" aria-label="Travel date certainty" className="grid grid-cols-3 gap-2">
+                        <div className="flex gap-2 flex-wrap">
                           {DATE_CERTAINTY_OPTIONS.map((option) => (
-                            <div
+                            <button
                               key={option.value}
-                              id={`date-certainty-${option.value}`}
-                              role="radio"
-                              aria-checked={field.value === option.value}
-                              aria-label={option.label}
-                              tabIndex={0}
+                              type="button"
                               onClick={() => field.onChange(option.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  field.onChange(option.value);
-                                }
-                              }}
-                              className={`p-2 border rounded cursor-pointer transition-all hover:shadow-sm focus:outline-none ${
+                              className={`text-xs px-3 py-1.5 rounded font-medium transition-all ${
                                 field.value === option.value
-                                  ? 'border-blue-500 bg-blue-50'
-                                  : 'border-gray-200 hover:border-gray-300'
+                                  ? 'bg-blue-500 text-white'
+                                  : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
                               }`}
                             >
-                              <option.icon className={`w-4 h-4 mb-1 ${field.value === option.value ? 'text-blue-600' : 'text-gray-400'}`} />
-                              <div className="font-medium text-xs">{option.label}</div>
-                            </div>
+                              {option.label}
+                            </button>
                           ))}
                         </div>
                       </FormControl>
-                      <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
 
-              <Separator className="my-6" />
-
               {watchedValues.travelDateStatus === "confirmed" && (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-                  <Calendar className="w-4 h-4 mr-2 text-blue-500" />
-                  When do you need it?
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="mb-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <FormField
                     control={form.control}
                     name="pickupDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs font-semibold text-gray-700">Pickup Date</FormLabel>
+                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">📅 Pickup</FormLabel>
                         <FormControl>
-                          <Input
-                            type="date"
-                            {...field}
-                            min={new Date().toISOString().split('T')[0]}
-                            className="h-9 text-sm border border-gray-300 focus:border-blue-500"
-                          />
+                          <Input type="date" {...field} min={new Date().toISOString().split('T')[0]} className="h-9 text-xs" />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-xs" />
                       </FormItem>
                     )}
                   />
@@ -1361,62 +1327,40 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                     name="pickupTime"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs font-semibold text-gray-700">Pickup Time</FormLabel>
+                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">⏰ Time</FormLabel>
                         <FormControl>
-                          <Input
-                            type="time"
-                            {...field}
-                            className="h-9 text-sm border border-gray-300 focus:border-blue-500"
-                          />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="returnDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center text-sm font-medium text-gray-700">
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Return Date
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="date"
-                              {...field}
-                              min={watchedValues.pickupDate || new Date().toISOString().split('T')[0]}
-                              className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="returnTime"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center text-sm font-medium text-gray-700">
-                            <Clock className="w-4 h-4 mr-2" />
-                            Return Time
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              type="time"
-                              {...field}
-                              className="h-12 border-2 border-gray-200 focus:border-blue-500 rounded-lg"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                          <Input type="time" {...field} className="h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="returnDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">📅 Return</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} min={watchedValues.pickupDate || new Date().toISOString().split('T')[0]} className="h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="returnTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">⏰ Time</FormLabel>
+                        <FormControl>
+                          <Input type="time" {...field} className="h-9 text-xs" />
+                        </FormControl>
+                        <FormMessage className="text-xs" />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               </div>
               )}
@@ -1514,98 +1458,50 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
 
               <Separator className="my-8" />
 
-              {/* Location Section */}
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-                  <MapPin className="w-5 h-5 mr-2 text-green-500" />
-                  Where are you traveling?
-                </h3>
-                
-                {/* Route Type Selection */}
-                <div className="mb-6">
-                  <div className="flex flex-wrap gap-3">
+              {/* Location & Trip Type Section - Compact */}
+              <div className="mb-4 space-y-3">
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    { value: "custom", label: "Custom Route" },
+                    { value: "local", label: "Local" },
+                    { value: "not_decided", label: "Not Decided" },
+                  ].map((opt) => (
                     <button
+                      key={opt.value}
                       type="button"
                       onClick={() => {
-                        setRouteType("custom");
-                        form.setValue("dropoffLocation", "");
-                        form.setValue("tripType", "one_way"); // Reset to default trip type for custom routes
+                        setRouteType(opt.value as any);
+                        if (opt.value === "local") {
+                          form.setValue("dropoffLocation", "Local");
+                          form.setValue("tripType", "local");
+                        } else if (opt.value === "not_decided") {
+                          form.setValue("dropoffLocation", "Not Decided Yet");
+                        } else {
+                          form.setValue("dropoffLocation", "");
+                        }
                       }}
-                      className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 ${
-                        routeType === "custom"
-                          ? "border-green-500 bg-green-50 text-green-700"
-                          : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+                      className={`text-xs px-3 py-1.5 rounded font-medium transition-all ${
+                        routeType === opt.value
+                          ? "bg-green-500 text-white"
+                          : "bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600"
                       }`}
                     >
-                      Custom Route
+                      {opt.label}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRouteType("local");
-                        form.setValue("dropoffLocation", "Local");
-                        form.setValue("tripType", "local");
-                      }}
-                      className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 ${
-                        routeType === "local"
-                          ? "border-green-500 bg-green-50 text-green-700"
-                          : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
-                      }`}
-                    >
-                      ✅ Local
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRouteType("not_decided");
-                        form.setValue("dropoffLocation", "Not Decided Yet");
-                        form.setValue("tripType", "airport"); // Using airport as the closest existing type for flexible trips
-                      }}
-                      className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 ${
-                        routeType === "not_decided"
-                          ? "border-green-500 bg-green-50 text-green-700"
-                          : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
-                      }`}
-                    >
-                      ✅ Not Decided Yet
-                    </button>
-                  </div>
+                  ))}
                 </div>
 
-                {/* Popular Destinations */}
-                <div className="mb-6">
-                  <p className="text-xs font-medium text-gray-500 mb-3">Popular Destinations</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                    {["Ujjain", "Omkareshwar", "Mandu", "Indore", "Bhopal", "Khajuraho", "Jabalpur", "Goa"].map((loc) => (
-                      <button
-                        key={loc}
-                        type="button"
-                        onClick={() => form.setValue("pickupLocation", loc)}
-                        className="px-3 py-2 text-xs font-medium bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all text-gray-700"
-                      >
-                        📍 {loc}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <FormField
                     control={form.control}
                     name="pickupLocation"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-semibold text-gray-800">
-                          <MapPin className="inline w-4 h-4 mr-1" />From (Pickup)
-                        </FormLabel>
+                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">📍 From</FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder="Enter pickup location..."
-                            {...field}
-                            className="h-10 border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-lg"
-                          />
+                          <Input placeholder="Pickup location" {...field} className="h-9 text-xs" />
                         </FormControl>
-                        <FormMessage />
+                        <FormMessage className="text-xs" />
                       </FormItem>
                     )}
                   />
@@ -1616,64 +1512,52 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                       name="dropoffLocation"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-semibold text-gray-800">
-                            <MapPin className="inline w-4 h-4 mr-1" />To (Drop-off)
-                          </FormLabel>
+                          <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">📍 To</FormLabel>
                           <FormControl>
-                            <Input
-                              placeholder="Enter destination..."
-                              {...field}
-                              className="h-10 border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-lg"
-                            />
+                            <Input placeholder="Destination" {...field} className="h-9 text-xs" />
                           </FormControl>
-                          <FormMessage />
+                          <FormMessage className="text-xs" />
                         </FormItem>
                       )}
                     />
                   )}
 
                   {routeType !== "custom" && (
-                    <div className="flex items-center justify-center h-10 bg-blue-50 border border-blue-200 rounded-lg">
-                      <span className="text-blue-700 font-medium text-sm">
-                        {routeType === "local" ? "📍 Local Trip" : "🤔 Not Decided"}
-                      </span>
+                    <div className="flex items-center justify-center h-9 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded text-green-700 dark:text-green-400 text-xs font-medium">
+                      {routeType === "local" ? "📍 Local" : "🤔 Not Decided"}
                     </div>
                   )}
                 </div>
               </div>
 
-              <Separator className="my-8" />
-
-              {/* Trip Type Section */}
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Choose your trip type</h3>
+              {/* Trip Type Section - Compact */}
+              <div className="mb-4">
                 <FormField
                   control={form.control}
                   name="tripType"
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                           {[
-                            { value: "one_way", label: "One Way", icon: "→", color: "blue" },
-                            { value: "round_trip", label: "Round Trip", icon: "⟷", color: "green" },
-                            { value: "local", label: "Local", icon: "📍", color: "purple" },
-                            { value: "airport", label: "Airport", icon: "✈️", color: "orange" }
+                            { value: "one_way", label: "One Way", icon: "→" },
+                            { value: "round_trip", label: "Round", icon: "⟷" },
+                            { value: "local", label: "Local", icon: "📍" },
+                            { value: "airport", label: "Airport", icon: "✈️" }
                           ].map((option) => (
-                            <div
+                            <button
                               key={option.value}
+                              type="button"
                               onClick={() => field.onChange(option.value)}
-                              className={`p-3 sm:p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 hover:shadow-md ${
+                              className={`p-2 text-xs border rounded font-medium transition-all text-center ${
                                 field.value === option.value
-                                  ? 'border-blue-500 bg-blue-50 shadow-lg'
-                                  : 'border-gray-200 hover:border-gray-300'
+                                  ? 'border-blue-500 bg-blue-50 text-blue-900 dark:bg-blue-900/30 dark:text-blue-300'
+                                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 text-gray-700 dark:text-gray-300'
                               }`}
                             >
-                              <div className="text-center">
-                                <div className="text-xl sm:text-2xl mb-1 sm:mb-2">{option.icon}</div>
-                                <div className="font-medium text-xs sm:text-sm">{option.label}</div>
-                              </div>
-                            </div>
+                              <div className="text-lg mb-1">{option.icon}</div>
+                              <div>{option.label}</div>
+                            </button>
                           ))}
                         </div>
                       </FormControl>
