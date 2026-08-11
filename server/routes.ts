@@ -47,6 +47,7 @@ import competitiveIntelligenceRouter from "./routes/competitive-intelligence";
 import yieldManagementRouter from "./routes/yield-management";
 import orchestrationRouter from "./routes/orchestration";
 import fraudDetectionRouter from "./routes/fraud-detection";
+import supportRouter from "./routes/support";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -9031,6 +9032,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register fraud detection API routes
   app.use("/api/fraud", fraudDetectionRouter);
+
+  // Register support API routes
+  app.use("/api/support", supportRouter);
 
   const httpServer = createServer(app);
 
