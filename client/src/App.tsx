@@ -41,6 +41,7 @@ import SupportAccessBanner from "@/components/root/support-access-banner";
 import DriverPayrollDashboard from "./pages/driver-payroll-dashboard";
 import VendorSettlementPortal from "./pages/vendor-settlement-portal";
 import PlatformAdmin360 from "./pages/platform-admin-360";
+import OperationsCenter from "./pages/operations-center";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -199,6 +200,13 @@ function AuthenticatedApp() {
       <Route path="/platform-admin">
         <ProtectedRoute requiredRole="admin">
           <PlatformAdmin360 />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Operations Center - Command Center */}
+      <Route path="/operations">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <OperationsCenter />
         </ProtectedRoute>
       </Route>
 
