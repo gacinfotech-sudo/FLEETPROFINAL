@@ -1,6 +1,13 @@
 // Notification Channel Manager - Unified interface for multiple delivery channels
-import nodemailer from 'nodemailer';
 import { createLogger } from './logger';
+
+let nodemailer: any;
+try {
+  nodemailer = require('nodemailer');
+} catch (e) {
+  // nodemailer is optional if email delivery not configured
+  nodemailer = null;
+}
 
 const log = createLogger('NotificationChannels');
 
@@ -35,6 +42,11 @@ export class EmailChannel {
   }
 
   private initializeTransporter() {
+    if (!nodemailer) {
+      log.warn('nodemailer not available, email delivery disabled');
+      return;
+    }
+
     const provider = this.config.provider || 'smtp';
 
     if (provider === 'sendgrid') {
