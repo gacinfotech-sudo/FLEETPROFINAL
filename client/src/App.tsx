@@ -40,6 +40,7 @@ import FeatureFlagsPage from "./pages/root/feature-flags";
 import SupportAccessBanner from "@/components/root/support-access-banner";
 import DriverPayrollDashboard from "./pages/driver-payroll-dashboard";
 import VendorSettlementPortal from "./pages/vendor-settlement-portal";
+import PlatformAdmin360 from "./pages/platform-admin-360";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -191,6 +192,13 @@ function AuthenticatedApp() {
       <Route path="/vendor-settlement">
         <ProtectedRoute allowedRoles={["client", "manager"]}>
           <VendorSettlementPortal />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Platform Admin 360 - Root/Super Admin */}
+      <Route path="/platform-admin">
+        <ProtectedRoute requiredRole="admin">
+          <PlatformAdmin360 />
         </ProtectedRoute>
       </Route>
 
