@@ -255,20 +255,79 @@ export class NotificationTriggerEngine {
         return;
       }
 
-      // Send notification to each recipient
-      const sentCount = 0;
-      const failedCount = 0;
+      // Import delivery orchestrator for sending notifications
+      const { notificationDeliveryOrchestrator } = await import('./notificationDeliveryOrchestrator');
 
-      // TODO: Integrate with delivery orchestrator to send notifications
-      // For now, just log the intent
+      let sentCount = 0;
+      let failedCount = 0;
 
-      log.info('Notifications to be sent', {
+      // Send notification to each recipient via orchestrator
+      for (const recipientId of recipients) {
+        try {
+          // Resolve template and prepare notification content
+          const { notificationTemplateManager } = await import('./notificationTemplates');
+          const template = await notificationTemplateManager.getTemplate(trigger.templateId);
+
+          if (!template) {
+            log.warn('Template not found', { templateId: trigger.templateId, recipientId });
+            failedCount++;
+            continue;
+          }
+
+          // Prepare delivery request with template data
+          const deliveryRequest = {
+            userId: recipientId,
+            title: template.subject || trigger.name,
+            body: template.body || '',
+            category: eventData.type,
+            templateId: trigger.templateId,
+            channels: trigger.channels as any[],
+            data: {
+              ...eventData.metadata,
+              entityId: eventData.entityId,
+              entityType: eventData.entityType,
+              triggerId: trigger._id
+            },
+            priority: (eventData.metadata?.priority as 'high' | 'normal' | 'low') || 'normal'
+          };
+
+          // Send via delivery orchestrator
+          const result = await notificationDeliveryOrchestrator.deliver(deliveryRequest);
+
+          if (result.success) {
+            sentCount++;
+            log.debug('Notification sent to recipient', {
+              recipientId,
+              triggerId: trigger._id,
+              channels: result.sentVia
+            });
+          } else {
+            failedCount++;
+            log.warn('Notification delivery failed for recipient', {
+              recipientId,
+              triggerId: trigger._id,
+              reasons: result.skippedReasons
+            });
+          }
+        } catch (error) {
+          failedCount++;
+          log.error('Error sending notification to recipient', {
+            recipientId,
+            triggerId: trigger._id,
+            error
+          });
+        }
+      }
+
+      log.info('Notifications sent via orchestrator', {
         triggerId: trigger._id,
         eventType: eventData.type,
-        recipients: recipients.length
+        recipients: recipients.length,
+        sent: sentCount,
+        failed: failedCount
       });
 
-      await this.logExecution(trigger, eventData, 'executed', recipients.length, undefined);
+      await this.logExecution(trigger, eventData, 'executed', sentCount, undefined);
     } catch (error) {
       log.error('Failed to send notification', { error, triggerId: trigger._id });
       await this.logExecution(trigger, eventData, 'failed', undefined, (error as Error).message);
