@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { MessageCircle, Send, History, AlertTriangle, FileDown } from "lucide-react";
+import { FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -198,6 +199,7 @@ export default function BookingCommunication({ booking }: Props) {
               </pre>
             </div>
           )}
+          <FormSubmitStatus status={sendMutation.isPending ? 'loading' : sendMutation.isSuccess ? 'success' : 'idle'} successMessage="Message sent" />
           <DialogFooter>
             <Button variant="outline" onClick={() => { setPreviewType(null); setPreviewData(null); }}>Cancel</Button>
             <Button

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Send } from "lucide-react";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -48,6 +49,13 @@ export default function ResourceFulfilmentPanel({ booking }: Props) {
   });
   const contactedVendorIds = new Set(responses.map((r: any) => r.vendorId));
   const uncontactedVendors = (activeVendors || []).filter((v: any) => !contactedVendorIds.has(v._id));
+
+  // Auto-save form state
+  const { save: autoSaveResponse } = useFormAutoSave('vendor-response-form', responseForm, 2000);
+
+  useEffect(() => {
+    if (respondingVendorId) autoSaveResponse();
+  }, [responseForm, respondingVendorId, autoSaveResponse]);
 
   const startMutation = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/bookings/${bookingId}/sourcing-requests`, { quantity: 1 })).json(),
@@ -219,6 +227,7 @@ export default function ResourceFulfilmentPanel({ booking }: Props) {
               <Input id="sourcing-record-cost" type="number" value={responseForm.quotedCost} onChange={(e) => setResponseForm({ ...responseForm, quotedCost: e.target.value })} />
             </div>
           </div>
+          <FormSubmitStatus status={recordMutation.isPending ? 'loading' : recordMutation.isSuccess ? 'success' : 'idle'} successMessage="Response recorded" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setRespondingVendorId(null)}>Cancel</Button>
             <Button id="sourcing-record-save" disabled={recordMutation.isPending} onClick={() => recordMutation.mutate()}>Save Response</Button>

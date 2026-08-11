@@ -321,6 +321,7 @@ export default function CustomerService({ customerId, bookings }: Props) {
               <Textarea value={complaintForm.description} onChange={(e) => setComplaintForm((f) => ({ ...f, description: e.target.value }))} />
             </div>
           </div>
+          <FormSubmitStatus status={addComplaint.isPending ? 'loading' : addComplaint.isSuccess ? 'success' : 'idle'} successMessage="Complaint recorded" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowComplaintForm(false)}>Cancel</Button>
             <Button disabled={!complaintForm.description.trim() || (complaintForm.responsibleParty !== 'unclear' && !complaintForm.responsibilityReason.trim()) || addComplaint.isPending} onClick={() => addComplaint.mutate()}>Submit Complaint</Button>
@@ -385,6 +386,7 @@ export default function CustomerService({ customerId, bookings }: Props) {
               <Textarea value={resolveForm.resolution} onChange={(e) => setResolveForm((f) => ({ ...f, resolution: e.target.value }))} />
             </div>
           </div>
+          <FormSubmitStatus status={resolveComplaint.isPending ? 'loading' : resolveComplaint.isSuccess ? 'success' : 'idle'} successMessage="Complaint updated" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setResolvingComplaint(null)}>Cancel</Button>
             <Button disabled={(resolveForm.responsibleParty !== 'unclear' && !resolveForm.responsibilityReason.trim()) || resolveComplaint.isPending} onClick={() => resolveComplaint.mutate()}>Save</Button>

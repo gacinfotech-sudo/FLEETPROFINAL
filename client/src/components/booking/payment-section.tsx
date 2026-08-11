@@ -1,5 +1,5 @@
 import { safeRandomUUID } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { IndianRupee, Plus, Undo2 } from "lucide-react";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -66,6 +67,13 @@ export default function PaymentSection({ booking }: Props) {
     enabled: !!bookingId,
   });
   const history = historyQuery.data || [];
+
+  // Auto-save form state
+  const { save: autoSaveForm } = useFormAutoSave('payment-form', form, 2000);
+
+  useEffect(() => {
+    if (showAddPayment) autoSaveForm();
+  }, [form, showAddPayment, autoSaveForm]);
 
   const totalAmount = booking.totalAmount || 0;
   const advanceReceived = booking.advanceReceived || 0;
@@ -234,6 +242,7 @@ export default function PaymentSection({ booking }: Props) {
               <Input value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
             </div>
           </div>
+          <FormSubmitStatus status={addPaymentMutation.isPending ? 'loading' : addPaymentMutation.isSuccess ? 'success' : 'idle'} successMessage="Payment recorded" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddPayment(false)}>Cancel</Button>
             <Button
