@@ -37,6 +37,7 @@ import matchingRouter from "./routes/matching";
 import maintenanceRouter from "./routes/maintenance";
 import driverIntelligenceRouter from "./routes/driver-intelligence";
 import customerLtvRouter from "./routes/customer-ltv";
+import dispatchRouter from "./routes/dispatch";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -8991,6 +8992,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register customer LTV and churn API routes
   app.use("/api/customer-ltv", customerLtvRouter);
+
+  // Register driver dispatch API routes
+  app.use("/api/dispatch", dispatchRouter);
 
   const httpServer = createServer(app);
 
