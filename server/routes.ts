@@ -31,6 +31,8 @@ import {
 } from "./middleware/security";
 import { recommendationMiddleware } from "./middleware/recommendationMiddleware";
 import recommendationsRouter from "./routes/recommendations";
+import { pricingMiddleware } from "./middleware/pricingMiddleware";
+import pricingRouter from "./routes/pricing";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -363,6 +365,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Apply recommendation middleware for intelligent suggestion system
   app.use(recommendationMiddleware);
+
+  // Apply pricing middleware for dynamic price calculations
+  app.use(pricingMiddleware);
 
   // Client fetches this once on load / after login to get the current
   // CSRF token to echo back as the X-CSRF-Token header.
@@ -8967,6 +8972,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register recommendations API routes
   app.use("/api/recommendations", recommendationsRouter);
+
+  // Register pricing API routes
+  app.use("/api/pricing", pricingRouter);
 
   const httpServer = createServer(app);
 
