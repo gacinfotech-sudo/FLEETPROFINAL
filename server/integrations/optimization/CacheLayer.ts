@@ -239,7 +239,8 @@ export class CacheLayer {
     const regex = new RegExp(pattern);
     const keysToDelete: string[] = [];
 
-    for (const key of this.memoryCache.keys()) {
+    const entries = Array.from(this.memoryCache.entries());
+    for (const [key] of entries) {
       if (regex.test(key)) {
         keysToDelete.push(key);
       }

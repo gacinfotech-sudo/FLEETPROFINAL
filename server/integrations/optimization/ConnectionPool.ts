@@ -189,7 +189,8 @@ export class ConnectionPool {
    * Find an idle connection
    */
   private findIdleConnection(): PooledConnection | null {
-    for (const conn of this.connections.values()) {
+    const entries = Array.from(this.connections.entries());
+    for (const [, conn] of entries) {
       if (
         conn.state === ConnectionState.IDLE &&
         !this.isConnectionStale(conn) &&
@@ -363,7 +364,8 @@ export class ConnectionPool {
     });
 
     // Mark unhealthy connections for reconnection
-    for (const conn of this.connections.values()) {
+    const entries = Array.from(this.connections.entries());
+    for (const [, conn] of entries) {
       if (conn.errorCount > this.config.errorThreshold / 2) {
         this.logger.warn('Unhealthy connection detected', {
           connectionId: conn.id,
@@ -379,7 +381,8 @@ export class ConnectionPool {
   private performStaleCheck(): void {
     const staleConnections: PooledConnection[] = [];
 
-    for (const conn of this.connections.values()) {
+    const entries = Array.from(this.connections.entries());
+    for (const [, conn] of entries) {
       if (this.isConnectionStale(conn) && conn.state === ConnectionState.IDLE) {
         staleConnections.push(conn);
       }
@@ -407,7 +410,8 @@ export class ConnectionPool {
     let totalErrors = 0;
     let stalledConnections = 0;
 
-    for (const conn of this.connections.values()) {
+    const entries = Array.from(this.connections.entries());
+    for (const [, conn] of entries) {
       totalConnections++;
       totalRequests += conn.requestCount;
       totalErrors += conn.errorCount;
@@ -450,7 +454,8 @@ export class ConnectionPool {
     });
 
     // Close all connections
-    for (const conn of this.connections.values()) {
+    const conns = Array.from(this.connections.values());
+    for (const conn of conns) {
       conn.state = ConnectionState.CLOSED;
     }
 
@@ -478,7 +483,8 @@ export class ConnectionPool {
     }
 
     // Close all connections
-    for (const conn of this.connections.values()) {
+    const entries = Array.from(this.connections.entries());
+    for (const [, conn] of entries) {
       conn.state = ConnectionState.CLOSED;
       // Actual close logic would be here
     }
