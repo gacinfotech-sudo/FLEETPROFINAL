@@ -42,6 +42,7 @@ import anomalyDetectionRouter from "./routes/anomaly-detection";
 import analyticsRouter from "./routes/analytics";
 import notificationsRouter from "./routes/notifications";
 import mlModelsRouter from "./routes/ml-models";
+import resourceAllocationRouter from "./routes/resource-allocation";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -9011,6 +9012,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register ML models API routes
   app.use("/api/ml", mlModelsRouter);
+
+  // Register resource allocation API routes
+  app.use("/api/resources", resourceAllocationRouter);
 
   const httpServer = createServer(app);
 
