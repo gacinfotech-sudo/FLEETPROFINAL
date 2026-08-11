@@ -56,6 +56,7 @@ import notificationWebhooksRouter from "./routes/notification-webhooks";
 import notificationBatchRouter from "./routes/notification-batch";
 import notificationAnalyticsRouter from "./routes/notification-analytics";
 import userNotificationsRouter from "./routes/user-notifications";
+import notificationChannelConfigRouter from "./routes/notification-channel-config";
 import mlModelsRouter from "./routes/ml-models";
 import resourceAllocationRouter from "./routes/resource-allocation";
 import competitiveIntelligenceRouter from "./routes/competitive-intelligence";
@@ -9165,6 +9166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/notification-webhooks", notificationWebhooksRouter);
   app.use("/api/notification-batch", notificationBatchRouter);
   app.use("/api/user/notifications", userNotificationsRouter);
+  app.use("/api/notification-channels", notificationChannelConfigRouter);
 
   // ========== DRIVER SALARY MASTER ROUTES ==========
   app.post("/api/driver-salary/master", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
