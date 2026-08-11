@@ -1267,33 +1267,32 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
     switch (step) {
       case 1:
         return (
-          <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200 shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg">
-              <CardTitle className="flex items-center text-lg sm:text-xl">
-                <MapPin className="w-5 h-5 sm:w-6 sm:h-6 mr-2 sm:mr-3" />
+          <Card className="bg-gradient-to-br from-blue-50 to-white border-blue-200 shadow-md">
+            <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg p-3">
+              <CardTitle className="flex items-center text-base">
+                <MapPin className="w-4 h-4 mr-2" />
                 Trip Details & Schedule
               </CardTitle>
-              <p className="text-blue-100 text-xs sm:text-sm">Tell us when and where you need to go</p>
             </CardHeader>
-            <CardContent className="p-4 sm:p-8">
-              {/* Date-Certainty Section - Compact */}
-              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+            <CardContent className="p-4">
+              {/* Date-Certainty Section - Ultra Compact */}
+              <div className="mb-3 flex gap-1.5 flex-wrap">
                 <FormField
                   control={form.control}
                   name="travelDateStatus"
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <div className="flex gap-2 flex-wrap">
+                        <div className="flex gap-1.5 flex-wrap">
                           {DATE_CERTAINTY_OPTIONS.map((option) => (
                             <button
                               key={option.value}
                               type="button"
                               onClick={() => field.onChange(option.value)}
-                              className={`text-xs px-3 py-1.5 rounded font-medium transition-all ${
+                              className={`text-xs px-2 py-1 rounded font-medium transition-all ${
                                 field.value === option.value
                                   ? 'bg-blue-500 text-white'
-                                  : 'bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
+                                  : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-slate-700'
                               }`}
                             >
                               {option.label}
@@ -1307,8 +1306,8 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
               </div>
 
               {watchedValues.travelDateStatus === "confirmed" && (
-              <div className="mb-4">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="mb-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   <FormField
                     control={form.control}
                     name="pickupDate"
@@ -1458,13 +1457,13 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
 
               <Separator className="my-8" />
 
-              {/* Location & Trip Type Section - Compact */}
-              <div className="mb-4 space-y-3">
-                <div className="flex gap-2 flex-wrap">
+              {/* Location & Trip Type Section - Ultra Compact */}
+              <div className="mb-3 space-y-2">
+                <div className="flex gap-1.5 flex-wrap">
                   {[
-                    { value: "custom", label: "Custom Route" },
+                    { value: "custom", label: "Custom" },
                     { value: "local", label: "Local" },
-                    { value: "not_decided", label: "Not Decided" },
+                    { value: "not_decided", label: "Undecided" },
                   ].map((opt) => (
                     <button
                       key={opt.value}
@@ -1480,10 +1479,10 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                           form.setValue("dropoffLocation", "");
                         }
                       }}
-                      className={`text-xs px-3 py-1.5 rounded font-medium transition-all ${
+                      className={`text-xs px-2 py-1 rounded font-medium transition-all ${
                         routeType === opt.value
                           ? "bg-green-500 text-white"
-                          : "bg-white dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600"
+                          : "bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-slate-700"
                       }`}
                     >
                       {opt.label}
@@ -1491,7 +1490,7 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   ))}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                   <FormField
                     control={form.control}
                     name="pickupLocation"
@@ -1530,17 +1529,17 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                 </div>
               </div>
 
-              {/* Trip Type Section - Compact */}
-              <div className="mb-4">
+              {/* Trip Type Section - Ultra Compact */}
+              <div className="mb-3">
                 <FormField
                   control={form.control}
                   name="tripType"
                   render={({ field }) => (
                     <FormItem>
                       <FormControl>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
                           {[
-                            { value: "one_way", label: "One Way", icon: "→" },
+                            { value: "one_way", label: "1-Way", icon: "→" },
                             { value: "round_trip", label: "Round", icon: "⟷" },
                             { value: "local", label: "Local", icon: "📍" },
                             { value: "airport", label: "Airport", icon: "✈️" }
@@ -1549,19 +1548,19 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                               key={option.value}
                               type="button"
                               onClick={() => field.onChange(option.value)}
-                              className={`p-2 text-xs border rounded font-medium transition-all text-center ${
+                              className={`p-1.5 text-xs border rounded font-medium transition-all text-center ${
                                 field.value === option.value
-                                  ? 'border-blue-500 bg-blue-50 text-blue-900 dark:bg-blue-900/30 dark:text-blue-300'
-                                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 text-gray-700 dark:text-gray-300'
+                                  ? 'border-blue-500 bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-300'
+                                  : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-slate-800/50'
                               }`}
                             >
-                              <div className="text-lg mb-1">{option.icon}</div>
-                              <div>{option.label}</div>
+                              <div className="text-sm mb-0.5">{option.icon}</div>
+                              <div className="leading-tight">{option.label}</div>
                             </button>
                           ))}
                         </div>
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-xs" />
                     </FormItem>
                   )}
                 />
