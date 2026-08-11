@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Briefcase, Plus, CheckCircle2, XCircle, Trash2, FileText, ExternalLink } from "lucide-react";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { verificationBadgeClass } from "./driver-domain-constants";
 
 interface Props {
@@ -26,6 +27,11 @@ export default function DriverEmploymentHistoryPanel({ driverId }: Props) {
   const queryClient = useQueryClient();
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const { save: autoSave } = useFormAutoSave("driver-employment-history-form", form, 2000);
+
+  useEffect(() => {
+    autoSave();
+  }, [form, autoSave]);
 
   const historyQuery = useQuery<any>({ queryKey: [`/api/drivers/${driverId}/employment-history`] });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: [`/api/drivers/${driverId}/employment-history`] });
@@ -119,6 +125,11 @@ export default function DriverEmploymentHistoryPanel({ driverId }: Props) {
               <Textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
             </div>
           </div>
+          <FormSubmitStatus
+            status={addMutation.isPending ? "loading" : addMutation.isError ? "error" : "idle"}
+            successMessage="Employment entry saved successfully"
+            errorMessage="Could not save employment entry"
+          />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => setShowAddForm(false)}>Cancel</Button>
             <Button

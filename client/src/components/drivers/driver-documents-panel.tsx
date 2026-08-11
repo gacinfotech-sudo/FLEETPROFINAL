@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Upload, ExternalLink, Lock, CheckCircle2, XCircle } from "lucide-react";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import {
   DOCUMENT_TYPES, DOCUMENT_TYPE_LABELS, DOCUMENT_TYPE_EXPIRY_BEARING,
   COMPLIANCE_STATUS_LABELS, complianceBadgeClass, documentComplianceStatus,
@@ -28,6 +29,13 @@ export default function DriverDocumentsPanel({ driverId }: Props) {
   const [documentNumber, setDocumentNumber] = useState("");
   const [issueDate, setIssueDate] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
+
+  const formData = { documentType, label, documentNumber, issueDate, expiryDate };
+  const { save: autoSave } = useFormAutoSave("driver-documents-form", formData, 2000);
+
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const documentsQuery = useQuery<any>({ queryKey: [`/api/drivers/${driverId}/documents`] });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: [`/api/drivers/${driverId}/documents`] });
@@ -131,6 +139,11 @@ export default function DriverDocumentsPanel({ driverId }: Props) {
               </>
             )}
           </div>
+          <FormSubmitStatus
+            status={uploadMutation.isPending ? "loading" : uploadMutation.isError ? "error" : "idle"}
+            successMessage="Document uploaded successfully"
+            errorMessage="Could not upload document"
+          />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => setShowUploadForm(false)}>Cancel</Button>
             <Button

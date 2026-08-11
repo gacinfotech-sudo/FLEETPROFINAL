@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, Phone, ShieldAlert, Plus, CheckCircle2, XCircle, Trash2 } from "lucide-react";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import {
   CONTACT_CATEGORIES, CONTACT_CATEGORY_LABELS, DEFAULT_CONTACT_THRESHOLD,
   verificationBadgeClass, type ContactCategory,
@@ -30,6 +31,11 @@ export default function DriverContactsPanel({ driverId }: Props) {
   const queryClient = useQueryClient();
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
+  const { save: autoSave } = useFormAutoSave("driver-contacts-form", form, 2000);
+
+  useEffect(() => {
+    autoSave();
+  }, [form, autoSave]);
 
   const contactsQuery = useQuery<any>({ queryKey: [`/api/drivers/${driverId}/contacts`] });
 
@@ -162,6 +168,11 @@ export default function DriverContactsPanel({ driverId }: Props) {
           <p className="text-xs text-gray-500">
             Up to {DEFAULT_CONTACT_THRESHOLD} contacts per driver — this is a profile target, not a requirement to save.
           </p>
+          <FormSubmitStatus
+            status={addMutation.isPending ? "loading" : addMutation.isError ? "error" : "idle"}
+            successMessage="Contact saved successfully"
+            errorMessage="Could not save contact"
+          />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => setShowAddForm(false)}>Cancel</Button>
             <Button

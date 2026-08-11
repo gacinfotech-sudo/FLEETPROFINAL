@@ -4,6 +4,7 @@
 // from the server's computeRefund; this dialog never invents totals.
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,6 +78,12 @@ export default function ProcessRefundDialog({ bookingId, bookingCode, customerNa
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refund?.deductions ? JSON.stringify(refund.deductions) : ""]);
+
+  const formData = { rows, reason, payAmount, payMode, payRef, closeReason, forfeitMode };
+  const { save: autoSave } = useFormAutoSave(`process-refund-${bookingId}`, formData, 2000);
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const previewDeduction = useMemo(
     () => rows.filter((r) => r.enabled && !r.waived).reduce((s, r) => s + (Number(r.amount) || 0), 0),
@@ -207,6 +214,11 @@ export default function ProcessRefundDialog({ bookingId, bookingCode, customerNa
             )}
 
             {/* Calculation (spec §18) — server-confirmed numbers, live preview while editing */}
+            <FormSubmitStatus
+              status={call.isPending ? "loading" : call.isSuccess ? "success" : call.isError ? "error" : "idle"}
+              successMessage="Refund action completed!"
+              errorMessage={(call.error as any)?.message}
+            />
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm" data-testid="refund-calculation">
               <div className="flex justify-between"><span>Security Deposit</span><span className="font-medium">{money(comp?.depositAmount)}</span></div>
               <div className="flex justify-between text-red-700"><span>Total Deductions</span><span>− {money(previewDeduction)}</span></div>

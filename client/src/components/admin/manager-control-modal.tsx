@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -63,6 +64,12 @@ export default function ManagerControlModal({
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const formData = { tempPassword, newManagerLimit };
+  const { save: autoSave } = useFormAutoSave(`manager-control-${tenant?.id}`, formData, 2000);
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   // Fetch managers for this tenant
   const { data: managers = [], isLoading } = useQuery({
@@ -221,6 +228,11 @@ export default function ManagerControlModal({
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
+            <FormSubmitStatus
+              status={resetPasswordMutation.isPending || updateManagerLimitMutation.isPending ? "loading" : resetPasswordMutation.isSuccess || updateManagerLimitMutation.isSuccess ? "success" : resetPasswordMutation.isError || updateManagerLimitMutation.isError ? "error" : "idle"}
+              successMessage="Manager control action completed!"
+              errorMessage={(resetPasswordMutation.error as any)?.message || (updateManagerLimitMutation.error as any)?.message}
+            />
             <DialogTitle className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Users className="w-5 h-5" />

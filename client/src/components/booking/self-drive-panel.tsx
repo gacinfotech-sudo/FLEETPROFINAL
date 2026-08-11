@@ -3,7 +3,7 @@
 // deposit → handover checklist → return → refund settlement against
 // /api/bookings/:id/self-drive/*. No client-side financial formulas beyond
 // previews — every persisted number comes from the canonical endpoints.
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { CheckCircle2, Circle, Clock, IndianRupee, Loader2, MessageCircle, Star 
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { safeRandomUUID } from "@/lib/utils";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import FuelGauge, { fuelLabel } from "@/components/self-drive/fuel-gauge";
 import ProcessRefundDialog from "@/components/self-drive/process-refund-dialog";
 
@@ -76,6 +77,14 @@ export default function SelfDrivePanel({ bookingId, editable }: { bookingId: str
   const [refundOpen, setRefundOpen] = useState(false);
   const [reviewSending, setReviewSending] = useState(false);
   const [waSending, setWaSending] = useState<string | null>(null);
+
+  const { save: autoSaveDeposit } = useFormAutoSave(`self-drive-deposit-${bookingId}`, depositForm, 2000);
+  const { save: autoSaveHandover } = useFormAutoSave(`self-drive-handover-${bookingId}`, handoverForm, 2000);
+  const { save: autoSaveReturn } = useFormAutoSave(`self-drive-return-${bookingId}`, returnForm, 2000);
+
+  useEffect(() => { autoSaveDeposit(); }, [depositForm, autoSaveDeposit]);
+  useEffect(() => { autoSaveHandover(); }, [handoverForm, autoSaveHandover]);
+  useEffect(() => { autoSaveReturn(); }, [returnForm, autoSaveReturn]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: [tripKey] });

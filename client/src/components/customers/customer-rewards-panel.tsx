@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { Gift, Minus, Plus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,12 @@ export default function CustomerRewardsPanel({ customerId, rewards }: Props) {
   const [points, setPoints] = useState("100");
   const [reason, setReason] = useState("");
   const canAdjust = user?.role === 'admin' || user?.role === 'client';
+
+  const formData = { points, reason };
+  const { save: autoSave } = useFormAutoSave(`customer-rewards-${customerId}`, formData, 2000);
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}`] });
@@ -105,6 +112,11 @@ export default function CustomerRewardsPanel({ customerId, rewards }: Props) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader><DialogTitle>Give or Deduct Reward Points</DialogTitle></DialogHeader>
+          <FormSubmitStatus
+            status={mutation.isPending ? "loading" : mutation.isSuccess ? "success" : mutation.isError ? "error" : "idle"}
+            successMessage="Reward points updated!"
+            errorMessage={(mutation.error as any)?.message}
+          />
           <div className="space-y-4">
             <div>
               <Label>Points</Label>
