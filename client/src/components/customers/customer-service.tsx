@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Star, AlertTriangle, Plus, CheckCircle2, Clock } from "lucide-react";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -89,6 +90,23 @@ export default function CustomerService({ customerId, bookings }: Props) {
     queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).includes('/customer-feedback-profile') });
     queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith('/api/reports/vehicle-performance') });
   };
+
+  // Auto-save forms
+  const { save: autoSaveFeedback } = useFormAutoSave('customer-feedback-form', feedbackForm, 2000);
+  const { save: autoSaveComplaint } = useFormAutoSave('customer-complaint-form', complaintForm, 2000);
+  const { save: autoSaveResolve } = useFormAutoSave('customer-resolve-form', resolveForm, 2000);
+
+  useEffect(() => {
+    if (showFeedbackForm) autoSaveFeedback();
+  }, [feedbackForm, showFeedbackForm, autoSaveFeedback]);
+
+  useEffect(() => {
+    if (showComplaintForm) autoSaveComplaint();
+  }, [complaintForm, showComplaintForm, autoSaveComplaint]);
+
+  useEffect(() => {
+    if (resolvingComplaint) autoSaveResolve();
+  }, [resolveForm, resolvingComplaint, autoSaveResolve]);
 
   const addFeedback = useMutation({
     mutationFn: async () => {
@@ -245,6 +263,7 @@ export default function CustomerService({ customerId, bookings }: Props) {
               <Textarea value={feedbackForm.comments} onChange={(e) => setFeedbackForm((f) => ({ ...f, comments: e.target.value }))} />
             </div>
           </div>
+          <FormSubmitStatus status={addFeedback.isPending ? 'loading' : addFeedback.isSuccess ? 'success' : 'idle'} successMessage="Feedback recorded" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowFeedbackForm(false)}>Cancel</Button>
             <Button disabled={addFeedback.isPending} onClick={() => addFeedback.mutate()}>Save Feedback</Button>
