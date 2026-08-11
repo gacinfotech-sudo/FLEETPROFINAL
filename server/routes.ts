@@ -51,6 +51,7 @@ import supportRouter from "./routes/support";
 import feedbackRouter from "./routes/feedback";
 import driverEarningsRouter from "./routes/driver-earnings";
 import vehicleTrackingRouter from "./routes/vehicle-tracking";
+import safetyIncidentsRouter from "./routes/safety-incidents";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -9047,6 +9048,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register vehicle tracking API routes
   app.use("/api/tracking", vehicleTrackingRouter);
+
+  // Register safety incidents API routes
+  app.use("/api/safety", safetyIncidentsRouter);
 
   const httpServer = createServer(app);
 
