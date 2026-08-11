@@ -33,6 +33,7 @@ import { recommendationMiddleware } from "./middleware/recommendationMiddleware"
 import recommendationsRouter from "./routes/recommendations";
 import { pricingMiddleware } from "./middleware/pricingMiddleware";
 import pricingRouter from "./routes/pricing";
+import matchingRouter from "./routes/matching";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -8975,6 +8976,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register pricing API routes
   app.use("/api/pricing", pricingRouter);
+
+  // Register demand-supply matching API routes
+  app.use("/api/matching", matchingRouter);
 
   const httpServer = createServer(app);
 
