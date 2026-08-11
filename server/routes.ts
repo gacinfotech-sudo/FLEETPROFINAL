@@ -35,6 +35,8 @@ import { pricingMiddleware } from "./middleware/pricingMiddleware";
 import pricingRouter from "./routes/pricing";
 import matchingRouter from "./routes/matching";
 import maintenanceRouter from "./routes/maintenance";
+import driverIntelligenceRouter from "./routes/driver-intelligence";
+import customerLtvRouter from "./routes/customer-ltv";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -8983,6 +8985,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register predictive maintenance API routes
   app.use("/api/maintenance", maintenanceRouter);
+
+  // Register driver intelligence API routes
+  app.use("/api/driver-intelligence", driverIntelligenceRouter);
+
+  // Register customer LTV and churn API routes
+  app.use("/api/customer-ltv", customerLtvRouter);
 
   const httpServer = createServer(app);
 
