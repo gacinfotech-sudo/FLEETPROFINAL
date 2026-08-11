@@ -16,6 +16,7 @@ import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, 
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
+import BookingAssistant from "./booking-assistant";
 
 const bookingSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
@@ -579,6 +580,16 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
       />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Booking Assistant - Intelligent Guide */}
+        <BookingAssistant
+          tripType={watchedValues.tripType}
+          passengerCount={watchedValues.passengerCount}
+          vehicleSelected={!!watchedValues.vehicleId}
+          dateSelected={!!watchedValues.pickupDate && !!watchedValues.returnDate}
+          routeSet={!!watchedValues.pickupLocation && !!watchedValues.dropoffLocation}
+          priceCalculated={!!watchedValues.amount}
+          paymentMethod={watchedValues.paymentMethod}
+        />
         {/* Progress Steps */}
         <div className="mb-6 sm:mb-8">
           <div className="flex items-center justify-center overflow-x-auto pb-2">
