@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,6 +10,7 @@ import { TrendingUp, AlertCircle, RefreshCw, Users, DollarSign, Zap, Calendar, T
 import SmartRecommendations from "@/components/dashboard/smart-recommendations";
 import CriticalAlerts from "@/components/dashboard/critical-alerts";
 import QuickActions from "@/components/dashboard/quick-actions";
+import NotificationCenter from "@/components/dashboard/notification-center";
 
 interface TenantDashboardStats {
   periodDays: number;
@@ -73,10 +75,69 @@ const STATUS_COLORS: Record<string, string> = {
   upcoming: "#8b5cf6",
 };
 
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  priority: "critical" | "high" | "medium" | "low";
+  actionUrl?: string;
+  actionLabel?: string;
+  read: boolean;
+  channels: string[];
+  createdAt: Date;
+  sentAt?: Date;
+}
+
 export default function TenantDashboard360() {
   const { data, isLoading, error, refetch } = useQuery<TenantDashboardStats>({
     queryKey: ["/api/tenant/dashboard"],
   });
+  const queryClient = useQueryClient();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
+
+  // Setup WebSocket connection for real-time notifications
+  useEffect(() => {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+    ws.onopen = () => {
+      console.log("WebSocket connected for real-time notifications");
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const notification = JSON.parse(event.data);
+        setNotifications((prev) => {
+          const exists = prev.some((n) => n.id === notification.id);
+          if (exists) return prev;
+          return [notification, ...prev].slice(0, 50); // Keep latest 50
+        });
+        // Auto-refresh dashboard when critical notification received
+        if (notification.priority === "critical") {
+          queryClient.invalidateQueries({ queryKey: ["/api/tenant/dashboard"] });
+        }
+      } catch (err) {
+        console.error("Failed to parse notification:", err);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket disconnected");
+      // Attempt to reconnect after 5 seconds
+      setTimeout(() => {
+        // Reconnect logic here
+      }, 5000);
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [queryClient]);
 
   if (isLoading) {
     return (
@@ -107,6 +168,17 @@ export default function TenantDashboard360() {
 
   return (
     <div className="p-6 space-y-6">
+      {/* Notification Center */}
+      <NotificationCenter
+        notifications={notifications}
+        onMarkAsRead={(id) => {
+          setReadNotifications((prev) => new Set([...prev, id]));
+        }}
+        onDismiss={(id) => {
+          setNotifications((prev) => prev.filter((n) => n.id !== id));
+        }}
+      />
+
       {/* Header */}
       <div className="gradient-header bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white shadow-lg">
         <div className="flex items-center justify-between flex-wrap gap-4">
