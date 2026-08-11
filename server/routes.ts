@@ -43,6 +43,7 @@ import anomalyDetectionRouter from "./routes/anomaly-detection";
 import analyticsRouter from "./routes/analytics";
 import notificationsRouter from "./routes/notifications";
 import notificationAnalyticsRouter from "./routes/notification-analytics";
+import scheduledNotificationsRouter from "./routes/scheduled-notifications";
 import mlModelsRouter from "./routes/ml-models";
 import resourceAllocationRouter from "./routes/resource-allocation";
 import competitiveIntelligenceRouter from "./routes/competitive-intelligence";
@@ -9065,6 +9066,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register notification analytics API routes
   app.use("/api/notification-analytics", notificationAnalyticsRouter);
+
+  // Register scheduled notifications API routes
+  app.use("/api/scheduled-notifications", scheduledNotificationsRouter);
 
   // Register ML models API routes
   app.use("/api/ml", mlModelsRouter);

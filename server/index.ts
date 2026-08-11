@@ -153,6 +153,15 @@ app.use((req, res, next) => {
   // Store server instance globally for notifications
   (global as any).notificationServer = server;
 
+  // Start notification scheduler
+  try {
+    const { notificationScheduler } = await import('./utils/notificationScheduler');
+    notificationScheduler.start();
+    log2.info('Notification scheduler started');
+  } catch (error) {
+    log2.error('Failed to start notification scheduler', { error });
+  }
+
   // Integrator addition (TASK-02 telephony real-time hand-off — see
   // .claude/tasks/reports/TASK-02-report.md "Proposed WebSocket bootstrap
   // + room design"). No WebSocket/Socket.IO layer existed anywhere in this
