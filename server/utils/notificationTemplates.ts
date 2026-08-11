@@ -37,7 +37,9 @@ export interface NotificationTemplate {
 export type TemplateCategory = 'booking' | 'payment' | 'notification' | 'alert' | 'reminder';
 
 class TemplateManager {
-  private db = mongoose.connection.db!;
+  private get db() {
+    return mongoose.connection.db;
+  }
 
   async createTemplate(template: Omit<NotificationTemplate, '_id' | 'version' | 'createdAt' | 'updatedAt'>): Promise<string> {
     try {
@@ -271,6 +273,73 @@ class TemplateManager {
     } catch (error) {
       log.error('Failed to get template stats', { error });
       return { total: 0, active: 0, byCategory: {} };
+    }
+  }
+
+  async initializeBuiltInTemplates(): Promise<void> {
+    try {
+      if (!this.db) {
+        log.warn('Database not initialized yet, skipping built-in templates initialization');
+        return;
+      }
+
+      const collection = this.db.collection('notification_templates');
+      const count = await collection.countDocuments({ eventType: 'booking_created' });
+
+      if (count === 0) {
+        log.info('Initializing built-in notification templates');
+
+        const builtInTemplates = [
+          {
+            name: 'Booking Created',
+            eventType: 'booking_created',
+            category: 'booking',
+            title: 'Booking Confirmed',
+            body: 'Your booking {{bookingId}} has been confirmed for {{pickupDate}}',
+            variables: ['bookingId', 'pickupDate'],
+            channels: ['push', 'email', 'sms'],
+            version: 1,
+            enabled: true,
+            status: 'active',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          },
+          {
+            name: 'Payment Received',
+            eventType: 'payment_received',
+            category: 'payment',
+            title: 'Payment Confirmed',
+            body: 'Payment of ₹{{amount}} received for booking {{bookingId}}',
+            variables: ['amount', 'bookingId'],
+            channels: ['push', 'email', 'sms'],
+            version: 1,
+            enabled: true,
+            status: 'active',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          },
+          {
+            name: 'Booking Reminder',
+            eventType: 'booking_reminder',
+            category: 'reminder',
+            title: 'Upcoming Trip',
+            body: 'Your trip starts in {{hoursRemaining}} hours. Vehicle: {{vehicleNumber}}',
+            variables: ['hoursRemaining', 'vehicleNumber'],
+            channels: ['push', 'sms'],
+            version: 1,
+            enabled: true,
+            status: 'active',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        ];
+
+        await collection.insertMany(builtInTemplates as any);
+        log.info(`Initialized ${builtInTemplates.length} built-in templates`);
+      }
+    } catch (error) {
+      log.error('Failed to initialize built-in templates', { error });
+      // Don't throw - allow app to continue even if template initialization fails
     }
   }
 }
