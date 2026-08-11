@@ -3,6 +3,7 @@ import express, { Request, Response } from 'express';
 import { ObjectId } from 'mongodb';
 import mongoose from 'mongoose';
 import { vapidManager } from '../utils/vapidConfig';
+import { notificationAnalytics } from '../utils/notificationAnalytics';
 import { createLogger } from '../utils/logger';
 import { authenticateUser, requireAdmin } from '../middleware/auth';
 
@@ -178,6 +179,9 @@ router.post('/send', authenticateUser, requireAdmin, async (req: Request, res: R
 
     const subscriptions = users.map((user: any) => user.pushSubscription);
 
+    // Generate unique notification ID
+    const notificationId = `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     // Prepare notification payload
     const payload = {
       title: title || 'FleetPro Notification',
@@ -185,9 +189,29 @@ router.post('/send', authenticateUser, requireAdmin, async (req: Request, res: R
       icon: icon || '/icons/icon-192x192.png',
       badge: badge || '/icons/icon-192x192.png',
       tag: tag || 'fleetpro-notification',
-      data: data || {},
+      data: { ...data, notificationId },
       vibrate: [200, 100, 200],
     };
+
+    // Record notifications in analytics (before sending)
+    const analyticsRecords: { [key: string]: string } = {};
+    for (const user of users) {
+      try {
+        const logId = await notificationAnalytics.recordNotificationSent(
+          notificationId,
+          user._id.toString(),
+          title,
+          body,
+          'targeted',
+          undefined,
+          ['sent-via-api'],
+          { tags: tag ? [tag] : [] }
+        );
+        analyticsRecords[user._id.toString()] = logId;
+      } catch (err) {
+        log.warn('Failed to record notification in analytics', { error: err });
+      }
+    }
 
     // Send notifications
     const results = await vapidManager.sendBulkPushNotifications(subscriptions, payload);
@@ -213,11 +237,16 @@ router.post('/send', authenticateUser, requireAdmin, async (req: Request, res: R
     res.json({
       success: true,
       message: 'Notifications sent',
+      notificationId,
       results: {
         requested: userIds.length,
         found: users.length,
         sent: results.sent,
         failed: results.failed,
+      },
+      analytics: {
+        recordedCount: Object.keys(analyticsRecords).length,
+        trackingUrl: `/api/notification-analytics/notifications/${notificationId}`,
       },
     });
   } catch (error) {
@@ -277,6 +306,9 @@ router.post('/broadcast', authenticateUser, requireAdmin, async (req: Request, r
 
     const subscriptions = users.map((user: any) => user.pushSubscription);
 
+    // Generate unique notification ID
+    const notificationId = `notif-broadcast-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     // Prepare notification payload
     const payload = {
       title: title || 'FleetPro Notification',
@@ -284,9 +316,29 @@ router.post('/broadcast', authenticateUser, requireAdmin, async (req: Request, r
       icon: icon || '/icons/icon-192x192.png',
       badge: badge || '/icons/icon-192x192.png',
       tag: tag || 'fleetpro-broadcast',
-      data: data || {},
+      data: { ...data, notificationId },
       vibrate: [200, 100, 200],
     };
+
+    // Record notifications in analytics (before sending)
+    const analyticsRecords: { [key: string]: string } = {};
+    for (const user of users) {
+      try {
+        const logId = await notificationAnalytics.recordNotificationSent(
+          notificationId,
+          user._id.toString(),
+          title,
+          body,
+          'broadcast',
+          targetRole,
+          ['broadcast'],
+          { tags: tag ? [tag] : [] }
+        );
+        analyticsRecords[user._id.toString()] = logId;
+      } catch (err) {
+        log.warn('Failed to record notification in analytics', { error: err });
+      }
+    }
 
     // Send notifications
     const results = await vapidManager.sendBulkPushNotifications(subscriptions, payload);
@@ -308,11 +360,16 @@ router.post('/broadcast', authenticateUser, requireAdmin, async (req: Request, r
     res.json({
       success: true,
       message: 'Broadcast notification sent',
+      notificationId,
       results: {
         total: users.length,
         targetRole: targetRole || 'all',
         sent: results.sent,
         failed: results.failed,
+      },
+      analytics: {
+        recordedCount: Object.keys(analyticsRecords).length,
+        trackingUrl: `/api/notification-analytics/notifications/${notificationId}`,
       },
     });
   } catch (error) {

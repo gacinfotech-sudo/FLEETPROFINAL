@@ -336,6 +336,9 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   console.log('[ServiceWorker] Notification clicked:', event.notification.tag);
 
+  // Extract notification ID for analytics
+  const notificationId = event.notification.data?.notificationId;
+
   event.notification.close();
 
   event.waitUntil(
@@ -343,19 +346,42 @@ self.addEventListener('notificationclick', (event) => {
       // Check if app is already open
       for (let i = 0; i < clientList.length; i++) {
         if (clientList[i].url === '/' && 'focus' in clientList[i]) {
+          // Record click in analytics if we have notification ID
+          if (notificationId) {
+            fetch('/api/notification-analytics/click', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ notificationId }),
+            }).catch(() => {
+              console.warn('[ServiceWorker] Failed to record notification click');
+            });
+          }
           return clientList[i].focus();
         }
       }
 
       // Open new window if not open
       if (self.clients.openWindow) {
+        // Record click in analytics if we have notification ID
+        if (notificationId) {
+          fetch('/api/notification-analytics/click', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notificationId }),
+          }).catch(() => {
+            console.warn('[ServiceWorker] Failed to record notification click');
+          });
+        }
         return self.clients.openWindow('/');
       }
     })
   );
 
-  // Notify client of click
-  notifyClients('NOTIFICATION_CLICK', { tag: event.notification.tag });
+  // Notify client of click with notification ID
+  notifyClients('NOTIFICATION_CLICK', {
+    tag: event.notification.tag,
+    notificationId: notificationId
+  });
 });
 
 console.log('[ServiceWorker] FleetPro PWA Service Worker ready');

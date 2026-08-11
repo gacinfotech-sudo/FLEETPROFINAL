@@ -115,6 +115,49 @@ router.get('/user/:userId/history', authenticateUser, async (req: Request, res: 
   }
 });
 
+// POST /api/notification-analytics/click
+// Record notification click (called from service worker)
+router.post('/click', async (req: Request, res: Response) => {
+  try {
+    const { notificationId } = req.body;
+
+    if (!notificationId) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        message: 'notificationId is required',
+      });
+    }
+
+    const collection = mongoose.connection.db!.collection('notification_logs');
+
+    // Find all logs for this notification (multiple users may have received it)
+    const logs = await collection.find({ notificationId }).toArray();
+
+    let clickedCount = 0;
+    for (const log of logs) {
+      const success = await notificationAnalytics.recordClick(log._id);
+      if (success) clickedCount++;
+    }
+
+    log.info('Notification click recorded', {
+      notificationId,
+      clickedCount,
+    });
+
+    res.json({
+      success: true,
+      message: `Click recorded for ${clickedCount} notification(s)`,
+      clickedCount,
+    });
+  } catch (error) {
+    log.error('Failed to record click', { error });
+    res.status(500).json({
+      error: 'Failed to record click',
+      message: (error as Error).message,
+    });
+  }
+});
+
 // POST /api/notification-analytics/cleanup
 // Cleanup old notification records (admin only)
 router.post('/cleanup', authenticateUser, requireAdmin, async (req: Request, res: Response) => {
