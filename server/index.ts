@@ -189,6 +189,15 @@ app.use((req, res, next) => {
     log2.error('Failed to start notification retry manager', { error });
   }
 
+  // Start notification rate limiter
+  try {
+    const { notificationRateLimiter } = await import('./utils/notificationRateLimiter');
+    await notificationRateLimiter.start();
+    log2.info('Notification rate limiter started');
+  } catch (error) {
+    log2.error('Failed to start notification rate limiter', { error });
+  }
+
   // Integrator addition (TASK-02 telephony real-time hand-off — see
   // .claude/tasks/reports/TASK-02-report.md "Proposed WebSocket bootstrap
   // + room design"). No WebSocket/Socket.IO layer existed anywhere in this
