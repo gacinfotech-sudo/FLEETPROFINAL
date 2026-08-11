@@ -9157,6 +9157,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register admin dashboard API routes
   app.use("/api/admin", adminDashboardRouter);
 
+  // Register tenant admin API routes (Phase 14: Multi-Tenant Admin)
+  app.use("/api/admin", tenantAdminRouter);
+
   // ========== NOTIFICATION SYSTEM ROUTES ==========
   app.use("/api/notification-analytics", notificationAnalyticsRouter);
   app.use("/api/notification-scheduled", scheduledNotificationsRouter);
