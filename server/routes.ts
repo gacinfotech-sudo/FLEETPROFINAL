@@ -44,6 +44,7 @@ import notificationsRouter from "./routes/notifications";
 import mlModelsRouter from "./routes/ml-models";
 import resourceAllocationRouter from "./routes/resource-allocation";
 import competitiveIntelligenceRouter from "./routes/competitive-intelligence";
+import yieldManagementRouter from "./routes/yield-management";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -9019,6 +9020,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register competitive intelligence API routes
   app.use("/api/competitors", competitiveIntelligenceRouter);
+
+  // Register yield management API routes
+  app.use("/api/yield", yieldManagementRouter);
 
   const httpServer = createServer(app);
 
