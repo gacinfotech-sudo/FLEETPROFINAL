@@ -308,25 +308,6 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   const queryClient = useQueryClient();
 
   const totalSteps = 4;
-  const { save: autoSaveBooking } = useFormAutoSave("enhanced-booking-form", {}, 3000);
-
-  // Initialize smart booking navigation
-  const { handleNextClick, handleCreateBooking } = useSmartBookingNavigation({
-    currentStep: step,
-    formData: form.getValues(),
-    routeType,
-    resourceMode,
-    onStepChange: setStep,
-    onFieldFocus: (fieldName) => {
-      // Auto-focus field if possible
-      const selector = `input[name='${fieldName}'], select[name='${fieldName}']`;
-      setTimeout(() => {
-        const element = document.querySelector(selector) as HTMLInputElement | HTMLSelectElement | null;
-        if (element) element.focus();
-      }, 300);
-    },
-    onFieldHighlight: setHighlightedField,
-  });
 
   const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
@@ -382,6 +363,24 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       collectionMode: "company",
       redeemPoints: undefined,
     },
+  });
+
+  const { save: autoSaveBooking } = useFormAutoSave("enhanced-booking-form", {}, 3000);
+
+  const { handleNextClick, handleCreateBooking } = useSmartBookingNavigation({
+    currentStep: step,
+    formData: form.getValues(),
+    routeType,
+    resourceMode,
+    onStepChange: setStep,
+    onFieldFocus: (fieldName) => {
+      const selector = `input[name='${fieldName}'], select[name='${fieldName}']`;
+      setTimeout(() => {
+        const element = document.querySelector(selector) as HTMLInputElement | HTMLSelectElement | null;
+        if (element) element.focus();
+      }, 300);
+    },
+    onFieldHighlight: setHighlightedField,
   });
 
   // Applies a Lead-conversion prefill exactly once, on mount, without
