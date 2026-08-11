@@ -296,6 +296,11 @@ export default function SelfDrivePanel({ bookingId, editable }: { bookingId: str
               <Label>Remarks (optional)</Label>
               <Input value={depositForm.notes} onChange={(e) => setDepositForm({ ...depositForm, notes: e.target.value })} />
             </div>
+            <FormSubmitStatus
+              status={post.isPending ? "loading" : post.isError ? "error" : "idle"}
+              successMessage="Deposit recorded successfully"
+              errorMessage="Could not record deposit"
+            />
             <Button size="sm" disabled={post.isPending} onClick={saveDeposit} data-testid="sd-deposit-save">Record Deposit</Button>
           </div>
         ) : (
@@ -397,6 +402,11 @@ export default function SelfDrivePanel({ bookingId, editable }: { bookingId: str
               <Label>Handover Notes (optional)</Label>
               <Textarea rows={2} value={handoverForm.notes} onChange={(e) => setHandoverForm({ ...handoverForm, notes: e.target.value })} />
             </div>
+            <FormSubmitStatus
+              status={post.isPending ? "loading" : post.isError ? "error" : "idle"}
+              successMessage="Handover recorded successfully"
+              errorMessage="Could not record handover"
+            />
             <Button size="sm" disabled={post.isPending} onClick={saveHandover} data-testid="sd-handover-save">Record Handover</Button>
           </div>
         ) : (
@@ -454,6 +464,11 @@ export default function SelfDrivePanel({ bookingId, editable }: { bookingId: str
               <Label>Return Notes (optional)</Label>
               <Textarea rows={2} value={returnForm.notes} onChange={(e) => setReturnForm({ ...returnForm, notes: e.target.value })} />
             </div>
+            <FormSubmitStatus
+              status={post.isPending ? "loading" : post.isError ? "error" : "idle"}
+              successMessage="Vehicle return recorded successfully"
+              errorMessage="Could not record vehicle return"
+            />
             <Button size="sm" disabled={post.isPending} onClick={saveReturn} data-testid="sd-return-save">Complete Vehicle Return</Button>
             <p className="text-[11px] text-gray-500">Completing the return opens the refund settlement automatically when a deposit is held.</p>
           </div>

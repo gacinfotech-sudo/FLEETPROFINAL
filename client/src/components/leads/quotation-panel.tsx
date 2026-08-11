@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Trash2, Plus, Download, MessageCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import QuotationDocument from "./quotation-document";
 
 const PRICING_TYPES = ["fixed", "per_km", "per_day", "per_hour", "monthly", "custom"];
@@ -65,6 +66,11 @@ export default function QuotationPanel({ leadId, inquiry }: { leadId: string; in
   const [paymentTerms, setPaymentTerms] = useState("");
   const [viewingQuotation, setViewingQuotation] = useState<any>(null);
   const [acceptingOption, setAcceptingOption] = useState<{ quotation: any; optionNumber: number } | null>(null);
+
+  const quotationFormData = { draftOptions, validTill, paymentTerms };
+  const { save: autoSave } = useFormAutoSave(`quotation-create-${leadId}`, quotationFormData, 2000);
+
+  useEffect(() => { autoSave(); }, [quotationFormData, autoSave]);
 
   const { data: quotations = [], isLoading } = useQuery<any[]>({
     queryKey: [`/api/leads/${leadId}/quotations`],
@@ -322,6 +328,11 @@ export default function QuotationPanel({ leadId, inquiry }: { leadId: string; in
               <div><Label>Payment Terms</Label><Input value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)} /></div>
             </div>
 
+            <FormSubmitStatus
+              status={createMutation.isPending ? "loading" : createMutation.isError ? "error" : "idle"}
+              successMessage="Quotation created successfully"
+              errorMessage="Could not create quotation"
+            />
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
               <Button type="button" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>Save Quotation</Button>

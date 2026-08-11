@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 const FOLLOWUP_TYPES = ["Call", "WhatsApp", "Email", "Meeting", "Quotation Follow-up", "Customer Decision", "Price Negotiation", "Payment Follow-up", "Future Travel Requirement", "Custom"];
 const OUTCOMES = ["connected", "no_answer", "callback_requested", "quotation_requested", "negotiation", "confirmed", "not_interested", "postponed", "lost"];
@@ -35,6 +36,14 @@ export default function FollowUpPanel({ leadId }: { leadId: string }) {
   const [outcome, setOutcome] = useState("connected");
   const [customerResponse, setCustomerResponse] = useState("");
   const [nextFollowUpAt, setNextFollowUpAt] = useState("");
+
+  const createFormData = { type, scheduledAt, purpose };
+  const completeFormData = { outcome, customerResponse, nextFollowUpAt };
+  const { save: autoSaveCreate } = useFormAutoSave(`followup-create-${leadId}`, createFormData, 2000);
+  const { save: autoSaveComplete } = useFormAutoSave(`followup-complete-${leadId}`, completeFormData, 2000);
+
+  useEffect(() => { autoSaveCreate(); }, [createFormData, autoSaveCreate]);
+  useEffect(() => { autoSaveComplete(); }, [completeFormData, autoSaveComplete]);
 
   const { data: followUps = [], isLoading } = useQuery<any[]>({
     queryKey: [`/api/leads/${leadId}/followups`],
@@ -124,6 +133,11 @@ export default function FollowUpPanel({ leadId }: { leadId: string }) {
               <Textarea id="fu-purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. Follow up on quotation QUO-0001" />
             </div>
           </div>
+          <FormSubmitStatus
+            status={createMutation.isPending ? "loading" : createMutation.isError ? "error" : "idle"}
+            successMessage="Follow-up scheduled successfully"
+            errorMessage="Could not schedule follow-up"
+          />
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
             <Button disabled={!scheduledAt || createMutation.isPending} onClick={() => createMutation.mutate()}>Schedule</Button>
@@ -151,6 +165,11 @@ export default function FollowUpPanel({ leadId }: { leadId: string }) {
               <Input id="fu-next" type="datetime-local" value={nextFollowUpAt} onChange={(e) => setNextFollowUpAt(e.target.value)} />
             </div>
           </div>
+          <FormSubmitStatus
+            status={completeMutation.isPending ? "loading" : completeMutation.isError ? "error" : "idle"}
+            successMessage="Follow-up completed successfully"
+            errorMessage="Could not complete follow-up"
+          />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCompleting(null)}>Cancel</Button>
             <Button disabled={completeMutation.isPending} onClick={() => completeMutation.mutate()}>Save</Button>
