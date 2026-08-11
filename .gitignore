@@ -23,3 +23,7 @@ whatsapp-sessions/
 # wiping shared coordination state on trunk. Ignoring it means plain
 # `git clean -fd` (without -x) now skips it.
 .claude/
+
+# SSL/TLS certificates (regenerate locally)
+ssl/key.pem
+ssl/cert.pem
