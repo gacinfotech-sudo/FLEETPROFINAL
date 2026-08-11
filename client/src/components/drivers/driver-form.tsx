@@ -222,9 +222,9 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
   return (
     <div className="space-y-5">
       <FormSubmitStatus
-        status={mutation.isPending ? "loading" : mutation.isSuccess ? "success" : mutation.isError ? "error" : "idle"}
+        status={isSaving ? "loading" : "idle"}
         successMessage="Driver saved successfully!"
-        errorMessage={mutation.error?.message || "Failed to save driver"}
+        errorMessage="Failed to save driver"
       />
 
       {/* Step navigator */}
