@@ -42,6 +42,8 @@ import DriverPayrollDashboard from "./pages/driver-payroll-dashboard";
 import VendorSettlementPortal from "./pages/vendor-settlement-portal";
 import PlatformAdmin360 from "./pages/platform-admin-360";
 import OperationsCenter from "./pages/operations-center";
+import LiveBookings from "./pages/live-bookings";
+import UpcomingBookings from "./pages/upcoming-bookings";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -207,6 +209,18 @@ function AuthenticatedApp() {
       <Route path="/operations">
         <ProtectedRoute allowedRoles={["client", "manager"]}>
           <OperationsCenter />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Bookings */}
+      <Route path="/bookings/live">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <LiveBookings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/bookings/upcoming">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <UpcomingBookings />
         </ProtectedRoute>
       </Route>
 
