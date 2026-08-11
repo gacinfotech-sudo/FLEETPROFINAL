@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,6 +60,12 @@ export default function BillingReviewPanel({ booking }: Props) {
   const [showReject, setShowReject] = useState(false);
   const [rejectNote, setRejectNote] = useState("");
 
+  const formData = { rejectNote };
+  const { save: autoSave } = useFormAutoSave(`gps-billing-${bookingId}`, formData, 2000);
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
+
   const queryKey = [`/api/gps/billing/bookings/${bookingId}/reconciliation`];
 
   const { data, isLoading } = useQuery<any>({
@@ -108,6 +115,11 @@ export default function BillingReviewPanel({ booking }: Props) {
 
   return (
     <div className="space-y-3">
+      <FormSubmitStatus
+        status={approveMutation.isPending || rejectMutation.isPending ? "loading" : approveMutation.isSuccess || rejectMutation.isSuccess ? "success" : approveMutation.isError || rejectMutation.isError ? "error" : "idle"}
+        successMessage="GPS reconciliation status updated!"
+        errorMessage={(approveMutation.error as any)?.message || (rejectMutation.error as any)?.message}
+      />
       <div className="flex items-center justify-between">
         <Label className="text-sm font-medium text-gray-700 flex items-center gap-2">
           <Satellite className="h-4 w-4" /> GPS Distance Reconciliation

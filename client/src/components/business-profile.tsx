@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,12 @@ export default function BusinessProfile({ userRole, onShowOnboarding }: Business
   const [isUploadingSignature, setIsUploadingSignature] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const signatureInputRef = useRef<HTMLInputElement>(null);
+
+  const formData = { ...businessDetails };
+  const { save: autoSave } = useFormAutoSave("business-profile", formData, 2000);
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   // Check if user has access to business profile management
   const hasAccess = userRole === 'client' || userRole === 'admin';
@@ -530,6 +537,11 @@ export default function BusinessProfile({ userRole, onShowOnboarding }: Business
   return (
     <Card className="mb-6">
       <CardHeader>
+        <FormSubmitStatus
+          status={updateProfileMutation.isPending ? "loading" : updateProfileMutation.isSuccess ? "success" : updateProfileMutation.isError ? "error" : "idle"}
+          successMessage="Business profile updated!"
+          errorMessage={(updateProfileMutation.error as any)?.message}
+        />
         <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
           <CardTitle className="flex items-center space-x-2">
             <span className="text-lg">🏢</span>

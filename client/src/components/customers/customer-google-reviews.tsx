@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, ExternalLink, MessageCircle, Pencil, Send, Star } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { useFormAutoSave, FormSubmitStatus } from '@/components/forms/form-enhancements';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -118,6 +119,23 @@ export default function CustomerGoogleReviews({ customerId, bookings }: { custom
     setEditing(review);
   };
 
+  // Auto-save forms
+  const { save: autoSaveRequest } = useFormAutoSave('google-review-request', requestForm, 2000);
+  const { save: autoSaveReceived } = useFormAutoSave('google-review-received', receivedForm, 2000);
+  const { save: autoSaveEdit } = useFormAutoSave('google-review-edit', editForm, 2000);
+
+  useEffect(() => {
+    if (requestOpen) autoSaveRequest();
+  }, [requestForm, requestOpen, autoSaveRequest]);
+
+  useEffect(() => {
+    if (receiving) autoSaveReceived();
+  }, [receivedForm, receiving, autoSaveReceived]);
+
+  useEffect(() => {
+    if (editing) autoSaveEdit();
+  }, [editForm, editing, autoSaveEdit]);
+
   return (
     <Card className="border-amber-200">
       <CardHeader className="pb-3">
@@ -173,6 +191,7 @@ export default function CustomerGoogleReviews({ customerId, bookings }: { custom
             <div><Label>Google Review Page URL</Label><Input type="url" placeholder="https://g.page/r/.../review" value={requestForm.reviewPageUrl} onChange={(event) => setRequestForm({ ...requestForm, reviewPageUrl: event.target.value })} /></div>
             {requestForm.channel === 'whatsapp' ? <div className="rounded-md bg-green-50 border border-green-100 p-3 text-sm flex gap-2"><MessageCircle className="h-4 w-4 text-green-700 mt-0.5" /> The consent-aware WhatsApp sender will log the message and prevent duplicate processing.</div> : <label className="flex items-center gap-2 text-sm"><Checkbox checked={requestForm.confirmedSent} onCheckedChange={(value) => setRequestForm({ ...requestForm, confirmedSent: !!value })} /> I confirm this request was actually sent through the selected channel.</label>}
           </div>
+          <FormSubmitStatus status={requestMutation.isPending ? 'loading' : requestMutation.isSuccess ? 'success' : 'idle'} />
           <DialogFooter><Button variant="outline" onClick={() => setRequestOpen(false)}>Cancel</Button><Button disabled={requestMutation.isPending || !requestForm.bookingId || !requestForm.reviewPageUrl || (requestForm.channel !== 'whatsapp' && !requestForm.confirmedSent)} onClick={() => requestMutation.mutate()}>{requestMutation.isPending ? 'Sending...' : requestForm.channel === 'whatsapp' ? 'Send & Record' : 'Record Confirmed Request'}</Button></DialogFooter>
         </DialogContent>
       </Dialog>
@@ -188,6 +207,7 @@ export default function CustomerGoogleReviews({ customerId, bookings }: { custom
             <div><Label>Notes</Label><Textarea value={receivedForm.notes} onChange={(event) => setReceivedForm({ ...receivedForm, notes: event.target.value })} /></div>
             <label className="flex items-start gap-2 text-sm rounded-md border p-3"><Checkbox checked={receivedForm.confirmedReceived} onCheckedChange={(value) => setReceivedForm({ ...receivedForm, confirmedReceived: !!value })} /><span>I personally verified that this Google review exists and the rating/evidence above is accurate.</span></label>
           </div>
+          <FormSubmitStatus status={receivedMutation.isPending ? 'loading' : receivedMutation.isSuccess ? 'success' : 'idle'} />
           <DialogFooter><Button variant="outline" onClick={() => setReceiving(null)}>Cancel</Button><Button disabled={receivedMutation.isPending || !receivedForm.confirmedReceived || (!receivedForm.reviewLink && receivedForm.reviewReference.trim().length < 3)} onClick={() => receivedMutation.mutate()}>Confirm Review Received</Button></DialogFooter>
         </DialogContent>
       </Dialog>
@@ -203,6 +223,7 @@ export default function CustomerGoogleReviews({ customerId, bookings }: { custom
             <label className="flex items-center gap-2 text-sm"><Checkbox checked={editForm.followUpRequired} onCheckedChange={(value) => setEditForm({ ...editForm, followUpRequired: !!value })} /> Follow-up required</label>
             <div><Label>Notes</Label><Textarea value={editForm.notes} onChange={(event) => setEditForm({ ...editForm, notes: event.target.value })} /></div>
           </div>
+          <FormSubmitStatus status={editMutation.isPending ? 'loading' : editMutation.isSuccess ? 'success' : 'idle'} />
           <DialogFooter><Button variant="outline" onClick={() => setEditing(null)}>Cancel</Button><Button disabled={editMutation.isPending || !editForm.reviewPageUrl} onClick={() => editMutation.mutate()}>Save Review Details</Button></DialogFooter>
         </DialogContent>
       </Dialog>

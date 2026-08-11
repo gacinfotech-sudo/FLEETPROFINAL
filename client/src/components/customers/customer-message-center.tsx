@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { whatsappErrorToast } from "@/lib/whatsapp-error";
@@ -56,6 +57,13 @@ export default function CustomerMessageCenter({ customerId, bookings }: Props) {
       setSelectedKey(templates[0].key);
     }
   }, [templates, selectedKey]);
+
+  // Auto-save form state
+  const { save: autoSaveForm } = useFormAutoSave('message-center-form', { bookingId, selectedKey }, 2000);
+
+  useEffect(() => {
+    autoSaveForm();
+  }, [bookingId, selectedKey, autoSaveForm]);
 
   const sendMutation = useMutation({
     mutationFn: async (template: MessageTemplate) => (await apiRequest(
@@ -123,6 +131,7 @@ export default function CustomerMessageCenter({ customerId, bookings }: Props) {
                     <Send className="h-4 w-4 mr-2" />{sendMutation.isPending ? 'Sending...' : 'Send Now'}
                   </Button>
                 </div>
+                <FormSubmitStatus status={sendMutation.isPending ? 'loading' : sendMutation.isSuccess ? 'success' : 'idle'} successMessage="Message sent" />
                 <pre className="whitespace-pre-wrap text-sm font-sans text-gray-700 max-h-52 overflow-y-auto">{selected.content}</pre>
                 {!selected.enabled && <p className="text-xs text-red-600 mt-2">{selected.disabledReason}</p>}
               </div>

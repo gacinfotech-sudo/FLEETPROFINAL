@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Merge, ShieldCheck } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -44,6 +45,13 @@ export default function CustomerDuplicateReview({ customerId }: { customerId: st
     },
     onError: (error: any) => toast({ title: "Merge failed", description: error.message, variant: "destructive" }),
   });
+
+  // Auto-save form state
+  const { save: autoSaveMergeForm } = useFormAutoSave('duplicate-review-form', { reason, candidateId: candidate?._id }, 2000);
+
+  useEffect(() => {
+    if (candidate) autoSaveMergeForm();
+  }, [reason, candidate, autoSaveMergeForm]);
 
   if (isLoading) return null;
   if (candidates.length === 0) {
@@ -89,6 +97,7 @@ export default function CustomerDuplicateReview({ customerId }: { customerId: st
             <strong>{candidate?.name}</strong> will become a merge tombstone. Its bookings, rewards, feedback, complaints, requirements, messages and follow-ups will move to the current customer.
           </div>
           <div><Label>Merge reason</Label><Input placeholder="Example: Same customer registered with alternate mobile" value={reason} onChange={(event) => setReason(event.target.value)} /></div>
+          <FormSubmitStatus status={mergeMutation.isPending ? 'loading' : mergeMutation.isSuccess ? 'success' : 'idle'} successMessage="Customers merged" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCandidate(null)}>Cancel</Button>
             <Button variant="destructive" disabled={reason.trim().length < 5 || mergeMutation.isPending} onClick={() => mergeMutation.mutate()}>
