@@ -54,6 +54,7 @@ import notificationHealthRouter from "./routes/notification-health";
 import notificationRateLimitRouter from "./routes/notification-rate-limit";
 import notificationWebhooksRouter from "./routes/notification-webhooks";
 import notificationBatchRouter from "./routes/notification-batch";
+import notificationAnalyticsRouter from "./routes/notification-analytics";
 import mlModelsRouter from "./routes/ml-models";
 import resourceAllocationRouter from "./routes/resource-allocation";
 import competitiveIntelligenceRouter from "./routes/competitive-intelligence";
@@ -9148,6 +9149,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register admin dashboard API routes
   app.use("/api/admin", adminDashboardRouter);
+
+  // ========== NOTIFICATION SYSTEM ROUTES ==========
+  app.use("/api/notification-analytics", notificationAnalyticsRouter);
+  app.use("/api/notification-scheduled", scheduledNotificationsRouter);
+  app.use("/api/notification-indexes", notificationIndexesRouter);
+  app.use("/api/notification-templates", notificationTemplatesRouter);
+  app.use("/api/notification-preferences", notificationPreferencesRouter);
+  app.use("/api/notification-audit", notificationAuditRouter);
+  app.use("/api/notification-delivery", notificationDeliveryRouter);
+  app.use("/api/notification-retry", notificationRetryRouter);
+  app.use("/api/notification-health", notificationHealthRouter);
+  app.use("/api/notification-rate-limit", notificationRateLimitRouter);
+  app.use("/api/notification-webhooks", notificationWebhooksRouter);
+  app.use("/api/notification-batch", notificationBatchRouter);
 
   // ========== DRIVER SALARY MASTER ROUTES ==========
   app.post("/api/driver-salary/master", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
