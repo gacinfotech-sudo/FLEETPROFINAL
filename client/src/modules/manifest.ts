@@ -44,7 +44,8 @@ export const SAAS_MODULES = [
 
   // Vendor Management
   { id: 'vendors', label: 'Vendors', iconKey: 'contact', parentGroup: 'vendors' },
-  { id: 'vendor-settlement', label: 'Vendor Settlement', iconKey: 'alert', parentGroup: 'vendors' },
+  { id: 'vendor-settlement', label: 'Settlement Portal', iconKey: 'revenue', parentGroup: 'vendors' },
+  { id: 'vendor-invoices', label: 'Vendor Invoices', iconKey: 'alert', parentGroup: 'vendors' },
 
   // Finance
   { id: 'revenue', label: 'Revenue Report', iconKey: 'revenue', parentGroup: 'finance' },

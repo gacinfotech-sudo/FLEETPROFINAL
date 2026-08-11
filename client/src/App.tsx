@@ -39,6 +39,7 @@ import ProductConfigPage from "./pages/root/product-config";
 import FeatureFlagsPage from "./pages/root/feature-flags";
 import SupportAccessBanner from "@/components/root/support-access-banner";
 import DriverPayrollDashboard from "./pages/driver-payroll-dashboard";
+import VendorSettlementPortal from "./pages/vendor-settlement-portal";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -183,6 +184,13 @@ function AuthenticatedApp() {
       <Route path="/driver-payroll">
         <ProtectedRoute allowedRoles={["client", "manager"]}>
           <DriverPayrollDashboard />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Vendor Settlement Portal */}
+      <Route path="/vendor-settlement">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <VendorSettlementPortal />
         </ProtectedRoute>
       </Route>
 
