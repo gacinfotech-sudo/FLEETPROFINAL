@@ -40,6 +40,7 @@ import customerLtvRouter from "./routes/customer-ltv";
 import dispatchRouter from "./routes/dispatch";
 import anomalyDetectionRouter from "./routes/anomaly-detection";
 import analyticsRouter from "./routes/analytics";
+import notificationsRouter from "./routes/notifications";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -9003,6 +9004,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register analytics API routes
   app.use("/api/analytics", analyticsRouter);
+
+  // Register notifications API routes
+  app.use("/api/notifications", notificationsRouter);
 
   const httpServer = createServer(app);
 
