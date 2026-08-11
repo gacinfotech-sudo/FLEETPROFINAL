@@ -52,6 +52,7 @@ import feedbackRouter from "./routes/feedback";
 import driverEarningsRouter from "./routes/driver-earnings";
 import vehicleTrackingRouter from "./routes/vehicle-tracking";
 import safetyIncidentsRouter from "./routes/safety-incidents";
+import loyaltyRewardsRouter from "./routes/loyalty-rewards";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -9051,6 +9052,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register safety incidents API routes
   app.use("/api/safety", safetyIncidentsRouter);
+
+  // Register loyalty rewards API routes
+  app.use("/api/loyalty", loyaltyRewardsRouter);
 
   const httpServer = createServer(app);
 
