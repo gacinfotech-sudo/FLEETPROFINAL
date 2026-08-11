@@ -46,6 +46,7 @@ import notificationAnalyticsRouter from "./routes/notification-analytics";
 import scheduledNotificationsRouter from "./routes/scheduled-notifications";
 import notificationIndexesRouter from "./routes/notification-indexes";
 import notificationTemplatesRouter from "./routes/notification-templates";
+import notificationPreferencesRouter from "./routes/notification-preferences";
 import mlModelsRouter from "./routes/ml-models";
 import resourceAllocationRouter from "./routes/resource-allocation";
 import competitiveIntelligenceRouter from "./routes/competitive-intelligence";
@@ -9077,6 +9078,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register notification templates API routes
   app.use("/api/notification-templates", notificationTemplatesRouter);
+
+  // Register notification preferences API routes
+  app.use("/api/notification-preferences", notificationPreferencesRouter);
 
   // Register ML models API routes
   app.use("/api/ml", mlModelsRouter);
