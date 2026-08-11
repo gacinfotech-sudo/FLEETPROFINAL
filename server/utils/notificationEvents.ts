@@ -99,6 +99,10 @@ export class NotificationEventEmitter extends EventEmitter {
       // Store event for audit trail
       await this.storeEvent(eventData);
 
+      // Wire to delivery orchestrator - FIXED TODO #1
+      const { notificationDeliveryOrchestrator } = await import('./notificationDeliveryOrchestrator');
+      await notificationDeliveryOrchestrator.handleNotificationEvent(eventData);
+
       // Emit to listeners
       super.emit(eventData.type, eventData);
     } catch (error) {

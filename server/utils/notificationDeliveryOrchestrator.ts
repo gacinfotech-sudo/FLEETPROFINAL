@@ -837,6 +837,137 @@ class NotificationDeliveryOrchestrator {
     }
   }
 
+  async handleNotificationEvent(eventData: any): Promise<void> {
+    // FIXED TODO #1: Handle notification events from event emitter
+    // Wire events directly to delivery orchestrator
+    try {
+      log.info('Handling notification event', {
+        type: eventData.type,
+        userId: eventData.userId
+      });
+
+      // Get trigger rules for this event type
+      const triggersCollection = this.db.collection('notification_triggers');
+      const triggers = await triggersCollection
+        .find({
+          eventType: eventData.type,
+          enabled: true,
+          tenantId: eventData.tenantId
+        })
+        .toArray();
+
+      if (!triggers || triggers.length === 0) {
+        log.info('No triggers configured for event', { type: eventData.type });
+        return;
+      }
+
+      // Execute each trigger
+      for (const trigger of triggers) {
+        try {
+          // Check trigger conditions
+          if (!this.matchesTriggerConditions(eventData, trigger)) {
+            log.debug('Event did not match trigger conditions', {
+              triggerId: trigger._id,
+              eventType: eventData.type
+            });
+            continue;
+          }
+
+          // Get template
+          const templatesCollection = this.db.collection('notification_templates');
+          const template = await templatesCollection.findOne({
+            _id: new (require('mongoose')).Types.ObjectId(trigger.templateId)
+          });
+
+          if (!template) {
+            log.warn('Template not found for trigger', {
+              triggerId: trigger._id,
+              templateId: trigger.templateId
+            });
+            continue;
+          }
+
+          // Prepare delivery request
+          const deliveryRequest: DeliveryRequest = {
+            userId: eventData.userId,
+            title: this.interpolateTemplate(template.title, eventData.metadata),
+            body: this.interpolateTemplate(template.body, eventData.metadata),
+            category: eventData.type,
+            templateId: trigger.templateId,
+            channels: trigger.channels as any,
+            data: eventData.metadata,
+            priority: 'high'
+          };
+
+          // Deliver notification
+          const result = await this.deliver(deliveryRequest);
+
+          // Log trigger execution
+          const logsCollection = this.db.collection('trigger_execution_logs');
+          await logsCollection.insertOne({
+            tenantId: eventData.tenantId,
+            triggerId: trigger._id,
+            eventType: eventData.type,
+            eventData,
+            status: result.success ? 'executed' : 'failed',
+            sentCount: result.sentVia.length,
+            failureReason: result.success ? null : Object.values(result.skippedReasons).join(', '),
+            executedAt: new Date(),
+            createdAt: new Date()
+          });
+
+          log.info('Trigger executed', {
+            triggerId: trigger._id,
+            success: result.success,
+            channels: result.sentVia
+          });
+        } catch (error) {
+          log.error('Trigger execution failed', {
+            triggerId: trigger._id,
+            error
+          });
+        }
+      }
+    } catch (error) {
+      log.error('Event handling failed', { error });
+    }
+  }
+
+  private matchesTriggerConditions(eventData: any, trigger: any): boolean {
+    if (!trigger.conditions) return true;
+
+    const cond = trigger.conditions;
+
+    // Check user role if specified
+    if (cond.userRole && !cond.userRole.includes(eventData.userRole)) {
+      return false;
+    }
+
+    // Check amount range if applicable
+    if (eventData.amount !== undefined) {
+      if (cond.minAmount !== undefined && eventData.amount < cond.minAmount) {
+        return false;
+      }
+      if (cond.maxAmount !== undefined && eventData.amount > cond.maxAmount) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  private interpolateTemplate(template: string, data?: Record<string, any>): string {
+    if (!data) return template;
+
+    let result = template;
+    Object.entries(data).forEach(([key, value]) => {
+      const placeholder = `{{${key}}}`;
+      result = result.replace(new RegExp(placeholder, 'g'), String(value || ''));
+    });
+
+    return result;
+  }
+
   private async logAuditAction(
     userId: string,
     action: AuditAction,
