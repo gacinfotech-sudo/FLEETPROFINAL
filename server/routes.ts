@@ -53,6 +53,7 @@ import driverEarningsRouter from "./routes/driver-earnings";
 import vehicleTrackingRouter from "./routes/vehicle-tracking";
 import safetyIncidentsRouter from "./routes/safety-incidents";
 import loyaltyRewardsRouter from "./routes/loyalty-rewards";
+import adminDashboardRouter from "./routes/admin-dashboard";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -9055,6 +9056,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register loyalty rewards API routes
   app.use("/api/loyalty", loyaltyRewardsRouter);
+
+  // Register admin dashboard API routes
+  app.use("/api/admin", adminDashboardRouter);
 
   const httpServer = createServer(app);
 
