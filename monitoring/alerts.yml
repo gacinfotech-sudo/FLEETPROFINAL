@@ -1,0 +1,151 @@
+groups:
+  - name: fleetpro.rules
+    interval: 30s
+    rules:
+      # High latency alert
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.95, request_latency_ms) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High request latency detected"
+          description: "P95 request latency is {{ $value }}ms (threshold: 1000ms)"
+
+      # Delivery success rate alert
+      - alert: LowDeliverySuccessRate
+        expr: delivery_success_rate < 95
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Delivery success rate critically low"
+          description: "Delivery success rate is {{ $value }}% (threshold: 95%)"
+
+      # High error rate alert
+      - alert: HighErrorRate
+        expr: |
+          (increase(http_requests_total{status_code=~"5.."}[5m]) /
+           increase(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      # Provider error rate alert
+      - alert: HighProviderErrorRate
+        expr: provider_error_rate > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High provider error rate"
+          description: "Provider error rate is {{ $value }}% (threshold: 10%)"
+
+      # Queue depth alert
+      - alert: HighQueueDepth
+        expr: queue_depth > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Queue depth is high"
+          description: "Queue depth is {{ $value }} items (threshold: 10000)"
+
+      # Database connection pool exhaustion
+      - alert: DatabaseConnectionPoolExhaustion
+        expr: |
+          (db_connection_pool_active / db_connection_pool_size) > 0.9
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "Connection pool usage is {{ $value | humanizePercentage }} (threshold: 90%)"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: |
+          (process_resident_memory_bytes / (1024 * 1024 * 1024)) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}GB (threshold: 2GB)"
+
+      # Cache hit rate too low
+      - alert: LowCacheHitRate
+        expr: cache_hit_rate < 70
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "Cache hit rate below target"
+          description: "Cache hit rate is {{ $value }}% (target: 70%)"
+
+      # Slow database queries
+      - alert: SlowDatabaseQueries
+        expr: |
+          histogram_quantile(0.95, db_query_latency_ms) > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow database queries detected"
+          description: "P95 query latency is {{ $value }}ms (threshold: 500ms)"
+
+      # Notification delivery failures
+      - alert: HighNotificationFailureRate
+        expr: |
+          (increase(notifications_sent_total{status="failed"}[5m]) /
+           increase(notifications_sent_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High notification failure rate"
+          description: "Notification failure rate is {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # Service down alert
+      - alert: ServiceDown
+        expr: up{job="fleetpro-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FleetPro service is down"
+          description: "The FleetPro service has been unreachable for more than 1 minute"
+
+      # Low active bookings (business metric)
+      - alert: LowActiveBookings
+        expr: active_bookings < 5
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low active bookings"
+          description: "Active bookings is {{ $value }} (expected: > 5)"
+
+      # External API latency high
+      - alert: HighExternalApiLatency
+        expr: |
+          histogram_quantile(0.95, external_api_latency_ms) > 5000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High external API latency"
+          description: "P95 external API latency is {{ $value }}ms (threshold: 5000ms)"
+
+      # WebSocket connection limit warning
+      - alert: HighWebSocketConnections
+        expr: active_websocket_connections > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High WebSocket connection count"
+          description: "Active WebSocket connections: {{ $value }} (threshold: 1000)"
