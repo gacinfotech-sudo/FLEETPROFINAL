@@ -49,9 +49,12 @@ export interface RateLimitStats {
 }
 
 class NotificationRateLimiter {
-  private db = mongoose.connection.db!;
   private isRunning = false;
   private cleanupInterval = 3600000; // Clean every hour
+
+  private get db() {
+    return mongoose.connection.db;
+  }
 
   // Default policies
   private defaultPolicies: Omit<RateLimitPolicy, '_id' | 'createdAt' | 'updatedAt'>[] = [
@@ -408,6 +411,11 @@ class NotificationRateLimiter {
 
   private async initializeDefaultPolicies(): Promise<void> {
     try {
+      if (!this.db) {
+        log.warn('Database not initialized yet, skipping default policies initialization');
+        return;
+      }
+
       const collection = this.db.collection('notification_rate_limit_policies');
 
       // Check if default policies exist

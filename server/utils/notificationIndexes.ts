@@ -16,7 +16,9 @@ export interface IndexDefinition {
 }
 
 export class NotificationIndexManager {
-  private db = mongoose.connection.db!;
+  private get db() {
+    return mongoose.connection.db;
+  }
 
   // Scheduled notifications indexes
   private scheduledNotificationsIndexes: IndexDefinition[] = [
@@ -106,6 +108,11 @@ export class NotificationIndexManager {
 
   async ensureIndexes(): Promise<void> {
     try {
+      if (!this.db) {
+        log.warn('Database not initialized yet, skipping index creation');
+        return;
+      }
+
       log.info('Ensuring notification system indexes');
 
       // Ensure scheduled notifications indexes
