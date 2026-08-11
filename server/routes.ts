@@ -10,11 +10,11 @@ import { fileTypeFromFile } from "file-type";
 import { storage } from "./storage-mongodb";
 import { authenticateUser, requireAdmin, requireTenant, type AuthRequest } from "./middleware/auth";
 import { requirePermission, PERMISSIONS } from "./middleware/permissions";
-import { 
-  validatePasswordStrength, 
-  loginRateLimit, 
-  loginSpeedLimit, 
-  httpsRedirect, 
+import {
+  validatePasswordStrength,
+  loginRateLimit,
+  loginSpeedLimit,
+  httpsRedirect,
   securityHeaders,
   trackLoginAttempt,
   getRecentFailedAttempts,
@@ -29,6 +29,8 @@ import {
   csrfProtection,
   type LoginAttempt
 } from "./middleware/security";
+import { recommendationMiddleware } from "./middleware/recommendationMiddleware";
+import recommendationsRouter from "./routes/recommendations";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -358,6 +360,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // requests. See middleware/security.ts for rationale.
   app.use(issueCsrfToken);
   app.use(csrfProtection);
+
+  // Apply recommendation middleware for intelligent suggestion system
+  app.use(recommendationMiddleware);
 
   // Client fetches this once on load / after login to get the current
   // CSRF token to echo back as the X-CSRF-Token header.
@@ -8959,6 +8964,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch vendor ratings" });
     }
   });
+
+  // Register recommendations API routes
+  app.use("/api/recommendations", recommendationsRouter);
 
   const httpServer = createServer(app);
 

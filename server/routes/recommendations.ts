@@ -1,11 +1,12 @@
 import express from "express";
 import { smartRecommendationEngine } from "../services/smartRecommendationEngine";
 import { customerIntelligenceEngine } from "../services/customerIntelligenceEngine";
+import { authenticateUser, requireTenant } from "../middleware/auth";
 
 const router = express.Router();
 
 // GET /api/recommendations - Get recommendations for a customer
-router.get("/", async (req, res) => {
+router.get("/", authenticateUser, requireTenant, async (req: any, res) => {
   try {
     const { customerId, type } = req.query;
 
@@ -14,7 +15,7 @@ router.get("/", async (req, res) => {
     }
 
     // Generate fresh recommendations
-    const recommendations = await req.recommendations.generate(customerId);
+    const recommendations = await req.recommendations?.generate(customerId) || [];
 
     // Filter by type if specified
     const filtered = type && typeof type === "string"
@@ -29,7 +30,7 @@ router.get("/", async (req, res) => {
 });
 
 // POST /api/recommendations/:id/accept - Accept a recommendation
-router.post("/:id/accept", (req, res) => {
+router.post("/:id/accept", (req: any, res) => {
   try {
     const { id } = req.params;
     const { customerId } = req.body;
@@ -38,7 +39,7 @@ router.post("/:id/accept", (req, res) => {
       return res.status(400).json({ error: "customerId is required" });
     }
 
-    req.recommendations.trackAction(customerId, id, "accepted");
+    req.recommendations?.trackAction(customerId, id, "accepted");
 
     res.json({
       success: true,
@@ -52,7 +53,7 @@ router.post("/:id/accept", (req, res) => {
 });
 
 // POST /api/recommendations/:id/dismiss - Dismiss a recommendation
-router.post("/:id/dismiss", (req, res) => {
+router.post("/:id/dismiss", (req: any, res) => {
   try {
     const { id } = req.params;
     const { customerId } = req.body;
@@ -61,7 +62,7 @@ router.post("/:id/dismiss", (req, res) => {
       return res.status(400).json({ error: "customerId is required" });
     }
 
-    req.recommendations.trackAction(customerId, id, "dismissed");
+    req.recommendations?.trackAction(customerId, id, "dismissed");
 
     res.json({
       success: true,
@@ -75,9 +76,9 @@ router.post("/:id/dismiss", (req, res) => {
 });
 
 // GET /api/recommendations/stats - Get recommendation statistics
-router.get("/stats", (req, res) => {
+router.get("/stats", (req: any, res) => {
   try {
-    const stats = req.recommendations.getStats();
+    const stats = req.recommendations?.getStats() || {};
     res.json(stats);
   } catch (error) {
     console.error("Error fetching recommendation stats:", error);
@@ -86,7 +87,7 @@ router.get("/stats", (req, res) => {
 });
 
 // POST /api/recommendations/bulk-generate - Generate recommendations for multiple customers
-router.post("/bulk-generate", async (req, res) => {
+router.post("/bulk-generate", async (req: any, res) => {
   try {
     const { customerIds } = req.body;
 
@@ -97,7 +98,7 @@ router.post("/bulk-generate", async (req, res) => {
     const results: Record<string, any> = {};
 
     for (const customerId of customerIds) {
-      const recommendations = await req.recommendations.generate(customerId);
+      const recommendations = await (req.recommendations?.generate(customerId) || []);
       results[customerId] = recommendations;
     }
 
@@ -113,9 +114,9 @@ router.post("/bulk-generate", async (req, res) => {
 });
 
 // GET /api/recommendations/trending - Get trending recommendations across all customers
-router.get("/trending", (req, res) => {
+router.get("/trending", (req: any, res) => {
   try {
-    const stats = req.recommendations.getStats();
+    const stats = req.recommendations?.getStats() || {};
 
     // Calculate trending recommendations based on distribution
     const trendingTypes = Object.entries(stats.typeDistribution || {})
@@ -138,7 +139,7 @@ router.get("/trending", (req, res) => {
 });
 
 // POST /api/recommendations/test - Test recommendation engine with sample data
-router.post("/test", (req, res) => {
+router.post("/test", (req: any, res) => {
   try {
     const testContext = {
       customerId: "test_customer_001",
