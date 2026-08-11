@@ -50,6 +50,7 @@ import notificationPreferencesRouter from "./routes/notification-preferences";
 import notificationAuditRouter from "./routes/notification-audit";
 import notificationDeliveryRouter from "./routes/notification-delivery";
 import notificationRetryRouter from "./routes/notification-retry";
+import notificationHealthRouter from "./routes/notification-health";
 import mlModelsRouter from "./routes/ml-models";
 import resourceAllocationRouter from "./routes/resource-allocation";
 import competitiveIntelligenceRouter from "./routes/competitive-intelligence";
@@ -9093,6 +9094,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register notification retry API routes
   app.use("/api/notification-retry", notificationRetryRouter);
+
+  // Register notification health API routes
+  app.use("/api/notification-health", notificationHealthRouter);
 
   // Register ML models API routes
   app.use("/api/ml", mlModelsRouter);
