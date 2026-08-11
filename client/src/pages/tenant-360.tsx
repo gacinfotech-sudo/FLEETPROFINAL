@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,6 +11,9 @@ import SmartRecommendations from "@/components/dashboard/smart-recommendations";
 import CriticalAlerts from "@/components/dashboard/critical-alerts";
 import QuickActions from "@/components/dashboard/quick-actions";
 import NotificationCenter from "@/components/dashboard/notification-center";
+import CommandPalette from "@/components/dashboard/command-palette";
+import KeyboardShortcutsHelp from "@/components/dashboard/keyboard-shortcuts-help";
+import { useKeyboardShortcuts, COMMON_SHORTCUTS } from "@/hooks/useKeyboardShortcuts";
 
 interface TenantDashboardStats {
   periodDays: number;
@@ -95,6 +98,70 @@ export default function TenantDashboard360() {
   const queryClient = useQueryClient();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  // Keyboard shortcuts for quick actions
+  const shortcuts = [
+    {
+      key: "B",
+      callback: useCallback(() => {
+        window.location.href = "/bookings/create";
+      }, []),
+      description: COMMON_SHORTCUTS.CREATE_BOOKING.description,
+    },
+    {
+      key: "P",
+      callback: useCallback(() => {
+        window.location.href = "/bookings/payments";
+      }, []),
+      description: COMMON_SHORTCUTS.COLLECT_PAYMENT.description,
+    },
+    {
+      key: "D",
+      callback: useCallback(() => {
+        window.location.href = "/drivers/onboard";
+      }, []),
+      description: COMMON_SHORTCUTS.ONBOARD_DRIVER.description,
+    },
+    {
+      key: "V",
+      callback: useCallback(() => {
+        window.location.href = "/bookings/pending";
+      }, []),
+      description: COMMON_SHORTCUTS.ASSIGN_VEHICLE.description,
+    },
+    {
+      key: "A",
+      callback: useCallback(() => {
+        window.location.href = "/analytics";
+      }, []),
+      description: COMMON_SHORTCUTS.VIEW_ANALYTICS.description,
+    },
+    {
+      key: "H",
+      callback: useCallback(() => {
+        setHelpOpen(true);
+      }, []),
+      description: COMMON_SHORTCUTS.OPEN_HELP.description,
+    },
+    {
+      key: "/",
+      callback: useCallback(() => {
+        setCommandPaletteOpen(true);
+      }, []),
+      description: COMMON_SHORTCUTS.OPEN_SEARCH.description,
+    },
+    {
+      key: "R",
+      callback: useCallback(() => {
+        refetch();
+      }, [refetch]),
+      description: "Refresh dashboard",
+    },
+  ];
+
+  useKeyboardShortcuts(shortcuts, { enabled: true });
 
   // Setup WebSocket connection for real-time notifications
   useEffect(() => {
@@ -548,6 +615,18 @@ export default function TenantDashboard360() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Command Palette (accessible via / key) */}
+      <CommandPalette
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+      />
+
+      {/* Keyboard Shortcuts Help (accessible via H key or help button) */}
+      <KeyboardShortcutsHelp
+        isOpen={helpOpen}
+        onClose={() => setHelpOpen(false)}
+      />
     </div>
   );
 }
