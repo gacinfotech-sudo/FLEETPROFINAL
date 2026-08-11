@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,7 @@ import { UserPlus, Trash2, Users, Key, Eye, EyeOff, Mail, AlertCircle, ChevronDo
 import { apiRequest } from "@/lib/queryClient";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 // Form schema for creating new sub-users
 const createSubUserSchema = z.object({
@@ -83,6 +84,12 @@ export default function UserManagement() {
       name: "",
     },
   });
+
+  const formData = { userId: form.watch('userId'), password: form.watch('password'), name: form.watch('name') };
+  const { save: autoSave } = useFormAutoSave("user-create-form", formData, 2000);
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const toggleGroup = (groupId: string) => {
     setExpandedGroups(prev => {
@@ -294,6 +301,11 @@ export default function UserManagement() {
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormSubmitStatus
+                  status={createSubUserMutation.isPending ? "loading" : createSubUserMutation.isSuccess ? "success" : createSubUserMutation.isError ? "error" : "idle"}
+                  successMessage="Manager created successfully!"
+                  errorMessage={(createSubUserMutation.error as any)?.message}
+                />
                 <FormField
                   control={form.control}
                   name="userId"

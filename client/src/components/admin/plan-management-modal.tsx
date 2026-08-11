@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Settings, Users, Car, UserCheck, Shield, Power, Trash2 } from "lucide-react";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 const planSchema = z.object({
   subscriptionPlan: z.enum(["starter", "pro", "custom"]),
@@ -41,6 +42,7 @@ export default function PlanManagementModal({ tenant, isOpen, onClose }: PlanMan
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
+  const [formValues, setFormValues] = useState<any>(null);
 
   // Fetch current plan details
   const { data: planData, isLoading: planLoading } = useQuery({
@@ -85,12 +87,21 @@ export default function PlanManagementModal({ tenant, isOpen, onClose }: PlanMan
   // Update form when plan data loads
   useEffect(() => {
     if (planData) {
-      form.reset({
+      const formData = {
         subscriptionPlan: (planData as any).subscriptionPlan || 'starter',
         limits: (planData as any).limits || { vehicles: 6, drivers: 3, managers: 1 },
-      });
+      };
+      form.reset(formData);
+      setFormValues(formData);
     }
   }, [planData, form]);
+
+  // Auto-save form data
+  const formData = form.watch();
+  const { save: autoSave } = useFormAutoSave("plan-management-modal", formData, 2000);
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const updatePlanMutation = useMutation({
     mutationFn: async (data: PlanFormData) => {
@@ -280,6 +291,11 @@ export default function PlanManagementModal({ tenant, isOpen, onClose }: PlanMan
               ) : (
                 <Form {...form}>
                   <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <FormSubmitStatus
+                      status={updatePlanMutation.isPending ? "loading" : updatePlanMutation.isSuccess ? "success" : updatePlanMutation.isError ? "error" : "idle"}
+                      successMessage="Plan updated!"
+                      errorMessage={(updatePlanMutation.error as any)?.message}
+                    />
                     <FormField
                       control={form.control}
                       name="subscriptionPlan"

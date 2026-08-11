@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Truck, Plus } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 const NOT_ASSIGNABLE_STATUSES = new Set(["cancelled", "no_show", "completed", "closed"]);
 const ADD_NEW = "__add_new__";
@@ -29,6 +30,21 @@ export default function AssignVendorDialog({ booking }: Props) {
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [newDriver, setNewDriver] = useState({ name: "", primaryMobile: "" });
   const [newVehicle, setNewVehicle] = useState({ registrationNumber: "", vehicleModel: "", category: "sedan" });
+
+  // Auto-save form data
+  const formData = {
+    vendorId,
+    driverId,
+    vehicleId,
+    agreedRate,
+    advancePaid,
+    newDriver,
+    newVehicle,
+  };
+  const { save: autoSave } = useFormAutoSave("assign-vendor-dialog", formData, 2000);
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const { data: vendors } = useQuery<any[]>({
     queryKey: ["/api/vendors", "active"],
@@ -170,6 +186,12 @@ export default function AssignVendorDialog({ booking }: Props) {
               </>
             )}
           </div>
+
+          <FormSubmitStatus
+            status={assignMutation.isPending ? "loading" : assignMutation.isSuccess ? "success" : assignMutation.isError ? "error" : "idle"}
+            successMessage="Vendor assigned!"
+            errorMessage={(assignMutation.error as any)?.message}
+          />
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

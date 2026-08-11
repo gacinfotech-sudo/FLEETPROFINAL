@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CalendarPlus, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 const EXTENDABLE_STATUSES = ["confirmed", "vehicle_assigned", "driver_assigned", "ready_for_dispatch",
   "trip_started", "ongoing", "extended", "return_pending"];
@@ -47,6 +48,19 @@ export default function ExtendBookingDialog({ booking }: Props) {
     routeCharge: 0,
     discount: 0,
   });
+
+  // Auto-save form data
+  const formData = {
+    newReturnDate,
+    newReturnTime,
+    destinations,
+    reason,
+    charges,
+  };
+  const { save: autoSave } = useFormAutoSave("extend-booking-dialog", formData, 2000);
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const setCharge = (key: keyof typeof charges, value: string) => {
     setCharges((prev) => ({ ...prev, [key]: value === "" ? 0 : Number(value) }));
@@ -201,6 +215,12 @@ export default function ExtendBookingDialog({ booking }: Props) {
             <div className="flex justify-between"><span>Amount Already Received</span><span>{fmtMoney(booking.advanceReceived)}</span></div>
             <div className="flex justify-between text-red-600"><span>Revised Balance</span><strong>{fmtMoney(revisedBalance)}</strong></div>
           </div>
+
+          <FormSubmitStatus
+            status={extendMutation.isPending ? "loading" : extendMutation.isSuccess ? "success" : extendMutation.isError ? "error" : "idle"}
+            successMessage="Booking extended!"
+            errorMessage={(extendMutation.error as any)?.message}
+          />
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

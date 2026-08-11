@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { KeyRound } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 interface Props {
   driverId: string;
@@ -30,6 +31,12 @@ export default function SetDriverPinDialog({ driverId, driverName }: Props) {
     onError: (err: any) => toast({ title: "Could not set PIN", description: err.message, variant: "destructive" }),
   });
 
+  const formData = { pin };
+  const { save: autoSave } = useFormAutoSave(`driver-pin-${driverId}`, formData, 2000);
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
+
   return (
     <>
       <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
@@ -38,6 +45,11 @@ export default function SetDriverPinDialog({ driverId, driverName }: Props) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Set Driver Portal PIN</DialogTitle></DialogHeader>
+          <FormSubmitStatus
+            status={setPinMutation.isPending ? "loading" : setPinMutation.isSuccess ? "success" : setPinMutation.isError ? "error" : "idle"}
+            successMessage="PIN saved!"
+            errorMessage={(setPinMutation.error as any)?.message}
+          />
           <div className="space-y-3">
             <p className="text-sm text-gray-600">
               {driverName} will use their registered phone number plus this PIN to log in to the driver portal at /driver-login.
