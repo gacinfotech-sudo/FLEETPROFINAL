@@ -32,6 +32,7 @@ export const SAAS_MODULES = [
   { id: 'driver-attendance', label: 'Attendance', iconKey: 'driver-attendance', parentGroup: 'drivers' },
   { id: 'driver-leave', label: 'Leave Calendar', iconKey: 'driver-leave', parentGroup: 'drivers' },
   { id: 'driver-performance', label: 'Performance', iconKey: 'driver-performance', parentGroup: 'drivers' },
+  { id: 'driver-payroll', label: 'Payroll & Earnings', iconKey: 'revenue', parentGroup: 'drivers' },
 
   // Vehicles Group
   { id: 'fleet', label: 'View Fleet', iconKey: 'fleet', parentGroup: 'vehicles' },

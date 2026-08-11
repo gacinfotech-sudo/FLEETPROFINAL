@@ -38,6 +38,7 @@ import SalesPipeline from "./pages/root/sales-pipeline";
 import ProductConfigPage from "./pages/root/product-config";
 import FeatureFlagsPage from "./pages/root/feature-flags";
 import SupportAccessBanner from "@/components/root/support-access-banner";
+import DriverPayrollDashboard from "./pages/driver-payroll-dashboard";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -175,6 +176,13 @@ function AuthenticatedApp() {
       <Route path="/tenant-360">
         <ProtectedRoute allowedRoles={["client", "manager"]}>
           <TenantDashboard360 />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Driver Payroll Dashboard */}
+      <Route path="/driver-payroll">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <DriverPayrollDashboard />
         </ProtectedRoute>
       </Route>
 
