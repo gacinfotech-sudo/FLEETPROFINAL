@@ -54,7 +54,7 @@ export interface Incident {
     station: string;
     date: Date;
   };
-  investiga tion?: {
+  investigation?: {
     investigatorId: string;
     startDate: Date;
     findings?: string;
