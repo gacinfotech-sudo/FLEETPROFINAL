@@ -204,6 +204,11 @@ class NotificationBatchProcessor {
 
   private async processPendingJobs(): Promise<void> {
     try {
+      if (!this.db) {
+        log.warn('Database not initialized, skipping batch processing');
+        return;
+      }
+
       const collection = this.db.collection('notification_batch_jobs');
 
       // Find pending jobs

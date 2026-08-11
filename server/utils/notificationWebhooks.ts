@@ -355,6 +355,11 @@ class NotificationWebhookManager {
 
   private async checkAndRetryFailedWebhooks(): Promise<void> {
     try {
+      if (!this.db) {
+        log.warn('Database not initialized, skipping webhook retry check');
+        return;
+      }
+
       const eventsCollection = this.db.collection('notification_webhook_events');
       const subsCollection = this.db.collection('notification_webhook_subscriptions');
 
