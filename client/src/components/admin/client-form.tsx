@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 const clientSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -155,9 +156,21 @@ export default function ClientForm({ client, onSuccess }: ClientFormProps) {
     }
   };
 
+  // Form auto-save
+  const { save: autoSave } = useFormAutoSave("client-form", form.watch(), 2000);
+  useEffect(() => {
+    autoSave();
+  }, [form.watch(), autoSave]);
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <FormSubmitStatus
+          status={createTenantMutation.isPending || updateTenantMutation.isPending ? "loading" : createTenantMutation.isSuccess || updateTenantMutation.isSuccess ? "success" : createTenantMutation.isError || updateTenantMutation.isError ? "error" : "idle"}
+          successMessage="Client saved successfully!"
+          errorMessage={(createTenantMutation.error as any)?.message || (updateTenantMutation.error as any)?.message || "Failed to save client"}
+        />
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}

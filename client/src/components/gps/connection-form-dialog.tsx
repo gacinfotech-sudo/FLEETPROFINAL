@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useCreateGpsConnection, useUpdateGpsConnection } from './api';
 import { KNOWN_PROVIDER_KEYS } from './capabilities';
+import { useFormAutoSave, FormSubmitStatus } from '@/components/forms/form-enhancements';
 import type { GpsAuthenticationType, GpsConnection } from './types';
 
 const AUTH_TYPES: Array<{ value: GpsAuthenticationType; label: string }> = [
@@ -151,6 +152,12 @@ export function ConnectionFormDialog({
     );
   };
 
+  // Form auto-save
+  const { save: autoSave } = useFormAutoSave("gps-connection-form", form, 2000);
+  useEffect(() => {
+    autoSave();
+  }, [form, autoSave]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -158,6 +165,12 @@ export function ConnectionFormDialog({
           <DialogTitle>{isEdit ? 'Edit GPS connection' : 'Add GPS connection'}</DialogTitle>
           <DialogDescription>Connect a GPS/telematics provider account for this tenant.</DialogDescription>
         </DialogHeader>
+
+        <FormSubmitStatus
+          status={createMutation.isPending || updateMutation.isPending ? "loading" : createMutation.isSuccess || updateMutation.isSuccess ? "success" : createMutation.isError || updateMutation.isError ? "error" : "idle"}
+          successMessage="Connection saved successfully!"
+          errorMessage={(createMutation.error as any)?.message || (updateMutation.error as any)?.message || "Failed to save connection"}
+        />
 
         <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
           <div>

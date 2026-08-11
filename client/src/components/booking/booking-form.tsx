@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, Check, Phone, Mail } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 const bookingSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
@@ -563,8 +564,20 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
     }
   };
 
+  // Form auto-save
+  const { save: autoSave } = useFormAutoSave("booking-form", form.watch(), 2000);
+  useEffect(() => {
+    autoSave();
+  }, [form.watch(), autoSave]);
+
   return (
     <Form {...form}>
+      <FormSubmitStatus
+        status={bookingMutation.isPending ? "loading" : bookingMutation.isSuccess ? "success" : bookingMutation.isError ? "error" : "idle"}
+        successMessage="Booking created successfully!"
+        errorMessage={(bookingMutation.error as any)?.message || "Failed to create booking"}
+      />
+
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Progress Steps */}
         <div className="mb-6 sm:mb-8">
