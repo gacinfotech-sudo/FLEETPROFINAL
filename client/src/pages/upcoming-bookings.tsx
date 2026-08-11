@@ -16,6 +16,11 @@ export default function UpcomingBookings() {
   const { openBooking } = useBookingWorkspace();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["/api/operations/upcoming-bookings?days=3"],
+    queryFn: async () => {
+      const res = await fetch('/api/operations/upcoming-bookings?days=3', { credentials: "include" });
+      if (!res.ok) throw new Error('Failed to fetch upcoming bookings');
+      return res.json();
+    },
     refetchInterval: 60000,
   });
 

@@ -48,6 +48,11 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
 
   const { data, isLoading, isError } = useQuery({
     queryKey: [`/api/operations/live-bookings?startingWindow=${startingWindow}&endingWindow=${endingWindow}`],
+    queryFn: async () => {
+      const res = await fetch(`/api/operations/live-bookings?startingWindow=${startingWindow}&endingWindow=${endingWindow}`, { credentials: "include" });
+      if (!res.ok) throw new Error('Failed to fetch live bookings');
+      return res.json();
+    },
     refetchInterval: 60000, // gentle auto-refresh, not a tight poll loop
   });
 
