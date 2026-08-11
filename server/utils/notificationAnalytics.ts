@@ -186,11 +186,6 @@ class NotificationAnalytics {
             deliveredAt: new Date(),
             ...(endpoint && { recipientEndpoint: endpoint }),
           },
-          $push: {
-            metadata: {
-              deliveryTimeMs: deliveryTime,
-            },
-          },
         }
       );
 
@@ -284,15 +279,6 @@ class NotificationAnalytics {
             failureReason: reason,
             retryCount: newRetryCount,
             updatedAt: new Date(),
-          },
-          $push: {
-            metadata: {
-              failureAttempt: {
-                attempt: newRetryCount,
-                reason,
-                timestamp: new Date(),
-              },
-            },
           },
         }
       );

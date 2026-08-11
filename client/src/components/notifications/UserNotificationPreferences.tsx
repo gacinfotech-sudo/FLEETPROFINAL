@@ -54,7 +54,12 @@ export const UserNotificationPreferences: React.FC = () => {
 
   const fetchPreferences = async () => {
     try {
-      const response = await fetch('/api/notification-preferences');
+      // Get userId from session or global state
+      const userId = (typeof window !== 'undefined' ? (window as any).__userId : null) ||
+                      localStorage.getItem('userId') ||
+                      'current-user';
+
+      const response = await fetch(`/api/notification-preferences/${userId}`);
       const data = await response.json();
       setPreferences(data.preferences);
     } catch (error) {
@@ -70,7 +75,12 @@ export const UserNotificationPreferences: React.FC = () => {
 
     setSaving(true);
     try {
-      const response = await fetch('/api/notification-preferences', {
+      // Get userId from session or global state
+      const userId = (typeof window !== 'undefined' ? (window as any).__userId : null) ||
+                      localStorage.getItem('userId') ||
+                      'current-user';
+
+      const response = await fetch(`/api/notification-preferences/${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(preferences)

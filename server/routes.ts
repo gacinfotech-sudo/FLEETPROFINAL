@@ -43,6 +43,7 @@ import anomalyDetectionRouter from "./routes/anomaly-detection";
 import analyticsRouter from "./routes/analytics";
 import notificationsRouter from "./routes/notifications";
 import notificationAnalyticsRouter from "./routes/notification-analytics";
+import notificationAnalyticsDashboardRouter from "./routes/notification-analytics-dashboard";
 import scheduledNotificationsRouter from "./routes/scheduled-notifications";
 import notificationIndexesRouter from "./routes/notification-indexes";
 import notificationTemplatesRouter from "./routes/notification-templates";
@@ -54,7 +55,6 @@ import notificationHealthRouter from "./routes/notification-health";
 import notificationRateLimitRouter from "./routes/notification-rate-limit";
 import notificationWebhooksRouter from "./routes/notification-webhooks";
 import notificationBatchRouter from "./routes/notification-batch";
-import notificationAnalyticsRouter from "./routes/notification-analytics";
 import userNotificationsRouter from "./routes/user-notifications";
 import notificationChannelConfigRouter from "./routes/notification-channel-config";
 import notificationTriggersRouter from "./routes/notification-triggers";
@@ -9080,6 +9080,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register notification analytics API routes
   app.use("/api/notification-analytics", notificationAnalyticsRouter);
+
+  // Register notification analytics dashboard API routes
+  app.use("/api/notification-analytics", notificationAnalyticsDashboardRouter);
 
   // Register scheduled notifications API routes
   app.use("/api/scheduled-notifications", scheduledNotificationsRouter);

@@ -1,0 +1,420 @@
+/* Push Notification Settings Styles */
+
+.push-notification-settings {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto',
+    'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+}
+
+.settings-loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+  font-size: 16px;
+}
+
+/* Alerts */
+.settings-alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.settings-alert-error {
+  background: #fee;
+  border: 1px solid #fcc;
+  color: #c00;
+}
+
+@media (prefers-color-scheme: dark) {
+  .settings-alert-error {
+    background: #7f1d1d;
+    border-color: #991b1b;
+    color: #fca5a5;
+  }
+}
+
+.settings-alert-success {
+  background: #efe;
+  border: 1px solid #cfc;
+  color: #080;
+}
+
+@media (prefers-color-scheme: dark) {
+  .settings-alert-success {
+    background: #1f7f1f;
+    border-color: #1b9b1b;
+    color: #5afa5a;
+  }
+}
+
+.settings-alert-close {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.settings-alert-close:hover {
+  opacity: 1;
+}
+
+/* Settings Section */
+.settings-section {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .settings-section {
+    background: #1f2937;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.section-header h3 {
+  margin: 0 0 4px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+@media (prefers-color-scheme: dark) {
+  .section-header h3 {
+    color: #f3f4f6;
+  }
+}
+
+.section-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+}
+
+@media (prefers-color-scheme: dark) {
+  .section-header p {
+    color: #9ca3af;
+  }
+}
+
+/* Devices List */
+.devices-list {
+  margin: 20px 0;
+}
+
+.device-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+
+@media (prefers-color-scheme: dark) {
+  .device-card {
+    border-color: #374151;
+  }
+}
+
+.device-card:hover {
+  background: #f9f9f9;
+  border-color: #d0d0d0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .device-card:hover {
+    background: #111827;
+    border-color: #4b5563;
+  }
+}
+
+.device-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.device-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.device-details {
+  flex: 1;
+}
+
+.device-name {
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .device-name {
+    color: #f3f4f6;
+  }
+}
+
+.device-meta {
+  font-size: 13px;
+  color: #666;
+}
+
+@media (prefers-color-scheme: dark) {
+  .device-meta {
+    color: #9ca3af;
+  }
+}
+
+.device-timestamps {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .device-timestamps {
+    color: #6b7280;
+  }
+}
+
+.device-remove-btn {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.device-remove-btn:hover {
+  background: #fee;
+  color: #c00;
+}
+
+@media (prefers-color-scheme: dark) {
+  .device-remove-btn:hover {
+    background: #7f1d1d;
+    color: #fca5a5;
+  }
+}
+
+.empty-devices {
+  text-align: center;
+  padding: 20px;
+  color: #999;
+  font-size: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .empty-devices {
+    color: #6b7280;
+  }
+}
+
+/* Add Device Button */
+.add-device-btn {
+  width: 100%;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.add-device-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+}
+
+.add-device-btn:active {
+  transform: translateY(0);
+}
+
+/* Preferences Groups */
+.preferences-group {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e0e0e0;
+}
+
+@media (prefers-color-scheme: dark) {
+  .preferences-group {
+    border-top-color: #374151;
+  }
+}
+
+.preferences-group:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.preferences-group h4 {
+  margin: 0 0 16px 0;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #666;
+}
+
+@media (prefers-color-scheme: dark) {
+  .preferences-group h4 {
+    color: #9ca3af;
+  }
+}
+
+/* Preference Items */
+.preference-item {
+  margin-bottom: 16px;
+  padding: 12px 0;
+}
+
+.preference-item:last-child {
+  margin-bottom: 0;
+}
+
+.preference-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.preference-toggle input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #667eea;
+}
+
+.preference-toggle input[type='checkbox']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.preference-toggle label {
+  cursor: pointer;
+  font-weight: 500;
+  color: #1f2937;
+  user-select: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .preference-toggle label {
+    color: #f3f4f6;
+  }
+}
+
+.preference-toggle input[type='checkbox']:disabled + label {
+  opacity: 0.6;
+  color: #999;
+}
+
+.preference-description {
+  margin: 0;
+  margin-left: 26px;
+  font-size: 13px;
+  color: #999;
+  line-height: 1.4;
+}
+
+@media (prefers-color-scheme: dark) {
+  .preference-description {
+    color: #6b7280;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .push-notification-settings {
+    padding: 12px;
+  }
+
+  .settings-section {
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+
+  .device-card {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .device-info {
+    width: 100%;
+  }
+
+  .device-remove-btn {
+    align-self: flex-start;
+  }
+
+  .section-header h3 {
+    font-size: 16px;
+  }
+
+  .add-device-btn {
+    font-size: 13px;
+  }
+}
+
+/* Focus States */
+.preference-toggle input[type='checkbox']:focus {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+.add-device-btn:focus {
+  outline: 2px solid rgba(102, 126, 234, 0.5);
+  outline-offset: 2px;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .device-card,
+  .add-device-btn {
+    transition: none;
+  }
+
+  .add-device-btn:hover {
+    transform: none;
+  }
+}
