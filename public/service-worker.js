@@ -207,4 +207,155 @@ self.addEventListener('message', (event) => {
   }
 });
 
+// Background Sync event
+self.addEventListener('sync', (event) => {
+  console.log('[ServiceWorker] Background sync triggered:', event.tag);
+
+  if (event.tag === 'bookings-sync') {
+    event.waitUntil(syncBookings());
+  } else if (event.tag === 'customers-sync') {
+    event.waitUntil(syncCustomers());
+  } else if (event.tag === 'vehicles-sync') {
+    event.waitUntil(syncVehicles());
+  } else if (event.tag === 'drivers-sync') {
+    event.waitUntil(syncDrivers());
+  } else if (event.tag === 'general-sync') {
+    event.waitUntil(syncAll());
+  }
+});
+
+async function syncBookings() {
+  try {
+    const response = await fetch('/api/bookings');
+    if (response.ok) {
+      const data = await response.json();
+      notifyClients('SYNC_COMPLETE', { tag: 'bookings-sync', data });
+      return true;
+    }
+  } catch (error) {
+    notifyClients('SYNC_ERROR', { tag: 'bookings-sync', error: error.message });
+    throw error;
+  }
+}
+
+async function syncCustomers() {
+  try {
+    const response = await fetch('/api/customers');
+    if (response.ok) {
+      const data = await response.json();
+      notifyClients('SYNC_COMPLETE', { tag: 'customers-sync', data });
+      return true;
+    }
+  } catch (error) {
+    notifyClients('SYNC_ERROR', { tag: 'customers-sync', error: error.message });
+    throw error;
+  }
+}
+
+async function syncVehicles() {
+  try {
+    const response = await fetch('/api/vehicles');
+    if (response.ok) {
+      const data = await response.json();
+      notifyClients('SYNC_COMPLETE', { tag: 'vehicles-sync', data });
+      return true;
+    }
+  } catch (error) {
+    notifyClients('SYNC_ERROR', { tag: 'vehicles-sync', error: error.message });
+    throw error;
+  }
+}
+
+async function syncDrivers() {
+  try {
+    const response = await fetch('/api/drivers');
+    if (response.ok) {
+      const data = await response.json();
+      notifyClients('SYNC_COMPLETE', { tag: 'drivers-sync', data });
+      return true;
+    }
+  } catch (error) {
+    notifyClients('SYNC_ERROR', { tag: 'drivers-sync', error: error.message });
+    throw error;
+  }
+}
+
+async function syncAll() {
+  const results = await Promise.all([
+    syncBookings(),
+    syncCustomers(),
+    syncVehicles(),
+    syncDrivers(),
+  ]);
+  return results.every((r) => r === true);
+}
+
+function notifyClients(type, data) {
+  self.clients.matchAll().then((clients) => {
+    clients.forEach((client) => {
+      client.postMessage({ type, ...data });
+    });
+  });
+}
+
+// Push notification event
+self.addEventListener('push', (event) => {
+  console.log('[ServiceWorker] Push notification received');
+
+  let notificationData = {
+    title: 'FleetPro Notification',
+    body: 'You have a new notification',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png',
+    tag: 'fleetpro-push',
+  };
+
+  if (event.data) {
+    try {
+      notificationData = { ...notificationData, ...event.data.json() };
+    } catch (error) {
+      console.warn('[ServiceWorker] Failed to parse push data:', error);
+      notificationData.body = event.data.text();
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(notificationData.title, {
+      body: notificationData.body,
+      icon: notificationData.icon,
+      badge: notificationData.badge,
+      tag: notificationData.tag,
+      data: notificationData.data || {},
+      actions: notificationData.actions || [],
+      requireInteraction: notificationData.requireInteraction || false,
+    })
+  );
+});
+
+// Notification click event
+self.addEventListener('notificationclick', (event) => {
+  console.log('[ServiceWorker] Notification clicked:', event.notification.tag);
+
+  event.notification.close();
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window' }).then((clientList) => {
+      // Check if app is already open
+      for (let i = 0; i < clientList.length; i++) {
+        if (clientList[i].url === '/' && 'focus' in clientList[i]) {
+          return clientList[i].focus();
+        }
+      }
+
+      // Open new window if not open
+      if (self.clients.openWindow) {
+        return self.clients.openWindow('/');
+      }
+    })
+  );
+
+  // Notify client of click
+  notifyClients('NOTIFICATION_CLICK', { tag: event.notification.tag });
+});
+
 console.log('[ServiceWorker] FleetPro PWA Service Worker ready');

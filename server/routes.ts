@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { z } from "zod";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import MongoStore from "connect-mongo";
@@ -98,6 +99,46 @@ import { findOrCreateCustomer, recomputeCustomerStats, classifyCustomer } from "
 import { creditBookingReward, reverseBookingReward, previewRedemption, commitRedemption, computeLoyaltyTier, getRewardRule, adjustRewardPoints, creditVerifiedGoogleReviewReward } from "./services/rewardService";
 import { getRewardEventRules, generateReferralCode, captureReferral, linkReferralToBooking, markReferralBookingCompleted, reverseReferralRewardsForBooking, findReferrerCustomer, buildRewardsReferralDashboard } from "./services/referralService";
 import { RewardEventRule, Referral, type RewardEventKey } from "./models/index";
+import {
+  createOrUpdateSalaryMaster,
+  getSalaryMasterByDriver,
+  listSalaryMasters,
+  updateSalaryMasterStatus,
+  deleteSalaryMaster
+} from "./services/driverSalaryMasterService";
+import {
+  requestAdvance,
+  approveAdvance,
+  recordAdvancePayment,
+  getAdvancesByDriver,
+  getAdvanceSummary
+} from "./services/driverAdvanceService";
+import {
+  calculatePayroll,
+  getPayroll,
+  getPayrollByMonth,
+  approvePayroll,
+  recordPaymentForDriver,
+  closePayroll,
+  listPayrolls
+} from "./services/monthlyPayrollService";
+import {
+  getMonthlyLedgerForDriver,
+  generateLedgerReport,
+  exportLedgerToCSV
+} from "./services/driverSalaryLedgerService";
+import {
+  createSalaryMasterSchema,
+  updateSalaryMasterSchema,
+  createAdvanceRequestSchema,
+  approveAdvanceSchema,
+  recordAdvancePaymentSchema,
+  calculatePayrollSchema,
+  approvePayrollSchema,
+  recordPaymentSchema,
+  ledgerQuerySchema,
+  payrollListQuerySchema
+} from "./schemas/payroll-schemas";
 import { RewardTransaction, RewardRule } from "./models/index";
 import { computeSegments, computeTagCounts, getSegmentFilter } from "./services/segmentService";
 import { CustomerTagEvent, CustomerFeedback, CustomerComplaint, CustomerFollowUp, CustomerRequirement, CustomerConsentEvent, CustomerBillingProfile, Invoice, Campaign, CampaignRecipient, GoogleReviewTracking, Inquiry, Lead, Quotation, LeadFollowUp, BookingDraft, Tenant } from "./models/index";
@@ -9059,6 +9100,212 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register admin dashboard API routes
   app.use("/api/admin", adminDashboardRouter);
+
+  // ========== DRIVER SALARY MASTER ROUTES ==========
+  app.post("/api/driver-salary/master", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const validated = createSalaryMasterSchema.parse({ ...req.body, tenantId: req.tenantId.toString() });
+      const salaryMaster = await createOrUpdateSalaryMaster(validated);
+      res.json(salaryMaster);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/driver-salary/master/:driverId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const master = await getSalaryMasterByDriver(req.tenantId.toString(), req.params.driverId);
+      if (!master) return res.status(404).json({ message: "Salary master not found" });
+      res.json(master);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/driver-salary/masters", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const masters = await listSalaryMasters(req.tenantId.toString(), { status: status as any });
+      res.json(masters);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/driver-salary/master/:driverId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const status = req.body.status || 'active';
+      const updated = await updateSalaryMasterStatus(req.tenantId.toString(), req.params.driverId, status);
+      if (!updated) return res.status(404).json({ message: "Salary master not found" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ========== DRIVER ADVANCE ROUTES ==========
+  app.post("/api/driver-advance/request", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const validated = createAdvanceRequestSchema.parse({ ...req.body, tenantId: req.tenantId.toString() });
+      const advance = await requestAdvance(validated);
+      res.status(201).json(advance);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/driver-advance/:id/approve", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const validated = approveAdvanceSchema.parse(req.body);
+      const advance = await approveAdvance(req.tenantId.toString(), req.params.id, validated.approvedBy, validated.notes);
+      if (!advance) return res.status(404).json({ message: "Advance not found" });
+      res.json(advance);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/driver-advance/:id/pay", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const validated = recordAdvancePaymentSchema.parse(req.body);
+      const advance = await recordAdvancePayment(req.tenantId.toString(), req.params.id, validated.paidBy, validated.paymentMode, validated.transactionReference);
+      if (!advance) return res.status(404).json({ message: "Advance not found" });
+      res.json(advance);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/driver-advance/:driverId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const summary = await getAdvancesByDriver(req.tenantId.toString(), req.params.driverId);
+      res.json(summary);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ========== MONTHLY PAYROLL ROUTES ==========
+  app.post("/api/payroll/calculate", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const validated = calculatePayrollSchema.parse({ ...req.body, tenantId: req.tenantId.toString() });
+      const payroll = await calculatePayroll(validated, { userId: req.user?.userId || 'system', role: req.user?.role || 'admin' });
+      res.status(201).json(payroll);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/payroll/:id/approve", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const validated = approvePayrollSchema.parse(req.body);
+      const payroll = await approvePayroll(req.tenantId.toString(), req.params.id, validated.approvedBy, validated.notes);
+      if (!payroll) return res.status(404).json({ message: "Payroll not found" });
+      res.json(payroll);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/payroll/:id/pay", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const validated = recordPaymentSchema.parse(req.body);
+      const payroll = await recordPaymentForDriver(req.tenantId.toString(), req.params.id, validated.driverId, validated.paidAmount, validated.paymentMode, validated.paidBy, validated.transactionReference);
+      if (!payroll) return res.status(404).json({ message: "Payroll not found" });
+      res.json(payroll);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/payroll/:id/close", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const payroll = await closePayroll(req.tenantId.toString(), req.params.id);
+      if (!payroll) return res.status(404).json({ message: "Payroll not found" });
+      res.json(payroll);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/payroll/:id", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const payroll = await getPayroll(req.tenantId.toString(), req.params.id);
+      if (!payroll) return res.status(404).json({ message: "Payroll not found" });
+      res.json(payroll);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/payroll", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+      const payrolls = await listPayrolls(req.tenantId.toString(), { status, month, year });
+      res.json(payrolls);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ========== SALARY LEDGER ROUTES ==========
+  app.get("/api/driver-salary/ledger/:driverId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const month = parseInt(req.query.month as string);
+      const year = parseInt(req.query.year as string);
+      if (!month || !year) return res.status(400).json({ message: "Month and year required" });
+      const summary = await getMonthlyLedgerForDriver(req.tenantId.toString(), req.params.driverId, month, year);
+      res.json(summary);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/driver-salary/ledger", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const month = parseInt(req.query.month as string);
+      const year = parseInt(req.query.year as string);
+      if (!month || !year) return res.status(400).json({ message: "Month and year required" });
+      const report = await generateLedgerReport(req.tenantId.toString(), month, year);
+      res.json(report);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/driver-salary/ledger/export/:month/:year", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const csv = await exportLedgerToCSV(req.tenantId.toString(), parseInt(req.params.month), parseInt(req.params.year));
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="payroll-ledger-${req.params.month}-${req.params.year}.csv"`);
+      res.send(csv);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   const httpServer = createServer(app);
 
