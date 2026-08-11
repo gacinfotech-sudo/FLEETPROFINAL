@@ -49,6 +49,7 @@ import orchestrationRouter from "./routes/orchestration";
 import fraudDetectionRouter from "./routes/fraud-detection";
 import supportRouter from "./routes/support";
 import feedbackRouter from "./routes/feedback";
+import driverEarningsRouter from "./routes/driver-earnings";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -9039,6 +9040,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register feedback API routes
   app.use("/api/feedback", feedbackRouter);
+
+  // Register driver earnings API routes
+  app.use("/api/earnings", driverEarningsRouter);
 
   const httpServer = createServer(app);
 
