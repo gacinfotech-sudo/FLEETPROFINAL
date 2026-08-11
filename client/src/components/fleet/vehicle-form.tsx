@@ -1,4 +1,5 @@
 import { useForm } from "react-hook-form";
+import { useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
@@ -12,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "../../hooks/use-auth";
 import { Car, AlertTriangle, Shield } from "lucide-react";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 // TASK-VEHICLE-DOMAIN-01: Quick-Add Required fields are Registration Number,
 // Make, Model, Vehicle Category (docs/vehicle-research/VEHICLE-360-SPEC.md).
@@ -195,9 +197,22 @@ export default function VehicleForm({ vehicle, onSuccess }: VehicleFormProps) {
     await saveWithMode(raw, 'draft');
   };
 
+  // Form auto-save
+  const { save: autoSave } = useFormAutoSave("vehicle-form", form.watch(), 2000);
+  useEffect(() => {
+    autoSave();
+  }, [form.watch(), autoSave]);
+
   return (
     <Form {...form}>
       <form onSubmit={handleSaveVehicle} className="space-y-6">
+        {/* Form Status */}
+        <FormSubmitStatus
+          status={createVehicleMutation.isPending || updateVehicleMutation.isPending ? "loading" : createVehicleMutation.isSuccess || updateVehicleMutation.isSuccess ? "success" : createVehicleMutation.isError || updateVehicleMutation.isError ? "error" : "idle"}
+          successMessage="Vehicle saved successfully!"
+          errorMessage={(createVehicleMutation.error as any)?.message || (updateVehicleMutation.error as any)?.message || "Failed to save vehicle"}
+        />
+
         {/* Plan Limit Notification */}
         {!vehicle && subscriptionPlan && (
           <Card className="border-l-4 border-l-blue-500 bg-blue-50/50">
