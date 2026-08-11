@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Gift } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 interface Props {
   userRole: string;
@@ -45,6 +46,18 @@ export default function RewardReferralSettingsPanel({ userRole }: Props) {
       setEventLoaded(true);
     }
   }, [eventRules, eventLoaded]);
+
+  // Auto-save rule form
+  const { save: autoSaveRule } = useFormAutoSave("reward-referral-settings-rule", ruleForm, 2000);
+  useEffect(() => {
+    if (ruleLoaded) autoSaveRule();
+  }, [ruleForm, autoSaveRule, ruleLoaded]);
+
+  // Auto-save event form
+  const { save: autoSaveEvent } = useFormAutoSave("reward-referral-settings-event", eventForm, 2000);
+  useEffect(() => {
+    if (eventLoaded) autoSaveEvent();
+  }, [eventForm, autoSaveEvent, eventLoaded]);
 
   const saveRuleMutation = useMutation({
     mutationFn: async () => (await apiRequest("PUT", "/api/reward-rules", ruleForm)).json(),

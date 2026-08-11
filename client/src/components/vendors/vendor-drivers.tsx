@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,12 @@ export default function VendorDrivers({ vendorId }: { vendorId: string }) {
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState(emptyForm());
+
+  const formData = { ...form };
+  const { save: autoSave } = useFormAutoSave(`vendor-driver-${vendorId}`, formData, 2000);
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const { data: drivers, isLoading } = useQuery<any[]>({ queryKey: [`/api/vendors/${vendorId}/drivers`] });
 
@@ -90,6 +97,11 @@ export default function VendorDrivers({ vendorId }: { vendorId: string }) {
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
         <DialogContent>
           <DialogHeader><DialogTitle>Add Vendor Driver</DialogTitle></DialogHeader>
+          <FormSubmitStatus
+            status={createMutation.isPending ? "loading" : createMutation.isSuccess ? "success" : createMutation.isError ? "error" : "idle"}
+            successMessage="Driver added successfully!"
+            errorMessage={(createMutation.error as any)?.message}
+          />
           <div className="space-y-3">
             <div>
               <Label>Name</Label>

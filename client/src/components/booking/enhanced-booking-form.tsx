@@ -3625,9 +3625,15 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                 </div>
               </div>
 
+              <FormSubmitStatus
+                status={createBookingMutation.isPending ? "loading" : createBookingMutation.isSuccess ? "success" : createBookingMutation.isError ? "error" : "idle"}
+                successMessage="Booking created successfully!"
+                errorMessage={(createBookingMutation.error as any)?.message}
+              />
+
               <div className="flex flex-col sm:flex-row justify-between gap-3 pt-4 sm:pt-8">
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   variant="outline"
                   onClick={prevStep}
                   disabled={createBookingMutation.isPending}
@@ -3636,8 +3642,8 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
                 </Button>
-                
-                <Button 
+
+                <Button
                   type="submit"
                   disabled={createBookingMutation.isPending}
                   className="w-full sm:w-auto px-4 sm:px-8 py-3 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700"

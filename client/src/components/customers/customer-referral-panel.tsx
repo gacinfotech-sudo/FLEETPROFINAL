@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Share2, Users, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 interface Props {
   customerId: string;
@@ -33,6 +34,19 @@ export default function CustomerReferralPanel({ customerId }: Props) {
 
   const { data: customer } = useQuery<any>({ queryKey: [`/api/customers/${customerId}`] });
   const { data: referrals } = useQuery<any[]>({ queryKey: [`/api/customers/${customerId}/referrals`] });
+
+  // Form data for auto-save
+  const formData = {
+    customerId,
+    referralCode: customer?.referralCode || "",
+    copied,
+  };
+
+  const { save: autoSave } = useFormAutoSave("customer-referral-panel", formData, 2000);
+
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const generateCodeMutation = useMutation({
     mutationFn: async () => (await apiRequest("POST", `/api/customers/${customerId}/referral-code`)).json(),
@@ -70,6 +84,7 @@ export default function CustomerReferralPanel({ customerId }: Props) {
     <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2"><Users className="h-5 w-5 text-emerald-600" /> Referral Program</CardTitle>
+        <FormSubmitStatus status={generateCodeMutation.isPending ? "loading" : generateCodeMutation.isSuccess ? "success" : generateCodeMutation.isError ? "error" : "idle"} successMessage="Referral code generated" errorMessage="Failed to generate code" />
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-lg bg-white border p-3 flex items-center justify-between gap-3 flex-wrap">

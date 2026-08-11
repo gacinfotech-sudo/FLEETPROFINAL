@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MessageCircle, Mail, Phone, Megaphone, ShieldOff } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 interface Props {
   customerId: string;
@@ -28,6 +29,19 @@ export default function CustomerConsent({ customerId, customer }: Props) {
   const queryClient = useQueryClient();
   const [showDNC, setShowDNC] = useState(false);
   const [dncReason, setDncReason] = useState("");
+
+  // Form data for auto-save
+  const formData = {
+    customerId,
+    dncReason,
+    showDNC,
+  };
+
+  const { save: autoSave } = useFormAutoSave("customer-consent", formData, 2000);
+
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: [`/api/customers/${customerId}`] });
@@ -58,6 +72,7 @@ export default function CustomerConsent({ customerId, customer }: Props) {
 
   return (
     <div className="space-y-2">
+      <FormSubmitStatus status={toggleConsent.isPending || markDNC.isPending ? "loading" : toggleConsent.isSuccess || markDNC.isSuccess ? "success" : toggleConsent.isError || markDNC.isError ? "error" : "idle"} successMessage="Consent updated" errorMessage="Failed to update consent" />
       {customer.status === 'do_not_contact' && (
         <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg p-3">
           <div className="flex items-center gap-2 text-red-800 text-sm">

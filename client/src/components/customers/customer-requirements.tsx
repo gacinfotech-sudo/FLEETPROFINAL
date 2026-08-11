@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ClipboardList, Plus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 const EMPTY_FORM: Record<string, any> = {
   bookingId: "none", tripRequirement: "", pickupRequirements: "", dropRequirements: "", route: "",
@@ -51,6 +52,13 @@ export default function CustomerRequirements({ customerId, bookings }: { custome
     queryKey: [`/api/customers/${customerId}/requirements`],
   });
 
+  // Form data for auto-save
+  const { save: autoSave } = useFormAutoSave("customer-requirements", form, 2000);
+
+  useEffect(() => {
+    autoSave();
+  }, [form, autoSave]);
+
   const addMutation = useMutation({
     mutationFn: async () => {
       const payload = {
@@ -80,6 +88,7 @@ export default function CustomerRequirements({ customerId, bookings }: { custome
           <CardTitle className="text-base flex items-center gap-2"><ClipboardList className="h-5 w-5 text-indigo-600" /> Requirements History</CardTitle>
           <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" /> Add Requirement</Button>
         </div>
+        <FormSubmitStatus status={addMutation.isPending ? "loading" : addMutation.isSuccess ? "success" : addMutation.isError ? "error" : "idle"} successMessage="Requirement saved" errorMessage="Failed to save requirement" />
       </CardHeader>
       <CardContent>
         {isLoading ? <p className="text-sm text-gray-500">Loading...</p> : requirements.length === 0 ? (

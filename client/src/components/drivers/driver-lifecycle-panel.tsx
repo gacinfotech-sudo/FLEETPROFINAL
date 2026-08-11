@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,12 @@ export default function DriverLifecyclePanel({ driverId }: Props) {
   const queryClient = useQueryClient();
   const [targetStage, setTargetStage] = useState<LifecycleStage | "">("");
   const [reason, setReason] = useState("");
+
+  const formData = { targetStage, reason };
+  const { save: autoSave } = useFormAutoSave(`driver-lifecycle-${driverId}`, formData, 2000);
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const stageQuery = useQuery<any>({ queryKey: [`/api/drivers/${driverId}/lifecycle-stage`] });
   const eligibilityQuery = useQuery<any>({ queryKey: [`/api/drivers/${driverId}/assignment-eligibility`] });
@@ -103,6 +110,11 @@ export default function DriverLifecyclePanel({ driverId }: Props) {
       </div>
 
       <div className="border rounded-lg p-3 space-y-2">
+        <FormSubmitStatus
+          status={transitionMutation.isPending ? "loading" : transitionMutation.isSuccess ? "success" : transitionMutation.isError ? "error" : "idle"}
+          successMessage="Lifecycle stage updated!"
+          errorMessage={(transitionMutation.error as any)?.message}
+        />
         <Label>Transition to a new stage</Label>
         <div className="flex flex-col sm:flex-row gap-2">
           <Select value={targetStage} onValueChange={(v) => setTargetStage(v as LifecycleStage)}>
