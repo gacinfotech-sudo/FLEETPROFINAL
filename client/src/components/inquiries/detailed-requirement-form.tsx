@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Trash2, Plus } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 
 const TRIP_TYPE_OPTIONS = [
   ["local", "Local"], ["airport_transfer", "Airport Transfer"], ["railway_transfer", "Railway Transfer"],
@@ -102,6 +103,20 @@ export default function DetailedRequirementForm({ inquiry, onSuccess, onCancel }
     setNewCustomVehicle({ customVehicleName: "", seatingCapacity: "", quantity: "1", customerDescription: "" });
   };
   const removeCustomVehicle = (index: number) => setCustomVehicleRequests((list) => list.filter((_, i) => i !== index));
+
+  const formData = {
+    tripType, flexibleDate, route, viaLocations, placesToVisit,
+    seniorCitizens, children, infants, luggageCount,
+    driverPreference, languagePreference, acRequirement, paymentArrangement, tollParkingAgreement,
+    customerVisibleInstructions, driverInstructions, officeOnlyNotes, billingInstructions,
+    vehicleRequirements, customVehicleRequests,
+  };
+
+  const { save: autoSave } = useFormAutoSave(`dreq-form-${inquiry._id}`, formData, 2000);
+
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -255,6 +270,12 @@ export default function DetailedRequirementForm({ inquiry, onSuccess, onCancel }
         <div><Label htmlFor="dreq-office-notes">Office-only Notes</Label><Textarea id="dreq-office-notes" rows={2} value={officeOnlyNotes} onChange={(e) => setOfficeOnlyNotes(e.target.value)} /></div>
         <div><Label htmlFor="dreq-billing-notes">Billing Instructions</Label><Textarea id="dreq-billing-notes" rows={2} value={billingInstructions} onChange={(e) => setBillingInstructions(e.target.value)} /></div>
       </div>
+
+      <FormSubmitStatus
+        status={saveMutation.isPending ? "loading" : saveMutation.isSuccess ? "success" : saveMutation.isError ? "error" : "idle"}
+        successMessage="Requirement details saved!"
+        errorMessage={(saveMutation.error as any)?.message || "Failed to save"}
+      />
 
       <div className="flex justify-end gap-2 pt-2">
         {onCancel && <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>}

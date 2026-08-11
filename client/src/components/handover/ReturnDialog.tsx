@@ -1,7 +1,7 @@
 // Staff-facing "conduct a vehicle return" dialog — the counterpart to
 // HandoverDialog.tsx. See that file's header comment re: not being wired
 // into any existing staff page yet (out of this task's ownership).
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import RemovableItemInventoryEditor from "./RemovableItemInventoryEditor";
 import type { RemovableItemInventoryEntry, VehicleHandover } from "./types";
 
@@ -32,6 +33,13 @@ export default function ReturnDialog({ vehicleId, open, onOpenChange, onCreated 
   const [inventory, setInventory] = useState<RemovableItemInventoryEntry[]>([]);
   const [photos, setPhotos] = useState<File[]>([]);
   const [result, setResult] = useState<VehicleHandover | null>(null);
+
+  const formData = { odometerReading, fuelLevel, expectedTripDistanceKm, damageNoted, inventory };
+  const { save: autoSave } = useFormAutoSave(`return-form-${vehicleId}`, formData, 2000);
+
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -117,6 +125,11 @@ export default function ReturnDialog({ vehicleId, open, onOpenChange, onCreated 
                 <Input id="ret-photos" type="file" accept="image/*" multiple onChange={(e) => setPhotos(Array.from(e.target.files || []))} />
               </div>
             </div>
+            <FormSubmitStatus
+              status={mutation.isPending ? "loading" : mutation.isSuccess ? "success" : mutation.isError ? "error" : "idle"}
+              successMessage="Vehicle return recorded!"
+              errorMessage={(mutation.error as any)?.message || "Failed to record return"}
+            />
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button disabled={mutation.isPending || !odometerReading || !fuelLevel} onClick={() => mutation.mutate()}>

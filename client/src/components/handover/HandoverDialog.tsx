@@ -5,7 +5,7 @@
 // not covered by the hard-scope exception (only client/src/pages/
 // driver-portal.tsx is). See this task's report for the proposed,
 // not-yet-applied integration point.
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import RemovableItemInventoryEditor from "./RemovableItemInventoryEditor";
 import type { RemovableItemInventoryEntry, VehicleHandover } from "./types";
 
@@ -33,6 +34,13 @@ export default function HandoverDialog({ vehicleId, driverId, open, onOpenChange
   const [damageNoted, setDamageNoted] = useState("");
   const [inventory, setInventory] = useState<RemovableItemInventoryEntry[]>([]);
   const [photos, setPhotos] = useState<File[]>([]);
+
+  const formData = { odometerReading, fuelLevel, damageNoted, inventory };
+  const { save: autoSave } = useFormAutoSave(`handover-form-${vehicleId}`, formData, 2000);
+
+  useEffect(() => {
+    autoSave();
+  }, [formData, autoSave]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -85,6 +93,11 @@ export default function HandoverDialog({ vehicleId, driverId, open, onOpenChange
             <Input id="photos" type="file" accept="image/*" multiple onChange={(e) => setPhotos(Array.from(e.target.files || []))} />
           </div>
         </div>
+        <FormSubmitStatus
+          status={mutation.isPending ? "loading" : mutation.isSuccess ? "success" : mutation.isError ? "error" : "idle"}
+          successMessage="Handover recorded!"
+          errorMessage={(mutation.error as any)?.message || "Failed to record handover"}
+        />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button
