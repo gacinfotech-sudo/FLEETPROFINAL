@@ -46,9 +46,12 @@ export interface RetryableNotification {
 }
 
 class NotificationRetryManager {
-  private db = mongoose.connection.db!;
   private isRunning = false;
   private checkInterval = 30000; // Check every 30 seconds
+
+  private get db() {
+    return mongoose.connection.db;
+  }
 
   // Default retry policy
   private defaultPolicy: RetryPolicy = {
@@ -357,6 +360,11 @@ class NotificationRetryManager {
 
   private async checkAndRetry(): Promise<void> {
     try {
+      if (!this.db) {
+        log.warn('Database not initialized yet, skipping retry check');
+        return;
+      }
+
       const collection = this.db.collection('retryable_notifications');
       const now = new Date();
 

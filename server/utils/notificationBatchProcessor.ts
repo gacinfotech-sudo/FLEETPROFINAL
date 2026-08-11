@@ -49,10 +49,13 @@ export interface BulkOperationResult {
 }
 
 class NotificationBatchProcessor {
-  private db = mongoose.connection.db!;
   private isRunning = false;
   private processingInterval = 5000; // Process every 5 seconds
   private batchSize = 100; // Process 100 items at a time
+
+  private get db() {
+    return mongoose.connection.db;
+  }
 
   async start(): Promise<void> {
     if (this.isRunning) {

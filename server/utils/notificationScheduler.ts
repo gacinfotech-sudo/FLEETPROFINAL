@@ -33,9 +33,12 @@ export interface ScheduledNotificationRecord {
 }
 
 class NotificationScheduler {
-  private db = mongoose.connection.db!;
   private checkInterval = 60000; // Check every minute
   private isRunning = false;
+
+  private get db() {
+    return mongoose.connection.db;
+  }
 
   async start(): Promise<void> {
     if (this.isRunning) {
@@ -158,6 +161,11 @@ class NotificationScheduler {
 
   private async checkAndSendScheduled(): Promise<void> {
     try {
+      if (!this.db) {
+        log.warn('Database not initialized yet, skipping scheduler check');
+        return;
+      }
+
       const collection = this.db.collection('scheduled_notifications');
       const usersCollection = this.db.collection('users');
 
