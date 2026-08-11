@@ -22,6 +22,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import html2pdf from 'html2pdf.js';
 import BookingConfirmationPDF from "./booking-confirmation-pdf";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
+import { useSmartBookingNavigation } from "@/hooks/useSmartBookingNavigation";
+import { validateCompleteBooking } from "@/utils/bookingValidation";
+import "./booking-highlighting.css";
 
 const bookingSchema = z.object({
   customerName: z.string().min(1, "Customer name is required"),
@@ -276,6 +279,8 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [routeType, setRouteType] = useState<"custom" | "local" | "not_decided">("custom");
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
+  // Smart validation & field highlighting
+  const [highlightedField, setHighlightedField] = useState<string>("");
   // Referral capture (spec §28) — kept entirely separate from the
   // Booking Source panel above: a Referral is a rewarded relationship
   // between two real Customer records, not a free-text source-category
@@ -301,9 +306,27 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   const bookingIdempotencyKeyRef = useRef<string>(safeRandomUUID());
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const totalSteps = 4;
   const { save: autoSaveBooking } = useFormAutoSave("enhanced-booking-form", {}, 3000);
+
+  // Initialize smart booking navigation
+  const { handleNextClick, handleCreateBooking } = useSmartBookingNavigation({
+    currentStep: step,
+    formData: form.getValues(),
+    routeType,
+    resourceMode,
+    onStepChange: setStep,
+    onFieldFocus: (fieldName) => {
+      // Auto-focus field if possible
+      const selector = `input[name='${fieldName}'], select[name='${fieldName}']`;
+      setTimeout(() => {
+        const element = document.querySelector(selector) as HTMLInputElement | HTMLSelectElement | null;
+        if (element) element.focus();
+      }, 300);
+    },
+    onFieldHighlight: setHighlightedField,
+  });
 
   const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
@@ -1567,40 +1590,13 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
               </div>
 
               <div className="flex justify-end pt-4 sm:pt-6">
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   onClick={() => {
-                    const dropoffValid = routeType !== "custom" || form.getValues("dropoffLocation");
-                    // TASK-BOOKING-UI-04: which date fields are required
-                    // depends on travelDateStatus — 'confirmed' (default)
-                    // keeps today's exact pickup/return date+time
-                    // requirement; 'range' requires the tentative window
-                    // instead; 'not_decided' requires no date field at all.
-                    const travelDateStatus = form.getValues("travelDateStatus");
-                    const dateFieldsValid =
-                      travelDateStatus === "range"
-                        ? !!(form.getValues("tentativeStartDate") && form.getValues("tentativeEndDate"))
-                        : travelDateStatus === "not_decided"
-                        ? true
-                        : !!(form.getValues("pickupDate") && form.getValues("returnDate") &&
-                             form.getValues("pickupTime") && form.getValues("returnTime"));
-                    const isValid = dateFieldsValid &&
-                                   form.getValues("pickupLocation") &&
-                                   dropoffValid &&
-                                   form.getValues("tripType");
-
-                    if (isValid) {
+                    // Use smart navigation to validate and auto-navigate to missing fields
+                    const { canProceed } = handleNextClick();
+                    if (canProceed) {
                       handleDateSelection();
-                    } else {
-                      toast({
-                        title: "Please fill all required fields",
-                        description: travelDateStatus === "range"
-                          ? "Earliest/latest date, location and trip type fields are required."
-                          : travelDateStatus === "not_decided"
-                          ? "Location and trip type fields are required."
-                          : "All date, time, location and trip type fields are required.",
-                        variant: "destructive"
-                      });
                     }
                   }}
                   className="w-full sm:w-auto px-4 sm:px-8 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"

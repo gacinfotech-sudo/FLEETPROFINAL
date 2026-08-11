@@ -1,0 +1,54 @@
+/* Smart Booking Field Highlighting */
+
+.booking-field-highlight {
+  animation: highlightPulse 0.6s ease-in-out;
+  outline: 2px solid #ef4444;
+  outline-offset: 2px;
+  background-color: rgba(239, 68, 68, 0.1) !important;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.3) !important;
+}
+
+@keyframes highlightPulse {
+  0% {
+    outline-width: 2px;
+    outline-offset: 2px;
+    background-color: rgba(239, 68, 68, 0.2);
+  }
+  50% {
+    outline-width: 3px;
+    outline-offset: 3px;
+    background-color: rgba(239, 68, 68, 0.15);
+  }
+  100% {
+    outline-width: 2px;
+    outline-offset: 2px;
+    background-color: rgba(239, 68, 68, 0.1);
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .booking-field-highlight {
+    outline-color: #fca5a5;
+    background-color: rgba(252, 165, 165, 0.08) !important;
+    box-shadow: 0 0 8px rgba(252, 165, 165, 0.2) !important;
+  }
+
+  @keyframes highlightPulse {
+    0% {
+      outline-width: 2px;
+      outline-offset: 2px;
+      background-color: rgba(252, 165, 165, 0.1);
+    }
+    50% {
+      outline-width: 3px;
+      outline-offset: 3px;
+      background-color: rgba(252, 165, 165, 0.08);
+    }
+    100% {
+      outline-width: 2px;
+      outline-offset: 2px;
+      background-color: rgba(252, 165, 165, 0.08);
+    }
+  }
+}

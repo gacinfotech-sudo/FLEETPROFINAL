@@ -6,6 +6,7 @@
 import { useEffect, useRef } from "react";
 import { useToast } from "./use-toast";
 import { validateCompleteBooking, type BookingFormData, type ValidationResult } from "@/utils/bookingValidation";
+import { highlightField, scrollToField, clearFieldHighlight } from "@/utils/fieldHighlighting";
 
 interface UseSmartBookingNavigationProps {
   currentStep: number;
@@ -63,18 +64,19 @@ export const useSmartBookingNavigation = ({
           const element = document.querySelector(fieldElement) as HTMLInputElement | HTMLSelectElement | null;
           if (element) {
             element.focus();
-            element.scrollIntoView({ behavior: "smooth", block: "center" });
+            scrollToField(field);
             onFieldFocus?.(field);
           }
         }
 
         // Highlight the field for visibility
-        if (onFieldHighlight) {
-          onFieldHighlight(field);
-          highlightTimeoutRef.current = setTimeout(() => {
-            onFieldHighlight("");
-          }, 3000); // Remove highlight after 3 seconds
-        }
+        highlightField(field);
+        onFieldHighlight?.(field);
+
+        highlightTimeoutRef.current = setTimeout(() => {
+          clearFieldHighlight(field);
+          onFieldHighlight?.("");
+        }, 3000); // Remove highlight after 3 seconds
       }, 300); // Allow time for step transition
 
       return { isValid: false, targetStep: step };
