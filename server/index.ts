@@ -52,7 +52,12 @@ import { startOperationsReminderScheduler, stopOperationsReminderScheduler } fro
 // a correlation ID to every request (not just /api/root/**) before any
 // route/error path runs. See docs/root-control-plane/ROOT-INTEGRATION-report.md.
 import { correlationIdMiddleware } from "./root/middleware/correlationId";
+import { requestLoggingMiddleware } from "./middleware/requestLogger";
+import { errorHandlingMiddleware } from "./middleware/errorHandler";
+import { healthMonitor } from "./utils/healthCheck";
+import { createLogger } from "./utils/logger";
 
+const log2 = createLogger('Server');
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 // Trust only the known number of reverse-proxy hops. `true` trusts arbitrary
@@ -66,6 +71,10 @@ app.set('trust proxy', Number.isInteger(configuredProxyHops) && configuredProxyH
 // materially cuts transfer time for JSON API responses and any
 // non-Vite-bundled assets; negligible CPU cost on a local dev machine.
 app.use(compression());
+
+// Add structured request logging middleware
+app.use(requestLoggingMiddleware);
+
 // Capture the raw request body bytes alongside the parsed JSON — needed by
 // both the telephony webhook (TASK-02) and GPS webhook (TASK-GPS-INGESTION-04)
 // receivers to verify provider signatures against the actual wire bytes sent,
@@ -112,9 +121,10 @@ app.use((req, res, next) => {
 (async () => {
   // Connect to MongoDB Atlas
   await connectDB();
-  
+  log2.info('MongoDB connected successfully', { database: mongoose.connection.name });
+
   // Skip default admin user creation - secure admin already exists
-  console.log('✅ Using existing secure admin credentials');
+  log2.info('Using existing secure admin credentials');
 
   // Check for emergency admin creation from environment variables
   try {
@@ -128,6 +138,14 @@ app.use((req, res, next) => {
   app.get('/dashboard.html', (req, res) => {
     const dashboardPath = path.join(__dirname, '../public/dashboard.html');
     res.sendFile(dashboardPath);
+  });
+
+  // Health check endpoint for monitoring
+  app.get('/health', async (req, res) => {
+    const dbConnected = mongoose.connection.readyState === 1;
+    const health = await healthMonitor.getStatus(dbConnected, mongoose.connection.name);
+    const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 503 : 500;
+    res.status(statusCode).json(health);
   });
 
   const server = await registerRoutes(app);
@@ -271,6 +289,7 @@ app.use((req, res, next) => {
       host,
     }, () => {
       log(`🔒 serving HTTPS on ${host}:${port}`);
+      log2.info(`HTTPS server started`, { host, port, ssl: true });
     });
   } else {
     server.listen({
@@ -278,6 +297,7 @@ app.use((req, res, next) => {
       host,
     }, () => {
       log(`serving HTTP on ${host}:${port}`);
+      log2.info(`HTTP server started`, { host, port, ssl: false });
     });
   }
 
