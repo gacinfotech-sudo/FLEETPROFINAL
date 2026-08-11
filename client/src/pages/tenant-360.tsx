@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { TrendingUp, AlertCircle, RefreshCw, Users, DollarSign, Zap, Calendar, Target } from "lucide-react";
+import SmartRecommendations from "@/components/dashboard/smart-recommendations";
+import CriticalAlerts from "@/components/dashboard/critical-alerts";
+import QuickActions from "@/components/dashboard/quick-actions";
 
 interface TenantDashboardStats {
   periodDays: number;
@@ -120,6 +123,49 @@ export default function TenantDashboard360() {
             Refresh
           </Button>
         </div>
+      </div>
+
+      {/* Intelligence System: Alerts, Recommendations, Quick Actions */}
+      <div className="space-y-4">
+        <CriticalAlerts
+          alerts={[
+            ...(data.metrics.bookings > 10 ? [{
+              id: "booking-surge",
+              type: "critical" as const,
+              title: "🔥 Booking Surge",
+              description: `${data.metrics.bookings} new bookings in queue. Assign vehicles ASAP.`,
+              affectedItems: data.metrics.bookings,
+              actionRequired: true,
+              resolveAction: "Assign Now",
+              timestamp: new Date(),
+            }] : []),
+            ...(data.metrics.bookingCompletionRate < 85 ? [{
+              id: "low-completion",
+              type: "warning" as const,
+              title: "⚠️ Low Completion Rate",
+              description: `${data.metrics.bookingCompletionRate}% completion. Investigate cancellations.`,
+              affectedItems: 0,
+              actionRequired: true,
+              resolveAction: "Review",
+              timestamp: new Date(),
+            }] : []),
+          ]}
+        />
+
+        <SmartRecommendations
+          stats={{
+            pendingBookings: data.metrics.bookings,
+            availableVehicles: data.metrics.vehicles,
+            activeDrivers: data.metrics.drivers,
+            todayRevenue: data.performanceKpis.revenueThisMonth,
+            completionRate: data.metrics.bookingCompletionRate,
+            averageRating: data.metrics.avgRevenuePerBooking,
+            upcomingTrips: data.recentBookings.filter(b => b.status === "upcoming").length,
+            pendingPayments: data.recentBookings.filter(b => b.status === "payment_pending").length,
+          }}
+        />
+
+        <QuickActions />
       </div>
 
       {/* Key Metrics */}
