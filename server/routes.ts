@@ -34,6 +34,7 @@ import recommendationsRouter from "./routes/recommendations";
 import { pricingMiddleware } from "./middleware/pricingMiddleware";
 import pricingRouter from "./routes/pricing";
 import matchingRouter from "./routes/matching";
+import maintenanceRouter from "./routes/maintenance";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -8979,6 +8980,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register demand-supply matching API routes
   app.use("/api/matching", matchingRouter);
+
+  // Register predictive maintenance API routes
+  app.use("/api/maintenance", maintenanceRouter);
 
   const httpServer = createServer(app);
 
