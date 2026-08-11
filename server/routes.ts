@@ -38,6 +38,7 @@ import maintenanceRouter from "./routes/maintenance";
 import driverIntelligenceRouter from "./routes/driver-intelligence";
 import customerLtvRouter from "./routes/customer-ltv";
 import dispatchRouter from "./routes/dispatch";
+import anomalyDetectionRouter from "./routes/anomaly-detection";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -8995,6 +8996,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register driver dispatch API routes
   app.use("/api/dispatch", dispatchRouter);
+
+  // Register anomaly detection API routes
+  app.use("/api/anomaly-detection", anomalyDetectionRouter);
 
   const httpServer = createServer(app);
 
