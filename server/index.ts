@@ -162,6 +162,15 @@ app.use((req, res, next) => {
     log2.error('Failed to ensure notification indexes', { error });
   }
 
+  // Initialize notification templates
+  try {
+    const { notificationTemplateManager } = await import('./utils/notificationTemplates');
+    await notificationTemplateManager.initializeBuiltInTemplates();
+    log2.info('Notification templates initialized');
+  } catch (error) {
+    log2.error('Failed to initialize notification templates', { error });
+  }
+
   // Start notification scheduler
   try {
     const { notificationScheduler } = await import('./utils/notificationScheduler');
