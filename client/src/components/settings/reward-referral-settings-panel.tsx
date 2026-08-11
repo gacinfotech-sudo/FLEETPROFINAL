@@ -101,6 +101,10 @@ export default function RewardReferralSettingsPanel({ userRole }: Props) {
           Configure how customers earn and redeem points. Existing customer balances and ledger history are never
           affected by changing these rules — only new events use the updated values.
         </p>
+        <div className="mt-3 space-y-2">
+          <FormSubmitStatus status={saveRuleMutation.isPending ? "loading" : saveRuleMutation.isSuccess ? "success" : saveRuleMutation.isError ? "error" : "idle"} successMessage="Booking reward rule saved" errorMessage="Failed to save booking reward" />
+          <FormSubmitStatus status={saveEventMutation.isPending ? "loading" : saveEventMutation.isSuccess ? "success" : saveEventMutation.isError ? "error" : "idle"} successMessage="Event rule saved" errorMessage="Failed to save event rule" />
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         <div>
