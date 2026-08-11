@@ -51,10 +51,6 @@ export default function PaymentSection({ booking }: Props) {
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const [showAddPayment, setShowAddPayment] = useState(false);
-  // Fresh per dialog-open, held for its lifetime — see the matching
-  // comment in customer-dashboard.tsx's recordPaymentMutation.
-  const [idempotencyKey, setIdempotencyKey] = useState("");
   const bookingId = booking._id || booking.id;
 
   const [form, setForm] = useState({
@@ -62,13 +58,15 @@ export default function PaymentSection({ booking }: Props) {
     transactionReference: "", receivedBy: "", notes: "",
   });
 
+  const [showAddPayment, setShowAddPayment] = useState(false);
+  const [idempotencyKey, setIdempotencyKey] = useState("");
+
   const historyQuery = useQuery<any[]>({
     queryKey: [`/api/bookings/${bookingId}/payments`],
     enabled: !!bookingId,
   });
   const history = historyQuery.data || [];
 
-  // Auto-save form state
   const { save: autoSaveForm } = useFormAutoSave('payment-form', form, 2000);
 
   useEffect(() => {
