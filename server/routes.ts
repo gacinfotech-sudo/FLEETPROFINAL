@@ -71,6 +71,7 @@ import vehicleTrackingRouter from "./routes/vehicle-tracking";
 import safetyIncidentsRouter from "./routes/safety-incidents";
 import loyaltyRewardsRouter from "./routes/loyalty-rewards";
 import adminDashboardRouter from "./routes/admin-dashboard";
+import tenantAdminRouter from "./admin/routes";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";

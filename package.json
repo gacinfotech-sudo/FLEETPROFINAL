@@ -12,7 +12,13 @@
     "lan:start": "tsx scripts/lan-start.ts",
     "lan:check": "tsx scripts/lan-check.ts",
     "admin:bootstrap": "tsx scripts/admin-bootstrap.ts",
-    "admin:status": "tsx scripts/admin-status.ts"
+    "admin:status": "tsx scripts/admin-status.ts",
+    "test:smoke": "tsx tests/smoke.test.ts",
+    "test:framework": "tsx tests/autonomous-framework.ts",
+    "test:health": "MONITOR_DURATION=60 tsx tests/health-monitor-autofix.ts",
+    "test:orchestrate": "tsx tests/test-orchestrator.ts",
+    "test:orchestrate:verbose": "tsx tests/test-orchestrator.ts --verbose",
+    "test:all": "npm run test:orchestrate"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
