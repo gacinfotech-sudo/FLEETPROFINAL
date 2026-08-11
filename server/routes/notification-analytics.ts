@@ -115,6 +115,92 @@ router.get('/user/:userId/history', authenticateUser, async (req: Request, res: 
   }
 });
 
+// POST /api/notification-analytics/delivery
+// Record notification delivery (called from service worker on push event)
+router.post('/delivery', async (req: Request, res: Response) => {
+  try {
+    const { notificationId } = req.body;
+
+    if (!notificationId) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        message: 'notificationId is required',
+      });
+    }
+
+    const collection = mongoose.connection.db!.collection('notification_logs');
+
+    // Find all logs for this notification
+    const logs = await collection.find({ notificationId }).toArray();
+
+    let deliveredCount = 0;
+    for (const log of logs) {
+      const success = await notificationAnalytics.recordDelivery(log._id, 'service-worker');
+      if (success) deliveredCount++;
+    }
+
+    log.info('Notification delivery recorded', {
+      notificationId,
+      deliveredCount,
+    });
+
+    res.json({
+      success: true,
+      message: `Delivery recorded for ${deliveredCount} notification(s)`,
+      deliveredCount,
+    });
+  } catch (error) {
+    log.error('Failed to record delivery', { error });
+    res.status(500).json({
+      error: 'Failed to record delivery',
+      message: (error as Error).message,
+    });
+  }
+});
+
+// POST /api/notification-analytics/dismissal
+// Record notification dismissal (called from service worker on close event)
+router.post('/dismissal', async (req: Request, res: Response) => {
+  try {
+    const { notificationId } = req.body;
+
+    if (!notificationId) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        message: 'notificationId is required',
+      });
+    }
+
+    const collection = mongoose.connection.db!.collection('notification_logs');
+
+    // Find all logs for this notification
+    const logs = await collection.find({ notificationId }).toArray();
+
+    let dismissedCount = 0;
+    for (const log of logs) {
+      const success = await notificationAnalytics.recordDismissal(log._id);
+      if (success) dismissedCount++;
+    }
+
+    log.info('Notification dismissal recorded', {
+      notificationId,
+      dismissedCount,
+    });
+
+    res.json({
+      success: true,
+      message: `Dismissal recorded for ${dismissedCount} notification(s)`,
+      dismissedCount,
+    });
+  } catch (error) {
+    log.error('Failed to record dismissal', { error });
+    res.status(500).json({
+      error: 'Failed to record dismissal',
+      message: (error as Error).message,
+    });
+  }
+});
+
 // POST /api/notification-analytics/click
 // Record notification click (called from service worker)
 router.post('/click', async (req: Request, res: Response) => {

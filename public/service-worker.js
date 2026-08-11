@@ -319,6 +319,9 @@ self.addEventListener('push', (event) => {
     }
   }
 
+  // Extract notificationId for delivery tracking
+  const notificationId = notificationData.data?.notificationId;
+
   event.waitUntil(
     self.registration.showNotification(notificationData.title, {
       body: notificationData.body,
@@ -328,6 +331,18 @@ self.addEventListener('push', (event) => {
       data: notificationData.data || {},
       actions: notificationData.actions || [],
       requireInteraction: notificationData.requireInteraction || false,
+    }).then(() => {
+      // Record delivery in analytics (after notification is shown)
+      if (notificationId) {
+        fetch('/api/notification-analytics/delivery', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notificationId }),
+        }).catch(() => {
+          console.warn('[ServiceWorker] Failed to record delivery analytics');
+          // Non-blocking - don't fail notification on analytics error
+        });
+      }
     })
   );
 });
@@ -379,6 +394,30 @@ self.addEventListener('notificationclick', (event) => {
 
   // Notify client of click with notification ID
   notifyClients('NOTIFICATION_CLICK', {
+    tag: event.notification.tag,
+    notificationId: notificationId
+  });
+});
+
+// Notification close event (dismissal tracking)
+self.addEventListener('notificationclose', (event) => {
+  console.log('[ServiceWorker] Notification closed:', event.notification.tag);
+
+  // Extract notification ID for dismissal tracking
+  const notificationId = event.notification.data?.notificationId;
+
+  if (notificationId) {
+    fetch('/api/notification-analytics/dismissal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notificationId }),
+    }).catch(() => {
+      console.warn('[ServiceWorker] Failed to record dismissal analytics');
+    });
+  }
+
+  // Notify client of dismissal
+  notifyClients('NOTIFICATION_CLOSE', {
     tag: event.notification.tag,
     notificationId: notificationId
   });

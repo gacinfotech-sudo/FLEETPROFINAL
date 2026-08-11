@@ -96,7 +96,7 @@ class NotificationAnalytics {
 
   async recordDelivery(
     logId: string | mongoose.Types.ObjectId,
-    endpoint: string
+    endpoint?: string
   ): Promise<boolean> {
     try {
       const collection = this.db.collection('notification_logs');
@@ -117,7 +117,7 @@ class NotificationAnalytics {
           $set: {
             status: DeliveryStatus.DELIVERED,
             deliveredAt: new Date(),
-            recipientEndpoint: endpoint,
+            ...(endpoint && { recipientEndpoint: endpoint }),
           },
           $push: {
             metadata: {
