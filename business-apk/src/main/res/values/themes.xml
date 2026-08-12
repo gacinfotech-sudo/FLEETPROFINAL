@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light Theme -->
+    <style name="Theme.FleetPro.Light" parent="Theme.MaterialComponents.Light">
+        <!-- Primary Colors -->
+        <item name="colorPrimary">@color/primary_light</item>
+        <item name="colorPrimaryVariant">@color/primary_dark_light</item>
+        <item name="colorSecondary">@color/secondary_light</item>
+        <item name="colorSecondaryVariant">@color/secondary_dark_light</item>
+
+        <!-- Background Colors -->
+        <item name="android:colorBackground">@color/background_light</item>
+        <item name="colorSurface">@color/surface_light</item>
+
+        <!-- Text Colors -->
+        <item name="android:textColorPrimary">@color/text_primary_light</item>
+        <item name="android:textColorSecondary">@color/text_secondary_light</item>
+
+        <!-- Status Bar -->
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:statusBarColor">@color/status_bar_light</item>
+
+        <!-- Navigation Bar -->
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:navigationBarColor">@color/nav_bar_light</item>
+
+        <!-- Material Components -->
+        <item name="elevatedButtonStyle">@style/Widget.Button.Elevated.Light</item>
+        <item name="outlinedButtonStyle">@style/Widget.Button.Outlined.Light</item>
+        <item name="textInputStyle">@style/Widget.TextInput.Light</item>
+    </style>
+
+    <!-- Dark Theme -->
+    <style name="Theme.FleetPro.Dark" parent="Theme.MaterialComponents">
+        <!-- Primary Colors -->
+        <item name="colorPrimary">@color/primary_dark</item>
+        <item name="colorPrimaryVariant">@color/primary_dark_variant</item>
+        <item name="colorSecondary">@color/secondary_dark</item>
+        <item name="colorSecondaryVariant">@color/secondary_dark_variant</item>
+
+        <!-- Background Colors - OLED Optimized -->
+        <item name="android:colorBackground">@color/background_dark</item>
+        <item name="colorSurface">@color/surface_dark</item>
+
+        <!-- Text Colors -->
+        <item name="android:textColorPrimary">@color/text_primary_dark</item>
+        <item name="android:textColorSecondary">@color/text_secondary_dark</item>
+
+        <!-- Status Bar -->
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/status_bar_dark</item>
+
+        <!-- Navigation Bar -->
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:navigationBarColor">@color/nav_bar_dark</item>
+
+        <!-- Material Components -->
+        <item name="elevatedButtonStyle">@style/Widget.Button.Elevated.Dark</item>
+        <item name="outlinedButtonStyle">@style/Widget.Button.Outlined.Dark</item>
+        <item name="textInputStyle">@style/Widget.TextInput.Dark</item>
+    </style>
+
+    <!-- Accessibility: High Contrast Light Theme -->
+    <style name="Theme.FleetPro.HighContrast.Light" parent="Theme.FleetPro.Light">
+        <item name="colorPrimary">@color/primary_high_contrast</item>
+        <item name="android:textColorPrimary">@color/text_high_contrast_light</item>
+        <item name="android:textColorSecondary">@color/text_high_contrast_secondary</item>
+    </style>
+
+    <!-- Accessibility: High Contrast Dark Theme -->
+    <style name="Theme.FleetPro.HighContrast.Dark" parent="Theme.FleetPro.Dark">
+        <item name="colorPrimary">@color/primary_high_contrast_dark</item>
+        <item name="android:textColorPrimary">@color/text_high_contrast_dark</item>
+        <item name="android:textColorSecondary">@color/text_high_contrast_secondary_dark</item>
+    </style>
+
+    <!-- Button Styles - Light -->
+    <style name="Widget.Button.Elevated.Light" parent="Widget.MaterialComponents.Button">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:letterSpacing">0.01</item>
+    </style>
+
+    <style name="Widget.Button.Outlined.Light" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <!-- Button Styles - Dark -->
+    <style name="Widget.Button.Elevated.Dark" parent="Widget.Button.Elevated.Light">
+        <!-- Inherit same button height/size -->
+    </style>
+
+    <style name="Widget.Button.Outlined.Dark" parent="Widget.Button.Outlined.Light">
+        <!-- Inherit same button height/size -->
+    </style>
+
+    <!-- Text Input Styles -->
+    <style name="Widget.TextInput.Light" parent="Widget.MaterialComponents.TextInputLayout.FilledBox">
+        <item name="boxStrokeColor">@color/text_input_stroke_light</item>
+        <item name="hintTextColor">@color/text_input_hint_light</item>
+    </style>
+
+    <style name="Widget.TextInput.Dark" parent="Widget.MaterialComponents.TextInputLayout.FilledBox">
+        <item name="boxStrokeColor">@color/text_input_stroke_dark</item>
+        <item name="hintTextColor">@color/text_input_hint_dark</item>
+    </style>
+
+    <!-- Smooth Transitions -->
+    <style name="Animation.Theme.Transition">
+        <item name="android:windowEnterAnimation">@android:anim/fade_in</item>
+        <item name="android:windowExitAnimation">@android:anim/fade_out</item>
+    </style>
+</resources>
