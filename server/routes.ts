@@ -67,6 +67,8 @@ import fraudDetectionRouter from "./routes/fraud-detection";
 import supportRouter from "./routes/support";
 import feedbackRouter from "./routes/feedback";
 import driverEarningsRouter from "./routes/driver-earnings";
+import driverSalaryRouter from "./routes/driverSalaryRoutes";
+import financeSalaryRouter from "./routes/financeSalaryRoutes";
 import vehicleTrackingRouter from "./routes/vehicle-tracking";
 import safetyIncidentsRouter from "./routes/safety-incidents";
 import loyaltyRewardsRouter from "./routes/loyalty-rewards";
@@ -9144,6 +9146,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register driver earnings API routes
   app.use("/api/earnings", driverEarningsRouter);
+
+  // Register driver salary API routes
+  app.use("/api/driver-salary", driverSalaryRouter);
+
+  // Register finance salary API routes (PHASE 9)
+  app.use("/api/finance", financeSalaryRouter);
 
   // Register vehicle tracking API routes
   app.use("/api/tracking", vehicleTrackingRouter);

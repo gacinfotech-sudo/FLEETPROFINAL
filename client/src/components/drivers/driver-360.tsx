@@ -9,6 +9,9 @@ import DriverDocumentsPanel from "./driver-documents-panel";
 import DriverEmploymentHistoryPanel from "./driver-employment-history-panel";
 import DriverLifecyclePanel from "./driver-lifecycle-panel";
 import DriverAttendanceLeavePanel from "./driver-attendance-leave-panel";
+import { SalarySummary } from "../driver-360/SalarySummary";
+import { SalaryHistory } from "../driver-360/SalaryHistory";
+import { SalaryLedger } from "../driver-360/SalaryLedger";
 import {
   DEFAULT_LIFECYCLE_STAGE, LIFECYCLE_STAGE_LABELS, lifecycleStageBadgeClass,
   complianceBadgeClass, COMPLIANCE_STATUS_LABELS, documentComplianceStatus,
@@ -83,6 +86,7 @@ export default function Driver360({ driver, onOpenBooking }: Props) {
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="employment">Employment</TabsTrigger>
             <TabsTrigger value="attendance-leave">Attendance &amp; Leave</TabsTrigger>
+            <TabsTrigger value="salary">💰 Salary</TabsTrigger>
             <TabsTrigger value="lifecycle">Lifecycle</TabsTrigger>
             <TabsTrigger value="feedback">Feedback</TabsTrigger>
           </TabsList>
@@ -204,6 +208,14 @@ export default function Driver360({ driver, onOpenBooking }: Props) {
 
         <TabsContent value="attendance-leave">
           <DriverAttendanceLeavePanel driverId={driverId} />
+        </TabsContent>
+
+        <TabsContent value="salary">
+          <div className="space-y-6">
+            <SalarySummary driverId={driverId} />
+            <SalaryHistory driverId={driverId} />
+            <SalaryLedger driverId={driverId} />
+          </div>
         </TabsContent>
 
         <TabsContent value="lifecycle">

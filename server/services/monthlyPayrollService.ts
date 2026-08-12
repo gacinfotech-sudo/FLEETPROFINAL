@@ -5,7 +5,9 @@ import {
   DriverSalaryMaster,
   Driver,
   DriverAdvance,
-  DriverSalaryLedger
+  DriverSalaryLedger,
+  DriverAttendance,
+  Booking
 } from '../models/index';
 import {
   calculateSalary,
@@ -26,10 +28,147 @@ export interface PayrollCalculationRequest {
   overrideDeductions?: Record<string, DeductionData>;
 }
 
+/**
+ * Helper: Fetch attendance data for a driver in given month
+ */
+async function fetchAttendanceForMonth(
+  tenantId: string,
+  driverId: mongoose.Types.ObjectId,
+  month: number,
+  year: number
+): Promise<AttendanceData | undefined> {
+  try {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+
+    const records = await DriverAttendance.find({
+      tenantId: new mongoose.Types.ObjectId(tenantId),
+      driverId,
+      date: { $gte: startDate, $lte: endDate }
+    });
+
+    let presentDays = 0;
+    let absentDays = 0;
+    let paidLeaves = 0;
+    let unpaidLeaves = 0;
+    let halfDays = 0;
+    let weeklyOffs = 0;
+
+    for (const record of records) {
+      switch (record.status) {
+        case 'present':
+        case 'late':
+          presentDays++;
+          break;
+        case 'absent':
+          absentDays++;
+          break;
+        case 'paid_leave':
+          paidLeaves++;
+          break;
+        case 'unpaid_leave':
+          unpaidLeaves++;
+          break;
+        case 'half_day':
+          halfDays++;
+          break;
+        case 'weekly_off':
+          weeklyOffs++;
+          break;
+      }
+    }
+
+    const totalWorkingDays = presentDays + halfDays + paidLeaves + unpaidLeaves;
+
+    return {
+      presentDays,
+      absentDays,
+      paidLeaves,
+      unpaidLeaves,
+      halfDays,
+      weeklyOffs,
+      totalWorkingDays: totalWorkingDays || 26 // Default to 26 if no attendance data
+    };
+  } catch (error) {
+    console.error('Error fetching attendance:', error);
+    // Return default attendance data if fetch fails
+    return {
+      presentDays: 0,
+      absentDays: 0,
+      paidLeaves: 0,
+      unpaidLeaves: 0,
+      halfDays: 0,
+      weeklyOffs: 0,
+      totalWorkingDays: 26
+    };
+  }
+}
+
+/**
+ * Helper: Fetch trip incentive data for a driver in given month
+ */
+async function fetchTripIncentivesForMonth(
+  tenantId: string,
+  driverId: mongoose.Types.ObjectId,
+  month: number,
+  year: number
+): Promise<TripIncentiveData | undefined> {
+  try {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+
+    const bookings = await Booking.find({
+      tenantId: new mongoose.Types.ObjectId(tenantId),
+      driverId,
+      pickupDate: { $gte: startDate, $lte: endDate },
+      status: { $in: ['completed', 'in_progress', 'confirmed'] }
+    });
+
+    let totalTrips = bookings.length;
+    let totalKm = 0;
+    let nightDutyTrips = 0;
+    let outstationTrips = 0;
+    let specialDutyTrips = 0;
+
+    for (const booking of bookings) {
+      if ((booking as any).tripDistance) totalKm += (booking as any).tripDistance;
+      if ((booking as any).isNightDuty) nightDutyTrips++;
+      if ((booking as any).isOutstation) outstationTrips++;
+      if ((booking as any).specialDuty) specialDutyTrips++;
+    }
+
+    return {
+      totalTrips,
+      totalKm,
+      nightDutyTrips,
+      outstationTrips,
+      specialDutyTrips
+    };
+  } catch (error) {
+    console.error('Error fetching trip incentives:', error);
+    // Return default trip data if fetch fails
+    return {
+      totalTrips: 0,
+      totalKm: 0,
+      nightDutyTrips: 0,
+      outstationTrips: 0,
+      specialDutyTrips: 0
+    };
+  }
+}
+
 export async function calculatePayroll(
   request: PayrollCalculationRequest,
   calculatedBy: { userId: string; role: string }
 ): Promise<IMonthlyPayroll> {
+  // Validate month and year
+  if (request.month < 1 || request.month > 12) {
+    throw new Error('Invalid month. Must be between 1 and 12');
+  }
+  if (request.year < 2020) {
+    throw new Error('Invalid year. Must be 2020 or later');
+  }
+
   // Check if payroll already exists for this month
   const existing = await MonthlyPayroll.findOne({
     tenantId: new mongoose.Types.ObjectId(request.tenantId),
@@ -47,83 +186,134 @@ export async function calculatePayroll(
     drivers = await Driver.find({
       tenantId: new mongoose.Types.ObjectId(request.tenantId),
       _id: { $in: request.drivers.map(id => new mongoose.Types.ObjectId(id)) }
+    }).catch(err => {
+      console.error('Error fetching specified drivers:', err);
+      throw new Error('Failed to fetch drivers');
     });
   } else {
     drivers = await Driver.find({
       tenantId: new mongoose.Types.ObjectId(request.tenantId),
       status: { $ne: 'inactive' }
+    }).catch(err => {
+      console.error('Error fetching drivers:', err);
+      throw new Error('Failed to fetch drivers');
     });
+  }
+
+  if (!drivers || drivers.length === 0) {
+    throw new Error('No active drivers found for payroll calculation');
   }
 
   // Calculate salary for each driver
   const driverPayrolls = [];
 
   for (const driver of drivers) {
-    const salaryMaster = await DriverSalaryMaster.findOne({
-      tenantId: new mongoose.Types.ObjectId(request.tenantId),
-      driverId: driver._id,
-      status: 'active'
-    });
+    try {
+      const salaryMaster = await DriverSalaryMaster.findOne({
+        tenantId: new mongoose.Types.ObjectId(request.tenantId),
+        driverId: driver._id,
+        status: 'active'
+      });
 
-    if (!salaryMaster) {
-      continue; // Skip drivers without salary configuration
+      if (!salaryMaster) {
+        console.warn(`Skipping driver ${driver.name} - no active salary configuration`);
+        continue; // Skip drivers without salary configuration
+      }
+
+      // Get advances
+      const advances = await DriverAdvance.find({
+        tenantId: new mongoose.Types.ObjectId(request.tenantId),
+        driverId: driver._id,
+        status: { $in: ['paid', 'approved'] }
+      }).catch(() => []);
+
+      // Fetch attendance data (use override if provided, otherwise fetch from DB)
+      let attendance = request.overrideAttendance?.[driver._id.toString()];
+      if (!attendance) {
+        attendance = await fetchAttendanceForMonth(
+          request.tenantId,
+          driver._id,
+          request.month,
+          request.year
+        );
+      }
+
+      // Fetch trip incentive data (use override if provided, otherwise fetch from DB)
+      let tripIncentives = request.overrideTripIncentives?.[driver._id.toString()];
+      if (!tripIncentives) {
+        tripIncentives = await fetchTripIncentivesForMonth(
+          request.tenantId,
+          driver._id,
+          request.month,
+          request.year
+        );
+      }
+
+      // Use override deductions if provided
+      const deductions = request.overrideDeductions?.[driver._id.toString()];
+
+      // Prepare calculation input
+      const calcInput: SalaryCalculationInput = {
+        salaryMaster,
+        month: request.month,
+        year: request.year,
+        attendance,
+        tripIncentives,
+        deductions,
+        advances
+      };
+
+      const breakup = calculateSalary(calcInput);
+
+      // Driver name fallback
+      const driverName = driver.name || `Driver ${driver._id}`;
+
+      // Create payroll entry for this driver
+      driverPayrolls.push({
+        driverId: driver._id,
+        driverName,
+        baseSalary: breakup.earnings.baseSalary,
+        attendanceBonus: breakup.earnings.attendanceBonus || undefined,
+        tripIncentive: breakup.earnings.tripIncentive || undefined,
+        kmIncentive: breakup.earnings.kmIncentive || undefined,
+        nightAllowance: breakup.earnings.nightAllowance || undefined,
+        outstationAllowance: breakup.earnings.outstationAllowance || undefined,
+        foodAllowance: breakup.earnings.foodAllowance || undefined,
+        grossSalary: breakup.grossSalary,
+        absenceDeduction: breakup.deductions.absenceDeduction || undefined,
+        advanceRecovery: breakup.deductions.advanceRecovery || undefined,
+        penaltyDeduction: breakup.deductions.penaltyDeduction || undefined,
+        damageRecovery: breakup.deductions.damageRecovery || undefined,
+        challanRecovery: breakup.deductions.challanRecovery || undefined,
+        cashShortage: breakup.deductions.cashShortage || undefined,
+        fuelExcessRecovery: breakup.deductions.fuelExcessRecovery || undefined,
+        otherDeductions: breakup.deductions.otherDeductions || undefined,
+        totalDeductions: breakup.totalDeductions,
+        netSalary: breakup.netSalary,
+        paymentStatus: 'not_paid',
+        payments: [],
+        totalPaid: 0,
+        remainingAmount: breakup.netSalary,
+        calculatedBy,
+        calculatedAt: new Date()
+      });
+    } catch (error) {
+      console.error(`Error calculating payroll for driver ${driver.name}:`, error);
+      // Continue with next driver instead of failing entire payroll
     }
+  }
 
-    // Get advances
-    const advances = await DriverAdvance.find({
-      tenantId: new mongoose.Types.ObjectId(request.tenantId),
-      driverId: driver._id,
-      status: { $in: ['paid', 'approved'] }
-    });
-
-    // Prepare calculation input
-    const calcInput: SalaryCalculationInput = {
-      salaryMaster,
-      month: request.month,
-      year: request.year,
-      attendance: request.overrideAttendance?.[driver._id.toString()],
-      tripIncentives: request.overrideTripIncentives?.[driver._id.toString()],
-      deductions: request.overrideDeductions?.[driver._id.toString()],
-      advances
-    };
-
-    const breakup = calculateSalary(calcInput);
-
-    // Create payroll entry for this driver
-    driverPayrolls.push({
-      driverId: driver._id,
-      driverName: driver.name,
-      baseSalary: breakup.earnings.baseSalary,
-      attendanceBonus: breakup.earnings.attendanceBonus || undefined,
-      tripIncentive: breakup.earnings.tripIncentive || undefined,
-      kmIncentive: breakup.earnings.kmIncentive || undefined,
-      nightAllowance: breakup.earnings.nightAllowance || undefined,
-      outstationAllowance: breakup.earnings.outstationAllowance || undefined,
-      foodAllowance: breakup.earnings.foodAllowance || undefined,
-      grossSalary: breakup.grossSalary,
-      absenceDeduction: breakup.deductions.absenceDeduction || undefined,
-      advanceRecovery: breakup.deductions.advanceRecovery || undefined,
-      penaltyDeduction: breakup.deductions.penaltyDeduction || undefined,
-      damageRecovery: breakup.deductions.damageRecovery || undefined,
-      challanRecovery: breakup.deductions.challanRecovery || undefined,
-      cashShortage: breakup.deductions.cashShortage || undefined,
-      fuelExcessRecovery: breakup.deductions.fuelExcessRecovery || undefined,
-      otherDeductions: breakup.deductions.otherDeductions || undefined,
-      totalDeductions: breakup.totalDeductions,
-      netSalary: breakup.netSalary,
-      paymentStatus: 'not_paid',
-      payments: [],
-      totalPaid: 0,
-      remainingAmount: breakup.netSalary,
-      calculatedBy,
-      calculatedAt: new Date()
-    });
+  // Ensure we have at least one driver payroll
+  if (driverPayrolls.length === 0) {
+    throw new Error('No driver payrolls could be calculated. Check that drivers have active salary configuration.');
   }
 
   // Calculate payroll totals
   const totalGrossSalary = driverPayrolls.reduce((sum, dp) => sum + dp.grossSalary, 0);
   const totalDeductions = driverPayrolls.reduce((sum, dp) => sum + dp.totalDeductions, 0);
   const totalNetSalary = driverPayrolls.reduce((sum, dp) => sum + dp.netSalary, 0);
+
+  console.log(`Payroll calculation complete: ${driverPayrolls.length} drivers, Total: ₹${totalNetSalary}`);
 
   // Create or update payroll
   if (existing) {

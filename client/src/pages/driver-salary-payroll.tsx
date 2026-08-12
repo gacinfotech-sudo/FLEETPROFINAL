@@ -5,7 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const fmtMoney = (n: number) => `₹${n.toLocaleString('en-IN')}`;
@@ -40,7 +40,10 @@ export default function DriverSalaryPayroll() {
         credentials: 'include',
         body: JSON.stringify({ month, year })
       });
-      if (!res.ok) throw new Error('Failed to calculate payroll');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || 'Failed to calculate payroll');
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -48,7 +51,9 @@ export default function DriverSalaryPayroll() {
       queryClient.invalidateQueries({ queryKey: ['/api/payroll', month, year] });
     },
     onError: (error: any) => {
-      toast({ variant: 'destructive', description: error.message });
+      const errorMsg = error?.message || 'Failed to calculate payroll';
+      console.error('Payroll calculation error:', error);
+      toast({ variant: 'destructive', description: errorMsg });
     }
   });
 
@@ -76,6 +81,9 @@ export default function DriverSalaryPayroll() {
   // Payment action
   const paymentMutation = useMutation({
     mutationFn: async (data: any) => {
+      if (!data.driverId) throw new Error('Please select a driver');
+      if (!data.paidAmount || data.paidAmount <= 0) throw new Error('Please enter a valid amount');
+
       const res = await fetch(`/api/payroll/${currentPayroll._id}/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -87,17 +95,22 @@ export default function DriverSalaryPayroll() {
           paidBy: { userId: 'current-user', role: 'admin' }
         })
       });
-      if (!res.ok) throw new Error('Failed to record payment');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || errorData.error || 'Failed to record payment');
+      }
       return res.json();
     },
     onSuccess: () => {
-      toast({ description: 'Payment recorded' });
+      toast({ description: 'Payment recorded successfully' });
       setShowPaymentDialog(false);
       setPaymentData({ driverId: '', paidAmount: 0, paymentMode: 'cash' });
       queryClient.invalidateQueries({ queryKey: ['/api/payroll', month, year] });
     },
     onError: (error: any) => {
-      toast({ variant: 'destructive', description: error.message });
+      const errorMsg = error?.message || 'Failed to record payment';
+      console.error('Payment error:', error);
+      toast({ variant: 'destructive', description: errorMsg });
     }
   });
 
@@ -209,9 +222,9 @@ export default function DriverSalaryPayroll() {
         </Card>
 
         {/* Payroll Table */}
-        {currentPayroll && (
+        {currentPayroll && currentPayroll.driverPayrolls && currentPayroll.driverPayrolls.length > 0 ? (
           <Card className="p-6">
-            <h2 className="text-lg font-bold mb-4">Payroll Summary</h2>
+            <h2 className="text-lg font-bold mb-4">Payroll Summary ({currentPayroll.driverPayrolls.length} drivers)</h2>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -228,23 +241,35 @@ export default function DriverSalaryPayroll() {
                 </TableHeader>
                 <TableBody>
                   {currentPayroll.driverPayrolls.map((dp: any) => (
-                    <TableRow key={dp.driverId}>
-                      <TableCell className="font-medium">{dp.driverName}</TableCell>
-                      <TableCell className="text-right">{fmtMoney(dp.baseSalary)}</TableCell>
-                      <TableCell className="text-right">{fmtMoney(dp.grossSalary)}</TableCell>
-                      <TableCell className="text-right text-orange-600">{fmtMoney(dp.totalDeductions)}</TableCell>
-                      <TableCell className="text-right font-bold">{fmtMoney(dp.netSalary)}</TableCell>
-                      <TableCell className="text-right text-green-600">{fmtMoney(dp.totalPaid)}</TableCell>
-                      <TableCell className="text-right text-red-600">{fmtMoney(dp.remainingAmount)}</TableCell>
+                    <TableRow key={dp.driverId?.toString ? dp.driverId.toString() : dp.driverId}>
+                      <TableCell className="font-medium">{dp.driverName || 'Unknown Driver'}</TableCell>
+                      <TableCell className="text-right">{fmtMoney(dp.baseSalary || 0)}</TableCell>
+                      <TableCell className="text-right">{fmtMoney(dp.grossSalary || 0)}</TableCell>
+                      <TableCell className="text-right text-orange-600">{fmtMoney(dp.totalDeductions || 0)}</TableCell>
+                      <TableCell className="text-right font-bold">{fmtMoney(dp.netSalary || 0)}</TableCell>
+                      <TableCell className="text-right text-green-600">{fmtMoney(dp.totalPaid || 0)}</TableCell>
+                      <TableCell className="text-right text-red-600">{fmtMoney(dp.remainingAmount || 0)}</TableCell>
                       <TableCell>
-                        <Badge variant={statusBadgeVariant(dp.paymentStatus)}>
-                          {dp.paymentStatus.replace('_', ' ')}
+                        <Badge variant={statusBadgeVariant(dp.paymentStatus || 'not_paid')}>
+                          {(dp.paymentStatus || 'not_paid').replace('_', ' ')}
                         </Badge>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+            </div>
+          </Card>
+        ) : currentPayroll ? (
+          <Card className="p-6">
+            <div className="text-center py-8 text-gray-500">
+              <p>No driver payroll data available. Please calculate payroll first.</p>
+            </div>
+          </Card>
+        ) : (
+          <Card className="p-6">
+            <div className="text-center py-8 text-gray-500">
+              <p>No payroll found for {new Date(2026, month - 1).toLocaleString('default', { month: 'long' })} {year}</p>
             </div>
           </Card>
         )}
@@ -264,11 +289,15 @@ export default function DriverSalaryPayroll() {
                   onChange={(e) => setPaymentData({ ...paymentData, driverId: e.target.value })}
                 >
                   <option value="">Select driver...</option>
-                  {currentPayroll?.driverPayrolls.map((dp: any) => (
-                    <option key={dp.driverId} value={dp.driverId}>
-                      {dp.driverName} (Pending: {fmtMoney(dp.remainingAmount)})
-                    </option>
-                  ))}
+                  {currentPayroll?.driverPayrolls && currentPayroll.driverPayrolls.length > 0 ? (
+                    currentPayroll.driverPayrolls.map((dp: any) => (
+                      <option key={dp.driverId?.toString ? dp.driverId.toString() : dp.driverId} value={dp.driverId?.toString ? dp.driverId.toString() : dp.driverId}>
+                        {dp.driverName || 'Unknown Driver'} (Pending: {fmtMoney(dp.remainingAmount || 0)})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="" disabled>No drivers available</option>
+                  )}
                 </select>
               </div>
               <div>
