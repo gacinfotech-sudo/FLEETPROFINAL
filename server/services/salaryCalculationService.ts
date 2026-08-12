@@ -155,6 +155,8 @@ function calculateEarnings(
   attendance?: AttendanceData,
   tripIncentives?: TripIncentiveData
 ) {
+  const isPerTripSalary = salaryMaster.salaryType === 'per_trip';
+
   switch (salaryMaster.salaryType) {
     case 'fixed_monthly':
       breakup.earnings.baseSalary = salaryMaster.baseSalary;
@@ -179,8 +181,8 @@ function calculateEarnings(
       break;
   }
 
-  // Add trip incentives if applicable
-  if (tripIncentives) {
+  // Add trip incentives if applicable (but NOT for per_trip salary type, as it's already in base)
+  if (tripIncentives && !isPerTripSalary) {
     breakup.earnings.tripIncentive = (salaryMaster.perTripSalary || 0) * tripIncentives.totalTrips;
     breakup.earnings.kmIncentive = (salaryMaster.kmIncentivePerKm || 0) * tripIncentives.totalKm;
     breakup.earnings.nightAllowance = (salaryMaster.nightAllowancePerNight || 0) * tripIncentives.nightDutyTrips;
@@ -283,8 +285,11 @@ export function validateCalculationInput(input: SalaryCalculationInput) {
       (input.attendance.weeklyOffs || 0) +
       (input.attendance.halfDays || 0);
 
-    if (totalDays > 31) {
-      throw new Error('Total attendance days exceed calendar days in month');
+    // Calculate actual days in the month
+    const daysInMonth = new Date(input.year, input.month, 0).getDate();
+
+    if (totalDays > daysInMonth) {
+      throw new Error(`Total attendance days (${totalDays}) exceed calendar days in ${input.month}/${input.year} (${daysInMonth})`);
     }
   }
 }

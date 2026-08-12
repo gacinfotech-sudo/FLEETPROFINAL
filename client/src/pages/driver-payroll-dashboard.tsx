@@ -43,11 +43,11 @@ export default function DriverPayrollDashboard() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/payroll/summary"] });
-      toast({ title: "Payout initiated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/payroll/summary", payoutMonth] });
+      toast({ description: "Payout initiated successfully" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      toast({ variant: "destructive", description: error?.message || "Failed to initiate payout" });
     },
   });
 

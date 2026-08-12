@@ -67,6 +67,7 @@ import fraudDetectionRouter from "./routes/fraud-detection";
 import supportRouter from "./routes/support";
 import feedbackRouter from "./routes/feedback";
 import driverEarningsRouter from "./routes/driver-earnings";
+import driversRouter from "./routes/drivers";
 import driverSalaryRouter from "./routes/driverSalaryRoutes";
 import financeSalaryRouter from "./routes/financeSalaryRoutes";
 import vehicleTrackingRouter from "./routes/vehicle-tracking";
@@ -9147,6 +9148,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register driver earnings API routes
   app.use("/api/earnings", driverEarningsRouter);
 
+  // Register driver discovery & management routes
+  app.use("/api/drivers", driversRouter);
+
   // Register driver salary API routes
   app.use("/api/driver-salary", driverSalaryRouter);
 
@@ -9350,6 +9354,167 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const year = req.query.year ? parseInt(req.query.year as string) : undefined;
       const payrolls = await listPayrolls(req.tenantId.toString(), { status, month, year });
       res.json(payrolls);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/payroll/summary", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      // Parse month parameter (format: YYYY-MM or separate month/year)
+      let month: number | undefined;
+      let year: number | undefined;
+
+      if (req.query.month && typeof req.query.month === 'string') {
+        // Handle ISO format (YYYY-MM)
+        if (req.query.month.includes('-')) {
+          const [y, m] = req.query.month.split('-');
+          year = parseInt(y);
+          month = parseInt(m);
+        } else {
+          // Handle separate month parameter
+          month = parseInt(req.query.month);
+          year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear();
+        }
+      }
+
+      // Use current month/year as default
+      if (!month || !year) {
+        const now = new Date();
+        month = now.getMonth() + 1;
+        year = now.getFullYear();
+      }
+
+      // Fetch payroll for the month
+      const payroll = await getPayrollByMonth(req.tenantId.toString(), month, year);
+
+      if (!payroll) {
+        return res.json({
+          drivers: [],
+          summary: {
+            totalEarnings: 0,
+            avgPerDriver: 0,
+            pendingPayouts: 0,
+            totalDeductions: 0
+          },
+          earningsTrend: []
+        });
+      }
+
+      // Build driver list with payout status
+      const drivers = payroll.driverPayrolls.map((dp) => ({
+        id: dp.driverId.toString(),
+        name: dp.driverName,
+        earnings: dp.grossSalary,
+        bonus: dp.tripIncentive || 0,
+        trips: 0,
+        rating: 5,
+        payoutStatus: dp.paymentStatus,
+        lastPayoutDate: dp.paidAt ? new Date(dp.paidAt).toLocaleDateString('en-IN') : null
+      }));
+
+      const summary = {
+        totalEarnings: payroll.totalGrossSalary,
+        avgPerDriver: payroll.driverCount > 0 ? Math.round(payroll.totalGrossSalary / payroll.driverCount) : 0,
+        pendingPayouts: payroll.driverPayrolls.filter(dp => dp.paymentStatus !== 'paid').length,
+        totalDeductions: payroll.totalDeductions
+      };
+
+      res.json({
+        drivers,
+        summary,
+        earningsTrend: []
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/payroll/driver/:driverId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+
+      if (!month || !year) {
+        return res.status(400).json({ message: "Month and year required" });
+      }
+
+      const payroll = await getPayrollByMonth(req.tenantId.toString(), month, year);
+      if (!payroll) {
+        return res.status(404).json({ message: "Payroll not found" });
+      }
+
+      const driverPayroll = payroll.driverPayrolls.find(
+        (dp) => dp.driverId.toString() === req.params.driverId
+      );
+
+      if (!driverPayroll) {
+        return res.status(404).json({ message: "Driver not found in payroll" });
+      }
+
+      res.json({
+        name: driverPayroll.driverName,
+        totalTrips: 0,
+        baseEarnings: driverPayroll.baseSalary,
+        bonuses: (driverPayroll.tripIncentive || 0) + (driverPayroll.kmIncentive || 0),
+        netEarnings: driverPayroll.netSalary
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/payroll/initiate-payout", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { driverId, month } = req.body;
+
+      if (!driverId || !month) {
+        return res.status(400).json({ message: "Driver ID and month required" });
+      }
+
+      // Parse month (ISO format YYYY-MM or separate month/year)
+      let payrollMonth: number | undefined;
+      let payrollYear: number | undefined;
+
+      if (month.includes('-')) {
+        const [y, m] = month.split('-');
+        payrollYear = parseInt(y);
+        payrollMonth = parseInt(m);
+      } else {
+        payrollMonth = parseInt(month);
+        payrollYear = new Date().getFullYear();
+      }
+
+      if (!payrollMonth || !payrollYear) {
+        return res.status(400).json({ message: "Invalid month format" });
+      }
+
+      const payroll = await getPayrollByMonth(req.tenantId.toString(), payrollMonth, payrollYear);
+      if (!payroll) {
+        return res.status(404).json({ message: "Payroll not found" });
+      }
+
+      const driverPayroll = payroll.driverPayrolls.find(
+        (dp) => dp.driverId.toString() === driverId
+      );
+
+      if (!driverPayroll) {
+        return res.status(404).json({ message: "Driver not found in payroll" });
+      }
+
+      if (driverPayroll.remainingAmount <= 0) {
+        return res.json({ message: "Driver has no pending amount", success: true });
+      }
+
+      // Payout initiated - in a real system, this would trigger actual payment processing
+      // For now, we just return success
+      res.json({
+        message: "Payout initiated successfully",
+        success: true,
+        driverId,
+        amount: driverPayroll.remainingAmount,
+        status: driverPayroll.paymentStatus
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

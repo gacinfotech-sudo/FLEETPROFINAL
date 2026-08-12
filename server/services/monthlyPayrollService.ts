@@ -106,6 +106,7 @@ async function fetchAttendanceForMonth(
 
 /**
  * Helper: Fetch trip incentive data for a driver in given month
+ * Only counts COMPLETED bookings for the incentive calculation
  */
 async function fetchTripIncentivesForMonth(
   tenantId: string,
@@ -116,12 +117,14 @@ async function fetchTripIncentivesForMonth(
   try {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0);
+    endDate.setHours(23, 59, 59, 999);
 
+    // Only count COMPLETED bookings, as in_progress and confirmed are not finalized
     const bookings = await Booking.find({
       tenantId: new mongoose.Types.ObjectId(tenantId),
       driverId,
       pickupDate: { $gte: startDate, $lte: endDate },
-      status: { $in: ['completed', 'in_progress', 'confirmed'] }
+      status: 'completed'
     });
 
     let totalTrips = bookings.length;
@@ -176,8 +179,12 @@ export async function calculatePayroll(
     year: request.year
   });
 
-  if (existing && existing.status === 'closed') {
-    throw new Error('Cannot recalculate a closed payroll');
+  if (existing && ['closed', 'paid'].includes(existing.status)) {
+    throw new Error(`Cannot recalculate a ${existing.status} payroll`);
+  }
+
+  if (existing && existing.status === 'approved' && existing.totalPaid > 0) {
+    throw new Error('Cannot recalculate an approved payroll with payments recorded');
   }
 
   // Get list of drivers to process
@@ -317,13 +324,40 @@ export async function calculatePayroll(
 
   // Create or update payroll
   if (existing) {
-    existing.driverPayrolls = driverPayrolls;
+    // Preserve payment information from existing payroll
+    const existingPaymentInfo = new Map(
+      existing.driverPayrolls.map(dp => [dp.driverId.toString(), { totalPaid: dp.totalPaid, payments: dp.payments }])
+    );
+
+    // Merge new calculations with existing payment data
+    const mergedPayrolls = driverPayrolls.map(newDp => {
+      const existingPayment = existingPaymentInfo.get(newDp.driverId.toString());
+      if (existingPayment) {
+        return {
+          ...newDp,
+          totalPaid: existingPayment.totalPaid,
+          payments: existingPayment.payments,
+          remainingAmount: Math.max(0, newDp.netSalary - existingPayment.totalPaid),
+          paymentStatus:
+            existingPayment.totalPaid === 0 ? 'not_paid' :
+            existingPayment.totalPaid >= newDp.netSalary ? 'paid' :
+            'partially_paid'
+        };
+      }
+      return newDp;
+    });
+
+    // Recalculate totals with preserved payment data
+    const recalculatedTotalPaid = mergedPayrolls.reduce((sum, dp) => sum + dp.totalPaid, 0);
+    const recalculatedTotalPending = totalNetSalary - recalculatedTotalPaid;
+
+    existing.driverPayrolls = mergedPayrolls;
     existing.driverCount = driverPayrolls.length;
     existing.totalGrossSalary = totalGrossSalary;
     existing.totalDeductions = totalDeductions;
     existing.totalNetSalary = totalNetSalary;
-    existing.totalPaid = 0;
-    existing.totalPending = totalNetSalary;
+    existing.totalPaid = recalculatedTotalPaid;
+    existing.totalPending = recalculatedTotalPending;
     existing.status = 'calculated';
     existing.updatedAt = new Date();
     return existing.save();
@@ -415,6 +449,15 @@ export async function recordPaymentForDriver(
 
   if (!driverPayroll) {
     throw new Error('Driver not found in payroll');
+  }
+
+  // Validate payment amount
+  if (paidAmount <= 0) {
+    throw new Error('Payment amount must be greater than 0');
+  }
+
+  if (paidAmount > driverPayroll.remainingAmount) {
+    throw new Error(`Payment amount ₹${paidAmount} exceeds remaining amount ₹${driverPayroll.remainingAmount}`);
   }
 
   // Add payment
