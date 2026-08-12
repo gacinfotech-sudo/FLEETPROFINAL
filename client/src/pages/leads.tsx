@@ -150,9 +150,28 @@ export default function LeadsPage({ onConvertToBooking, initialLeadId }: LeadsPa
     setConvertingToBooking(true);
     try {
       const quotations = await (await apiRequest("GET", `/api/leads/${lead._id}/quotations`)).json();
-      const accepted = quotations.find((q: any) => q.status === "accepted");
+      // A quotation is valid for booking conversion if:
+      // 1. Status is already 'accepted', OR
+      // 2. It has an acceptedOptionNumber AND status is one of the customer-acknowledged states
+      //    (sent, viewed, customer_query, negotiation, accepted)
+      // This ensures the customer's choice was recorded before conversion.
+      const CUSTOMER_ACKNOWLEDGED_STATES = ['sent', 'viewed', 'customer_query', 'negotiation', 'accepted'];
+      const accepted = quotations.find((q: any) =>
+        q.status === "accepted" ||
+        (q.acceptedOptionNumber && CUSTOMER_ACKNOWLEDGED_STATES.includes(q.status))
+      );
       if (!accepted) {
-        toast({ title: "No accepted quotation", description: "Accept a quotation before converting this lead to a booking.", variant: "destructive" });
+        // Check if there's an approved quotation that needs to be sent/accepted first
+        const approved = quotations.find((q: any) => q.status === "approved");
+        if (approved) {
+          toast({
+            title: "Quotation not yet sent",
+            description: `QUO-${approved.quotationNumber}: Mark it as 'Sent' first, then accept an option.`,
+            variant: "destructive"
+          });
+        } else {
+          toast({ title: "No accepted quotation", description: "Accept a quotation before converting this lead to a booking.", variant: "destructive" });
+        }
         return;
       }
       const option = accepted.options.find((o: any) => o.optionNumber === accepted.acceptedOptionNumber);
