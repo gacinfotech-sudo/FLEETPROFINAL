@@ -1,19 +1,259 @@
-
-> rest-express@1.0.0 dev
-> NODE_ENV=development tsx server/index.ts
-
-[dotenv@17.0.0] injecting env (8) from .env – 🔐 encrypt with dotenvx: https://dotenvx.com
-🔗 Connecting to MongoDB (attempt 1/3)...
+[2026-08-12T07:22:47.738Z] [VAPIDConfig:WARN] VAPID keys not configured. Push notifications will be disabled. { hasPublicKey: false, hasPrivateKey: false }
+[2026-08-12T07:22:47.739Z] [ProductionHardening:INFO] Production hardening initialized 
+[dotenv@17.0.0] injecting env (9) from .env – 🔐 encrypt with dotenvx: https://dotenvx.com
+🔗 Connecting to MongoDB (attempt 1/5)...
 ✅ MongoDB Connected: 127.0.0.1
 📊 Database: fleetpro
-✅ Using existing secure admin credentials
+[2026-08-12T07:22:47.772Z] [Server:INFO] MongoDB connected successfully { database: 'fleetpro' }
+[2026-08-12T07:22:47.773Z] [Server:INFO] Using existing secure admin credentials 
 🚨 Creating emergency admin user from environment variables
 ⚠️  Emergency admin user already exists
-3:04:56 PM [express] MongoDB connected - starting background job
+[2026-08-12T07:22:47.830Z] [NotificationIndexes:INFO] Ensuring notification system indexes 
+[2026-08-12T07:22:47.831Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'scheduled_notifications',
+  index: 'idx_scheduled_status_scheduledFor'
+}
+[2026-08-12T07:22:47.832Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'scheduled_notifications',
+  index: 'idx_scheduled_scheduledFor'
+}
+[2026-08-12T07:22:47.832Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'scheduled_notifications',
+  index: 'idx_scheduled_recurrenceEndDate_status'
+}
+[2026-08-12T07:22:47.833Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'scheduled_notifications',
+  index: 'idx_scheduled_ttl_90days'
+}
+[2026-08-12T07:22:47.833Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_notificationId' }
+[2026-08-12T07:22:47.833Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_userId_sentAt' }
+[2026-08-12T07:22:47.833Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_status_sentAt' }
+[2026-08-12T07:22:47.834Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_sentAt' }
+[2026-08-12T07:22:47.834Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'notification_logs',
+  index: 'idx_logs_notificationType_sentAt'
+}
+[2026-08-12T07:22:47.835Z] [NotificationIndexes:WARN] Failed to create index {
+  collection: 'notification_logs',
+  index: 'idx_logs_ttl_30days',
+  error: MongoServerError: An equivalent index already exists with a different name and options. Requested index: { v: 2, key: { sentAt: 1 }, name: "idx_logs_ttl_30days", expireAfterSeconds: 2592000 }, existing index: { v: 2, key: { sentAt: 1 }, name: "idx_logs_sentAt", sparse: false }
+      at Connection.sendCommand (/Users/pradeep/fleetpro-main-p0-fixed/fleetpro-main/node_modules/mongodb/lib/cmap/connection.js:306:27)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Connection.command (/Users/pradeep/fleetpro-main-p0-fixed/fleetpro-main/node_modules/mongodb/lib/cmap/connection.js:334:26)
+      at async Server.command (/Users/pradeep/fleetpro-main-p0-fixed/fleetpro-main/node_modules/mongodb/lib/sdam/server.js:194:29)
+      at async tryOperation (/Users/pradeep/fleetpro-main-p0-fixed/fleetpro-main/node_modules/mongodb/lib/operations/execute_operation.js:213:32)
+      at async executeOperation (/Users/pradeep/fleetpro-main-p0-fixed/fleetpro-main/node_modules/mongodb/lib/operations/execute_operation.js:78:16)
+      at async Collection.createIndex (/Users/pradeep/fleetpro-main-p0-fixed/fleetpro-main/node_modules/mongodb/lib/collection.js:373:25)
+      at async NotificationIndexManager.ensureCollectionIndexes (file:///Users/pradeep/fleetpro-customer360/dist/index.js:6195:15)
+      at async NotificationIndexManager.ensureIndexes (file:///Users/pradeep/fleetpro-customer360/dist/index.js:6183:11)
+      at async file:///Users/pradeep/fleetpro-customer360/dist/index.js:57838:5 {
+    errorLabelSet: Set(0) {},
+    errorResponse: {
+      ok: 0,
+      errmsg: 'An equivalent index already exists with a different name and options. Requested index: { v: 2, key: { sentAt: 1 }, name: "idx_logs_ttl_30days", expireAfterSeconds: 2592000 }, existing index: { v: 2, key: { sentAt: 1 }, name: "idx_logs_sentAt", sparse: false }',
+      code: 85,
+      codeName: 'IndexOptionsConflict'
+    },
+    ok: 0,
+    code: 85,
+    codeName: 'IndexOptionsConflict'
+  }
+}
+[2026-08-12T07:22:47.835Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_analytics' }
+[2026-08-12T07:22:47.835Z] [NotificationIndexes:INFO] All notification indexes verified 
+[2026-08-12T07:22:47.835Z] [Server:INFO] Notification indexes verified 
+[2026-08-12T07:22:47.837Z] [Server:INFO] Notification templates initialized 
+[2026-08-12T07:22:47.837Z] [NotificationScheduler:INFO] Notification scheduler started 
+[2026-08-12T07:22:47.838Z] [Server:INFO] Notification scheduler started 
+[2026-08-12T07:22:47.838Z] [NotificationRetry:INFO] Notification retry manager started 
+[2026-08-12T07:22:47.838Z] [Server:INFO] Notification retry manager started 
+[2026-08-12T07:22:47.838Z] [NotificationRateLimiter:INFO] Notification rate limiter started 
+[2026-08-12T07:22:47.839Z] [Server:INFO] Notification rate limiter started 
+[2026-08-12T07:22:47.839Z] [NotificationWebhooks:INFO] Notification webhook manager started 
+[2026-08-12T07:22:47.839Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 
+[2026-08-12T07:22:47.839Z] [Server:INFO] Notification webhook manager started 
+[2026-08-12T07:22:47.839Z] [NotificationBatchProcessor:INFO] Notification batch processor started 
+[2026-08-12T07:22:47.839Z] [Server:INFO] Notification batch processor started 
+12:52:47 PM [express] MongoDB connected - starting background job
 [operations] booking-end reminder scheduler started (every 60000ms)
-3:04:56 PM [express] serving on port 5050
-3:04:57 PM [express] GET /api/csrf-token 200 in 19ms :: {"csrfToken":"1599be8417382b96a2090833397b9f…
-Browserslist: browsers data (caniuse-lite) is 14 months old. Please run:
-  npx update-browserslist-db@latest
-  Why you should do it regularly: https://github.com/browserslist/update-db#readme
-3:04:59 PM [vite] Pre-transform error: Failed to resolve import "@/modules/manifest" from "client/src/components/layout/sidebar.tsx". Does the file exist?
+12:52:47 PM [express] 🔒 serving HTTPS on 0.0.0.0:5050
+[2026-08-12T07:22:47.849Z] [Server:INFO] HTTPS server started { host: '0.0.0.0', port: 5050, ssl: true }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+12:53:01 PM [express] GET /api/operations/alerts 200 in 29ms :: []
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+[2026-08-12T07:23:02.299Z] [RequestLogger:WARN] [GET] /api/root/support-access/status - 403 { duration: '18ms', ip: '192.168.29.77', size: 38 }
+12:53:02 PM [express] GET /api/root/support-access/status 403 in 20ms :: {"message":"Platform access …
+12:53:07 PM [express] GET /api/health 200 in 13ms
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+12:53:13 PM [express] GET /api/customers/tags 200 in 41ms :: []
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+12:53:13 PM [express] GET /api/customers 200 in 40ms :: [{"_id":"6a78c8726f1c464f491413cd","tenantId"…
+12:53:13 PM [express] GET /api/customers/segments 200 in 36ms :: [{"key":"new","label":"New Customers…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+[2026-08-12T07:23:17.342Z] [RequestLogger:WARN] [GET] /api/root/support-access/status - 403 { duration: '15ms', ip: '192.168.29.77', size: 38 }
+12:53:17 PM [express] GET /api/root/support-access/status 403 in 16ms :: {"message":"Platform access …
+[2026-08-12T07:23:30.878Z] [RequestLogger:WARN] [GET] /api/bookings/queues/most-recent - 401 { duration: '0ms', ip: '127.0.0.1', size: 37 }
+12:53:30 PM [express] GET /api/bookings/queues/most-recent 401 in 4ms :: {"message":"Authentication r…
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+12:53:31 PM [express] GET /api/operations/alerts 200 in 19ms :: []
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+[2026-08-12T07:23:32.396Z] [RequestLogger:WARN] [GET] /api/root/support-access/status - 403 { duration: '15ms', ip: '192.168.29.77', size: 38 }
+12:53:32 PM [express] GET /api/root/support-access/status 403 in 16ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+[2026-08-12T07:23:47.557Z] [RequestLogger:WARN] [GET] /api/root/support-access/status - 403 { duration: '14ms', ip: '192.168.29.77', size: 38 }
+12:53:47 PM [express] GET /api/root/support-access/status 403 in 16ms :: {"message":"Platform access …
+[2026-08-12T07:23:47.841Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 

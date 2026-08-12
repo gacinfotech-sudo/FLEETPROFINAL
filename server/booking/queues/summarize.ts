@@ -29,10 +29,23 @@ export function deriveAllocationSummary(b: BookingLike): AllocationSummary {
   return { driverAssigned, vehicleAssigned, vendorFulfilled, selfDrive, complete: driverAssigned && vehicleAssigned, label };
 }
 
+// Safe date conversion: validates the date before calling toISOString()
+function safeToISOString(d: Date | null | undefined): string | null {
+  if (!d) return null;
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
 export function summarizeBooking(b: BookingLike, reasons?: AttentionReason[]): QueueBookingRow {
   const vehicle = b.vehicleId && typeof b.vehicleId === 'object' ? b.vehicleId : null;
   const driver = b.driverId && typeof b.driverId === 'object' ? b.driverId : null;
   const followUpAt = resolveFollowUpAt(b);
+
+  // Helper to safely create dates from booking fields
+  const toDate = (field: any): Date | null => {
+    if (!field) return null;
+    const d = new Date(field);
+    return isNaN(d.getTime()) ? null : d;
+  };
 
   return {
     id: b._id?.toString?.() || String(b._id),
@@ -42,12 +55,12 @@ export function summarizeBooking(b: BookingLike, reasons?: AttentionReason[]): Q
     customerPhone: b.customerPhone,
     pickupLocation: b.pickupLocation,
     dropoffLocation: b.dropoffLocation,
-    pickupDate: b.pickupDate ? new Date(b.pickupDate).toISOString() : null,
+    pickupDate: safeToISOString(toDate(b.pickupDate)),
     pickupTime: b.pickupTime,
     status: b.status,
     travelDateStatus: resolveTravelDateStatus(b),
-    tentativeStartDate: b.tentativeStartDate ? new Date(b.tentativeStartDate).toISOString() : null,
-    tentativeEndDate: b.tentativeEndDate ? new Date(b.tentativeEndDate).toISOString() : null,
+    tentativeStartDate: safeToISOString(toDate(b.tentativeStartDate)),
+    tentativeEndDate: safeToISOString(toDate(b.tentativeEndDate)),
     followUpAt: followUpAt ? followUpAt.toISOString() : null,
     lastActivityAt: resolveLastActivityAt(b).toISOString(),
     resourceFulfilmentStatus: b.resourceFulfilmentStatus,

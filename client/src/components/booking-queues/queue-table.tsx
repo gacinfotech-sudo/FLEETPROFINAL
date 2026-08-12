@@ -32,12 +32,24 @@ const PRE_CONFIRM = new Set(["enquiry", "quotation_sent", "tentative", "on_hold"
 
 function fmtDate(d?: string | null) {
   if (!d) return "-";
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  try {
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return "-";
+  }
 }
 
 function fmtDateTime(d?: string | null) {
   if (!d) return "-";
-  return new Date(d).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  try {
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "-";
+  }
 }
 
 export function QueueTable({ rows, isLoading, emptyLabel, onRowClick }: {
@@ -79,6 +91,11 @@ export function QueueTable({ rows, isLoading, emptyLabel, onRowClick }: {
           {rows.map((b) => {
             const datePending = b.travelDateStatus === "not_decided";
             const canConfirm = PRE_CONFIRM.has(b.status);
+            const bookingId = b.bookingId || "N/A";
+            const customerName = b.customerName || "Unknown";
+            const customerPhone = b.customerPhone || "-";
+            const pickupLoc = b.pickupLocation || "-";
+            const dropoffLoc = b.dropoffLocation || "";
             return (
               <TableRow key={b.id} className="cursor-pointer hover:bg-gray-50" onClick={() => openRow(b)}>
                 <TableCell className="font-medium">
@@ -87,14 +104,14 @@ export function QueueTable({ rows, isLoading, emptyLabel, onRowClick }: {
                     className="text-blue-700 hover:underline font-mono text-xs"
                     onClick={(e) => { e.stopPropagation(); openBooking(b.id); }}
                   >
-                    {b.bookingId}
+                    {bookingId}
                   </button>
                 </TableCell>
                 <TableCell>
-                  <p>{b.customerName}</p>
-                  <p className="text-xs text-gray-500">{b.customerPhone}</p>
+                  <p>{customerName}</p>
+                  <p className="text-xs text-gray-500">{customerPhone}</p>
                 </TableCell>
-                <TableCell>{b.pickupLocation} {b.dropoffLocation ? `→ ${b.dropoffLocation}` : ""}</TableCell>
+                <TableCell>{pickupLoc} {dropoffLoc ? `→ ${dropoffLoc}` : ""}</TableCell>
                 <TableCell>
                   {datePending ? (
                     <Button
@@ -119,7 +136,7 @@ export function QueueTable({ rows, isLoading, emptyLabel, onRowClick }: {
                   )}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="capitalize">{b.status?.replace(/_/g, " ")}</Badge>
+                  <Badge variant="outline" className="capitalize">{(b.status || "unknown")?.replace(/_/g, " ")}</Badge>
                   {b.allocation && !b.allocation.complete && (
                     <span className="block text-xs text-amber-700 mt-1">{b.allocation.label}</span>
                   )}

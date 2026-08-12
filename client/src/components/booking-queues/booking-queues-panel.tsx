@@ -40,7 +40,10 @@ export default function BookingQueuesPanel({ onRowClick }: { onRowClick?: (row: 
   params.set("order", order);
   const url = `${active.endpoint}?${params.toString()}`;
 
-  const { data, isLoading, isError } = useQuery<{ items: QueueBookingRow[] }>({ queryKey: [url] });
+  const { data, isLoading, isError, error, refetch } = useQuery<{ items: QueueBookingRow[] }>({
+    queryKey: [url],
+    retry: 1,
+  });
   const rows = data?.items || [];
 
   // Counts for every tab's badge, fetched independently so switching tabs
@@ -49,7 +52,10 @@ export default function BookingQueuesPanel({ onRowClick }: { onRowClick?: (row: 
   // five genuinely separate endpoints, not one bucketed response).
   const countQueries = QUEUE_TABS.map((t) =>
     // eslint-disable-next-line react-hooks/rules-of-hooks
-    useQuery<{ items: QueueBookingRow[] }>({ queryKey: [t.endpoint] })
+    useQuery<{ items: QueueBookingRow[] }>({
+      queryKey: [t.endpoint],
+      retry: 1,
+    })
   );
 
   return (
@@ -92,7 +98,16 @@ export default function BookingQueuesPanel({ onRowClick }: { onRowClick?: (row: 
               </CardHeader>
               <CardContent>
                 {isError && activeTab === t.key ? (
-                  <p className="text-sm text-red-600">Failed to load {t.label}.</p>
+                  <div className="text-sm text-red-600">
+                    <p className="mb-2">Failed to load {t.label}.</p>
+                    {error && <p className="text-xs text-gray-500 mb-3">{String(error)}</p>}
+                    <button
+                      onClick={() => refetch()}
+                      className="px-3 py-1 text-sm bg-red-50 border border-red-200 rounded hover:bg-red-100"
+                    >
+                      Try Again
+                    </button>
+                  </div>
                 ) : (
                   <QueueTable
                     rows={activeTab === t.key ? rows : []}
