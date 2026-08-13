@@ -100,16 +100,39 @@ export async function getDriverSalaryConsolidated(
     status: { $in: ['active', 'inactive'] }
   });
 
+  // Fetch driver details (needed even if no salary config)
+  const driverDetails = await Driver.findById(driverObjId).select('name phone email');
+  if (!driverDetails) {
+    throw new Error(`Driver not found: ${driverId}`);
+  }
+
+  // If no salary master, return zero-data response (not an error)
   if (!salaryMaster) {
-    throw new Error(`No active salary configuration found for driver: ${driverId}`);
+    return {
+      driverId: String(driverObjId),
+      driverName: driverDetails.name || 'Unknown',
+      month,
+      year,
+      baseSalary: 0,
+      incentives: 0,
+      allowances: 0,
+      bonuses: 0,
+      grossSalary: 0,
+      advanceDeductions: 0,
+      rechargeDeductions: 0,
+      recoveryDeductions: 0,
+      penaltyDeductions: 0,
+      totalDeductions: 0,
+      totalPaid: 0,
+      totalPending: 0,
+      paymentStatus: 'pending',
+      paymentNotes: 'No salary configuration set up'
+    };
   }
 
   // Calculate period dates
   const periodStart = new Date(year, month - 1, 1);
   const periodEnd = new Date(year, month, 0);
-
-  // Fetch driver details
-  const driverDetails = await Driver.findById(driverObjId).select('name phone email');
 
   // Fetch salary record for this period
   const driverSalary = await DriverSalary.findOne({
@@ -315,7 +338,7 @@ export async function getSalaryDashboard(
     };
   }
 
-  // Get consolidated data for each driver
+  // Get consolidated data for each driver (including those without salary config)
   const drivers: ConsolidatedSalaryData[] = [];
   for (const driver of allDrivers) {
     try {
@@ -327,8 +350,29 @@ export async function getSalaryDashboard(
       );
       drivers.push(consolidatedData);
     } catch (error) {
-      // Skip drivers that don't have salary configuration yet
-      console.debug(`Skipping driver ${driver.name} (${driver._id}): no salary configuration`);
+      // Log error but don't skip - show driver with error status
+      console.warn(`Error getting salary data for driver ${driver.name} (${driver._id}):`, error?.message);
+      // Add driver with error status
+      drivers.push({
+        driverId: String(driver._id),
+        driverName: driver.name || 'Unknown',
+        month,
+        year,
+        baseSalary: 0,
+        incentives: 0,
+        allowances: 0,
+        bonuses: 0,
+        grossSalary: 0,
+        advanceDeductions: 0,
+        rechargeDeductions: 0,
+        recoveryDeductions: 0,
+        penaltyDeductions: 0,
+        totalDeductions: 0,
+        totalPaid: 0,
+        totalPending: 0,
+        paymentStatus: 'pending',
+        paymentNotes: 'Error loading salary data'
+      });
     }
   }
 

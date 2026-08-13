@@ -4376,3 +4376,2141 @@ User authenticated: { userId: 'ram', role: 'client' }
 11:03:12 AM [express] GET /api/users/sub-users 200 in 20ms :: [{"_id":"6a7af13f696b7b23942232e9","use…
 [RequestLogger:DEBUG] [GET] /api/operations/upcoming-bookings - 200 { duration: '26ms' }
 11:03:12 AM [express] GET /api/operations/upcoming-bookings 200 in 26ms :: [{"date":"2026-08-13","lab…
+[2026-08-13T05:33:26.679Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 
+[RequestLogger:DEBUG] [GET] /api/root/support-access/status {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[2026-08-13T05:33:27.040Z] [RequestLogger:WARN] [GET] /api/root/support-access/status - 403 { duration: '7ms', ip: '192.168.29.217', size: 38 }
+11:03:27 AM [express] GET /api/root/support-access/status 403 in 8ms :: {"message":"Platform access r…
+[RequestLogger:DEBUG] [GET] /api/operations/live-vehicles {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/operations/live-vehicles - 200 { duration: '8ms' }
+11:03:30 AM [express] GET /api/operations/live-vehicles 200 in 9ms :: {"generatedAt":"2026-08-13T05:3…
+[RequestLogger:DEBUG] [GET] /favicon.ico {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/csrf-token {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/csrf-token - 200 { duration: '12ms' }
+11:03:34 AM [express] GET /api/csrf-token 200 in 12ms :: {"csrfToken":"51921c0050af8cd9dfdb122e2e07c5…
+[RequestLogger:DEBUG] [POST] /api/operations/reminders/run {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [POST] /api/operations/reminders/run - 200 { duration: '16ms' }
+11:03:34 AM [express] POST /api/operations/reminders/run 200 in 17ms :: {"ok":true,"created":0}
+[RequestLogger:DEBUG] [GET] /api/operations/live-vehicles {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/operations/live-vehicles - 200 { duration: '12ms' }
+11:03:34 AM [express] GET /api/operations/live-vehicles 200 in 12ms :: {"generatedAt":"2026-08-13T05:…
+[RequestLogger:DEBUG] [GET] /api/operations/alerts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/operations/alerts - 200 { duration: '17ms' }
+11:03:41 AM [express] GET /api/operations/alerts 200 in 18ms :: []
+[RequestLogger:DEBUG] [GET] /api/root/support-access/status {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[2026-08-13T05:33:42.091Z] [RequestLogger:WARN] [GET] /api/root/support-access/status - 403 { duration: '12ms', ip: '192.168.29.217', size: 38 }
+11:03:42 AM [express] GET /api/root/support-access/status 403 in 13ms :: {"message":"Platform access …
+[RequestLogger:DEBUG] [GET] /api/operations/live-bookings {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/operations/live-bookings - 200 { duration: '41ms' }
+11:03:44 AM [express] GET /api/operations/live-bookings 200 in 40ms :: {"generatedAt":"2026-08-13T05:…
+[RequestLogger:DEBUG] [GET] /favicon.ico {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /dashboard/live-bookings {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@vite/client {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/main.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@react-refresh {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/vite/dist/client/env.mjs {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /manifest.json {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/react_jsx-dev-runtime.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/App.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/index.css {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/react-dom_client.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-QCHXOAYK.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-WOOG5QLI.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/wouter.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@tanstack_react-query.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/queryClient.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/toaster.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/tooltip.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/use-auth.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/offline-notification.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/error-boundary.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/landing.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] / {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/login.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/admin-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/dashboard.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/tenant-360.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/forced-password-reset.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/auth/protected-route.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-login.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/dashboard.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/tenants.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/tenant-360.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/global-customers.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/customer-360.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/security-center.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/support-tickets.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/error-center.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/diagnostics.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/sales-pipeline.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/product-config.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/root/support-access-banner.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-payroll-dashboard.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/vendor-settlement-portal.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/platform-admin-360.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/operations-center.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/live-bookings.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-RPCDYKBN.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/booking-workspace-context.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/api.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/use-toast.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/toast.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-tooltip.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-KBTYAULA.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/use-offline.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/lucide-react.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/button.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/card.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/badge.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/dialog.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/input.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/label.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/table.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/admin/client-form.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/admin/plan-management-modal.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/admin/manager-control-modal.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/skeleton.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/smart-recommendations.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/critical-alerts.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/quick-actions.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/notification-center.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/command-palette.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/layout/sidebar.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/useKeyboardShortcuts.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/use-permissions.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/overview.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/enhanced-booking-form.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-360.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/fleet/vehicle-feedback-profile.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-form.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/revenue-report.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/vendor-settlement.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/booking-history-pdf.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/invoice/enhanced-invoice-generator.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/user-management.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/business-profile.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/settings/reward-referral-settings-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/onboarding/onboarding-wizard.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/manage-expenses.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/live-operations.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/self-drive.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/operations/operations-alert-strip.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/after-sales.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/campaigns.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/rewards-referrals-dashboard.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/inquiries.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/leads.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/followups.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking-queues/booking-queues-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/payment-dues.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-leave.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/leave/today-on-leave-strip.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-attendance.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/vehicle-performance.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/gps-settings.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/whatsapp-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/daily-operations-popup.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/textarea.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/audit-log.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/tabs.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/feature-flags.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/react.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/accessibility-helpers.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/utils.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/booking-workspace.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-toast.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/class-variance-authority.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-UPVX7IVH.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-KADFZHNY.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-JTXUFRPV.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-BNESBGCN.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-ZGZLNDFP.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-YE5GEEUL.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-2UGGF4OY.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-K3KUYG4W.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-OXZDJRWN.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-AXMZZQ2X.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-2K77HOHX.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/vehicle-360.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-slot.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-portal.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-dialog.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-label.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/recharts.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@hookform_resolvers_zod.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/react-hook-form.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/zod.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/switch.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/form.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/forms/form-enhancements.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/checkbox.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/alert-dialog.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/progress.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/keyboard-shortcuts-help.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/theme-toggle.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/fleet/vehicle-form.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/modules/manifest.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/separator.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-salary-payroll.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/radio-group.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/collapsible.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/html2pdf__js.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/booking-confirmation-pdf.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/useSmartBookingNavigation.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/booking-highlighting.css {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/set-driver-pin-dialog.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-feedback-profile.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-contacts-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-documents-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-employment-history-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-lifecycle-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-attendance-leave-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/driver-360/SalarySummary.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/driver-360/SalaryHistory.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/driver-360/SalaryLedger.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-domain-constants.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/alert.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/jspdf.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/jspdf-autotable.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/revenue-dashboard-header.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/revenue-dashboard-theme.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/revenue-dashboard-charts.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/revenue-kpi-cards.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/top-vehicles-revenue-source.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/invoice/invoice-settings-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/customers.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/revenue-dashboard-utils.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/date-fns.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/operations/extend-booking-dialog.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/operations/collect-payment-dialog.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/sheet.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/operations/reminder-settings-dialog.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/self-drive/process-refund-dialog.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/vendors.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/inquiries/quick-inquiry-form.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/inquiries/detailed-requirement-form.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/pipeline/pipeline-stepper.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/pipeline/contextual-action-bar.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/pipelineStages.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-performance.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/leads/followup-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/leads/quotation-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-dashboard.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking-queues/queue-table.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/leave/leave-domain.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/select.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/live-map-view.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/vehicle-mapping-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/connection-setup-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/upcoming-bookings.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-tabs.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/clsx.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/tailwind-merge.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/booking-state.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/schedule-editor.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/payment-section.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/trip-cost-summary.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/resource-fulfilment-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/assign-vendor-dialog.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/extend-booking-dialog.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/booking-communication.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/self-drive-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-TPYHSINA.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-U7P2NEEE.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/handover/DriverHandoverAcceptance.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-MAQE74XC.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-3UMUPYER.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-4BFJKWC4.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-switch.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-progress.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-checkbox.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/dropdown-menu.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/use-theme.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-separator.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-radio-group.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/utils/bookingValidation.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/utils/fieldHighlighting.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-D7ZASVPN.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/analytics-drilldown-drawer.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/use-debounced-value.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/inquiries/vehicle-selector.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/vendors/vendor-drivers.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/vendors/vendor-vehicles.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/vendors/vendor-duties.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/leads/quotation-document.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-service.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-timeline.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-rewards-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-consent.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-referral-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-message-center.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-requirements.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking-queues/previous-booking-reuse.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-duplicate-review.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-payment-receipt.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-invoices.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-drivers.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-vehicles.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-google-reviews.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-self-drive.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-select.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/scroll-area.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/api.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/capabilities.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/fleet-map.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/status-summary-cards.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/vehicle-status-card.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/vehicle-detail-dialog.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/assign-device-dialog.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/unassign-device-dialog.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/connection-form-dialog.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/connection-sync-health-badge.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/duty-slip.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-ATIQ27TM.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-4RO2SXZU.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/whatsapp-error.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/self-drive/fuel-gauge.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-43G6IMPT.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-dropdown-menu.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/qrcode.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-scroll-area.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-6ZMM2PAV.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/leaflet-fleet-map.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/map-adapter.ts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/route-replay-panel.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/leaflet/dist/leaflet.css {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/react-leaflet.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/leaflet.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/slider.tsx {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/chunk-JQURRHX6.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-customer360/node_modules/.vite/deps/@radix-ui_react-slider.js {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/auth/me {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/auth/me - 200 { duration: '10ms' }
+11:03:59 AM [express] GET /api/auth/me 200 in 11ms :: {"user":{"id":"6a7617d841d6ae595bc7a113","userI…
+[RequestLogger:DEBUG] [GET] /favicon.ico {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/root/support-access/status {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/operations/alerts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/dashboard/overview {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/dashboard/upcoming-bookings {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/operations/live-bookings {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/vehicles {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[2026-08-13T05:33:59.237Z] [RequestLogger:WARN] [GET] /api/root/support-access/status - 403 { duration: '15ms', ip: '192.168.29.217', size: 38 }
+11:03:59 AM [express] GET /api/root/support-access/status 403 in 28ms :: {"message":"Platform access …
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/drivers {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/operations/alerts - 200 { duration: '40ms' }
+[RequestLogger:DEBUG] [GET] /api/vehicles - 200 { duration: '47ms' }
+[RequestLogger:DEBUG] [GET] /api/dashboard/overview - 200 { duration: '51ms' }
+[RequestLogger:DEBUG] [GET] /api/operations/live-bookings - 200 { duration: '52ms' }
+[RequestLogger:DEBUG] [GET] /api/dashboard/upcoming-bookings - 200 { duration: '53ms' }
+11:03:59 AM [express] GET /api/operations/alerts 200 in 53ms :: []
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+11:03:59 AM [express] GET /api/dashboard/overview 200 in 54ms :: {"periodDays":30,"kpis":{"revenue":{…
+11:03:59 AM [express] GET /api/vehicles 200 in 54ms :: [{"isDraft":false,"_id":"6a78d4f9f9e38cc57db73…
+[RequestLogger:DEBUG] [GET] /api/drivers - 200 { duration: '27ms' }
+11:03:59 AM [express] GET /api/operations/live-bookings 200 in 57ms :: {"generatedAt":"2026-08-13T05:…
+11:03:59 AM [express] GET /api/dashboard/upcoming-bookings 200 in 57ms :: {"today":[],"tomorrow":[{"_…
+11:03:59 AM [express] GET /api/drivers 200 in 28ms :: [{"_id":"6a78d4f9f9e38cc57db73f4b","tenantId":"…
+[RequestLogger:DEBUG] [GET] /api/bookings {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/bookings - 200 { duration: '15ms' }
+11:03:59 AM [express] GET /api/bookings 200 in 17ms :: [{"_id":"6a78c8726f1c464f49141532","tenantId":…
+[RequestLogger:DEBUG] [GET] /api/users/sub-users {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/operations/live-bookings {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /favicon.svg {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/users/sub-users - 200 { duration: '14ms' }
+11:03:59 AM [express] GET /api/users/sub-users 200 in 15ms :: [{"_id":"6a7af13f696b7b23942232e9","use…
+[RequestLogger:DEBUG] [GET] /api/operations/live-bookings - 200 { duration: '15ms' }
+11:03:59 AM [express] GET /api/operations/live-bookings 200 in 15ms :: {"generatedAt":"2026-08-13T05:…
+[RequestLogger:DEBUG] [GET] /api/root/support-access/status {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[2026-08-13T05:34:14.363Z] [RequestLogger:WARN] [GET] /api/root/support-access/status - 403 { duration: '12ms', ip: '192.168.29.217', size: 38 }
+11:04:14 AM [express] GET /api/root/support-access/status 403 in 13ms :: {"message":"Platform access …
+[RequestLogger:DEBUG] [GET] /api/csrf-token {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/csrf-token - 200 { duration: '11ms' }
+11:04:16 AM [express] GET /api/csrf-token 200 in 13ms :: {"csrfToken":"51921c0050af8cd9dfdb122e2e07c5…
+[RequestLogger:DEBUG] [POST] /api/bookings/6a7d53abcb00127029d8ddd8/status {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[AUTO-SYNC] Failed to trigger on booking completion: Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/Users/pradeep/fleetpro-customer360/services/driverAutoEnrollmentService' imported from /Users/pradeep/fleetpro-customer360/server/routes.ts
+    at finalizeResolution (node:internal/modules/esm/resolve:271:11)
+    at moduleResolve (node:internal/modules/esm/resolve:865:10)
+    at defaultResolve (node:internal/modules/esm/resolve:992:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:701:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:721:38)
+    at nextStep (node:internal/modules/customization_hooks:189:26)
+    at resolveBaseSync (file:///Users/pradeep/fleetpro-customer360/node_modules/tsx/dist/register-B_kKY3fL.mjs:2:9102)
+    at resolveDirectorySync (file:///Users/pradeep/fleetpro-customer360/node_modules/tsx/dist/register-B_kKY3fL.mjs:2:10315)
+    at resolveTsPathsSync (file:///Users/pradeep/fleetpro-customer360/node_modules/tsx/dist/register-B_kKY3fL.mjs:2:11547)
+    at resolve (file:///Users/pradeep/fleetpro-customer360/node_modules/tsx/dist/register-B_kKY3fL.mjs:2:13365)
+    at nextStep (node:internal/modules/customization_hooks:189:26)
+    at resolveWithHooks (node:internal/modules/customization_hooks:417:10)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:747:16)
+    at #resolve (node:internal/modules/esm/loader:683:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:603:35)
+    at node:internal/modules/esm/loader:632:32
+    at TracingChannel.tracePromise (node:diagnostics_channel:362:14)
+    at ModuleLoader.import (node:internal/modules/esm/loader:628:21)
+    at defaultImportModuleDynamicallyForModule (node:internal/modules/esm/utils:225:31)
+    at importModuleDynamicallyCallback (node:internal/modules/esm/utils:267:12)
+    at <anonymous> (/Users/pradeep/fleetpro-customer360/server/routes.ts:7487:50)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  code: 'ERR_MODULE_NOT_FOUND',
+  url: 'file:///Users/pradeep/fleetpro-customer360/services/driverAutoEnrollmentService'
+}
+[RequestLogger:DEBUG] [POST] /api/bookings/6a7d53abcb00127029d8ddd8/status - 200 { duration: '54ms' }
+11:04:16 AM [express] POST /api/bookings/6a7d53abcb00127029d8ddd8/status 200 in 54ms :: {"createdBy":…
+[RequestLogger:DEBUG] [GET] /api/operations/live-bookings {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/operations/live-bookings - 200 { duration: '20ms' }
+11:04:16 AM [express] GET /api/operations/live-bookings 200 in 20ms :: {"generatedAt":"2026-08-13T05:…
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2 {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2 - 200 { duration: '13ms' }
+11:04:25 AM [express] GET /api/bookings/6a7c58afce1befb4d2c61ec2 200 in 14ms :: {"_id":"6a7c58afce1be…
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2/whatsapp/messages {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2/whatsapp/messages - 200 { duration: '15ms' }
+11:04:25 AM [express] GET /api/bookings/6a7c58afce1befb4d2c61ec2/whatsapp/messages 200 in 16ms :: [{"…
+[2026-08-13T05:34:26.678Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2/payments {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2/payments - 200 { duration: '17ms' }
+11:04:28 AM [express] GET /api/bookings/6a7c58afce1befb4d2c61ec2/payments 200 in 18ms :: [{"createdBy…
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2/trip-cost-summary {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2/trip-cost-summary - 200 { duration: '16ms' }
+11:04:28 AM [express] GET /api/bookings/6a7c58afce1befb4d2c61ec2/trip-cost-summary 200 in 15ms :: {"c…
+[RequestLogger:DEBUG] [GET] /api/operations/alerts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/operations/alerts - 200 { duration: '14ms' }
+11:04:29 AM [express] GET /api/operations/alerts 200 in 15ms :: []
+[RequestLogger:DEBUG] [GET] /api/root/support-access/status {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[2026-08-13T05:34:29.516Z] [RequestLogger:WARN] [GET] /api/root/support-access/status - 403 { duration: '13ms', ip: '192.168.29.217', size: 38 }
+11:04:29 AM [express] GET /api/root/support-access/status 403 in 14ms :: {"message":"Platform access …
+[RequestLogger:DEBUG] [POST] /api/bookings/6a7c58afce1befb4d2c61ec2/payments {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [POST] /api/bookings/6a7c58afce1befb4d2c61ec2/payments - 200 { duration: '25ms' }
+11:04:36 AM [express] POST /api/bookings/6a7c58afce1befb4d2c61ec2/payments 200 in 26ms :: {"transacti…
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2/payments {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2/payments - 200 { duration: '20ms' }
+11:04:36 AM [express] GET /api/bookings/6a7c58afce1befb4d2c61ec2/payments 200 in 21ms :: [{"createdBy…
+[RequestLogger:DEBUG] [GET] /api/bookings {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/operations/alerts {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/operations/live-bookings {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2 {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/bookings - 200 { duration: '32ms' }
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2/payments {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2/trip-cost-summary {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/operations/alerts - 200 { duration: '35ms' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+11:04:36 AM [express] GET /api/operations/alerts 200 in 37ms :: []
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2 - 200 { duration: '26ms' }
+11:04:36 AM [express] GET /api/bookings 200 in 53ms :: [{"_id":"6a78c8726f1c464f49141532","tenantId":…
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2/payments - 200 { duration: '26ms' }
+[RequestLogger:DEBUG] [GET] /api/bookings/6a7c58afce1befb4d2c61ec2/trip-cost-summary - 200 { duration: '26ms' }
+11:04:36 AM [express] GET /api/bookings/6a7c58afce1befb4d2c61ec2 200 in 34ms :: {"_id":"6a7c58afce1be…
+11:04:36 AM [express] GET /api/bookings/6a7c58afce1befb4d2c61ec2/payments 200 in 28ms :: [{"createdBy…
+11:04:36 AM [express] GET /api/bookings/6a7c58afce1befb4d2c61ec2/trip-cost-summary 200 in 27ms :: {"c…
+[RequestLogger:DEBUG] [GET] /api/operations/live-bookings - 200 { duration: '37ms' }
+11:04:36 AM [express] GET /api/operations/live-bookings 200 in 37ms :: {"generatedAt":"2026-08-13T05:…
+[RequestLogger:DEBUG] [GET] /api/root/support-access/status {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[2026-08-13T05:34:44.586Z] [RequestLogger:WARN] [GET] /api/root/support-access/status - 403 { duration: '7ms', ip: '192.168.29.217', size: 38 }
+11:04:44 AM [express] GET /api/root/support-access/status 403 in 8ms :: {"message":"Platform access r…
+[RequestLogger:DEBUG] [GET] /api/operations/live-vehicles {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/operations/live-vehicles - 200 { duration: '23ms' }
+11:04:48 AM [express] GET /api/operations/live-vehicles 200 in 25ms :: {"generatedAt":"2026-08-13T05:…
+[RequestLogger:DEBUG] [GET] /favicon.ico {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/operations/upcoming-bookings {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
+User loaded by sessionId: {
+  userId: 'ram',
+  role: 'client',
+  tenantId: {
+    limits: { vehicles: 40, drivers: 60, managers: 20 },
+    usageCounters: { bookingsThisMonth: 0 },
+    _id: new ObjectId('6a7617d741d6ae595bc7a110'),
+    name: 'ram',
+    businessName: 'ram cabs',
+    isActive: true,
+    maxManagers: 5,
+    subscriptionPlan: 'pro',
+    createdAt: 2026-08-07T17:37:27.577Z,
+    __v: 0,
+    internalNotes: []
+  },
+  tenantIdType: 'object'
+}
+User authenticated: { userId: 'ram', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/operations/upcoming-bookings - 200 { duration: '36ms' }
+11:04:49 AM [express] GET /api/operations/upcoming-bookings 200 in 36ms :: [{"date":"2026-08-13","lab…
+[RequestLogger:DEBUG] [GET] /favicon.ico {
+  ip: '192.168.29.217',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36'
+}
