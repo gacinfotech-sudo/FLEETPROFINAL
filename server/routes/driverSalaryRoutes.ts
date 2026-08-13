@@ -948,4 +948,105 @@ router.get('/driver/:driverId/summary', authenticateUser, requireTenant, async (
   }
 });
 
+/**
+ * GET /api/driver-salary/consolidated/dashboard?month=8&year=2026
+ * Get consolidated salary dashboard with properly merged pending/paid/gross amounts
+ */
+router.get('/consolidated/dashboard', authenticateUser, requireTenant, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const month = parseInt(req.query.month as string) || new Date().getMonth() + 1;
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+
+    const { getSalaryDashboard } = await import('../services/consolidatedSalaryService');
+    const dashboard = await getSalaryDashboard(tenantId, month, year);
+
+    res.json({
+      success: true,
+      data: dashboard
+    });
+  } catch (error) {
+    console.error('Error fetching consolidated salary dashboard:', error);
+    res.status(500).json({ error: 'Failed to fetch consolidated salary dashboard' });
+  }
+});
+
+/**
+ * GET /api/driver-salary/consolidated/:driverId?month=8&year=2026
+ * Get consolidated salary data for a single driver
+ * Returns: {
+ *   driverId, driverName, month, year,
+ *   baseSalary, incentives, allowances, bonuses, grossSalary,
+ *   advanceDeductions, rechargeDeductions, recoveryDeductions, penaltyDeductions, totalDeductions,
+ *   totalPaid, totalPending, remainingBalance,
+ *   paymentStatus: "pending" | "partially_paid" | "paid",
+ *   transactions, ledgerEntries, paymentHistory
+ * }
+ */
+router.get('/consolidated/:driverId', authenticateUser, requireTenant, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const { driverId } = req.params;
+    const month = parseInt(req.query.month as string) || new Date().getMonth() + 1;
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+
+    const { getDriverSalaryConsolidated } = await import('../services/consolidatedSalaryService');
+    const consolidated = await getDriverSalaryConsolidated(tenantId, driverId, month, year);
+
+    res.json({
+      success: true,
+      data: consolidated
+    });
+  } catch (error) {
+    console.error('Error fetching consolidated driver salary:', error);
+    res.status(500).json({ error: 'Failed to fetch consolidated driver salary' });
+  }
+});
+
+/**
+ * GET /api/driver-salary/consolidated/:driverId/summary
+ * Get consolidated salary summary for a driver (YTD, current month, previous month)
+ */
+router.get('/consolidated/:driverId/summary', authenticateUser, requireTenant, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const { driverId } = req.params;
+
+    const { getDriverSalarySummary } = await import('../services/consolidatedSalaryService');
+    const summary = await getDriverSalarySummary(tenantId, driverId);
+
+    res.json({
+      success: true,
+      data: summary
+    });
+  } catch (error) {
+    console.error('Error fetching driver salary summary:', error);
+    res.status(500).json({ error: 'Failed to fetch driver salary summary' });
+  }
+});
+
+/**
+ * GET /api/driver-salary/consolidated/:driverId/validate?month=8&year=2026
+ * Validate salary calculations and identify discrepancies
+ */
+router.get('/consolidated/:driverId/validate', authenticateUser, requireTenant, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const { driverId } = req.params;
+    const month = parseInt(req.query.month as string) || new Date().getMonth() + 1;
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+
+    const { validateSalaryConsolidation } = await import('../services/consolidatedSalaryService');
+    const validation = await validateSalaryConsolidation(tenantId, driverId, month, year);
+
+    res.json({
+      success: true,
+      data: validation
+    });
+  } catch (error) {
+    console.error('Error validating salary consolidation:', error);
+    res.status(500).json({ error: 'Failed to validate salary consolidation' });
+  }
+});
+
 export default router;

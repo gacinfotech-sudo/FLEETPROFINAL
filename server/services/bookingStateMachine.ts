@@ -1,7 +1,97 @@
-import { Booking, DriverAttendance } from '../models/index';
+import { Booking, DriverAttendance, PaymentTransaction } from '../models/index';
 import { resolveOwnFleetEligibility } from '../vehicle/core/ownFleetEligibility';
 
 const ATTENDANCE_LATE_GRACE_MINUTES = 15;
+
+/**
+ * Checks if a booking is eligible to be closed (transitions to 'closed' status).
+ * Returns a structure indicating eligibility and any blocking reasons.
+ *
+ * Blocking conditions:
+ * - Self-drive refund in progress (deposit status not in a final state)
+ * - Outstanding payment balance remains
+ * - Pending refund transactions exist
+ */
+async function canCloseBooking(
+  bookingId: string,
+  tenantId: string
+): Promise<{
+  eligible: boolean;
+  blockingReasons: string[];
+  nextActions: string[];
+}> {
+  const query: any = { _id: bookingId };
+  if (tenantId) query.tenantId = tenantId;
+
+  const booking = await Booking.findOne(query);
+  if (!booking) {
+    return {
+      eligible: false,
+      blockingReasons: ['Booking not found'],
+      nextActions: [],
+    };
+  }
+
+  const blockingReasons: string[] = [];
+  const nextActions: string[] = [];
+
+  // Check 1: Self-drive refund status must be in a final state
+  if (booking.bookingType === 'self_drive' && booking.securityDepositAmount) {
+    const depositStatus = booking.securityDepositStatus || 'pending';
+    const finalDepositStates = ['refunded', 'forfeited'];
+    if (!finalDepositStates.includes(depositStatus)) {
+      blockingReasons.push(
+        `Self-drive security deposit is still ${depositStatus} (must be refunded or forfeited before closing)`
+      );
+      nextActions.push('Complete deposit settlement via self-drive refund/forfeiture process');
+    }
+  }
+
+  // Check 2: Outstanding payment balance must be settled
+  const totalAmount = booking.totalAmount || 0;
+  const advanceReceived = booking.advanceReceived || 0;
+  const outstandingBalance = totalAmount - advanceReceived;
+
+  if (outstandingBalance > 0) {
+    blockingReasons.push(
+      `Outstanding payment balance of ${outstandingBalance} remains (total: ${totalAmount}, received: ${advanceReceived})`
+    );
+    nextActions.push('Collect remaining payment or adjust pricing before closing');
+  }
+
+  // Check 3: No pending refund transactions should exist
+  try {
+    const pendingRefunds = await PaymentTransaction.findOne({
+      bookingId: booking._id,
+      tenantId: booking.tenantId,
+      paymentType: 'refund',
+      status: 'completed',
+      createdAt: { $exists: true },
+    });
+
+    if (pendingRefunds && !pendingRefunds.reversalOf) {
+      const refundAge = Date.now() - new Date(pendingRefunds.createdAt).getTime();
+      const dayInMs = 24 * 60 * 60 * 1000;
+      if (refundAge < 7 * dayInMs) {
+        blockingReasons.push(
+          'Recent refund transaction exists (may not be settled to customer yet)'
+        );
+        nextActions.push('Confirm refund settlement before closing booking');
+      }
+    }
+  } catch (err: any) {
+    console.warn(
+      `Warning: Could not check refund transactions for booking ${bookingId}:`,
+      err?.message || err
+    );
+  }
+
+  return {
+    eligible: blockingReasons.length === 0,
+    blockingReasons,
+    nextActions,
+  };
+}
 
 function combineDateTime(date: any, time?: string): Date | null {
   if (!date) return null;
@@ -218,6 +308,16 @@ export async function transitionBooking(
     if (eligibility.safetyHold) {
       throw new InvalidTransitionError(
         `Booking ${booking.bookingId}'s assigned vehicle is on Safety Hold (unresolved critical Daily Inspection defect) and cannot start a trip. Resolve the defect or reassign the vehicle (Change Vehicle / Allocation Pending / Vendor / Outsource) first.`
+      );
+    }
+  }
+
+  // Hard block: Cannot close if refunds/payments are unsettled
+  if (toStatus === 'closed') {
+    const closeEligibility = await canCloseBooking(String(booking._id), String(booking.tenantId));
+    if (!closeEligibility.eligible) {
+      throw new InvalidTransitionError(
+        `Cannot close booking ${booking.bookingId}: ${closeEligibility.blockingReasons.join('; ')}`
       );
     }
   }

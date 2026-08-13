@@ -366,6 +366,133 @@ router.get('/:id/auto-360', authenticateUser, requireTenant, async (req: Request
 });
 
 /**
+ * GET /api/drivers/:id/360-with-payroll
+ * Get enhanced Driver 360 view with integrated payroll data
+ * Includes: driver info, salary breakdown, payment history, YTD earnings
+ * Returns: comprehensive payroll-integrated view
+ */
+router.get('/:id/360-with-payroll', authenticateUser, requireTenant, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid driver ID' });
+    }
+
+    const driverId = new mongoose.Types.ObjectId(id);
+
+    // Import services
+    const { getDriver360WithEnhancedPayroll } = await import('../services/driver360Service');
+    const { getDriverPayrollAggregation } = await import('../services/driverPayrollAggregationService');
+
+    // Get base 360 data with enhanced payroll
+    const driver360 = await getDriver360WithEnhancedPayroll(tenantId, id);
+
+    if (!driver360) {
+      return res.status(404).json({ error: 'Driver not found' });
+    }
+
+    // Also get pure payroll aggregation for frontend
+    const payrollAgg = await getDriverPayrollAggregation(tenantId, id);
+
+    res.json({
+      success: true,
+      data: {
+        driver360,
+        payroll: payrollAgg,
+        metadata: {
+          lastUpdated: new Date(),
+          realtime: true,
+          dataSource: 'driver360-payroll-aggregation'
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching driver 360 with payroll:', error);
+    res.status(500).json({ error: 'Failed to fetch driver 360 with payroll data' });
+  }
+});
+
+/**
+ * GET /api/drivers/:id/payroll-summary
+ * Get quick payroll summary for driver
+ * Includes: current month salary, last payment, next payment, YTD
+ * Use this for dashboard cards and quick views
+ */
+router.get('/:id/payroll-summary', authenticateUser, requireTenant, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid driver ID' });
+    }
+
+    const { getDriverPayrollAggregation } = await import('../services/driverPayrollAggregationService');
+    const payroll = await getDriverPayrollAggregation(tenantId, id);
+
+    if (!payroll) {
+      return res.status(404).json({ error: 'Payroll data not found' });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        currentMonth: payroll.currentMonth,
+        lastPayment: payroll.lastPayment,
+        nextPayment: payroll.nextPayment,
+        ytdEarnings: payroll.ytdEarnings,
+        status: payroll.status
+      },
+      meta: {
+        lastUpdated: new Date(),
+        source: 'payroll-aggregation'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching payroll summary:', error);
+    res.status(500).json({ error: 'Failed to fetch payroll summary' });
+  }
+});
+
+/**
+ * GET /api/drivers/:id/payroll-details
+ * Get detailed payroll breakdown
+ * Includes: full salary calculation, payment history, detailed deductions
+ * Use this for detailed salary modals
+ */
+router.get('/:id/payroll-details', authenticateUser, requireTenant, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid driver ID' });
+    }
+
+    const { getDriverPayrollAggregation } = await import('../services/driverPayrollAggregationService');
+    const payroll = await getDriverPayrollAggregation(tenantId, id);
+
+    if (!payroll) {
+      return res.status(404).json({ error: 'Payroll data not found' });
+    }
+
+    res.json({
+      success: true,
+      data: payroll,
+      meta: {
+        lastUpdated: new Date(),
+        source: 'payroll-aggregation'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching payroll details:', error);
+    res.status(500).json({ error: 'Failed to fetch payroll details' });
+  }
+});
+
+/**
  * GET /api/drivers/payroll/candidates
  * Get drivers eligible for payroll
  */

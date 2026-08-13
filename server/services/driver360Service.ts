@@ -300,6 +300,36 @@ export async function getDriver360KPISummary(
 }
 
 /**
+ * Get Driver 360 with enhanced payroll data
+ * Imports payroll aggregation service to include detailed salary info
+ */
+export async function getDriver360WithEnhancedPayroll(
+  tenantId: string | mongoose.Types.ObjectId,
+  driverId: string | mongoose.Types.ObjectId
+): Promise<(Driver360Data & { enhancedSalary?: any }) | null> {
+  const baseData = await getDriver360(tenantId, driverId);
+
+  if (!baseData) {
+    return null;
+  }
+
+  try {
+    const { getDriverPayrollAggregation } = await import('./driverPayrollAggregationService');
+    const enhancedSalary = await getDriverPayrollAggregation(tenantId, driverId);
+
+    return {
+      ...baseData,
+      enhancedSalary,
+      salaryLastUpdated: new Date()
+    };
+  } catch (error) {
+    console.error('[Driver360] Error loading enhanced payroll data:', error);
+    // Return base data if payroll aggregation fails
+    return baseData;
+  }
+}
+
+/**
  * Get Driver 360 quick actions
  */
 export interface Driver360Action {

@@ -14,7 +14,7 @@ import { nanoid } from 'nanoid';
 const router = Router();
 const webhookManager = new WebhookManager();
 const storageService = new WebhookStorageService();
-const debugger = new WebhookDebugger();
+const webhookDebugger = new WebhookDebugger();
 
 // Middleware to validate webhook ownership
 const validateWebhookOwnership = async (
@@ -272,9 +272,9 @@ router.post(
       const webhook = (req as any).webhook;
 
       const result = await webhookManager.testWebhook(webhook);
-      const diagnostics = await debugger.testDeliveryWithDiagnostics(
+      const diagnostics = await webhookDebugger.testDeliveryWithDiagnostics(
         webhook.url,
-        debugger.generateTestPayload('webhook.test'),
+        webhookDebugger.generateTestPayload('webhook.test'),
         webhook.secret
       );
 
@@ -360,7 +360,7 @@ router.get(
         return res.status(404).json({ message: 'Event not found' });
       }
 
-      const debugLogs = debugger.getDebugLogs((req as any).webhook._id, 5);
+      const debugLogs = webhookDebugger.getDebugLogs((req as any).webhook._id, 5);
 
       res.json({
         event: event.toObject(),
@@ -496,8 +496,8 @@ router.get(
       const webhook = (req as any).webhook;
       const { limit = 50 } = req.query;
 
-      const logs = debugger.getDebugLogs(webhook._id, parseInt(limit as string));
-      const stats = debugger.getDebugStatistics(webhook._id);
+      const logs = webhookDebugger.getDebugLogs(webhook._id, parseInt(limit as string));
+      const stats = webhookDebugger.getDebugStatistics(webhook._id);
 
       res.json({
         logs,
@@ -520,7 +520,7 @@ router.post(
   requireTenant,
   async (req: AuthRequest, res: Response) => {
     try {
-      const inspection = debugger.inspectPayload(req.body);
+      const inspection = webhookDebugger.inspectPayload(req.body);
 
       res.json({
         inspection,
@@ -550,7 +550,7 @@ router.post(
         });
       }
 
-      const result = await debugger.testDeliveryWithDiagnostics(
+      const result = await webhookDebugger.testDeliveryWithDiagnostics(
         url,
         payload,
         secret,
@@ -601,7 +601,7 @@ router.post(
         return res.status(400).json({ message: 'Missing eventType' });
       }
 
-      const payload = debugger.generateTestPayload(eventType, customData);
+      const payload = webhookDebugger.generateTestPayload(eventType, customData);
 
       res.json({
         payload,
