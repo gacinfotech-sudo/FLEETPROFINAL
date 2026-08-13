@@ -4326,6 +4326,7 @@ export interface IDriverSalaryMaster extends Document {
   nightAllowancePerNight?: number;
   outstationAllowancePerDay?: number;
   foodAllowance?: number;
+  perBookingFoodCharge?: number;
   overtimeRatePerHour?: number;
   extraDutyRate?: number;
   weeklyOffDays?: number[];
@@ -4358,6 +4359,7 @@ const DriverSalaryMasterSchema = new Schema<IDriverSalaryMaster>({
   nightAllowancePerNight: { type: Number },
   outstationAllowancePerDay: { type: Number },
   foodAllowance: { type: Number },
+  perBookingFoodCharge: { type: Number },
   overtimeRatePerHour: { type: Number },
   extraDutyRate: { type: Number },
   weeklyOffDays: [{ type: Number }],
@@ -4512,6 +4514,7 @@ export interface IMonthlyPayroll extends Document {
     challanRecovery?: number;
     cashShortage?: number;
     fuelExcessRecovery?: number;
+    foodCharges?: number;
     otherDeductions?: number;
     totalDeductions: number;
     netSalary: number;
@@ -4570,6 +4573,7 @@ const MonthlyPayrollSchema = new Schema<IMonthlyPayroll>({
     challanRecovery: { type: Number },
     cashShortage: { type: Number },
     fuelExcessRecovery: { type: Number },
+    foodCharges: { type: Number },
     otherDeductions: { type: Number },
     totalDeductions: { type: Number, default: 0 },
     netSalary: { type: Number, default: 0 },

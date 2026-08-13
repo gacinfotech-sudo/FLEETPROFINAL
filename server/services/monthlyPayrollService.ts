@@ -15,7 +15,8 @@ import {
   SalaryBreakup,
   AttendanceData,
   TripIncentiveData,
-  DeductionData
+  DeductionData,
+  PreviousBalanceData
 } from './salaryCalculationService';
 
 export interface PayrollCalculationRequest {
@@ -134,7 +135,7 @@ async function fetchTripIncentivesForMonth(
     let specialDutyTrips = 0;
 
     for (const booking of bookings) {
-      if ((booking as any).tripDistance) totalKm += (booking as any).tripDistance;
+      if ((booking as any).totalKilometers) totalKm += (booking as any).totalKilometers;
       if ((booking as any).isNightDuty) nightDutyTrips++;
       if ((booking as any).isOutstation) outstationTrips++;
       if ((booking as any).specialDuty) specialDutyTrips++;
@@ -157,6 +158,88 @@ async function fetchTripIncentivesForMonth(
       outstationTrips: 0,
       specialDutyTrips: 0
     };
+  }
+}
+
+/**
+ * Helper: Fetch food charges for a driver in given month
+ * Calculates total food charges based on completed bookings
+ */
+async function fetchFoodChargesForMonth(
+  tenantId: string,
+  driverId: mongoose.Types.ObjectId,
+  month: number,
+  year: number,
+  foodChargePerBooking?: number
+): Promise<number> {
+  try {
+    if (!foodChargePerBooking || foodChargePerBooking <= 0) {
+      return 0; // No food charges configured
+    }
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Count COMPLETED bookings for food charges
+    const bookingCount = await Booking.countDocuments({
+      tenantId: new mongoose.Types.ObjectId(tenantId),
+      driverId,
+      pickupDate: { $gte: startDate, $lte: endDate },
+      status: 'completed'
+    });
+
+    return bookingCount * foodChargePerBooking;
+  } catch (error) {
+    console.error('Error fetching food charges:', error);
+    return 0;
+  }
+}
+
+/**
+ * Helper: Fetch previous month balance for carry-forward
+ */
+async function fetchPreviousBalanceForDriver(
+  tenantId: string,
+  driverId: mongoose.Types.ObjectId,
+  month: number,
+  year: number
+): Promise<PreviousBalanceData | null> {
+  try {
+    // Calculate previous month
+    let prevMonth = month - 1;
+    let prevYear = year;
+    if (prevMonth < 1) {
+      prevMonth = 12;
+      prevYear -= 1;
+    }
+
+    // Look for previous month's payroll
+    const prevPayroll = await MonthlyPayroll.findOne(
+      {
+        tenantId: new mongoose.Types.ObjectId(tenantId),
+        month: prevMonth,
+        year: prevYear
+      },
+      { 'driverPayrolls': { $elemMatch: { driverId } } }
+    );
+
+    if (!prevPayroll || !prevPayroll.driverPayrolls || prevPayroll.driverPayrolls.length === 0) {
+      return null; // No previous payroll found
+    }
+
+    const driverPayroll = prevPayroll.driverPayrolls[0];
+    const carryForward = Math.max(0, driverPayroll.netSalary - (driverPayroll.totalPaid || 0));
+
+    return {
+      month: prevMonth,
+      year: prevYear,
+      balance: driverPayroll.netSalary,
+      carryForward
+    };
+  } catch (error) {
+    console.error('Error fetching previous balance:', error);
+    return null;
   }
 }
 
@@ -256,8 +339,37 @@ export async function calculatePayroll(
         );
       }
 
-      // Use override deductions if provided
-      const deductions = request.overrideDeductions?.[driver._id.toString()];
+      // Use override deductions if provided, otherwise fetch from DB
+      let deductions = request.overrideDeductions?.[driver._id.toString()];
+      if (!deductions) {
+        // Fetch food charges based on completed bookings
+        const foodCharges = await fetchFoodChargesForMonth(
+          request.tenantId,
+          driver._id,
+          request.month,
+          request.year,
+          salaryMaster.perBookingFoodCharge || 0
+        );
+
+        deductions = {
+          absenceDays: 0,
+          penalties: 0,
+          damageRecovery: 0,
+          challanRecovery: 0,
+          cashShortage: 0,
+          fuelExcess: 0,
+          otherDeductions: 0,
+          foodCharges
+        };
+      }
+
+      // Fetch previous month balance for carry-forward
+      const prevBalance = await fetchPreviousBalanceForDriver(
+        request.tenantId,
+        driver._id,
+        request.month,
+        request.year
+      );
 
       // Prepare calculation input
       const calcInput: SalaryCalculationInput = {
@@ -267,7 +379,8 @@ export async function calculatePayroll(
         attendance,
         tripIncentives,
         deductions,
-        advances
+        advances,
+        previousBalance: prevBalance || undefined
       };
 
       const breakup = calculateSalary(calcInput);
@@ -294,6 +407,7 @@ export async function calculatePayroll(
         challanRecovery: breakup.deductions.challanRecovery || undefined,
         cashShortage: breakup.deductions.cashShortage || undefined,
         fuelExcessRecovery: breakup.deductions.fuelExcessRecovery || undefined,
+        foodCharges: breakup.deductions.foodCharges || undefined,
         otherDeductions: breakup.deductions.otherDeductions || undefined,
         totalDeductions: breakup.totalDeductions,
         netSalary: breakup.netSalary,

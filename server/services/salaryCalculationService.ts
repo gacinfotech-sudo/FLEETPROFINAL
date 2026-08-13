@@ -26,6 +26,14 @@ export interface DeductionData {
   cashShortage: number;
   fuelExcess: number;
   otherDeductions: number;
+  foodCharges?: number;
+}
+
+export interface PreviousBalanceData {
+  month: number;
+  year: number;
+  balance: number;
+  carryForward: number;
 }
 
 export interface SalaryCalculationInput {
@@ -36,6 +44,7 @@ export interface SalaryCalculationInput {
   tripIncentives?: TripIncentiveData;
   deductions?: DeductionData;
   advances?: IDriverAdvance[];
+  previousBalance?: PreviousBalanceData;
 }
 
 export interface SalaryBreakup {
@@ -70,11 +79,15 @@ export interface SalaryBreakup {
     challanRecovery: number;
     cashShortage: number;
     fuelExcessRecovery: number;
+    foodCharges: number;
     otherDeductions: number;
   };
   totalDeductions: number;
 
-  // Net salary
+  // Previous month carry-forward
+  previousBalance: number;
+
+  // Net salary = (Gross + PreviousBalance) - TotalDeductions
   netSalary: number;
 
   // Calculation notes (for audit trail)
@@ -125,9 +138,11 @@ export function calculateSalary(input: SalaryCalculationInput): SalaryBreakup {
       challanRecovery: 0,
       cashShortage: 0,
       fuelExcessRecovery: 0,
+      foodCharges: 0,
       otherDeductions: 0
     },
     totalDeductions: 0,
+    previousBalance: 0,
     netSalary: 0,
     calculationNotes: {
       workingDaysUsed: attendance?.totalWorkingDays || 0,
@@ -143,8 +158,13 @@ export function calculateSalary(input: SalaryCalculationInput): SalaryBreakup {
   // Calculate deductions
   calculateDeductions(breakup, salaryMaster, attendance, deductions, advances);
 
-  // Net salary = Gross - Total Deductions (ensure non-negative)
-  breakup.netSalary = Math.max(0, breakup.grossSalary - breakup.totalDeductions);
+  // Add previous balance
+  if (input.previousBalance) {
+    breakup.previousBalance = input.previousBalance.carryForward || 0;
+  }
+
+  // Net salary = (Gross + PreviousBalance) - Total Deductions (ensure non-negative)
+  breakup.netSalary = Math.max(0, breakup.grossSalary + breakup.previousBalance - breakup.totalDeductions);
 
   return breakup;
 }
@@ -232,6 +252,7 @@ function calculateDeductions(
     breakup.deductions.penaltyDeduction = deductions.penalties || 0;
     breakup.deductions.damageRecovery = deductions.damageRecovery || 0;
     breakup.deductions.challanRecovery = deductions.challanRecovery || 0;
+    breakup.deductions.foodCharges = deductions.foodCharges || 0;
     breakup.deductions.cashShortage = deductions.cashShortage || 0;
     breakup.deductions.fuelExcessRecovery = deductions.fuelExcess || 0;
     breakup.deductions.otherDeductions = deductions.otherDeductions || 0;
@@ -260,6 +281,40 @@ export async function fetchTripIncentiveData(
 ): Promise<TripIncentiveData | null> {
   // TODO: Integrate with FleetPro Trips/Bookings module when ready
   // For now: return null to indicate manual entry required
+  return null;
+}
+
+// Integration hook: Fetch penalties for a driver (placeholder for future integration)
+export async function fetchPenalties(
+  driverId: string,
+  month: number,
+  year: number
+): Promise<number> {
+  // TODO: Integrate with FleetPro penalties module when ready
+  // For now: return 0 (no penalties)
+  return 0;
+}
+
+// Integration hook: Fetch food charges per booking
+export async function fetchFoodCharges(
+  driverId: string,
+  month: number,
+  year: number,
+  foodChargePerBooking?: number
+): Promise<number> {
+  // TODO: Integrate with FleetPro bookings and food charges module
+  // For now: return 0 (no food charges)
+  return 0;
+}
+
+// Integration hook: Fetch previous month balance for carry-forward
+export async function fetchPreviousBalance(
+  driverId: string,
+  month: number,
+  year: number
+): Promise<PreviousBalanceData | null> {
+  // TODO: Integrate with DriverSalaryLedger to get previous month balance
+  // For now: return null (no previous balance)
   return null;
 }
 

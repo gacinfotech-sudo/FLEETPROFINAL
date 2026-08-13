@@ -331,6 +331,41 @@ router.get('/:id/salary-summary', authenticateUser, requireTenant, async (req: R
 });
 
 /**
+ * GET /api/drivers/:id/auto-360
+ * Get complete real-time 360 view with all connected data
+ * Fetches: driver info, salary, attendance, bookings, advances, penalties, payroll
+ * Returns: always current data (real-time sync)
+ */
+router.get('/:id/auto-360', authenticateUser, requireTenant, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Invalid driver ID' });
+    }
+
+    // Import auto-enrollment service for 360 view
+    const { getAuto360View } = await import('../services/driverAutoEnrollmentService');
+
+    const view360 = await getAuto360View(id, tenantId);
+
+    res.json({
+      success: true,
+      data: view360,
+      meta: {
+        lastUpdated: new Date(),
+        realtime: true,
+        dataSource: 'auto-sync'
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching auto-360 view:', error);
+    res.status(500).json({ error: 'Failed to fetch 360 view' });
+  }
+});
+
+/**
  * GET /api/drivers/payroll/candidates
  * Get drivers eligible for payroll
  */

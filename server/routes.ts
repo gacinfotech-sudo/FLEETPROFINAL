@@ -2482,7 +2482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check driver limit before adding
       const driverUsage = await storage.checkDriverLimit(req.tenantId!);
       if (!driverUsage.canAdd) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: `You've reached your maximum allowed drivers (${driverUsage.limit}). Upgrade your plan or contact admin.`,
           current: driverUsage.current,
           limit: driverUsage.limit
@@ -2491,7 +2491,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const driverData = mongoDriverSchema.parse({ ...req.body, tenantId: req.tenantId });
       const driver = await storage.createDriver(driverData);
-      res.json(driver);
+
+      // ========== PHASE 1: AUTO-ENROLL ==========
+      // Automatically create salary master and enroll in payroll
+      try {
+        const { autoCreateSalaryMaster, autoEnrollInPayroll } = await import('../services/driverAutoEnrollmentService');
+        const salaryMaster = await autoCreateSalaryMaster(driver, req.tenantId!);
+        await autoEnrollInPayroll(driver, req.tenantId!, salaryMaster);
+
+        // Return driver with auto-enrollment info
+        res.json({
+          ...driver,
+          autoEnrollment: {
+            salaryMasterId: salaryMaster._id?.toString(),
+            status: 'active',
+            autoCreated: true,
+            message: 'Salary master automatically created and driver enrolled in payroll'
+          }
+        });
+      } catch (autoEnrollError) {
+        // Log error but still return driver - auto-enrollment is non-blocking
+        console.error('[AUTO-ENROLL] Error during auto-enrollment:', autoEnrollError);
+        res.json({
+          ...driver,
+          autoEnrollment: {
+            status: 'partial',
+            error: 'Auto-enrollment encountered an issue, but driver was created',
+            message: 'Please manually configure salary master'
+          }
+        });
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         // TASK-DRIVER-ADD-400-FIX: previously returned the raw Zod
@@ -7451,6 +7480,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // ========== AUTO-SYNC TRIGGER ==========
+      // When booking is completed, trigger auto-salary recalculation (for trip incentives)
+      if (['completed', 'closed'].includes(status) && booking.driverId) {
+        try {
+          const { triggerAutoSyncPayrollData } = await import('../services/driverAutoEnrollmentService');
+          triggerAutoSyncPayrollData(
+            new mongoose.Types.ObjectId(booking.driverId.toString()),
+            req.tenantId!
+          ).catch(err => console.error('[AUTO-SYNC] Booking completion trigger failed:', err));
+        } catch (syncError) {
+          console.error('[AUTO-SYNC] Failed to trigger on booking completion:', syncError);
+        }
+      }
+
       res.json(booking);
     } catch (error: any) {
       if (error instanceof InvalidTransitionError) {
@@ -8162,6 +8205,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         { upsert: true, new: true }
       );
+
+      // ========== AUTO-SYNC TRIGGER ==========
+      // Trigger auto-salary recalculation when attendance is marked
+      try {
+        const { triggerAutoSyncPayrollData } = await import('../services/driverAutoEnrollmentService');
+        triggerAutoSyncPayrollData(
+          new mongoose.Types.ObjectId(req.params.id),
+          req.tenantId!
+        ).catch(err => console.error('[AUTO-SYNC] Attendance trigger failed:', err));
+      } catch (syncError) {
+        console.error('[AUTO-SYNC] Failed to trigger:', syncError);
+      }
+
       res.json(record);
     } catch (error: any) {
       console.error('Mark attendance error:', error?.message || error);
@@ -9253,6 +9309,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = approveAdvanceSchema.parse(req.body);
       const advance = await approveAdvance(req.tenantId.toString(), req.params.id, validated.approvedBy, validated.notes);
       if (!advance) return res.status(404).json({ message: "Advance not found" });
+
+      // ========== AUTO-SYNC TRIGGER ==========
+      // Trigger auto-salary recalculation when advance is approved
+      if (advance.driverId) {
+        try {
+          const { triggerAutoSyncPayrollData } = await import('../services/driverAutoEnrollmentService');
+          triggerAutoSyncPayrollData(
+            new mongoose.Types.ObjectId(advance.driverId.toString()),
+            req.tenantId!
+          ).catch(err => console.error('[AUTO-SYNC] Advance approval trigger failed:', err));
+        } catch (syncError) {
+          console.error('[AUTO-SYNC] Failed to trigger on advance approval:', syncError);
+        }
+      }
+
       res.json(advance);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -9267,6 +9338,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validated = recordAdvancePaymentSchema.parse(req.body);
       const advance = await recordAdvancePayment(req.tenantId.toString(), req.params.id, validated.paidBy, validated.paymentMode, validated.transactionReference);
       if (!advance) return res.status(404).json({ message: "Advance not found" });
+
+      // ========== AUTO-SYNC TRIGGER ==========
+      // Trigger auto-salary recalculation when advance payment is recorded
+      if (advance.driverId) {
+        try {
+          const { triggerAutoSyncPayrollData } = await import('../services/driverAutoEnrollmentService');
+          triggerAutoSyncPayrollData(
+            new mongoose.Types.ObjectId(advance.driverId.toString()),
+            req.tenantId!
+          ).catch(err => console.error('[AUTO-SYNC] Advance payment trigger failed:', err));
+        } catch (syncError) {
+          console.error('[AUTO-SYNC] Failed to trigger on advance payment:', syncError);
+        }
+      }
+
       res.json(advance);
     } catch (error: any) {
       if (error instanceof z.ZodError) {

@@ -48,6 +48,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { setTelephonyEventEmitter, type TelephonyEvent } from "./telephony/index";
 import { startGpsPollingScheduler, stopGpsPollingScheduler } from "./gps/ingestion/pollingScheduler";
 import { startOperationsReminderScheduler, stopOperationsReminderScheduler } from "./operations/reminderEngine";
+import { initializeAutoSyncScheduler } from "./services/payrollAutoSyncScheduler";
 // TASK-ROOT-SUPPORT-03 (Root Control Plane) additive middleware — attaches
 // a correlation ID to every request (not just /api/root/**) before any
 // route/error path runs. See docs/root-control-plane/ROOT-INTEGRATION-report.md.
@@ -420,6 +421,24 @@ app.use((req, res, next) => {
   }
   mongoose.connection.on('connected', () => startOperationsReminderScheduler());
   mongoose.connection.on('disconnected', () => stopOperationsReminderScheduler());
+
+  // Payroll Auto-Sync Scheduler — 100% automated driver salary processing
+  // Runs hourly to sync attendance, bookings, advances, and recalculate salaries
+  // Also processes monthly payroll automatically on 1st of each month
+  if (mongoose.connection.readyState === 1) {
+    try {
+      initializeAutoSyncScheduler();
+    } catch (error) {
+      console.error('[SCHEDULER] Failed to initialize auto-sync scheduler:', error);
+    }
+  }
+  mongoose.connection.on('connected', () => {
+    try {
+      initializeAutoSyncScheduler();
+    } catch (error) {
+      console.error('[SCHEDULER] Failed to initialize auto-sync scheduler on reconnect:', error);
+    }
+  });
 
   // NOTE: this in-process interval only runs once per Node process. If this
   // app is ever deployed with multiple instances/replicas, move this sweep
