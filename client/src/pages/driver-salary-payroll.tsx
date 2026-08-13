@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -21,6 +21,15 @@ export default function DriverSalaryPayroll() {
   const [showDriverDetails, setShowDriverDetails] = useState(false);
   const [selectedDriverPayroll, setSelectedDriverPayroll] = useState<any>(null);
   const [paymentData, setPaymentData] = useState({ driverId: '', paidAmount: 0, paymentMode: 'cash' });
+  const [csrfToken, setCsrfToken] = useState('');
+
+  // Fetch CSRF token on mount
+  useEffect(() => {
+    fetch('/api/csrf-token', { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => setCsrfToken(data.csrfToken))
+      .catch(err => console.error('CSRF token fetch failed:', err));
+  }, []);
 
   // Fetch payroll
   const { data: payrolls = [], isLoading } = useQuery({
@@ -53,7 +62,10 @@ export default function DriverSalaryPayroll() {
     mutationFn: async () => {
       const res = await fetch('/api/payroll/calculate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
         credentials: 'include',
         body: JSON.stringify({ month, year })
       });
@@ -79,7 +91,10 @@ export default function DriverSalaryPayroll() {
     mutationFn: async (payrollId: string) => {
       const res = await fetch(`/api/payroll/${payrollId}/approve`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
         credentials: 'include',
         body: JSON.stringify({ approvedBy: { userId: 'current-user', role: 'admin' } })
       });
@@ -100,7 +115,10 @@ export default function DriverSalaryPayroll() {
     mutationFn: async (payrollId: string) => {
       const res = await fetch(`/api/payroll/${payrollId}/close`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
         credentials: 'include'
       });
       if (!res.ok) throw new Error('Failed to close payroll');
@@ -125,7 +143,10 @@ export default function DriverSalaryPayroll() {
 
       const res = await fetch(`/api/payroll/${currentPayroll._id}/pay`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
+        },
         credentials: 'include',
         body: JSON.stringify({
           driverId: data.driverId,

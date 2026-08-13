@@ -1,15 +1,24 @@
 /**
- * PHASE 3: SALARY CALCULATION ENGINE
- * Precise decimal-based salary calculations
+ * PHASE 3: SALARY CALCULATION ENGINE (Enhanced)
+ * Precise decimal-based salary calculations with Driver Salary Profile integration
  * Uses standard arithmetic for rounding (JavaScript's native Number precision)
  * All monetary values stored as integers (paise/cents) for accuracy
+ *
+ * INTEGRATION FEATURES:
+ * - Active salary configuration validation
+ * - Driver Salary Profile retrieval
+ * - Status-aware salary calculations
+ * - Configuration versioning support
  */
 
+import mongoose from 'mongoose';
 import {
   IDriverSalaryMaster,
   IDriverAdvance,
   IDriverRecharge,
-  IDriverRecovery
+  IDriverRecovery,
+  DriverSalaryMaster,
+  Driver
 } from '../models/index';
 
 /**
@@ -35,6 +44,187 @@ function roundToPaise(rupees: number): number {
   return Math.round(rupees * 100) / 100;
 }
 
+/**
+ * ========================================
+ * DRIVER SALARY PROFILE INTEGRATION
+ * ========================================
+ */
+
+/**
+ * Error thrown when salary configuration validation fails
+ */
+export class SalaryConfigurationError extends Error {
+  constructor(public code: string, message: string) {
+    super(message);
+    this.name = 'SalaryConfigurationError';
+  }
+}
+
+/**
+ * Retrieve active salary master for a driver
+ * Enforces that the returned configuration is in 'active' status
+ */
+export async function getActiveSalaryConfig(
+  driverId: string | mongoose.Types.ObjectId,
+  tenantId: string | mongoose.Types.ObjectId
+): Promise<IDriverSalaryMaster | null> {
+  try {
+    const driverObjId = typeof driverId === 'string' ? new mongoose.Types.ObjectId(driverId) : driverId;
+    const tenantObjId = typeof tenantId === 'string' ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+
+    const salaryConfig = await DriverSalaryMaster.findOne({
+      driverId: driverObjId,
+      tenantId: tenantObjId,
+      status: 'active'
+    }).exec();
+
+    return salaryConfig || null;
+  } catch (error) {
+    console.error(`Error retrieving active salary config for driver ${driverId}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Retrieve all salary configurations for a driver (including inactive)
+ * Useful for audit trails and configuration history
+ */
+export async function getAllSalaryConfigsForDriver(
+  driverId: string | mongoose.Types.ObjectId,
+  tenantId: string | mongoose.Types.ObjectId
+): Promise<IDriverSalaryMaster[]> {
+  try {
+    const driverObjId = typeof driverId === 'string' ? new mongoose.Types.ObjectId(driverId) : driverId;
+    const tenantObjId = typeof tenantId === 'string' ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+
+    const configs = await DriverSalaryMaster.find({
+      driverId: driverObjId,
+      tenantId: tenantObjId
+    })
+      .sort({ updatedAt: -1 })
+      .exec();
+
+    return configs || [];
+  } catch (error) {
+    console.error(`Error retrieving salary configs for driver ${driverId}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Validate that a salary master is active
+ */
+export function validateSalaryMasterIsActive(
+  salaryMaster: IDriverSalaryMaster | null | undefined
+): { valid: boolean; error?: string } {
+  if (!salaryMaster) {
+    return {
+      valid: false,
+      error: 'Salary master configuration not found'
+    };
+  }
+
+  if (salaryMaster.status !== 'active') {
+    return {
+      valid: false,
+      error: `Salary master is in '${salaryMaster.status}' status, not 'active'`
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Validate salary master configuration completeness
+ * Ensures all required fields for salary calculation are present
+ */
+export function validateSalaryMasterCompleteness(
+  salaryMaster: IDriverSalaryMaster
+): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (!salaryMaster.driverId) {
+    errors.push('Driver ID is required');
+  }
+
+  if (!salaryMaster.baseSalary || salaryMaster.baseSalary <= 0) {
+    errors.push('Base salary must be greater than 0');
+  }
+
+  if (!salaryMaster.salaryType) {
+    errors.push('Salary type is required');
+  }
+
+  if (!salaryMaster.salaryStartDate) {
+    errors.push('Salary start date is required');
+  }
+
+  // Validate based on salary type
+  if (salaryMaster.salaryType === 'per_trip' && !salaryMaster.perTripSalary) {
+    errors.push('Per-trip salary amount is required for per-trip salary type');
+  }
+
+  if (salaryMaster.salaryType === 'daily' && !salaryMaster.perDaySalary) {
+    errors.push('Per-day salary amount is required for daily salary type');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Get salary configuration status summary
+ * Returns detailed information about a driver's salary configuration
+ */
+export async function getSalaryConfigurationStatus(
+  driverId: string | mongoose.Types.ObjectId,
+  tenantId: string | mongoose.Types.ObjectId
+): Promise<{
+  hasActiveSalary: boolean;
+  activeConfig: IDriverSalaryMaster | null;
+  lastModified?: Date;
+  configurationStatus: string;
+  linkedToDriver: boolean;
+  issues: string[];
+}> {
+  const driverObjId = typeof driverId === 'string' ? new mongoose.Types.ObjectId(driverId) : driverId;
+  const tenantObjId = typeof tenantId === 'string' ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+
+  const activeConfig = await getActiveSalaryConfig(driverObjId, tenantObjId);
+  const allConfigs = await getAllSalaryConfigsForDriver(driverObjId, tenantObjId);
+  const driver = await Driver.findById(driverObjId).exec();
+
+  const issues: string[] = [];
+
+  // Validate configuration
+  if (activeConfig) {
+    const completenessCheck = validateSalaryMasterCompleteness(activeConfig);
+    if (!completenessCheck.valid) {
+      issues.push(...completenessCheck.errors);
+    }
+  }
+
+  // Check driver link
+  const linkedToDriver = driver?.activeSalaryMasterId?.toString() === activeConfig?._id?.toString();
+  if (activeConfig && !linkedToDriver) {
+    issues.push('Active salary configuration not linked to driver profile');
+  }
+
+  return {
+    hasActiveSalary: !!activeConfig,
+    activeConfig: activeConfig || null,
+    lastModified: allConfigs[0]?.updatedAt,
+    configurationStatus: activeConfig?.status || 'not_configured',
+    linkedToDriver,
+    issues
+  };
+}
+
+/**
+ * Extended input interface with Driver Salary Profile integration
+ */
 export interface SalaryCalculationInput {
   salaryMaster: IDriverSalaryMaster;
   salaryPeriodStart: Date;
@@ -60,6 +250,20 @@ export interface SalaryCalculationInput {
   // Manual adjustments
   manualAllowances?: number;
   manualDeductions?: number;
+}
+
+/**
+ * Extended input interface for retrieving active salary config
+ * Allows calculation by either direct salaryMaster or by looking up active config
+ */
+export interface SalaryCalculationInputWithProfile extends SalaryCalculationInput {
+  // If provided, will fetch the active salary master for this driver
+  driverId?: string | mongoose.Types.ObjectId;
+  tenantId?: string | mongoose.Types.ObjectId;
+  // Force use of active salary config (ignores salaryMaster if true)
+  useActiveSalaryConfig?: boolean;
+  // Validate that salary master is active before calculating
+  validateSalaryMasterActive?: boolean;
 }
 
 export interface SalaryCalculationResult {
@@ -164,6 +368,60 @@ export function calculateNetPayable(
   // Net = Earnings - Deductions (minimum 0)
   const netInPaise = rupeesToPaise(totalEarnings) - rupeesToPaise(totalDeductionsAmount);
   return Math.max(0, paiseToRupees(netInPaise));
+}
+
+/**
+ * Calculate salary with active configuration (async version)
+ * This version supports fetching and validating active salary config automatically
+ */
+export async function calculateSalaryWithActiveConfig(
+  input: SalaryCalculationInputWithProfile
+): Promise<{ result: SalaryCalculationResult; configStatus: string }> {
+  let salaryMaster = input.salaryMaster;
+
+  // If useActiveSalaryConfig is true, fetch active config
+  if (input.useActiveSalaryConfig && input.driverId && input.tenantId) {
+    const activeConfig = await getActiveSalaryConfig(input.driverId, input.tenantId);
+
+    if (!activeConfig) {
+      throw new SalaryConfigurationError(
+        'NO_ACTIVE_SALARY_CONFIG',
+        `No active salary configuration found for driver ${input.driverId}`
+      );
+    }
+
+    salaryMaster = activeConfig;
+  }
+
+  // Validate salary master is active (if enabled)
+  if (input.validateSalaryMasterActive) {
+    const validation = validateSalaryMasterIsActive(salaryMaster);
+    if (!validation.valid) {
+      throw new SalaryConfigurationError('INACTIVE_SALARY_CONFIG', validation.error || 'Salary configuration is not active');
+    }
+  }
+
+  // Validate salary master completeness
+  const completenessCheck = validateSalaryMasterCompleteness(salaryMaster);
+  if (!completenessCheck.valid) {
+    throw new SalaryConfigurationError(
+      'INCOMPLETE_SALARY_CONFIG',
+      `Salary configuration is incomplete: ${completenessCheck.errors.join(', ')}`
+    );
+  }
+
+  // Create base input for calculation
+  const calcInput: SalaryCalculationInput = {
+    ...input,
+    salaryMaster
+  };
+
+  const result = calculateSalary(calcInput);
+
+  return {
+    result,
+    configStatus: salaryMaster.status
+  };
 }
 
 /**
@@ -402,6 +660,44 @@ export function validateSalaryCalculationInput(input: SalaryCalculationInput): {
 
   if (input.salaryMaster && input.salaryMaster.baseSalary < 0) {
     errors.push('Base salary cannot be negative');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+/**
+ * Validate salary calculation input with profile
+ * Includes checks for active salary configuration
+ */
+export async function validateSalaryCalculationInputWithProfile(
+  input: SalaryCalculationInputWithProfile
+): Promise<{ valid: boolean; errors: string[] }> {
+  const errors: string[] = [];
+
+  // Standard validation
+  const standardValidation = validateSalaryCalculationInput(input);
+  errors.push(...standardValidation.errors);
+
+  // Additional profile-based validation
+  if (input.useActiveSalaryConfig) {
+    if (!input.driverId || !input.tenantId) {
+      errors.push('Driver ID and Tenant ID are required when using active salary config');
+    } else {
+      const activeConfig = await getActiveSalaryConfig(input.driverId, input.tenantId);
+      if (!activeConfig) {
+        errors.push(`No active salary configuration found for driver`);
+      }
+    }
+  }
+
+  if (input.validateSalaryMasterActive && input.salaryMaster) {
+    const statusValidation = validateSalaryMasterIsActive(input.salaryMaster);
+    if (!statusValidation.valid) {
+      errors.push(statusValidation.error || 'Salary master is not active');
+    }
   }
 
   return {

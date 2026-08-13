@@ -12,6 +12,7 @@ import DriverAttendanceLeavePanel from "./driver-attendance-leave-panel";
 import { SalarySummary } from "../driver-360/SalarySummary";
 import { SalaryHistory } from "../driver-360/SalaryHistory";
 import { SalaryLedger } from "../driver-360/SalaryLedger";
+import { SalaryDetailsSection } from "../driver-360/SalaryDetailsSection";
 import {
   DEFAULT_LIFECYCLE_STAGE, LIFECYCLE_STAGE_LABELS, lifecycleStageBadgeClass,
   complianceBadgeClass, COMPLIANCE_STATUS_LABELS, documentComplianceStatus,
@@ -212,6 +213,7 @@ export default function Driver360({ driver, onOpenBooking }: Props) {
 
         <TabsContent value="salary">
           <div className="space-y-6">
+            <SalaryDetailsSection driverId={driverId} />
             <SalarySummary driverId={driverId} />
             <SalaryHistory driverId={driverId} />
             <SalaryLedger driverId={driverId} />

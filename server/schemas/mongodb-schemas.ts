@@ -121,7 +121,31 @@ export const mongoDriverSchema = z.object({
   maritalStatus: optionalString(z.enum(['single', 'married', 'divorced', 'widowed'])),
   aadharNumber: z.string().optional(),
   panNumber: z.string().optional(),
-  dateOfJoining: z.string().optional()
+  dateOfJoining: z.string().optional(),
+  // Salary-related fields (Phase 4 Driver Salary Integration)
+  activeSalaryMasterId: z.string().optional(),
+  baseSalary: z.number().min(0).optional(),
+  salarySetupCompleted: z.boolean().default(false),
+  salaryStructureType: z.enum(['fixed', 'flexible', 'piece_rate', 'hourly', 'hybrid']).optional(),
+  lastSalaryProcessedDate: z.string().optional(),
+  nextSalaryDate: z.string().optional(),
+  salaryFrequency: z.enum(['daily', 'weekly', 'bi_weekly', 'monthly']).optional(),
+  ctcAmount: z.number().min(0).optional(),
+  earningsBreakdown: z.object({
+    baseSalary: z.number().min(0).optional(),
+    bonus: z.number().min(0).optional(),
+    incentives: z.number().min(0).optional(),
+    allowances: z.number().min(0).optional(),
+  }).optional(),
+  deductionsBreakdown: z.object({
+    taxDeduction: z.number().min(0).optional(),
+    insurance: z.number().min(0).optional(),
+    advances: z.number().min(0).optional(),
+    otherDeductions: z.number().min(0).optional(),
+  }).optional(),
+  netSalaryAmount: z.number().min(0).optional(),
+  lastModifiedBy: z.string().optional(),
+  lastModifiedAt: z.string().optional()
 });
 
 // MongoDB Booking Schema

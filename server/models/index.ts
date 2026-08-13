@@ -219,6 +219,30 @@ export interface IDriver extends Document {
   loginPin?: string; // bcrypt hash, never the raw PIN
   loginPinSetAt?: Date;
   sessionId?: string;
+  // Salary-related fields (Phase 4 Driver Salary Integration)
+  activeSalaryMasterId?: mongoose.Types.ObjectId;
+  baseSalary?: number;
+  salarySetupCompleted: boolean;
+  salaryStructureType?: 'fixed' | 'flexible' | 'piece_rate' | 'hourly' | 'hybrid';
+  lastSalaryProcessedDate?: Date;
+  nextSalaryDate?: Date;
+  salaryFrequency?: 'daily' | 'weekly' | 'bi_weekly' | 'monthly';
+  ctcAmount?: number;
+  earningsBreakdown?: {
+    baseSalary?: number;
+    bonus?: number;
+    incentives?: number;
+    allowances?: number;
+  };
+  deductionsBreakdown?: {
+    taxDeduction?: number;
+    insurance?: number;
+    advances?: number;
+    otherDeductions?: number;
+  };
+  netSalaryAmount?: number;
+  lastModifiedBy?: string;
+  lastModifiedAt?: Date;
 }
 
 export interface IBooking extends Document {
@@ -700,9 +724,44 @@ const DriverSchema = new Schema<IDriver>({
   loginPin: { type: String },
   loginPinSetAt: { type: Date },
   sessionId: { type: String },
+  // Salary-related fields (Phase 4 Driver Salary Integration)
+  activeSalaryMasterId: { type: Schema.Types.ObjectId, ref: 'DriverSalaryMaster' },
+  baseSalary: { type: Number, min: 0 },
+  salarySetupCompleted: { type: Boolean, default: false },
+  salaryStructureType: {
+    type: String,
+    enum: ['fixed', 'flexible', 'piece_rate', 'hourly', 'hybrid']
+  },
+  lastSalaryProcessedDate: { type: Date },
+  nextSalaryDate: { type: Date },
+  salaryFrequency: {
+    type: String,
+    enum: ['daily', 'weekly', 'bi_weekly', 'monthly']
+  },
+  ctcAmount: { type: Number, min: 0 },
+  earningsBreakdown: {
+    baseSalary: { type: Number, min: 0 },
+    bonus: { type: Number, min: 0 },
+    incentives: { type: Number, min: 0 },
+    allowances: { type: Number, min: 0 }
+  },
+  deductionsBreakdown: {
+    taxDeduction: { type: Number, min: 0 },
+    insurance: { type: Number, min: 0 },
+    advances: { type: Number, min: 0 },
+    otherDeductions: { type: Number, min: 0 }
+  },
+  netSalaryAmount: { type: Number, min: 0 },
+  lastModifiedBy: { type: String },
+  lastModifiedAt: { type: Date }
 });
 // Backs authenticateDriver's per-request session lookup.
 DriverSchema.index({ sessionId: 1 });
+// Salary-related indices for efficient querying
+DriverSchema.index({ activeSalaryMasterId: 1 });
+DriverSchema.index({ salarySetupCompleted: 1 });
+DriverSchema.index({ nextSalaryDate: 1 });
+DriverSchema.index({ tenantId: 1, salarySetupCompleted: 1 });
 
 // Booking Schema
 const BookingSchema = new Schema<IBooking>({
@@ -4318,6 +4377,9 @@ export interface IDriverSalaryMaster extends Document {
   name: string;
   mobile: string;
   joiningDate: Date;
+  joiningBaseSalary: number; // Salary at the time of joining
+  currentBaseSalary: number; // Current salary (may differ from joining due to increments)
+  employmentType: 'permanent' | 'contract' | 'probation' | 'temporary' | 'casual';
   salaryType: 'fixed_monthly' | 'daily' | 'per_trip' | 'fixed_incentive' | 'custom';
   baseSalary: number;
   perDaySalary?: number;
@@ -4336,7 +4398,7 @@ export interface IDriverSalaryMaster extends Document {
   accountNumber?: string;
   ifscCode?: string;
   upiId?: string;
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'suspended' | 'terminated' | 'on_leave';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -4347,6 +4409,13 @@ const DriverSalaryMasterSchema = new Schema<IDriverSalaryMaster>({
   name: { type: String, required: true },
   mobile: { type: String, required: true },
   joiningDate: { type: Date, required: true },
+  joiningBaseSalary: { type: Number, required: true, default: 0 },
+  currentBaseSalary: { type: Number, required: true, default: 0 },
+  employmentType: {
+    type: String,
+    enum: ['permanent', 'contract', 'probation', 'temporary', 'casual'],
+    default: 'contract'
+  },
   salaryType: {
     type: String,
     enum: ['fixed_monthly', 'daily', 'per_trip', 'fixed_incentive', 'custom'],
@@ -4369,13 +4438,15 @@ const DriverSalaryMasterSchema = new Schema<IDriverSalaryMaster>({
   accountNumber: { type: String },
   ifscCode: { type: String },
   upiId: { type: String },
-  status: { type: String, enum: ['active', 'inactive'], default: 'active' },
+  status: { type: String, enum: ['active', 'inactive', 'suspended', 'terminated', 'on_leave'], default: 'active' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
 
 DriverSalaryMasterSchema.index({ tenantId: 1, driverId: 1 }, { unique: true });
 DriverSalaryMasterSchema.index({ tenantId: 1, status: 1 });
+DriverSalaryMasterSchema.index({ tenantId: 1, employmentType: 1 });
+DriverSalaryMasterSchema.index({ tenantId: 1, status: 1, employmentType: 1 });
 DriverSalaryMasterSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
 export const DriverSalaryMaster = mongoose.model<IDriverSalaryMaster>('DriverSalaryMaster', DriverSalaryMasterSchema);
 
