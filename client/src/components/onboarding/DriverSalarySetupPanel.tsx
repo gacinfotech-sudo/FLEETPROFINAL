@@ -21,6 +21,7 @@ import {
   TrendingUp,
   Calendar,
   AlertTriangle,
+  Minus,
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -271,7 +272,7 @@ export default function DriverSalarySetupPanel({
         )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="employment" className="text-xs sm:text-sm">
               <Briefcase className="w-4 h-4 sm:mr-2" />
               <span className="hidden sm:inline">Employment</span>
@@ -283,6 +284,10 @@ export default function DriverSalarySetupPanel({
             <TabsTrigger value="allowances" className="text-xs sm:text-sm">
               <AlertTriangle className="w-4 h-4 sm:mr-2" />
               <span className="hidden sm:inline">Allowances</span>
+            </TabsTrigger>
+            <TabsTrigger value="deductions" className="text-xs sm:text-sm">
+              <Minus className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Deductions</span>
             </TabsTrigger>
             <TabsTrigger value="bank" className="text-xs sm:text-sm">
               <Landmark className="w-4 h-4 sm:mr-2" />
@@ -626,6 +631,113 @@ export default function DriverSalarySetupPanel({
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="text-xs">
                 Allowances are added to the base salary for total monthly earning calculations. They can be adjusted in salary generation if needed.
+              </AlertDescription>
+            </Alert>
+          </TabsContent>
+
+          {/* Deductions Tab */}
+          <TabsContent value="deductions" className="space-y-4">
+            <p className="text-sm text-slate-600 mb-4">
+              View and manage salary deductions: advances, recharges, penalties, and other expenses that will be deducted from the final salary.
+            </p>
+
+            {/* Advances Section */}
+            <Card className="border-red-200 bg-red-50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Minus className="w-4 h-4 text-red-600" />
+                  <span>Advances</span>
+                </CardTitle>
+                <CardDescription className="text-xs">Outstanding advances taken by driver</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Total Outstanding Advances:</span>
+                    <span className="font-semibold text-red-600">₹0</span>
+                  </div>
+                  <p className="text-xs text-slate-500">Advances will be deducted from upcoming salary payments</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Recharges Section */}
+            <Card className="border-orange-200 bg-orange-50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Minus className="w-4 h-4 text-orange-600" />
+                  <span>Recharges</span>
+                </CardTitle>
+                <CardDescription className="text-xs">Mobile recharge and other vehicle-related expenses</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Pending Recharge Deduction:</span>
+                    <span className="font-semibold text-orange-600">₹0</span>
+                  </div>
+                  <p className="text-xs text-slate-500">Recharge expenses will be deducted from salary</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Penalties Section */}
+            <Card className="border-yellow-200 bg-yellow-50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                  <span>Penalties</span>
+                </CardTitle>
+                <CardDescription className="text-xs">Traffic violations, damage penalties, and disciplinary charges</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Outstanding Penalties:</span>
+                    <span className="font-semibold text-yellow-600">₹0</span>
+                  </div>
+                  <p className="text-xs text-slate-500">Penalties will be deducted from salary</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Other Expenses Section */}
+            <Card className="border-purple-200 bg-purple-50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Minus className="w-4 h-4 text-purple-600" />
+                  <span>Other Expenses</span>
+                </CardTitle>
+                <CardDescription className="text-xs">Miscellaneous deductions and recovery amounts</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-600">Total Other Deductions:</span>
+                    <span className="font-semibold text-purple-600">₹0</span>
+                  </div>
+                  <p className="text-xs text-slate-500">Other expenses and recoveries will be deducted from salary</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Total Deductions Summary */}
+            <Card className="border-red-500 bg-red-100">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold text-red-900">Total Monthly Deductions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-700">₹0</div>
+                  <p className="text-xs text-red-600 mt-1">Will be deducted from net salary at end of month</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Alert className="bg-blue-50 border-blue-200">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                All deductions (advances, recharges, penalties, and other expenses) are automatically calculated and deducted from the final salary. The net amount after all deductions will be transferred to the driver's account.
               </AlertDescription>
             </Alert>
           </TabsContent>
