@@ -60,6 +60,7 @@ import SuperAdminErrorReports from "./pages/superadmin/error-reports";
 import NotificationsAnalytics from "./pages/notifications-analytics";
 import NotificationPreferences from "./pages/notification-preferences";
 import NotificationAdminDashboard from "./pages/notification-admin-dashboard";
+import TemplateEditor from "./pages/template-editor";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -305,6 +306,13 @@ function AuthenticatedApp() {
       <Route path="/notifications/admin">
         <ProtectedRoute requiredRole="admin">
           <NotificationAdminDashboard />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Template Editor - WAVE 30A */}
+      <Route path="/notifications/templates">
+        <ProtectedRoute requiredRole="admin">
+          <TemplateEditor />
         </ProtectedRoute>
       </Route>
 
