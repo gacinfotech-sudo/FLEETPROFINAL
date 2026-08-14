@@ -399,11 +399,17 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
           )}
 
           {currentStep.key === "identity" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="sm:col-span-2 flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-gray-600" />
-                <h4 className="font-medium text-gray-900">Document Information</h4>
-              </div>
+            <div className="space-y-4">
+              <Alert className="bg-amber-50 border-amber-200">
+                <AlertDescription className="text-sm text-amber-800">
+                  ✓ This step is optional. You can fill in identity documents now or skip and add them later.
+                </AlertDescription>
+              </Alert>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2 flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-gray-600" />
+                  <h4 className="font-medium text-gray-900">Document Information (Optional)</h4>
+                </div>
               <FormField control={form.control} name="aadharNumber" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Aadhar Card Number (Optional)</FormLabel>
@@ -420,11 +426,12 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
                   <FormMessage />
                 </FormItem>
               )} />
-              <Alert className="sm:col-span-2 bg-blue-50 border-blue-200">
-                <AlertDescription className="text-xs text-blue-800">
-                  All fields on this step are optional. Scanned copies of identity/address/license documents (with expiry tracking and verification) are uploaded separately in the Documents step, once this profile is saved.
-                </AlertDescription>
-              </Alert>
+                <Alert className="sm:col-span-2 bg-blue-50 border-blue-200">
+                  <AlertDescription className="text-xs text-blue-800">
+                    Scanned copies of identity/address/license documents (with expiry tracking and verification) are uploaded separately in the Documents step, once this profile is saved.
+                  </AlertDescription>
+                </Alert>
+              </div>
             </div>
           )}
 
@@ -464,7 +471,7 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
               {currentStep.key === "identity" && (
                 <>
                   <Button type="button" variant="secondary" disabled={isSaving} onClick={() => saveBasics("close")}>
-                    {isSaving ? "Saving…" : driverId ? "Save & Close" : "Add Driver"}
+                    {isSaving ? "Saving…" : driverId ? "Save & Close" : "Skip & Add Driver"}
                   </Button>
                   <Button type="button" disabled={isSaving} onClick={() => saveBasics("continue")}>
                     {isSaving ? "Saving…" : "Save & Continue"} <ChevronRight className="w-4 h-4 ml-1" />
