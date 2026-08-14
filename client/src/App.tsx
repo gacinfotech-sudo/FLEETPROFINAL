@@ -80,6 +80,7 @@ import SmartChannelSelection from "./pages/smart-channel-selection";
 import TenantWhatsAppProfile from "./pages/tenant-whatsapp-profile";
 import WhatsAppTemplates from "./pages/whatsapp-templates";
 import WhatsAppTemplateEditor from "./pages/whatsapp-template-editor";
+import WhatsAppTemplateHistory from "./pages/whatsapp-template-history";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -437,6 +438,12 @@ function AuthenticatedApp() {
       <Route path="/settings/whatsapp-template-editor">
         <ProtectedRoute requiredRole="admin">
           <WhatsAppTemplateEditor />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/settings/whatsapp-template-history/:templateId*">
+        <ProtectedRoute requiredRole="admin">
+          <WhatsAppTemplateHistory />
         </ProtectedRoute>
       </Route>
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Edit2, Plus, Save, Eye, AlertCircle, CheckCircle, Copy, RotateCcw } from 'lucide-react';
+import { Edit2, Plus, Save, Eye, AlertCircle, CheckCircle, Copy, RotateCcw, History } from 'lucide-react';
+import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -69,12 +70,14 @@ const REQUIRED_VARIABLES = {
 
 export default function WhatsAppTemplateEditor() {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('customer');
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
+  const [changesSummary, setChangesSummary] = useState('');
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   const [formData, setFormData] = useState<Partial<Template>>({
@@ -100,23 +103,45 @@ export default function WhatsAppTemplateEditor() {
     mutationFn: async (data: Partial<Template>) => {
       const url = data._id ? `/api/tenant/whatsapp-templates/${data._id}` : '/api/tenant/whatsapp-templates';
       const method = data._id ? 'PUT' : 'POST';
+      const payload = {
+        ...data,
+        changesSummary: changesSummary || 'Template updated',
+      };
       const response = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error('Failed to save');
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['tenant-whatsapp-templates-full'] });
       toast({ title: 'Success', description: 'Template saved' });
+      // Create version after save
+      if (result.template?._id && formData._id) {
+        createVersion(result.template._id);
+      }
       resetForm();
     },
     onError: () => {
       toast({ title: 'Error', description: 'Failed to save template', variant: 'destructive' });
     },
   });
+
+  const createVersion = async (templateId: string) => {
+    try {
+      await fetch(`/api/tenant/whatsapp-templates/${templateId}/versions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          changesSummary: changesSummary || 'Template updated',
+        }),
+      });
+    } catch (error) {
+      console.error('Error creating version:', error);
+    }
+  };
 
   if (templatesData) setTemplates(templatesData);
 
@@ -193,6 +218,7 @@ export default function WhatsAppTemplateEditor() {
     setIsEditing(false);
     setValidationErrors([]);
     setWarnings([]);
+    setChangesSummary('');
   };
 
   const handleEdit = (template: Template) => {
@@ -386,6 +412,22 @@ export default function WhatsAppTemplateEditor() {
                       </Alert>
                     )}
 
+                    {/* Changes Summary (for version tracking) */}
+                    {selectedTemplate && (
+                      <div>
+                        <label className="text-sm font-medium">What changed?</label>
+                        <Input
+                          value={changesSummary}
+                          onChange={(e) => setChangesSummary(e.target.value)}
+                          placeholder="e.g., Updated greeting and timing details"
+                          className="text-sm"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          This will be tracked in the version history
+                        </p>
+                      </div>
+                    )}
+
                     {/* Message Body */}
                     <div>
                       <div className="flex justify-between items-center mb-2">
@@ -449,10 +491,16 @@ export default function WhatsAppTemplateEditor() {
                       <CardTitle>{selectedTemplate.name}</CardTitle>
                       <p className="text-sm text-gray-600 mt-1">v{selectedTemplate.version} • {selectedTemplate.status}</p>
                     </div>
-                    <Button onClick={() => handleEdit(selectedTemplate)}>
-                      <Edit2 className="w-4 h-4 mr-1" />
-                      Edit
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button onClick={() => navigate(`/settings/whatsapp-template-history/${selectedTemplate._id}`)} variant="outline">
+                        <History className="w-4 h-4 mr-1" />
+                        History
+                      </Button>
+                      <Button onClick={() => handleEdit(selectedTemplate)}>
+                        <Edit2 className="w-4 h-4 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">

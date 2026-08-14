@@ -144,3 +144,53 @@ export const whatsappIdempotencySchema = new mongoose.Schema({
 });
 
 whatsappIdempotencySchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+export const whatsappTemplateVersionSchema = new mongoose.Schema({
+  tenantId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  templateId: { type: mongoose.Schema.Types.ObjectId, required: true },
+
+  versionNumber: { type: Number, required: true },
+  isLatest: { type: Boolean, default: false, index: true },
+
+  templateType: { type: String, enum: ['customer', 'driver', 'owner', 'finance', 'payment', 'daily_summary'], required: true },
+  messageType: { type: String, required: true },
+
+  name: { type: String, required: true },
+  language: { type: String, enum: ['en', 'hi', 'hinglish'], required: true },
+
+  subject: { type: String },
+  body: { type: String, required: true },
+  variables: [{ type: String }],
+
+  status: { type: String, enum: ['draft', 'active', 'inactive'], default: 'draft' },
+
+  changesSummary: { type: String }, // "Changed subject and body wording"
+  changedBy: { type: String }, // user email or ID
+  changedAt: { type: Date, default: Date.now, index: true },
+
+  createdAt: { type: Date, default: Date.now },
+});
+
+export const whatsappTemplateAuditSchema = new mongoose.Schema({
+  tenantId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  templateId: { type: mongoose.Schema.Types.ObjectId, required: true },
+
+  action: { type: String, enum: ['created', 'updated', 'restored', 'deleted', 'activated', 'deactivated'], required: true },
+  versionNumber: { type: Number },
+
+  oldValues: { type: mongoose.Schema.Types.Mixed },
+  newValues: { type: mongoose.Schema.Types.Mixed },
+
+  changedBy: { type: String }, // user email or ID
+  changedAt: { type: Date, default: Date.now, index: true },
+
+  reason: { type: String }, // "Restored from version 3"
+  details: { type: String },
+
+  createdAt: { type: Date, default: Date.now, index: true },
+});
+
+// Add index for efficient version history queries
+whatsappTemplateVersionSchema.index({ tenantId: 1, templateId: 1, versionNumber: -1 });
+whatsappTemplateVersionSchema.index({ tenantId: 1, isLatest: 1 });
+whatsappTemplateAuditSchema.index({ tenantId: 1, templateId: 1 });

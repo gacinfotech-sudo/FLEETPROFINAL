@@ -11168,7 +11168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tenant/whatsapp-templates", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const { body, variables, ...rest } = req.body;
+      const { body, variables, changesSummary, ...rest } = req.body;
       const newTemplate = {
         tenantId: req.tenantId,
         body,
@@ -11182,6 +11182,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ?.db("fleetpro")
         .collection("whatsappTemplates")
         .insertOne(newTemplate);
+
+      // Create initial version
+      const WhatsAppTemplateVersioning = (await import('./services/whatsapp-template-versioning')).default;
+      await WhatsAppTemplateVersioning.createVersion(
+        req.tenantId,
+        result?.insertedId.toString() || '',
+        newTemplate,
+        changesSummary || 'Template created',
+        req.user?.email || 'system'
+      );
+
       res.json({ template: { ...newTemplate, _id: result?.insertedId } });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -11190,18 +11201,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/tenant/whatsapp-templates/:templateId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const { _id, body, variables, ...rest } = req.body;
+      const { _id, body, variables, changesSummary, ...rest } = req.body;
       const updateData = {
         body,
         variables: variables || extractVariablesFromText(body),
         updatedAt: new Date(),
         ...rest,
       };
-      await storage.client
+
+      // Update template
+      const result = await storage.client
         ?.db("fleetpro")
         .collection("whatsappTemplates")
-        .updateOne({ _id: new mongoose.Types.ObjectId(req.params.templateId), tenantId: req.tenantId }, { $set: updateData });
-      res.json({ success: true, message: 'Template updated' });
+        .findOneAndUpdate(
+          { _id: new mongoose.Types.ObjectId(req.params.templateId), tenantId: req.tenantId },
+          { $set: updateData },
+          { returnDocument: 'after' }
+        );
+
+      // Create version entry if body changed
+      if (body) {
+        const WhatsAppTemplateVersioning = (await import('./services/whatsapp-template-versioning')).default;
+        await WhatsAppTemplateVersioning.createVersion(
+          req.tenantId,
+          req.params.templateId,
+          { ...result.value, ...updateData },
+          changesSummary || 'Template updated',
+          req.user?.email || 'system'
+        );
+      }
+
+      res.json({ success: true, message: 'Template updated', template: result.value });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -11225,6 +11255,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const matches = [...text.matchAll(regex)];
     return [...new Set(matches.map((m) => `{{${m[1]}}}`))] as string[];
   };
+
+  // WAVE 47A: Template Versioning & History
+  app.get("/api/tenant/whatsapp-templates/:templateId/versions", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { templateId } = req.params;
+      const WhatsAppTemplateVersioning = (await import('./services/whatsapp-template-versioning')).default;
+      const versions = await WhatsAppTemplateVersioning.getVersionHistory(req.tenantId, templateId);
+      res.json(versions);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/tenant/whatsapp-templates/:templateId/version/:versionNumber", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { templateId, versionNumber } = req.params;
+      const WhatsAppTemplateVersioning = (await import('./services/whatsapp-template-versioning')).default;
+      const version = await WhatsAppTemplateVersioning.getVersion(req.tenantId, templateId, parseInt(versionNumber));
+      res.json(version);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/tenant/whatsapp-templates/:templateId/audit", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { templateId } = req.params;
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+      const WhatsAppTemplateVersioning = (await import('./services/whatsapp-template-versioning')).default;
+      const audit = await WhatsAppTemplateVersioning.getAuditTrail(req.tenantId, templateId, limit);
+      res.json(audit);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/tenant/whatsapp-templates/:templateId/compare", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { templateId } = req.params;
+      const { version1, version2 } = req.query;
+      if (!version1 || !version2) {
+        return res.status(400).json({ message: 'Both version1 and version2 required' });
+      }
+      const WhatsAppTemplateVersioning = (await import('./services/whatsapp-template-versioning')).default;
+      const comparison = await WhatsAppTemplateVersioning.compareVersions(
+        req.tenantId,
+        templateId,
+        parseInt(version1 as string),
+        parseInt(version2 as string)
+      );
+      res.json(comparison);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tenant/whatsapp-templates/:templateId/restore", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { templateId } = req.params;
+      const { versionNumber } = req.body;
+      if (!versionNumber) {
+        return res.status(400).json({ message: 'Version number required' });
+      }
+      const WhatsAppTemplateVersioning = (await import('./services/whatsapp-template-versioning')).default;
+      const restored = await WhatsAppTemplateVersioning.restoreVersion(
+        req.tenantId,
+        templateId,
+        versionNumber,
+        req.user?.email || 'unknown'
+      );
+      res.json({ success: true, message: 'Template restored', template: restored });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tenant/whatsapp-templates/:templateId/reset-default", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { templateId } = req.params;
+      const { defaultTemplate } = req.body;
+      if (!defaultTemplate) {
+        return res.status(400).json({ message: 'Default template required' });
+      }
+      const WhatsAppTemplateVersioning = (await import('./services/whatsapp-template-versioning')).default;
+      const reset = await WhatsAppTemplateVersioning.resetToDefault(
+        req.tenantId,
+        templateId,
+        defaultTemplate,
+        req.user?.email || 'unknown'
+      );
+      res.json({ success: true, message: 'Template reset to default', template: reset });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // WAVE 46A: Booking WhatsApp Integration
   app.post("/api/bookings/test-whatsapp", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
