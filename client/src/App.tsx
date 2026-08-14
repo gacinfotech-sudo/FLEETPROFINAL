@@ -73,8 +73,8 @@ function AuthenticatedApp() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : user ? (
-          // Redirect authenticated users to their respective dashboards
-          user.role === "admin" ? <AdminPanel key={user.userId} /> : <Dashboard key={user.userId} />
+          // Route all authenticated users to Dashboard (which uses Sidebar with role-based navigation)
+          <Dashboard key={user.userId} />
         ) : (
           <LoginPage />
         )}
