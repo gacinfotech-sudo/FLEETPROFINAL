@@ -11132,6 +11132,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // WAVE 44A: WhatsApp Templates
+  app.get("/api/tenant/whatsapp-templates", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const templates = await storage.client
+        ?.db("fleetpro")
+        .collection("whatsappTemplates")
+        .find({ tenantId: req.tenantId })
+        .toArray();
+      res.json({ templates: templates || [] });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tenant/whatsapp-templates", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { body, variables, ...rest } = req.body;
+      const newTemplate = {
+        tenantId: req.tenantId,
+        body,
+        variables: variables || extractVariablesFromText(body),
+        isCustom: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...rest,
+      };
+      const result = await storage.client
+        ?.db("fleetpro")
+        .collection("whatsappTemplates")
+        .insertOne(newTemplate);
+      res.json({ template: { ...newTemplate, _id: result?.insertedId } });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/tenant/whatsapp-templates/:templateId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { _id, body, variables, ...rest } = req.body;
+      const updateData = {
+        body,
+        variables: variables || extractVariablesFromText(body),
+        updatedAt: new Date(),
+        ...rest,
+      };
+      await storage.client
+        ?.db("fleetpro")
+        .collection("whatsappTemplates")
+        .updateOne({ _id: new mongoose.Types.ObjectId(req.params.templateId), tenantId: req.tenantId }, { $set: updateData });
+      res.json({ success: true, message: 'Template updated' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/tenant/whatsapp-templates/:templateId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      await storage.client
+        ?.db("fleetpro")
+        .collection("whatsappTemplates")
+        .deleteOne({ _id: new mongoose.Types.ObjectId(req.params.templateId), tenantId: req.tenantId, isCustom: true });
+      res.json({ success: true, message: 'Template deleted' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Helper function to extract variables from template text
+  const extractVariablesFromText = (text: string): string[] => {
+    const regex = /{{(\w+)}}/g;
+    const matches = [...text.matchAll(regex)];
+    return [...new Set(matches.map((m) => `{{${m[1]}}}`))] as string[];
+  };
+
   // WAVE 42A: Smart Channel Selection Endpoints
   app.get("/api/notifications/channel-strategies", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {

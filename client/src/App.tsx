@@ -78,6 +78,7 @@ import CampaignPredictor from "./pages/campaign-predictor";
 import CampaignJourneyBuilder from "./pages/campaign-journey-builder";
 import SmartChannelSelection from "./pages/smart-channel-selection";
 import TenantWhatsAppProfile from "./pages/tenant-whatsapp-profile";
+import WhatsAppTemplates from "./pages/whatsapp-templates";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -421,6 +422,13 @@ function AuthenticatedApp() {
       <Route path="/settings/whatsapp-profile">
         <ProtectedRoute requiredRole="admin">
           <TenantWhatsAppProfile />
+        </ProtectedRoute>
+      </Route>
+
+      {/* WhatsApp Templates - WAVE 44A */}
+      <Route path="/settings/whatsapp-templates">
+        <ProtectedRoute requiredRole="admin">
+          <WhatsAppTemplates />
         </ProtectedRoute>
       </Route>
 
