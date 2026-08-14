@@ -11221,6 +11221,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return [...new Set(matches.map((m) => `{{${m[1]}}}`))] as string[];
   };
 
+  // WAVE 46A: Booking WhatsApp Integration
+  app.post("/api/bookings/test-whatsapp", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { bookingId } = req.body;
+
+      // Fetch booking
+      const booking = await storage.client
+        ?.db("fleetpro")
+        .collection("bookings")
+        .findOne({ _id: new mongoose.Types.ObjectId(bookingId), tenantId: req.tenantId });
+
+      if (!booking) {
+        return res.status(404).json({ message: 'Booking not found' });
+      }
+
+      // Fetch tenant profile
+      const tenant = await storage.client
+        ?.db("fleetpro")
+        .collection("tenantWhatsAppProfiles")
+        .findOne({ tenantId: req.tenantId });
+
+      if (!tenant?.isActive) {
+        return res.status(400).json({ message: 'WhatsApp not configured for tenant' });
+      }
+
+      // Fetch driver and vehicle if assigned
+      let driver, vehicle, payment;
+      if (booking.driverId) {
+        driver = await storage.client
+          ?.db("fleetpro")
+          .collection("drivers")
+          .findOne({ _id: new mongoose.Types.ObjectId(booking.driverId) });
+      }
+
+      if (booking.vehicleId) {
+        vehicle = await storage.client
+          ?.db("fleetpro")
+          .collection("vehicles")
+          .findOne({ _id: new mongoose.Types.ObjectId(booking.vehicleId) });
+      }
+
+      // Fetch payment info
+      payment = await storage.client
+        ?.db("fleetpro")
+        .collection("bookingPayments")
+        .findOne({ bookingId: booking._id });
+
+      // Import and trigger
+      const BookingWhatsAppIntegration = (await import('./services/booking-whatsapp-integration')).default;
+      await BookingWhatsAppIntegration.handleBookingConfirmed({
+        tenantId: req.tenantId,
+        bookingId: booking._id.toString(),
+        eventType: 'BOOKING_CONFIRMED',
+        booking,
+        driver,
+        vehicle,
+        payment,
+        tenant,
+      });
+
+      res.json({ success: true, message: 'WhatsApp messages queued for sending' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // WAVE 42A: Smart Channel Selection Endpoints
   app.get("/api/notifications/channel-strategies", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
