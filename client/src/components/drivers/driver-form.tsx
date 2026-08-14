@@ -406,24 +406,23 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
               </div>
               <FormField control={form.control} name="aadharNumber" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Aadhar Card Number</FormLabel>
+                  <FormLabel>Aadhar Card Number (Optional)</FormLabel>
                   <FormControl><Input placeholder="Enter Aadhar card number" maxLength={12} {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="panNumber" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>PAN Card Number</FormLabel>
+                  <FormLabel>PAN Card Number (Optional)</FormLabel>
                   <FormControl>
                     <Input placeholder="Enter PAN card number" maxLength={10} style={{ textTransform: "uppercase" }} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
-              <Alert className="sm:col-span-2">
-                <AlertDescription className="text-xs">
-                  Scanned copies of identity/address/license documents (with expiry tracking and verification) are
-                  uploaded separately in the Documents step, once this profile is saved.
+              <Alert className="sm:col-span-2 bg-blue-50 border-blue-200">
+                <AlertDescription className="text-xs text-blue-800">
+                  All fields on this step are optional. Scanned copies of identity/address/license documents (with expiry tracking and verification) are uploaded separately in the Documents step, once this profile is saved.
                 </AlertDescription>
               </Alert>
             </div>

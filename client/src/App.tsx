@@ -76,6 +76,7 @@ import CampaignPredictor from "./pages/campaign-predictor";
 
 // Phase 5 WAVE Pages
 import CampaignJourneyBuilder from "./pages/campaign-journey-builder";
+import SmartChannelSelection from "./pages/smart-channel-selection";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -405,6 +406,13 @@ function AuthenticatedApp() {
       <Route path="/notifications/journey-builder">
         <ProtectedRoute requiredRole="admin">
           <CampaignJourneyBuilder />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Smart Channel Selection - WAVE 42A */}
+      <Route path="/notifications/channel-selection">
+        <ProtectedRoute requiredRole="admin">
+          <SmartChannelSelection />
         </ProtectedRoute>
       </Route>
 
