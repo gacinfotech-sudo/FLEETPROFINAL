@@ -70,6 +70,7 @@ import SMSOptimizer from "./pages/sms-optimizer";
 
 // Phase 4 WAVE Pages
 import PredictiveSendTime from "./pages/predictive-send-time";
+import AudienceSegmentation from "./pages/audience-segmentation";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -371,6 +372,13 @@ function AuthenticatedApp() {
       <Route path="/notifications/predictive-send-time">
         <ProtectedRoute requiredRole="admin">
           <PredictiveSendTime />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Audience Segmentation - WAVE 38A */}
+      <Route path="/notifications/segmentation">
+        <ProtectedRoute requiredRole="admin">
+          <AudienceSegmentation />
         </ProtectedRoute>
       </Route>
 
