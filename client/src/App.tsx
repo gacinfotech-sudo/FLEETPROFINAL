@@ -74,6 +74,9 @@ import AudienceSegmentation from "./pages/audience-segmentation";
 import ContentRecommendations from "./pages/content-recommendations";
 import CampaignPredictor from "./pages/campaign-predictor";
 
+// Phase 5 WAVE Pages
+import CampaignJourneyBuilder from "./pages/campaign-journey-builder";
+
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
 
@@ -395,6 +398,13 @@ function AuthenticatedApp() {
       <Route path="/notifications/campaign-predictor">
         <ProtectedRoute requiredRole="admin">
           <CampaignPredictor />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Campaign Journey Builder - WAVE 41A */}
+      <Route path="/notifications/journey-builder">
+        <ProtectedRoute requiredRole="admin">
+          <CampaignJourneyBuilder />
         </ProtectedRoute>
       </Route>
 

@@ -11038,6 +11038,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // WAVE 41A: Campaign Journey Builder Endpoints
+  app.get("/api/notifications/journeys", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const journeys = [
+        {
+          id: 'journey-1',
+          name: 'Onboarding Journey',
+          status: 'active',
+          stages: [
+            { id: 's1', name: 'User Signup', type: 'trigger', config: { event: 'user.created' } },
+            { id: 's2', name: 'Wait 1 hour', type: 'wait', config: { delay: 3600 } },
+            { id: 's3', name: 'Welcome Email', type: 'send', config: { template: 'welcome' } },
+            { id: 's4', name: 'Check Engagement', type: 'decision', config: { condition: 'email_opened' } },
+            { id: 's5', name: 'Update CRM', type: 'action', config: { action: 'crm_sync' } },
+          ],
+          recipients: 12450,
+          conversions: 2487,
+          conversionRate: 0.20,
+          createdAt: new Date(),
+        },
+        {
+          id: 'journey-2',
+          name: 'Abandoned Cart Recovery',
+          status: 'active',
+          stages: [
+            { id: 's1', name: 'Cart Abandoned', type: 'trigger', config: { event: 'cart.abandoned' } },
+            { id: 's2', name: 'Wait 2 hours', type: 'wait', config: { delay: 7200 } },
+            { id: 's3', name: 'Reminder SMS', type: 'send', config: { template: 'cart_reminder' } },
+          ],
+          recipients: 8340,
+          conversions: 2004,
+          conversionRate: 0.24,
+          createdAt: new Date(),
+        },
+      ];
+      res.json({ journeys });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/journeys", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { name, stages } = req.body;
+      const journey = { id: nanoid(), name, status: 'draft', stages, recipients: 0, conversions: 0, conversionRate: 0, createdAt: new Date() };
+      res.json({ journey });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/notifications/journeys/:journeyId/launch", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      res.json({ status: 'active', message: 'Journey launched' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
