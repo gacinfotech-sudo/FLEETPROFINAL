@@ -11256,6 +11256,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return [...new Set(matches.map((m) => `{{${m[1]}}}`))] as string[];
   };
 
+  // WAVE 49A: Template Tags & Categories
+  app.get("/api/tenant/whatsapp-tags", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppTemplateTags = (await import('./services/whatsapp-template-tags')).default;
+      const tags = await WhatsAppTemplateTags.getTags(req.tenantId);
+      res.json(tags);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tenant/whatsapp-tags", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppTemplateTags = (await import('./services/whatsapp-template-tags')).default;
+      const tag = await WhatsAppTemplateTags.createTag(req.tenantId, {
+        ...req.body,
+        createdBy: req.user?.email || 'system',
+      });
+      res.json(tag);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/tenant/whatsapp-tags/:tagId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppTemplateTags = (await import('./services/whatsapp-template-tags')).default;
+      const tag = await WhatsAppTemplateTags.updateTag(req.tenantId, req.params.tagId, req.body);
+      res.json(tag);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/tenant/whatsapp-tags/:tagId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppTemplateTags = (await import('./services/whatsapp-template-tags')).default;
+      await WhatsAppTemplateTags.deleteTag(req.tenantId, req.params.tagId);
+      res.json({ success: true, message: 'Tag deleted' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/tenant/whatsapp-categories", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppTemplateTags = (await import('./services/whatsapp-template-tags')).default;
+      const categories = await WhatsAppTemplateTags.getCategories(req.tenantId);
+      res.json(categories);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tenant/whatsapp-categories", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppTemplateTags = (await import('./services/whatsapp-template-tags')).default;
+      const category = await WhatsAppTemplateTags.createCategory(req.tenantId, req.body);
+      res.json(category);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/tenant/whatsapp-categories/:categoryId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppTemplateTags = (await import('./services/whatsapp-template-tags')).default;
+      const category = await WhatsAppTemplateTags.updateCategory(req.tenantId, req.params.categoryId, req.body);
+      res.json(category);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/tenant/whatsapp-categories/:categoryId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppTemplateTags = (await import('./services/whatsapp-template-tags')).default;
+      await WhatsAppTemplateTags.deleteCategory(req.tenantId, req.params.categoryId);
+      res.json({ success: true, message: 'Category deleted' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tenant/whatsapp-templates/:templateId/tags/:tagId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppTemplateTags = (await import('./services/whatsapp-template-tags')).default;
+      const template = await WhatsAppTemplateTags.addTagToTemplate(req.tenantId, req.params.templateId, req.params.tagId);
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/tenant/whatsapp-templates/:templateId/tags/:tagId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppTemplateTags = (await import('./services/whatsapp-template-tags')).default;
+      const template = await WhatsAppTemplateTags.removeTagFromTemplate(req.tenantId, req.params.templateId, req.params.tagId);
+      res.json(template);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/tenant/whatsapp-templates/search", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppTemplateTags = (await import('./services/whatsapp-template-tags')).default;
+      const { q, tags } = req.query;
+      let results: any[] = [];
+
+      if (q) {
+        results = await WhatsAppTemplateTags.searchByKeyword(req.tenantId, q as string);
+      } else if (tags) {
+        const tagArray = typeof tags === 'string' ? [tags] : (tags as string[]);
+        results = await WhatsAppTemplateTags.searchByTags(req.tenantId, tagArray);
+      }
+
+      res.json(results);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/tenant/whatsapp-tags/popular", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
+      const WhatsAppTemplateTags = (await import('./services/whatsapp-template-tags')).default;
+      const tags = await WhatsAppTemplateTags.getPopularTags(req.tenantId, limit);
+      res.json(tags);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // WAVE 48A: Approval Workflow
   app.get("/api/tenant/whatsapp-approvals/config", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {

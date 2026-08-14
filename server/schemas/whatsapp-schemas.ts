@@ -113,6 +113,7 @@ export const whatsappTemplateSchema = new mongoose.Schema({
 
   templateType: { type: String, enum: ['customer', 'driver', 'owner', 'finance', 'payment', 'daily_summary'], required: true },
   messageType: { type: String, required: true },
+  category: { type: mongoose.Schema.Types.ObjectId }, // reference to whatsappTemplateCategory
 
   name: { type: String, required: true },
   language: { type: String, enum: ['en', 'hi', 'hinglish'], required: true },
@@ -121,10 +122,14 @@ export const whatsappTemplateSchema = new mongoose.Schema({
   body: { type: String, required: true },
 
   variables: [{ type: String }], // ['{{bookingId}}', '{{driverName}}', etc.]
+  tags: [{ type: mongoose.Schema.Types.ObjectId }], // reference to whatsappTemplateTag
 
   isActive: { type: Boolean, default: true },
   isCustom: { type: Boolean, default: false },
 
+  searchKeywords: [{ type: String }], // for full-text search
+
+  createdBy: { type: String },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
@@ -252,3 +257,38 @@ export const whatsappApprovalConfigSchema = new mongoose.Schema({
 whatsappTemplateApprovalSchema.index({ tenantId: 1, templateId: 1, status: 1 });
 whatsappTemplateApprovalSchema.index({ tenantId: 1, status: 1, submittedAt: -1 });
 whatsappApprovalConfigSchema.index({ tenantId: 1 });
+
+export const whatsappTemplateTagSchema = new mongoose.Schema({
+  tenantId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
+  name: { type: String, required: true },
+  description: { type: String },
+  color: { type: String, default: '#3B82F6' }, // hex color for UI display
+  icon: { type: String }, // emoji or icon name
+
+  templateCount: { type: Number, default: 0 },
+  usage: { type: Number, default: 0 }, // how many times used in messages sent
+
+  createdBy: { type: String },
+  createdAt: { type: Date, default: Date.now, index: true },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+export const whatsappTemplateCategorySchema = new mongoose.Schema({
+  tenantId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
+  name: { type: String, required: true },
+  description: { type: String },
+  icon: { type: String }, // emoji or icon
+  order: { type: Number, default: 0 }, // sort order
+
+  defaultLanguage: { type: String, enum: ['en', 'hi', 'hinglish'], default: 'en' },
+  defaultApprovalRequired: { type: Boolean, default: false },
+  autoApprove: { type: Boolean, default: true },
+
+  templateCount: { type: Number, default: 0 },
+
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+whatsappTemplateTagSchema.index({ tenantId: 1, name: 1 });
+whatsappTemplateCategorySchema.index({ tenantId: 1, name: 1 });
