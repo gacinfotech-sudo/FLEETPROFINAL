@@ -64,6 +64,7 @@ import TemplateEditor from "./pages/template-editor";
 import ScheduledNotifications from "./pages/scheduled-notifications";
 import NotificationMonitor from "./pages/notification-monitor";
 import EventTriggers from "./pages/event-triggers";
+import NotificationABTesting from "./pages/notification-ab-testing";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -337,6 +338,13 @@ function AuthenticatedApp() {
       <Route path="/notifications/triggers">
         <ProtectedRoute requiredRole="admin">
           <EventTriggers />
+        </ProtectedRoute>
+      </Route>
+
+      {/* A/B Testing - WAVE 34A */}
+      <Route path="/notifications/ab-testing">
+        <ProtectedRoute requiredRole="admin">
+          <NotificationABTesting />
         </ProtectedRoute>
       </Route>
 
