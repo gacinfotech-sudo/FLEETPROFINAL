@@ -83,6 +83,7 @@ import WhatsAppTemplateEditor from "./pages/whatsapp-template-editor";
 import WhatsAppTemplateHistory from "./pages/whatsapp-template-history";
 import WhatsAppApprovalQueue from "./pages/whatsapp-approval-queue";
 import WhatsAppApprovalConfig from "./pages/whatsapp-approval-config";
+import SaaSAdminDashboard from "./pages/saas-admin-dashboard";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -203,6 +204,11 @@ function AuthenticatedApp() {
       </Route>
 
       {/* SaaS Platform Admin Routes — Complete Suite */}
+      <Route path="/saas/admin">
+        <ProtectedRoute requiredRole="admin">
+          <SaaSAdminDashboard />
+        </ProtectedRoute>
+      </Route>
       <Route path="/superadmin/dashboard">
         <ProtectedRoute requiredRole="admin">
           <SuperAdminDashboard />
