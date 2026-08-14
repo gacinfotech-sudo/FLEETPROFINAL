@@ -9826,6 +9826,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== SAAS TENANTS ROUTES - REAL DATABASE ==========
+  app.get("/api/saas/tenants", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const tenants = await storage.getAllTenants();
+      const enrichedTenants = await Promise.all(tenants.map(async (tenant: any) => {
+        const userCount = await storage.getUserCountByTenant(tenant._id);
+        const vehicleCount = await storage.getVehicleCountByTenant(tenant._id);
+        const driverCount = await storage.getDriverCountByTenant(tenant._id);
+        return {
+          id: tenant._id.toString(),
+          name: tenant.name,
+          code: tenant.code,
+          owner: tenant.primaryContact?.name || 'N/A',
+          email: tenant.primaryContact?.email || 'N/A',
+          status: tenant.active ? 'active' : 'inactive',
+          plan: tenant.subscriptionPlan || 'starter',
+          users: userCount || 0,
+          vehicles: vehicleCount || 0,
+          drivers: driverCount || 0,
+          createdAt: tenant.createdAt,
+          lastLogin: new Date(),
+          nextDueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        };
+      }));
+      res.json({ tenants: enrichedTenants, count: enrichedTenants.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/saas/tenants/:tenantId", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const tenant = await storage.getTenant(req.params.tenantId);
+      if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
+
+      const userCount = await storage.getUserCountByTenant(tenant._id);
+      const vehicleCount = await storage.getVehicleCountByTenant(tenant._id);
+      const driverCount = await storage.getDriverCountByTenant(tenant._id);
+
+      res.json({
+        id: tenant._id.toString(),
+        name: tenant.name,
+        code: tenant.code,
+        owner: tenant.primaryContact?.name || 'N/A',
+        email: tenant.primaryContact?.email || 'N/A',
+        status: tenant.active ? 'active' : 'inactive',
+        plan: tenant.subscriptionPlan || 'starter',
+        users: userCount || 0,
+        vehicles: vehicleCount || 0,
+        drivers: driverCount || 0,
+        createdAt: tenant.createdAt,
+        subscription: {
+          plan: tenant.subscriptionPlan || 'starter',
+          amount: 5000,
+          status: 'active',
+          nextDue: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          daysRemaining: 30,
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ========== NOTIFICATION SCHEDULER ROUTES (WAVE 21A) ==========
   app.get("/api/notifications/scheduled", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
