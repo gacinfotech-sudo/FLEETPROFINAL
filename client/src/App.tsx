@@ -66,6 +66,7 @@ import NotificationMonitor from "./pages/notification-monitor";
 import EventTriggers from "./pages/event-triggers";
 import NotificationABTesting from "./pages/notification-ab-testing";
 import NotificationInsights from "./pages/notification-insights";
+import SMSOptimizer from "./pages/sms-optimizer";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -353,6 +354,13 @@ function AuthenticatedApp() {
       <Route path="/notifications/insights">
         <ProtectedRoute requiredRole="admin">
           <NotificationInsights />
+        </ProtectedRoute>
+      </Route>
+
+      {/* SMS Optimizer - WAVE 36A */}
+      <Route path="/notifications/sms-optimizer">
+        <ProtectedRoute requiredRole="admin">
+          <SMSOptimizer />
         </ProtectedRoute>
       </Route>
 
