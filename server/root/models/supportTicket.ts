@@ -163,15 +163,5 @@ const SupportTicketSchema = new Schema<ISupportTicket>(
 
 // Existing {tenantId, field} convention (audit doc §12) for tenant-scoped
 // list/filter queries from Tenant 360's Support tab.
-SupportTicketSchema.index({ tenantId: 1, status: 1 });
-SupportTicketSchema.index({ tenantId: 1, severity: 1 });
-SupportTicketSchema.index({ tenantId: 1, createdAt: -1 });
-// Non-tenant-first indexes for cross-tenant Root queries (Support Center
-// list view, filtered/sorted across all tenants) — justified because the
-// Root Support Center's primary view is "all open tickets across every
-// tenant, newest/most severe first," which a tenant-first compound index
-// cannot serve without a full collection scan.
-SupportTicketSchema.index({ status: 1, severity: 1, createdAt: -1 });
-SupportTicketSchema.index({ correlationId: 1 }, { sparse: true });
-
-export const SupportTicket = mongoose.model<ISupportTicket>('SupportTicket', SupportTicketSchema);
+// Note: Model is defined/exported from server/models/index.ts to avoid
+// duplicate Mongoose model registration. This file exports only types & constants.

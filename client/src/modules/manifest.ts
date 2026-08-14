@@ -1,6 +1,19 @@
 // SaaS Module Manifest - Defines navigation structure and permissions
 // Restored to match the good state (1be6ca8) comprehensive navigation
 // This includes all 42+ items that were present before simplification
+
+// Platform Admin SaaS Modules (for Super Admin only)
+export const SAAS_ADMIN_MODULES = [
+  { id: 'saas-dashboard', label: 'Dashboard', iconKey: 'dashboard', parentGroup: 'saas' },
+  { id: 'saas-tenants', label: 'Tenants', iconKey: 'customers', parentGroup: 'saas' },
+  { id: 'saas-plans', label: 'Plans', iconKey: 'alert', parentGroup: 'saas' },
+  { id: 'saas-subscriptions', label: 'Subscriptions', iconKey: 'booking', parentGroup: 'saas' },
+  { id: 'saas-billing', label: 'Billing', iconKey: 'revenue', parentGroup: 'saas' },
+  { id: 'saas-support', label: 'Support', iconKey: 'contact', parentGroup: 'saas' },
+  { id: 'saas-profile', label: 'SaaS Profile', iconKey: 'profile', parentGroup: 'saas' },
+  { id: 'saas-security', label: 'Security', iconKey: 'alert', parentGroup: 'saas' },
+];
+
 export const SAAS_MODULES = [
   // Dashboard
   { id: 'dashboard', label: 'Dashboard', iconKey: 'dashboard', parentGroup: 'dashboard' },
@@ -134,9 +147,17 @@ export function getNavigationStructure(role?: string, permissions?: string[]): N
   // Collect top-level items (those with parentGroup: null) that should render as individual items
   const topLevelItems = ['rewards-referrals'];
 
+  // Add SaaS Platform Admin section for admin users
+  const saasSection: NavigationGroup = {
+    id: 'saas-platform',
+    label: 'SaaS Platform Admin',
+    iconKey: 'dashboard',
+    children: ['saas-dashboard', 'saas-tenants', 'saas-plans', 'saas-subscriptions', 'saas-billing', 'saas-support', 'saas-profile', 'saas-security']
+  };
+
   // Filter based on role and permissions
   if (role === 'admin') {
-    return groups; // Admin sees everything
+    return [saasSection, ...groups]; // Admin sees SaaS admin panel first, then everything else
   }
 
   if (role === 'manager') {

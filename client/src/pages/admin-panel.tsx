@@ -401,16 +401,25 @@ export default function AdminPanel() {
                     className="pl-10 w-64"
                   />
                 </div>
-                <Button 
-                  onClick={() => {
-                    setEditingClient(null);
-                    setShowClientForm(true);
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="mr-2" size={16} />
-                  Add Client
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => window.location.href = '/dashboard/admin-tenant-create'}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <Plus className="mr-2" size={16} />
+                    Create Tenant
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setEditingClient(null);
+                      setShowClientForm(true);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Plus className="mr-2" size={16} />
+                    Add Client
+                  </Button>
+                </div>
               </div>
             </div>
           </CardHeader>

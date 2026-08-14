@@ -31,9 +31,9 @@ import {
   SUPPORT_TICKET_SEVERITIES,
   SUPPORT_TICKET_STATUSES,
   SUPPORT_TICKET_TRANSITIONS,
-  SupportTicket,
   type SupportTicketStatus,
 } from '../models/supportTicket';
+import { SupportTicket } from '../../models/index';
 
 const ticketIdAlphabet = customAlphabet('ABCDEFGHJKMNPQRSTUVWXYZ23456789', 8);
 export function generateTicketId(): string {

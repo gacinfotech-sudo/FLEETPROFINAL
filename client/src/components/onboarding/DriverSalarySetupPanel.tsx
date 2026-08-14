@@ -118,7 +118,14 @@ export default function DriverSalarySetupPanel({
     weeklyOffDays: [0],
     weeklyOffLeaveType: "unpaid",
     salaryStartDate: new Date().toISOString().split("T")[0],
+    deductions: [],
   });
+
+  // Deduction form state
+  const [dedType, setDedType] = useState<string>("advance");
+  const [dedAmount, setDedAmount] = useState<string>("");
+  const [dedDate, setDedDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [dedReason, setDedReason] = useState<string>("");
 
   // Fetch existing salary configuration if available
   const { data: existingSalary, isLoading: isLoadingExisting } = useQuery({
@@ -195,6 +202,40 @@ export default function DriverSalarySetupPanel({
         ? f.weeklyOffDays.filter((d) => d !== day)
         : [...f.weeklyOffDays, day],
     }));
+  };
+
+  const handleAddDeduction = () => {
+    if (!dedAmount || !dedDate) {
+      toast({
+        title: "Missing Fields",
+        description: "Please provide amount and date",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newDeduction: Deduction = {
+      type: dedType as "advance" | "recharge" | "penalty" | "other",
+      amount: parseFloat(dedAmount),
+      date: dedDate,
+      reason: dedReason,
+    };
+
+    setForm(f => ({
+      ...f,
+      deductions: [...(f.deductions || []), newDeduction],
+    }));
+
+    // Reset form
+    setDedAmount("");
+    setDedDate(new Date().toISOString().split("T")[0]);
+    setDedReason("");
+    setDedType("advance");
+
+    toast({
+      title: "Deduction Added",
+      description: `₹${dedAmount} deduction added successfully`,
+    });
   };
 
   const handleSubmit = async () => {
@@ -661,7 +702,7 @@ export default function DriverSalarySetupPanel({
                     <Label htmlFor="dedType" className="text-xs font-medium">
                       Type *
                     </Label>
-                    <Select defaultValue="advance">
+                    <Select value={dedType} onValueChange={setDedType}>
                       <SelectTrigger id="dedType" className="mt-1 h-9 text-sm">
                         <SelectValue />
                       </SelectTrigger>
@@ -682,6 +723,8 @@ export default function DriverSalarySetupPanel({
                       id="dedAmount"
                       type="number"
                       placeholder="0"
+                      value={dedAmount}
+                      onChange={(e) => setDedAmount(e.target.value)}
                       className="mt-1 h-9 text-sm"
                     />
                   </div>
@@ -694,6 +737,8 @@ export default function DriverSalarySetupPanel({
                       <input
                         id="dedDate"
                         type="date"
+                        value={dedDate}
+                        onChange={(e) => setDedDate(e.target.value)}
                         className="w-full h-9 px-3 py-1 border border-slate-300 rounded-md text-sm cursor-pointer appearance-none bg-white"
                         style={{
                           colorScheme: 'light',
@@ -714,11 +759,16 @@ export default function DriverSalarySetupPanel({
                       id="dedReason"
                       type="text"
                       placeholder="e.g., Mobile recharge"
+                      value={dedReason}
+                      onChange={(e) => setDedReason(e.target.value)}
                       className="mt-1 h-9 text-sm"
                     />
                   </div>
                 </div>
-                <Button className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-xs h-8">
+                <Button
+                  onClick={handleAddDeduction}
+                  className="mt-3 w-full bg-blue-600 hover:bg-blue-700 text-xs h-8"
+                >
                   ➕ Add Deduction
                 </Button>
               </CardContent>
@@ -735,13 +785,29 @@ export default function DriverSalarySetupPanel({
                     </CardTitle>
                     <CardDescription className="text-xs">Outstanding advances taken by driver</CardDescription>
                   </div>
-                  <span className="text-lg font-bold text-red-600">₹0</span>
+                  <span className="text-lg font-bold text-red-600">
+                    ₹{form.deductions?.filter(d => d.type === 'advance').reduce((sum, d) => sum + d.amount, 0).toLocaleString() || '0'}
+                  </span>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-sm text-slate-500">
-                  No advances recorded. Add advances using the form above.
-                </div>
+                {form.deductions?.filter(d => d.type === 'advance').length ?? 0 > 0 ? (
+                  <div className="space-y-2">
+                    {form.deductions?.filter(d => d.type === 'advance').map((ded, idx) => (
+                      <div key={ded.id || idx} className="flex justify-between items-center p-2 bg-white rounded border border-red-100">
+                        <div className="text-sm">
+                          <div className="font-medium">₹{ded.amount.toLocaleString()}</div>
+                          <div className="text-xs text-slate-500">{new Date(ded.date).toLocaleDateString('en-IN')}</div>
+                        </div>
+                        {ded.reason && <div className="text-xs text-slate-600">{ded.reason}</div>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-500">
+                    No advances recorded. Add advances using the form above.
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -756,13 +822,29 @@ export default function DriverSalarySetupPanel({
                     </CardTitle>
                     <CardDescription className="text-xs">Mobile recharge & vehicle-related expenses</CardDescription>
                   </div>
-                  <span className="text-lg font-bold text-orange-600">₹0</span>
+                  <span className="text-lg font-bold text-orange-600">
+                    ₹{form.deductions?.filter(d => d.type === 'recharge').reduce((sum, d) => sum + d.amount, 0).toLocaleString() || '0'}
+                  </span>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-sm text-slate-500">
-                  No recharges recorded. Add recharges using the form above.
-                </div>
+                {form.deductions?.filter(d => d.type === 'recharge').length ?? 0 > 0 ? (
+                  <div className="space-y-2">
+                    {form.deductions?.filter(d => d.type === 'recharge').map((ded, idx) => (
+                      <div key={ded.id || idx} className="flex justify-between items-center p-2 bg-white rounded border border-orange-100">
+                        <div className="text-sm">
+                          <div className="font-medium">₹{ded.amount.toLocaleString()}</div>
+                          <div className="text-xs text-slate-500">{new Date(ded.date).toLocaleDateString('en-IN')}</div>
+                        </div>
+                        {ded.reason && <div className="text-xs text-slate-600">{ded.reason}</div>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-500">
+                    No recharges recorded. Add recharges using the form above.
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -777,13 +859,29 @@ export default function DriverSalarySetupPanel({
                     </CardTitle>
                     <CardDescription className="text-xs">Traffic violations, damage & disciplinary charges</CardDescription>
                   </div>
-                  <span className="text-lg font-bold text-yellow-600">₹0</span>
+                  <span className="text-lg font-bold text-yellow-600">
+                    ₹{form.deductions?.filter(d => d.type === 'penalty').reduce((sum, d) => sum + d.amount, 0).toLocaleString() || '0'}
+                  </span>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-sm text-slate-500">
-                  No penalties recorded. Add penalties using the form above.
-                </div>
+                {form.deductions?.filter(d => d.type === 'penalty').length ?? 0 > 0 ? (
+                  <div className="space-y-2">
+                    {form.deductions?.filter(d => d.type === 'penalty').map((ded, idx) => (
+                      <div key={ded.id || idx} className="flex justify-between items-center p-2 bg-white rounded border border-yellow-100">
+                        <div className="text-sm">
+                          <div className="font-medium">₹{ded.amount.toLocaleString()}</div>
+                          <div className="text-xs text-slate-500">{new Date(ded.date).toLocaleDateString('en-IN')}</div>
+                        </div>
+                        {ded.reason && <div className="text-xs text-slate-600">{ded.reason}</div>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-500">
+                    No penalties recorded. Add penalties using the form above.
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -798,13 +896,29 @@ export default function DriverSalarySetupPanel({
                     </CardTitle>
                     <CardDescription className="text-xs">Miscellaneous deductions & recovery amounts</CardDescription>
                   </div>
-                  <span className="text-lg font-bold text-purple-600">₹0</span>
+                  <span className="text-lg font-bold text-purple-600">
+                    ₹{form.deductions?.filter(d => d.type === 'other').reduce((sum, d) => sum + d.amount, 0).toLocaleString() || '0'}
+                  </span>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-sm text-slate-500">
-                  No other expenses recorded. Add expenses using the form above.
-                </div>
+                {form.deductions?.filter(d => d.type === 'other').length ?? 0 > 0 ? (
+                  <div className="space-y-2">
+                    {form.deductions?.filter(d => d.type === 'other').map((ded, idx) => (
+                      <div key={ded.id || idx} className="flex justify-between items-center p-2 bg-white rounded border border-purple-100">
+                        <div className="text-sm">
+                          <div className="font-medium">₹{ded.amount.toLocaleString()}</div>
+                          <div className="text-xs text-slate-500">{new Date(ded.date).toLocaleDateString('en-IN')}</div>
+                        </div>
+                        {ded.reason && <div className="text-xs text-slate-600">{ded.reason}</div>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-500">
+                    No other expenses recorded. Add expenses using the form above.
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -815,9 +929,21 @@ export default function DriverSalarySetupPanel({
               </CardHeader>
               <CardContent>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-red-700">₹0</div>
-                  <p className="text-xs text-red-600 mt-2">Advances + Recharges + Penalties + Other = Final Deduction</p>
-                  <p className="text-xs text-red-700 mt-1 font-semibold">Net Salary = Base + Allowances - ₹0</p>
+                  {(() => {
+                    const totalDed = form.deductions?.reduce((sum, d) => sum + d.amount, 0) || 0;
+                    const base = parseFloat(form.baseSalary?.toString() || "0") || 0;
+                    const allowances = (form.foodAllowance || 0) + (form.nightAllowancePerNight || 0) + (form.outstationAllowancePerDay || 0) + (form.perBookingFoodCharge || 0) + (form.kmIncentivePerKm || 0) + (form.overtimeRatePerHour || 0) + (form.extraDutyRate || 0);
+                    const netSalary = base + allowances - totalDed;
+                    return (
+                      <>
+                        <div className="text-3xl font-bold text-red-700">₹{totalDed.toLocaleString()}</div>
+                        <p className="text-xs text-red-600 mt-2">Advances + Recharges + Penalties + Other = Final Deduction</p>
+                        <p className="text-xs text-red-700 mt-1 font-semibold">
+                          Net Salary = ₹{base.toLocaleString()} + ₹{allowances.toLocaleString()} - ₹{totalDed.toLocaleString()} = <span className="text-green-600 font-bold">₹{Math.max(0, netSalary).toLocaleString()}</span>
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
               </CardContent>
             </Card>

@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import mongoose from 'mongoose';
-import { Tenant, User, Vehicle, Driver, Booking, Expense, VehicleBookingLock, ITenant, IUser, IVehicle, IDriver, IBooking, IExpense } from './models';
+import { Tenant, User, Vehicle, Driver, Booking, Expense, VehicleBookingLock, PlatformCompany, Plan, Subscription, BillingEntry, Invoice, ITenant, IUser, IVehicle, IDriver, IBooking, IExpense, IPlatformCompany, IPlan, ISubscription, IBillingEntry, IInvoice } from './models';
 import { findVehicleConflicts, findDriverConflicts, findTentativeDraftConflicts, combineDateTime } from './services/availability';
 import { generateUniqueBookingCode } from './services/bookingCodeService';
 // TASK-02 (telephony/RBAC isolation) additive import — CallSession/
@@ -138,6 +138,27 @@ export interface IStorage {
   updateExpense(id: string, data: any, tenantId?: string): Promise<IExpense | undefined>;
   deleteExpense(id: string, tenantId?: string): Promise<void>;
   getTotalExpenses(tenantId: string, startDate?: string, endDate?: string): Promise<number>;
+
+  // Platform Company methods
+  createPlatformCompany(data: Partial<IPlatformCompany>): Promise<IPlatformCompany>;
+  getPlatformCompany(): Promise<IPlatformCompany | undefined>;
+  updatePlatformCompany(data: Partial<IPlatformCompany>): Promise<IPlatformCompany | undefined>;
+
+  // Plan methods
+  createPlan(data: Partial<IPlan>): Promise<IPlan>;
+  getPlan(id: string): Promise<IPlan | undefined>;
+  getPlanByCode(code: string): Promise<IPlan | undefined>;
+  listPlans(filter?: { status?: string; isActive?: boolean }): Promise<IPlan[]>;
+  updatePlan(id: string, data: Partial<IPlan>): Promise<IPlan | undefined>;
+  deletePlan(id: string): Promise<void>;
+  seedDefaultPlans(): Promise<void>;
+
+  // Subscription methods
+  createSubscription(data: Partial<ISubscription>): Promise<ISubscription>;
+  getSubscriptionByTenant(tenantId: string): Promise<ISubscription | undefined>;
+  updateSubscription(id: string, data: Partial<ISubscription>): Promise<ISubscription | undefined>;
+  listSubscriptions(filter?: any): Promise<ISubscription[]>;
+  getSubscriptionsExpiringIn(days: number): Promise<ISubscription[]>;
 }
 
 // Serializes concurrent createBooking() calls for the same vehicle when running
@@ -1987,6 +2008,278 @@ export class MongoDBStorage implements IStorage {
       Customer.countDocuments(query),
     ]);
     return { rows, total };
+  }
+
+  // ============================================================================
+  // PLATFORM COMPANY PROFILE METHODS (SaaS Platform Info - Not Tenant)
+  // ============================================================================
+
+  async createPlatformCompany(data: Partial<IPlatformCompany>): Promise<IPlatformCompany> {
+    const company = new PlatformCompany({
+      name: data.name || 'FleetPro',
+      email: data.email,
+      phone: data.phone,
+      whatsapp: data.whatsapp,
+      address: data.address,
+      city: data.city,
+      state: data.state,
+      country: data.country,
+      pincode: data.pincode,
+      gst: data.gst,
+      pan: data.pan,
+      cin: data.cin,
+      bankName: data.bankName,
+      bankAccountNumber: data.bankAccountNumber,
+      bankIfscCode: data.bankIfscCode,
+      bankAccountHolderName: data.bankAccountHolderName,
+      upiId: data.upiId,
+      paymentQrUrl: data.paymentQrUrl,
+      termsOfServiceUrl: data.termsOfServiceUrl,
+      privacyPolicyUrl: data.privacyPolicyUrl,
+      refundPolicyUrl: data.refundPolicyUrl,
+      cancellationPolicyUrl: data.cancellationPolicyUrl,
+      supportEmail: data.supportEmail,
+      supportPhone: data.supportPhone,
+      supportWhatsapp: data.supportWhatsapp,
+      supportHours: data.supportHours,
+      supportLink: data.supportLink,
+      logoUrl: data.logoUrl,
+      faviconUrl: data.faviconUrl,
+      isActive: data.isActive !== false,
+      updatedBy: data.updatedBy,
+    });
+    return company.save();
+  }
+
+  async getPlatformCompany(): Promise<IPlatformCompany | undefined> {
+    return PlatformCompany.findOne({ isActive: true });
+  }
+
+  async updatePlatformCompany(data: Partial<IPlatformCompany>): Promise<IPlatformCompany | undefined> {
+    const company = await PlatformCompany.findOne({ isActive: true });
+    if (!company) return undefined;
+
+    Object.assign(company, data);
+    company.updatedAt = new Date();
+    return company.save();
+  }
+
+  // ============================================================================
+  // PLAN MANAGEMENT METHODS (Phase 2)
+  // ============================================================================
+
+  async createPlan(data: Partial<IPlan>): Promise<IPlan> {
+    const plan = new Plan({
+      name: data.name,
+      code: data.code?.toLowerCase(),
+      description: data.description,
+      pricing: data.pricing || { currency: 'INR' },
+      limits: data.limits || { vehicles: 10, drivers: 10, users: 5 },
+      features: data.features || [],
+      trial: data.trial || { enabled: false, daysCount: 14 },
+      gracePeriodDays: data.gracePeriodDays || 7,
+      billingCycles: data.billingCycles || ['monthly', 'annual'],
+      status: data.status || 'active',
+      displayOrder: data.displayOrder || 0,
+      isActive: data.isActive !== false,
+      createdBy: data.createdBy,
+    });
+    return plan.save();
+  }
+
+  async getPlan(id: string): Promise<IPlan | undefined> {
+    try {
+      return await Plan.findById(id);
+    } catch {
+      return undefined;
+    }
+  }
+
+  async getPlanByCode(code: string): Promise<IPlan | undefined> {
+    return Plan.findOne({ code: code.toLowerCase() });
+  }
+
+  async listPlans(filter?: { status?: string; isActive?: boolean }): Promise<IPlan[]> {
+    const query: any = {};
+    if (filter?.status) query.status = filter.status;
+    if (filter?.isActive !== undefined) query.isActive = filter.isActive;
+    return Plan.find(query).sort({ displayOrder: 1, createdAt: -1 });
+  }
+
+  async updatePlan(id: string, data: Partial<IPlan>): Promise<IPlan | undefined> {
+    try {
+      const plan = await Plan.findById(id);
+      if (!plan) return undefined;
+
+      Object.assign(plan, data);
+      plan.updatedAt = new Date();
+      return plan.save();
+    } catch {
+      return undefined;
+    }
+  }
+
+  async deletePlan(id: string): Promise<void> {
+    try {
+      await Plan.findByIdAndDelete(id);
+    } catch {
+      // Silently ignore
+    }
+  }
+
+  async seedDefaultPlans(): Promise<void> {
+    const existingCount = await Plan.countDocuments();
+    if (existingCount > 0) return; // Already seeded
+
+    const defaultPlans: Partial<IPlan>[] = [
+      {
+        name: 'Starter',
+        code: 'starter',
+        description: 'Perfect for small operations',
+        pricing: { monthly: 9999, annual: 99990, currency: 'INR' },
+        limits: { vehicles: 5, drivers: 5, users: 2, branches: 1 },
+        features: ['booking-management', 'driver-tracking'],
+        trial: { enabled: true, daysCount: 14 },
+        billingCycles: ['monthly', 'annual'],
+        displayOrder: 1,
+      },
+      {
+        name: 'Basic',
+        code: 'basic',
+        description: 'For growing fleets',
+        pricing: { monthly: 19999, annual: 199990, currency: 'INR' },
+        limits: { vehicles: 15, drivers: 15, users: 5, branches: 2 },
+        features: ['booking-management', 'driver-tracking', 'driver-360', 'vehicle-360'],
+        trial: { enabled: true, daysCount: 14 },
+        billingCycles: ['monthly', 'annual'],
+        displayOrder: 2,
+      },
+      {
+        name: 'Standard',
+        code: 'standard',
+        description: 'Professional features',
+        pricing: { monthly: 49999, annual: 499990, currency: 'INR' },
+        limits: { vehicles: 50, drivers: 50, users: 10, branches: 5 },
+        features: [
+          'booking-management',
+          'driver-tracking',
+          'driver-360',
+          'vehicle-360',
+          'salary-management',
+          'gps-tracking',
+          'advanced-reports',
+        ],
+        trial: { enabled: true, daysCount: 14 },
+        billingCycles: ['monthly', 'annual'],
+        displayOrder: 3,
+      },
+      {
+        name: 'Professional',
+        code: 'professional',
+        description: 'Enterprise-ready',
+        pricing: { monthly: 99999, annual: 999990, currency: 'INR' },
+        limits: { vehicles: 100, drivers: 100, users: 20, branches: 10 },
+        features: [
+          'booking-management',
+          'driver-tracking',
+          'driver-360',
+          'vehicle-360',
+          'salary-management',
+          'gps-tracking',
+          'advanced-reports',
+          'api-access',
+          'white-label',
+        ],
+        trial: { enabled: true, daysCount: 30 },
+        billingCycles: ['monthly', 'annual'],
+        displayOrder: 4,
+      },
+      {
+        name: 'Enterprise',
+        code: 'enterprise',
+        description: 'Custom unlimited solution',
+        pricing: { currency: 'INR' },
+        limits: { vehicles: 999, drivers: 999, users: 100, branches: 50 },
+        features: [
+          'booking-management',
+          'driver-tracking',
+          'driver-360',
+          'vehicle-360',
+          'salary-management',
+          'gps-tracking',
+          'advanced-reports',
+          'api-access',
+          'white-label',
+          'dedicated-support',
+          'custom-integration',
+        ],
+        trial: { enabled: false },
+        billingCycles: ['annual'],
+        displayOrder: 5,
+      },
+    ];
+
+    for (const planData of defaultPlans) {
+      await this.createPlan(planData);
+    }
+  }
+
+  // ============================================================================
+  // SUBSCRIPTION METHODS (Phase 3)
+  // ============================================================================
+
+  async createSubscription(data: Partial<ISubscription>): Promise<ISubscription> {
+    const subscription = new Subscription({
+      tenantId: data.tenantId,
+      planId: data.planId,
+      startDate: data.startDate || new Date(),
+      renewalDate: data.renewalDate,
+      billingCycle: data.billingCycle || 'annual',
+      autoRenew: data.autoRenew !== false,
+      status: data.status || 'TRIAL',
+      isTrial: data.isTrial || false,
+      trialEndsAt: data.trialEndsAt,
+      activatedAt: new Date(),
+    });
+    return subscription.save();
+  }
+
+  async getSubscriptionByTenant(tenantId: string): Promise<ISubscription | undefined> {
+    try {
+      return await Subscription.findOne({ tenantId, status: { $ne: 'CANCELLED' } })
+        .populate('planId')
+        .sort({ createdAt: -1 });
+    } catch {
+      return undefined;
+    }
+  }
+
+  async updateSubscription(id: string, data: Partial<ISubscription>): Promise<ISubscription | undefined> {
+    try {
+      const subscription = await Subscription.findById(id);
+      if (!subscription) return undefined;
+
+      Object.assign(subscription, data);
+      subscription.updatedAt = new Date();
+      return subscription.save();
+    } catch {
+      return undefined;
+    }
+  }
+
+  async listSubscriptions(filter?: any): Promise<ISubscription[]> {
+    const query = filter || {};
+    return Subscription.find(query).populate('planId').sort({ createdAt: -1 });
+  }
+
+  async getSubscriptionsExpiringIn(days: number): Promise<ISubscription[]> {
+    const now = new Date();
+    const future = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+    return Subscription.find({
+      renewalDate: { $gte: now, $lte: future },
+      status: { $in: ['ACTIVE', 'TRIAL'] },
+    }).populate('planId');
   }
 }
 

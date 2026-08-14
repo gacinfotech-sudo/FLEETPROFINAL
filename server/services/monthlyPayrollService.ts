@@ -351,6 +351,10 @@ export async function calculatePayroll(
           salaryMaster.perBookingFoodCharge || 0
         );
 
+        // Get salary master deductions (Advance, Recharge, Penalty, Other)
+        const salaryMasterDeds = (salaryMaster.deductions || []).reduce((sum: number, d: any) =>
+          sum + (d.amount || 0), 0);
+
         deductions = {
           absenceDays: 0,
           penalties: 0,
@@ -358,7 +362,7 @@ export async function calculatePayroll(
           challanRecovery: 0,
           cashShortage: 0,
           fuelExcess: 0,
-          otherDeductions: 0,
+          otherDeductions: salaryMasterDeds,
           foodCharges
         };
       }

@@ -74,6 +74,7 @@ export interface EnhancedDriver360Salary {
     };
     advancesDeduction: number;
     penaltyDeduction: number;
+    salaryConfigDeductions: number;
     attendanceBonus: number;
     incentives: number;
   };
@@ -337,7 +338,11 @@ export async function getDriverPayrollAggregation(
     const penaltyDeduction = recoveryCurrentMonth.reduce((sum: number, r: any) =>
       sum + (r.amount || 0), 0);
 
-    const totalDeductions = advancesDeduction + penaltyDeduction;
+    // New deductions from salary master configuration
+    const salaryMasterDeductions = (salaryMaster.deductions || []).reduce((sum: number, d: any) =>
+      sum + (d.amount || 0), 0);
+
+    const totalDeductions = advancesDeduction + penaltyDeduction + salaryMasterDeductions;
 
     // Salary calculations
     const grossSalary = baseSalary + totalIncentives;
@@ -429,6 +434,7 @@ export async function getDriverPayrollAggregation(
         },
         advancesDeduction,
         penaltyDeduction,
+        salaryConfigDeductions: salaryMasterDeductions,
         attendanceBonus,
         incentives: kmIncentive
       },

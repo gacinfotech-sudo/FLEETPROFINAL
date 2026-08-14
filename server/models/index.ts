@@ -4922,3 +4922,384 @@ DriverSalaryPaymentSchema.index({ salaryId: 1 });
 DriverSalaryPaymentSchema.index({ date: 1 });
 DriverSalaryPaymentSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
 export const DriverSalaryPayment = mongoose.model<IDriverSalaryPayment>('DriverSalaryPayment', DriverSalaryPaymentSchema);
+
+// ============================================================================
+// PLATFORM COMPANY PROFILE — SaaS Platform Info (Not Tenant-Specific)
+// ============================================================================
+// Stores FleetPro SaaS platform company information (name, GST, bank details,
+// payment QR, support contact, etc.). This is READ-ONLY to tenants but
+// displayable for invoicing/payment. Only PLATFORM_ROOT/PLATFORM_FINANCE_ADMIN
+// can modify this via the Super Admin Portal.
+
+export interface IPlatformCompany extends Document {
+  name: string; // e.g., "FleetPro Technologies Pvt Ltd"
+  email?: string; // Support email
+  phone?: string; // Support phone
+  whatsapp?: string; // WhatsApp business number
+  address?: string; // Registered office address
+  city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
+
+  // Tax & Registration
+  gst?: string; // GST number
+  pan?: string; // PAN number
+  cin?: string; // Corporate Identity Number
+
+  // Banking Details (for payment processing)
+  bankName?: string;
+  bankAccountNumber?: string;
+  bankIfscCode?: string;
+  bankAccountHolderName?: string;
+
+  // Digital Payment
+  upiId?: string; // e.g., fleetpro@okhdfcbank
+  paymentQrUrl?: string; // URL to payment QR code image
+
+  // Policies & Legal
+  termsOfServiceUrl?: string;
+  privacyPolicyUrl?: string;
+  refundPolicyUrl?: string;
+  cancellationPolicyUrl?: string;
+
+  // Support & Contact
+  supportEmail?: string;
+  supportPhone?: string;
+  supportWhatsapp?: string;
+  supportHours?: string; // e.g., "9 AM - 6 PM IST, Mon-Fri"
+  supportLink?: string; // Link to support portal/ticketing system
+
+  // Branding
+  logoUrl?: string;
+  faviconUrl?: string;
+
+  // Metadata
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  updatedBy?: { userId: string; platformRole: string }; // Who last modified
+}
+
+const PlatformCompanySchema = new Schema<IPlatformCompany>({
+  name: { type: String, required: true },
+  email: { type: String },
+  phone: { type: String },
+  whatsapp: { type: String },
+  address: { type: String },
+  city: { type: String },
+  state: { type: String },
+  country: { type: String },
+  pincode: { type: String },
+
+  gst: { type: String },
+  pan: { type: String },
+  cin: { type: String },
+
+  bankName: { type: String },
+  bankAccountNumber: { type: String },
+  bankIfscCode: { type: String },
+  bankAccountHolderName: { type: String },
+
+  upiId: { type: String },
+  paymentQrUrl: { type: String },
+
+  termsOfServiceUrl: { type: String },
+  privacyPolicyUrl: { type: String },
+  refundPolicyUrl: { type: String },
+  cancellationPolicyUrl: { type: String },
+
+  supportEmail: { type: String },
+  supportPhone: { type: String },
+  supportWhatsapp: { type: String },
+  supportHours: { type: String },
+  supportLink: { type: String },
+
+  logoUrl: { type: String },
+  faviconUrl: { type: String },
+
+  isActive: { type: Boolean, default: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  updatedBy: {
+    userId: { type: String },
+    platformRole: { type: String },
+    _id: false
+  },
+});
+
+PlatformCompanySchema.index({ name: 1 });
+PlatformCompanySchema.index({ isActive: 1 });
+PlatformCompanySchema.pre('save', function (next) {
+  (this as any).updatedAt = new Date();
+  next();
+});
+
+export const PlatformCompany = mongoose.model<IPlatformCompany>('PlatformCompany', PlatformCompanySchema);
+
+// ============================================================================
+// SUBSCRIPTION PLAN — Configurable SaaS Plans (Phase 2)
+// ============================================================================
+// Defines what each subscription plan includes: pricing, limits, features.
+// Plans are managed by PLATFORM_ROOT and assigned to tenants.
+
+export interface IPlan extends Document {
+  name: string; // e.g., "Starter", "Professional", "Enterprise"
+  code: string; // Unique code: 'starter', 'pro', 'enterprise'
+  description?: string; // Plan description for marketing
+
+  // Pricing (in smallest currency unit, e.g., paise for INR)
+  pricing: {
+    monthly?: number; // Monthly subscription price
+    quarterly?: number;
+    halfYearly?: number;
+    annual?: number;
+    currency: string; // 'INR', 'USD', etc.
+  };
+
+  // Limits per subscription
+  limits: {
+    vehicles: number;
+    drivers: number;
+    users: number;
+    branches?: number;
+    storage?: number; // In GB
+    bookingsPerMonth?: number;
+  };
+
+  // Features included in this plan
+  features: string[]; // e.g., ['driver-360', 'vehicle-360', 'gps-tracking', 'salary-management']
+
+  // Trial configuration
+  trial: {
+    enabled: boolean;
+    daysCount: number; // e.g., 14 days
+  };
+
+  // Grace period after expiration (days)
+  gracePeriodDays?: number;
+
+  // Billing cycle options available
+  billingCycles: ('monthly' | 'quarterly' | 'halfYearly' | 'annual')[];
+
+  // Status
+  status: 'active' | 'archived' | 'draft';
+  displayOrder: number; // Order in which to display plans (1-10)
+
+  // Metadata
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy?: { userId: string; platformRole: string };
+  updatedBy?: { userId: string; platformRole: string };
+}
+
+const PlanSchema = new Schema<IPlan>({
+  name: { type: String, required: true },
+  code: { type: String, required: true, unique: true, lowercase: true },
+  description: { type: String },
+
+  pricing: {
+    monthly: { type: Number },
+    quarterly: { type: Number },
+    halfYearly: { type: Number },
+    annual: { type: Number },
+    currency: { type: String, default: 'INR' },
+    _id: false,
+  },
+
+  limits: {
+    vehicles: { type: Number, required: true },
+    drivers: { type: Number, required: true },
+    users: { type: Number, required: true },
+    branches: { type: Number, default: 1 },
+    storage: { type: Number, default: 5 }, // 5 GB default
+    bookingsPerMonth: { type: Number, default: 1000 },
+    _id: false,
+  },
+
+  features: [{ type: String }],
+
+  trial: {
+    enabled: { type: Boolean, default: false },
+    daysCount: { type: Number, default: 14 },
+    _id: false,
+  },
+
+  gracePeriodDays: { type: Number, default: 7 },
+  billingCycles: [{ type: String, enum: ['monthly', 'quarterly', 'halfYearly', 'annual'] }],
+
+  status: { type: String, enum: ['active', 'archived', 'draft'], default: 'active' },
+  displayOrder: { type: Number, default: 0 },
+
+  isActive: { type: Boolean, default: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  createdBy: {
+    userId: { type: String },
+    platformRole: { type: String },
+    _id: false,
+  },
+  updatedBy: {
+    userId: { type: String },
+    platformRole: { type: String },
+    _id: false,
+  },
+});
+
+PlanSchema.index({ code: 1 });
+PlanSchema.index({ status: 1 });
+PlanSchema.index({ isActive: 1 });
+PlanSchema.index({ displayOrder: 1 });
+PlanSchema.pre('save', function (next) {
+  (this as any).updatedAt = new Date();
+  next();
+});
+
+export const Plan = mongoose.model<IPlan>('Plan', PlanSchema);
+
+// ============================================================================
+// SUBSCRIPTION — Tenant Subscription to Plans (Phase 3)
+// ============================================================================
+// Links a Tenant to a Plan with lifecycle tracking: start, renewal, grace, expiry
+
+export interface ISubscription extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  planId: mongoose.Types.ObjectId;
+
+  // Subscription dates
+  startDate: Date;
+  renewalDate: Date;
+  cancelledAt?: Date;
+
+  // Billing
+  billingCycle: 'monthly' | 'quarterly' | 'halfYearly' | 'annual';
+  autoRenew: boolean;
+
+  // Status machine
+  status: 'TRIAL' | 'ACTIVE' | 'PAYMENT_PENDING' | 'GRACE_PERIOD' | 'EXPIRED' | 'SUSPENDED' | 'CANCELLED';
+
+  // Payment tracking
+  lastPaymentDate?: Date;
+  lastPaymentAmount?: number;
+  paymentMethod?: string; // 'card', 'bank_transfer', 'upi', 'offline'
+
+  // Trial tracking
+  isTrial: boolean;
+  trialEndsAt?: Date;
+
+  // Metadata
+  activatedAt: Date;
+  suspendedAt?: Date;
+  suspensionReason?: string;
+  notes?: string;
+
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const SubscriptionSchema = new Schema<ISubscription>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  planId: { type: Schema.Types.ObjectId, ref: 'Plan', required: true },
+
+  startDate: { type: Date, required: true, default: Date.now },
+  renewalDate: { type: Date, required: true },
+  cancelledAt: { type: Date },
+
+  billingCycle: { type: String, enum: ['monthly', 'quarterly', 'halfYearly', 'annual'], required: true },
+  autoRenew: { type: Boolean, default: true },
+
+  status: {
+    type: String,
+    enum: ['TRIAL', 'ACTIVE', 'PAYMENT_PENDING', 'GRACE_PERIOD', 'EXPIRED', 'SUSPENDED', 'CANCELLED'],
+    default: 'TRIAL',
+  },
+
+  lastPaymentDate: { type: Date },
+  lastPaymentAmount: { type: Number },
+  paymentMethod: { type: String },
+
+  isTrial: { type: Boolean, default: false },
+  trialEndsAt: { type: Date },
+
+  activatedAt: { type: Date, default: Date.now },
+  suspendedAt: { type: Date },
+  suspensionReason: { type: String },
+  notes: { type: String },
+
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+SubscriptionSchema.index({ tenantId: 1 });
+SubscriptionSchema.index({ planId: 1 });
+SubscriptionSchema.index({ status: 1 });
+SubscriptionSchema.index({ renewalDate: 1 });
+SubscriptionSchema.pre('save', function (next) {
+  (this as any).updatedAt = new Date();
+  next();
+});
+
+export const Subscription = mongoose.model<ISubscription>('Subscription', SubscriptionSchema);
+
+// ============================================================================
+// SUPPORT TICKET — Customer Support Tickets (Phase 6)
+// ============================================================================
+
+export interface ISupportMessage {
+  userId: string;
+  userName: string;
+  message: string;
+  attachments?: string[];
+  createdAt: Date;
+}
+
+export interface ISupportTicket extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  ticketNumber: string; // TICKET-2026-001
+  category: 'technical' | 'billing' | 'subscription' | 'feature-request' | 'other';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  status: 'open' | 'assigned' | 'in-progress' | 'waiting-for-tenant' | 'resolved' | 'closed';
+  subject: string;
+  description: string;
+  messages: ISupportMessage[];
+  assignedTo?: string; // Admin user ID
+  createdBy: string; // Tenant user ID
+  createdAt: Date;
+  updatedAt: Date;
+  resolvedAt?: Date;
+}
+
+const SupportTicketSchema = new Schema<ISupportTicket>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  ticketNumber: { type: String, required: true, unique: true },
+  category: { type: String, enum: ['technical', 'billing', 'subscription', 'feature-request', 'other'], required: true },
+  priority: { type: String, enum: ['low', 'medium', 'high', 'urgent'], default: 'medium' },
+  status: {
+    type: String,
+    enum: ['open', 'assigned', 'in-progress', 'waiting-for-tenant', 'resolved', 'closed'],
+    default: 'open',
+  },
+  subject: { type: String, required: true },
+  description: { type: String, required: true },
+  messages: [
+    {
+      userId: { type: String, required: true },
+      userName: { type: String },
+      message: { type: String, required: true },
+      attachments: [{ type: String }],
+      createdAt: { type: Date, default: Date.now },
+      _id: false,
+    },
+  ],
+  assignedTo: { type: String },
+  createdBy: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+  resolvedAt: { type: Date },
+});
+
+SupportTicketSchema.index({ tenantId: 1, createdAt: -1 });
+SupportTicketSchema.index({ status: 1, priority: 1 });
+SupportTicketSchema.index({ ticketNumber: 1 });
+export const SupportTicket = mongoose.model<ISupportTicket>('SupportTicket', SupportTicketSchema);

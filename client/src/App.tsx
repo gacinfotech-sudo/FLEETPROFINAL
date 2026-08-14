@@ -45,6 +45,12 @@ import OperationsCenter from "./pages/operations-center";
 import LiveBookings from "./pages/live-bookings";
 import UpcomingBookings from "./pages/upcoming-bookings";
 
+// SaaS Platform Admin Pages
+import SuperAdminDashboard from "./pages/superadmin/dashboard";
+import SuperAdminTenants from "./pages/superadmin/tenants";
+import SuperAdminPlans from "./pages/superadmin/plans";
+import SuperAdminCompanyProfile from "./pages/superadmin/company-profile";
+
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
 
@@ -160,6 +166,28 @@ function AuthenticatedApp() {
       <Route path="/root/product-config">
         <ProtectedRoute requiredRole="admin">
           <ProductConfigPage />
+        </ProtectedRoute>
+      </Route>
+
+      {/* SaaS Platform Admin Routes — Super Admin Portal */}
+      <Route path="/superadmin/dashboard">
+        <ProtectedRoute requiredRole="admin">
+          <SuperAdminDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/superadmin/tenants">
+        <ProtectedRoute requiredRole="admin">
+          <SuperAdminTenants />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/superadmin/plans">
+        <ProtectedRoute requiredRole="admin">
+          <SuperAdminPlans />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/superadmin/company-profile">
+        <ProtectedRoute requiredRole="admin">
+          <SuperAdminCompanyProfile />
         </ProtectedRoute>
       </Route>
 

@@ -84,7 +84,8 @@ router.post('/master', authenticateUser, requireTenant, async (req: Request, res
       bankName,
       accountNumber,
       ifscCode,
-      upiId
+      upiId,
+      deductions
     } = req.body;
 
     // Validation
@@ -139,6 +140,7 @@ router.post('/master', authenticateUser, requireTenant, async (req: Request, res
       accountNumber: accountNumber || '',
       ifscCode: ifscCode || '',
       upiId: upiId || '',
+      deductions: deductions || [],
       status: 'active',
       createdBy: { userId, role: 'admin' },
       createdAt: existing ? existing.createdAt : new Date(),
