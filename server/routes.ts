@@ -10079,6 +10079,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== NOTIFICATION AUDIT & COMPLIANCE ROUTES (WAVE 25A) ==========
+  app.get("/api/notifications/audit-logs", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const auditService = require("./services/notification-audit").auditService;
+      const limit = parseInt(req.query.limit as string) || 100;
+      const logs = await auditService.getAuditLogs(req.tenantId.toString(), { limit });
+      res.json({ logs, count: logs.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/audit-logs", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { action, resourceType, resourceId, changes } = req.body;
+      const auditService = require("./services/notification-audit").auditService;
+
+      const log = await auditService.logAction(
+        req.tenantId.toString(),
+        req.user?.userId || "",
+        action,
+        resourceType,
+        resourceId,
+        changes || {},
+        req.ip,
+        req.get('user-agent')
+      );
+
+      res.status(201).json(log);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/audit-stats", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const auditService = require("./services/notification-audit").auditService;
+      const stats = await auditService.getAuditStats(req.tenantId.toString());
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/audit-export", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const format = (req.query.format as string) || "csv";
+      const auditService = require("./services/notification-audit").auditService;
+      const data = await auditService.exportAuditTrail(req.tenantId.toString(), format as any);
+
+      if (format === "csv") {
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="audit-trail-${new Date().toISOString().split('T')[0]}.csv"`);
+      } else {
+        res.setHeader('Content-Type', 'application/json');
+      }
+
+      res.send(data);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/consent", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { consentType, consented } = req.body;
+      const auditService = require("./services/notification-audit").auditService;
+
+      const record = await auditService.recordConsent(
+        req.tenantId.toString(),
+        req.user?.userId || "",
+        consentType,
+        consented,
+        "web-ui"
+      );
+
+      res.status(201).json(record);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ========== DELIVERY CHANNELS ROUTES (WAVE 26A) ==========
+  app.get("/api/notifications/channels", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const deliveryChannels = require("./services/delivery-channels").deliveryChannels;
+
+      // For demo, return mock channel configurations
+      const channels = [
+        { id: 'ch-email', channel: 'EMAIL', provider: 'SendGrid', isActive: true },
+        { id: 'ch-sms', channel: 'SMS', provider: 'Twilio', isActive: true },
+        { id: 'ch-push', channel: 'PUSH', provider: 'Firebase', isActive: true },
+        { id: 'ch-inapp', channel: 'IN_APP', provider: 'Built-in', isActive: true },
+      ];
+
+      res.json({ channels, count: channels.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/channels/:channel/delivery", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { notificationId, recipient } = req.body;
+      const channel = req.params.channel;
+
+      const deliveryChannels = require("./services/delivery-channels").deliveryChannels;
+
+      const delivery = await deliveryChannels.recordDelivery(
+        req.tenantId.toString(),
+        notificationId,
+        channel,
+        recipient,
+        "sent"
+      );
+
+      res.status(201).json(delivery);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/deliveries/:notificationId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const deliveryChannels = require("./services/delivery-channels").deliveryChannels;
+      const deliveries = await deliveryChannels.getDeliveryStatus(req.params.notificationId);
+      res.json({ deliveries, count: deliveries.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/channel-stats", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const deliveryChannels = require("./services/delivery-channels").deliveryChannels;
+      const stats = await deliveryChannels.getChannelStats(req.tenantId.toString());
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
