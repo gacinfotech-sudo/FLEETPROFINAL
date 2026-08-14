@@ -9959,6 +9959,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== NOTIFICATION TEMPLATES ROUTES (WAVE 23A) ==========
+  app.get("/api/notifications/templates", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const templateEngine = require("./services/notification-templates").templateEngine;
+      const category = req.query.category as string;
+      const templates = await templateEngine.listTemplates(req.tenantId.toString(), category);
+      res.json({ templates, count: templates.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/templates", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { name, description, body, channel, category, subject } = req.body;
+      if (!name || !body || !channel) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const templateEngine = require("./services/notification-templates").templateEngine;
+      const template = await templateEngine.createTemplate(
+        req.tenantId.toString(),
+        name,
+        description || "",
+        body,
+        channel,
+        category || "general",
+        req.user?.userId || ""
+      );
+
+      res.status(201).json(template);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/templates/:templateId/render", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { data } = req.body;
+      const templateEngine = require("./services/notification-templates").templateEngine;
+      const rendered = await templateEngine.renderTemplate(req.params.templateId, data || {});
+      res.json({ rendered });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ========== NOTIFICATION PREFERENCES ROUTES (WAVE 24A) ==========
+  app.get("/api/notifications/preferences", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const preferencesManager = require("./services/notification-preferences").preferencesManager;
+      const prefs = await preferencesManager.getOrCreatePreferences(
+        req.user?.userId || "",
+        req.tenantId.toString()
+      );
+      res.json(prefs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/notifications/preferences", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { categories, channels, quietHours, frequencyCap } = req.body;
+      const preferencesManager = require("./services/notification-preferences").preferencesManager;
+
+      let prefs = await preferencesManager.getOrCreatePreferences(
+        req.user?.userId || "",
+        req.tenantId.toString()
+      );
+
+      if (categories) {
+        for (const [cat, enabled] of Object.entries(categories)) {
+          prefs = await preferencesManager.updateCategoryPreference(
+            req.user?.userId || "",
+            req.tenantId.toString(),
+            cat,
+            enabled as boolean
+          );
+        }
+      }
+
+      if (channels) {
+        for (const [ch, enabled] of Object.entries(channels)) {
+          prefs = await preferencesManager.updateChannelPreference(
+            req.user?.userId || "",
+            req.tenantId.toString(),
+            ch,
+            enabled as boolean
+          );
+        }
+      }
+
+      if (quietHours) {
+        prefs = await preferencesManager.updateQuietHours(
+          req.user?.userId || "",
+          req.tenantId.toString(),
+          quietHours
+        );
+      }
+
+      res.json(prefs);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/unsubscribe", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const preferencesManager = require("./services/notification-preferences").preferencesManager;
+      const success = await preferencesManager.unsubscribe(
+        req.user?.userId || "",
+        req.tenantId.toString()
+      );
+      res.json({ success, message: success ? "Unsubscribed from all notifications" : "Failed to unsubscribe" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

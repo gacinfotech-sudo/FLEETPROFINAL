@@ -58,6 +58,7 @@ import SuperAdminErrorReports from "./pages/superadmin/error-reports";
 
 // Phase 3 WAVE Pages
 import NotificationsAnalytics from "./pages/notifications-analytics";
+import NotificationPreferences from "./pages/notification-preferences";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -289,6 +290,13 @@ function AuthenticatedApp() {
       <Route path="/notifications/analytics">
         <ProtectedRoute allowedRoles={["client", "manager"]}>
           <NotificationsAnalytics />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Notification Preferences - WAVE 24A */}
+      <Route path="/notifications/preferences">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <NotificationPreferences />
         </ProtectedRoute>
       </Route>
 
