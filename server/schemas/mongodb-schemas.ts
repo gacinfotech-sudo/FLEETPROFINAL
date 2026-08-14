@@ -21,6 +21,7 @@ export const mongoTenantSchema = z.object({
 export const mongoUserSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
   name: z.string().optional(),
+  phone: z.string().min(10, 'Phone number is required').optional(), // Optional for backward compatibility
   password: z.string().min(8, 'Password must be at least 8 characters'),
   // P0 FIX: the Mongoose model allows role 'manager' (server/models/index.ts),
   // but this Zod schema previously only allowed 'admin' | 'client', so
@@ -319,10 +320,65 @@ export const mongoCallSessionSchema = z.object({
   createdBy: z.object({ userId: z.string(), role: z.string() }),
 });
 
+// FLEETPRO BOOKING DRAFT SCHEMA
+// Auto-save intermediate booking state without final submission
+// Recovery on browser close/restart or session loss
+export const mongoBookingDraftSchema = z.object({
+  tenantId: z.string(),
+  userId: z.string(),
+  draftId: z.string(), // DRAFT-XXXX
+  status: z.enum(['in_progress', 'completed', 'finalized']).default('in_progress'),
+
+  // Customer reference
+  customerId: z.string().optional(),
+  customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
+
+  // Booking data (partial - may be incomplete)
+  bookingType: z.string().optional(),
+  tripType: z.string().optional(),
+  pickupLocation: z.string().optional(),
+  dropoffLocation: z.string().optional(),
+  pickupDate: z.string().optional(),
+  pickupTime: z.string().optional(),
+  returnDate: z.string().optional(),
+  returnTime: z.string().optional(),
+
+  // Vehicle & Driver
+  vehicleId: z.string().optional(),
+  vehicleCategory: z.string().optional(),
+  driverId: z.string().optional(),
+
+  // Pricing
+  totalAmount: z.number().optional(),
+  advanceAmount: z.number().optional(),
+  tollCharges: z.number().optional(),
+  parkingCharges: z.number().optional(),
+  miscellaneousAmount: z.number().optional(),
+
+  // Additional
+  notes: z.string().optional(),
+  source: z.string().optional(),
+  progressStep: z.number().default(0), // 0=customer, 1=trip, 2=date, 3=vehicle, 4=payment, etc.
+
+  // Audit
+  createdByUserId: z.string(),
+  createdByUserName: z.string(),
+  createdByUserMobile: z.string().optional(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+  lastSavedAt: z.date(),
+  expiresAt: z.date().optional(), // TTL: 30 days if not finalized
+
+  // Recovery
+  formData: z.record(z.unknown()).optional(), // Raw form data backup
+});
+
 export type MongoTenant = z.infer<typeof mongoTenantSchema>;
 export type MongoUser = z.infer<typeof mongoUserSchema>;
 export type MongoVehicle = z.infer<typeof mongoVehicleSchema>;
 export type MongoDriver = z.infer<typeof mongoDriverSchema>;
 export type MongoBooking = z.infer<typeof mongoBookingSchema>;
+export type MongoBookingDraft = z.infer<typeof mongoBookingDraftSchema>;
 export type MongoTelephonyIdentity = z.infer<typeof mongoTelephonyIdentitySchema>;
 export type MongoCallSession = z.infer<typeof mongoCallSessionSchema>;

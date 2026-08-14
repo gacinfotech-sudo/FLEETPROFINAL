@@ -11256,6 +11256,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return [...new Set(matches.map((m) => `{{${m[1]}}}`))] as string[];
   };
 
+  // FLEETPRO BOOKING DRAFT AUTO-SAVE (WAVE 50+)
+  // Create or get user's booking draft
+  app.post("/api/tenant/bookings/draft/start", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const BookingDraftService = (await import('./services/booking-draft-service')).default;
+      const { draftId, isNew } = await BookingDraftService.createOrGetDraft(
+        req.tenantId,
+        req.user?.userId || 'unknown',
+        req.user?.name || 'Unknown User',
+        req.user?.phone
+      );
+      res.json({ draftId, isNew });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Auto-save draft data
+  app.post("/api/tenant/bookings/draft/:draftId/save", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const BookingDraftService = (await import('./services/booking-draft-service')).default;
+      await BookingDraftService.saveDraft(req.tenantId, req.params.draftId, req.body);
+      res.json({ success: true, message: 'Draft saved' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get draft by ID
+  app.get("/api/tenant/bookings/draft/:draftId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const BookingDraftService = (await import('./services/booking-draft-service')).default;
+      const draft = await BookingDraftService.getDraft(req.tenantId, req.params.draftId);
+      if (!draft) {
+        return res.status(404).json({ message: 'Draft not found' });
+      }
+      res.json(draft);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // List user's active drafts
+  app.get("/api/tenant/bookings/drafts", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const BookingDraftService = (await import('./services/booking-draft-service')).default;
+      const drafts = await BookingDraftService.getUserDrafts(req.tenantId, req.user?.userId || 'unknown');
+      res.json(drafts);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Finalize draft to booking
+  app.post("/api/tenant/bookings/draft/:draftId/finalize", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const BookingDraftService = (await import('./services/booking-draft-service')).default;
+      const { bookingId } = await BookingDraftService.finalizeDraft(req.tenantId, req.params.draftId, req.body);
+      res.json({ success: true, bookingId });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Delete draft
+  app.delete("/api/tenant/bookings/draft/:draftId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const BookingDraftService = (await import('./services/booking-draft-service')).default;
+      await BookingDraftService.deleteDraft(req.tenantId, req.params.draftId);
+      res.json({ success: true, message: 'Draft deleted' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // FLEETPRO ZERO-DUPLICATE CUSTOMER LOOKUP (WAVE 50+)
   // Customer lookup by normalized mobile phone
   app.get("/api/tenant/customers/lookup", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
