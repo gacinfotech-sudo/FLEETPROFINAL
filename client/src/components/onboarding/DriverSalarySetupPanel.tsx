@@ -686,19 +686,24 @@ export default function DriverSalarySetupPanel({
                     />
                   </div>
 
-                  <div>
+                  <div className="relative">
                     <Label htmlFor="dedDate" className="text-xs font-medium">
                       Date * (📅 Calendar)
                     </Label>
-                    <input
-                      id="dedDate"
-                      type="date"
-                      className="mt-1 h-9 text-sm cursor-pointer w-full px-3 py-1 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      style={{
-                        colorScheme: 'light'
-                      }}
-                      required
-                    />
+                    <div className="relative mt-1">
+                      <input
+                        id="dedDate"
+                        type="date"
+                        className="w-full h-9 px-3 py-1 border border-slate-300 rounded-md text-sm cursor-pointer appearance-none bg-white"
+                        style={{
+                          colorScheme: 'light',
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'%3E%3C/rect%3E%3Cpath d='M16 2v4M8 2v4M3 10h18'%3E%3C/path%3E%3C/svg%3E")`,
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'right 6px center',
+                          paddingRight: '30px'
+                        }}
+                      />
+                    </div>
                   </div>
 
                   <div>
