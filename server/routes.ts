@@ -11097,6 +11097,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // WAVE 43A: WhatsApp Communication Profile
+  app.get("/api/tenant/whatsapp-profile", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const profile = await storage.client
+        ?.db("fleetpro")
+        .collection("tenantWhatsAppProfiles")
+        .findOne({ tenantId: req.tenantId });
+      res.json({ profile: profile || {} });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tenant/whatsapp-profile", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { companyName, customerLanguage, driverLanguage, dailySummaryTime, ...rest } = req.body;
+      const updateData = {
+        tenantId: req.tenantId,
+        companyName,
+        customerLanguage: customerLanguage || 'en',
+        driverLanguage: driverLanguage || 'hi',
+        dailySummaryTime: dailySummaryTime || '23:30',
+        updatedAt: new Date(),
+        ...rest,
+      };
+      const result = await storage.client
+        ?.db("fleetpro")
+        .collection("tenantWhatsAppProfiles")
+        .updateOne({ tenantId: req.tenantId }, { $set: updateData }, { upsert: true });
+      res.json({ success: true, message: 'Profile updated' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // WAVE 42A: Smart Channel Selection Endpoints
   app.get("/api/notifications/channel-strategies", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
