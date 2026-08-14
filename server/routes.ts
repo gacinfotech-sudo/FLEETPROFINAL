@@ -10221,6 +10221,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== NOTIFICATION WEBHOOKS ROUTES (WAVE 27A) ==========
+  app.post("/api/notifications/webhooks", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { url, events, retryAttempts } = req.body;
+      if (!url || !events || !Array.isArray(events)) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const webhookManager = require("./services/notification-webhooks").webhookManager;
+      const webhook = await webhookManager.registerWebhook(
+        req.tenantId.toString(),
+        url,
+        events,
+        retryAttempts || 5
+      );
+
+      res.status(201).json(webhook);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/webhooks", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const webhookManager = require("./services/notification-webhooks").webhookManager;
+      const webhooks = await webhookManager.getWebhooks(req.tenantId.toString());
+      res.json({ webhooks, count: webhooks.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/notifications/webhooks/:webhookId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const webhookManager = require("./services/notification-webhooks").webhookManager;
+      const success = await webhookManager.deleteWebhook(req.params.webhookId);
+      res.json({ success, message: success ? "Webhook deleted" : "Failed to delete webhook" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/webhooks/:webhookId/deliveries", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const webhookManager = require("./services/notification-webhooks").webhookManager;
+      const deliveries = await webhookManager.getDeliveries(req.params.webhookId);
+      res.json({ deliveries, count: deliveries.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ========== BATCH PROCESSING ROUTES (WAVE 28A) ==========
+  app.post("/api/notifications/batch", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { name, templateId, recipients, batchSize } = req.body;
+      if (!name || !templateId || !recipients || !Array.isArray(recipients)) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const batchProcessor = require("./services/batch-processor").batchProcessor;
+      const job = await batchProcessor.createBatchJob(
+        req.tenantId.toString(),
+        name,
+        templateId,
+        recipients,
+        batchSize || 100
+      );
+
+      res.status(201).json(job);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/batch", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const status = req.query.status as string;
+      const batchProcessor = require("./services/batch-processor").batchProcessor;
+      const jobs = await batchProcessor.listBatchJobs(req.tenantId.toString(), status);
+      res.json({ jobs, count: jobs.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/batch/:batchJobId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const batchProcessor = require("./services/batch-processor").batchProcessor;
+      const job = await batchProcessor.getBatchJob(req.params.batchJobId);
+      if (!job) {
+        return res.status(404).json({ message: "Batch job not found" });
+      }
+      res.json(job);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/batch/:batchJobId/result", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const batchProcessor = require("./services/batch-processor").batchProcessor;
+      const result = await batchProcessor.getBatchResult(req.params.batchJobId);
+      if (!result) {
+        return res.status(404).json({ message: "Result not found" });
+      }
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/batch/:batchJobId/retry", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const batchProcessor = require("./services/batch-processor").batchProcessor;
+      const job = await batchProcessor.retryBatchJob(req.params.batchJobId);
+      if (!job) {
+        return res.status(404).json({ message: "Batch job not found" });
+      }
+      res.json(job);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/batch/:batchJobId/cancel", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const batchProcessor = require("./services/batch-processor").batchProcessor;
+      const success = await batchProcessor.cancelBatchJob(req.params.batchJobId);
+      res.json({ success, message: success ? "Batch cancelled" : "Cannot cancel this batch" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/batch-stats", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const batchProcessor = require("./services/batch-processor").batchProcessor;
+      const stats = await batchProcessor.getBatchStats(req.tenantId.toString());
+      res.json(stats);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
