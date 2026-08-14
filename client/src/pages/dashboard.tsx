@@ -154,8 +154,21 @@ export default function Dashboard() {
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { canManageFleet, canManageDrivers, canViewRevenue, canDeleteBooking, canGenerateInvoice } = usePermissions();
+
+  // Don't render UI until auth is complete and user role is loaded
+  // This prevents sidebar from rendering with null user, which shows all menu items
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="text-gray-600 text-sm">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Sync URL with current view on mount with role-based access control
   // ONLY reads from URL params and updates state — does NOT call setLocation
