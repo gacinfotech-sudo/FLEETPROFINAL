@@ -62,6 +62,7 @@ import NotificationPreferences from "./pages/notification-preferences";
 import NotificationAdminDashboard from "./pages/notification-admin-dashboard";
 import TemplateEditor from "./pages/template-editor";
 import ScheduledNotifications from "./pages/scheduled-notifications";
+import NotificationMonitor from "./pages/notification-monitor";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -321,6 +322,13 @@ function AuthenticatedApp() {
       <Route path="/notifications/schedule">
         <ProtectedRoute requiredRole="admin">
           <ScheduledNotifications />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Notification Monitor - WAVE 32A */}
+      <Route path="/notifications/monitor">
+        <ProtectedRoute requiredRole="admin">
+          <NotificationMonitor />
         </ProtectedRoute>
       </Route>
 
