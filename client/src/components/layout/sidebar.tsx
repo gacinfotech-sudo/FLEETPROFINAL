@@ -214,6 +214,22 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
           </div>
         </nav>
 
+        {/* SaaS Platform Admin — Full SaaS management dashboard */}
+        {(user?.role === 'admin' || user?.platformRole) && (
+          <div className="px-3 lg:px-4 py-2 border-t border-gray-200 space-y-1 lg:space-y-2">
+            <div className="flex items-center px-1 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <ShieldCheck className="mr-2 shrink-0" size={14} />
+              SaaS Platform
+            </div>
+            <a
+              href="/saas/admin"
+              className="block rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-cyan-50 hover:to-transparent hover:text-cyan-700 transition-colors truncate"
+            >
+              📊 Admin Dashboard
+            </a>
+          </div>
+        )}
+
         {/* Root Control Plane (Wave 1) — see ROOT_NAV_ITEMS comment above
             for why this section uses real <a href> navigation instead of
             onViewChange. Client-side visibility only; real gating is

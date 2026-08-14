@@ -146,38 +146,82 @@ export default function SuperAdminDashboard() {
       <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Platform Features</h2>
         <p className="text-gray-600 mb-4">Click any card above to navigate. Available features:</p>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span>Dashboard - Real-time platform metrics</span>
+
+        {/* SaaS Admin Dashboard Features */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-cyan-700 mb-3">📊 SaaS Admin Management</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm bg-cyan-50 p-4 rounded-lg border border-cyan-200 mb-4">
+            <a href="/saas/admin" className="flex items-center gap-2 hover:text-cyan-700 font-medium cursor-pointer">
+              <CheckCircle className="w-5 h-5 text-cyan-600" />
+              <span>SaaS Admin Dashboard - Complete platform control</span>
+            </a>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-cyan-600" />
+              <span>Real-time analytics & metrics</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-cyan-600" />
+              <span>Tenant lifecycle management</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-cyan-600" />
+              <span>Revenue tracking & analytics</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-cyan-600" />
+              <span>Support ticket management</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-cyan-600" />
+              <span>Plan & subscription management</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-cyan-600" />
+              <span>Data sync & aggregation</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-cyan-600" />
+              <span>Multi-tab interface</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span>Tenants - Manage all customer tenants</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span>Tenant 360 - Complete tenant overview</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span>Plans - Subscription plans & pricing</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span>Subscriptions - Active subscriptions</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span>Billing - Revenue & payments</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span>Support - Customer support tickets</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <CheckCircle className="w-5 h-5 text-green-600" />
-            <span>Errors - Error reporting & tracking</span>
+        </div>
+
+        {/* Legacy SaaS Features */}
+        <div>
+          <h3 className="text-lg font-semibold text-blue-700 mb-3">🔧 Legacy SaaS Management</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <span>Dashboard - Real-time platform metrics</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <span>Tenants - Manage all customer tenants</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <span>Tenant 360 - Complete tenant overview</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <span>Plans - Subscription plans & pricing</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <span>Subscriptions - Active subscriptions</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <span>Billing - Revenue & payments</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <span>Support - Customer support tickets</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <span>Errors - Error reporting & tracking</span>
+            </div>
           </div>
         </div>
       </div>
