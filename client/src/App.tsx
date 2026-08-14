@@ -65,6 +65,7 @@ import ScheduledNotifications from "./pages/scheduled-notifications";
 import NotificationMonitor from "./pages/notification-monitor";
 import EventTriggers from "./pages/event-triggers";
 import NotificationABTesting from "./pages/notification-ab-testing";
+import NotificationInsights from "./pages/notification-insights";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -345,6 +346,13 @@ function AuthenticatedApp() {
       <Route path="/notifications/ab-testing">
         <ProtectedRoute requiredRole="admin">
           <NotificationABTesting />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Insights & Analytics - WAVE 35A */}
+      <Route path="/notifications/insights">
+        <ProtectedRoute requiredRole="admin">
+          <NotificationInsights />
         </ProtectedRoute>
       </Route>
 
