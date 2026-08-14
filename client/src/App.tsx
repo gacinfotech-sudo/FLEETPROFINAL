@@ -81,6 +81,8 @@ import TenantWhatsAppProfile from "./pages/tenant-whatsapp-profile";
 import WhatsAppTemplates from "./pages/whatsapp-templates";
 import WhatsAppTemplateEditor from "./pages/whatsapp-template-editor";
 import WhatsAppTemplateHistory from "./pages/whatsapp-template-history";
+import WhatsAppApprovalQueue from "./pages/whatsapp-approval-queue";
+import WhatsAppApprovalConfig from "./pages/whatsapp-approval-config";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -444,6 +446,18 @@ function AuthenticatedApp() {
       <Route path="/settings/whatsapp-template-history/:templateId*">
         <ProtectedRoute requiredRole="admin">
           <WhatsAppTemplateHistory />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/settings/whatsapp-approvals">
+        <ProtectedRoute requiredRole="admin">
+          <WhatsAppApprovalQueue />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/settings/whatsapp-approval-config">
+        <ProtectedRoute requiredRole="admin">
+          <WhatsAppApprovalConfig />
         </ProtectedRoute>
       </Route>
 

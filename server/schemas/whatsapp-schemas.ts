@@ -194,3 +194,61 @@ export const whatsappTemplateAuditSchema = new mongoose.Schema({
 whatsappTemplateVersionSchema.index({ tenantId: 1, templateId: 1, versionNumber: -1 });
 whatsappTemplateVersionSchema.index({ tenantId: 1, isLatest: 1 });
 whatsappTemplateAuditSchema.index({ tenantId: 1, templateId: 1 });
+
+export const whatsappTemplateApprovalSchema = new mongoose.Schema({
+  tenantId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
+  templateId: { type: mongoose.Schema.Types.ObjectId, required: true, index: true },
+  versionNumber: { type: Number, required: true },
+
+  status: { type: String, enum: ['draft', 'pending', 'approved', 'rejected'], default: 'draft', index: true },
+  requiresApproval: { type: Boolean, default: false },
+
+  submittedBy: { type: String },
+  submittedAt: { type: Date },
+
+  approvedBy: { type: String },
+  approvedAt: { type: Date },
+
+  rejectedBy: { type: String },
+  rejectedAt: { type: Date },
+  rejectionReason: { type: String },
+
+  reviewerComments: { type: String },
+  requestedChanges: [{ type: String }],
+
+  approvalNotes: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+export const whatsappApprovalConfigSchema = new mongoose.Schema({
+  tenantId: { type: mongoose.Schema.Types.ObjectId, required: true, unique: true },
+
+  enableApprovalWorkflow: { type: Boolean, default: false },
+  approvalRequired: { type: Boolean, default: false },
+
+  approvers: [
+    {
+      role: { type: String, enum: ['admin', 'manager', 'custom'], required: true },
+      userEmail: { type: String },
+      name: { type: String },
+      notifyEmail: { type: String },
+    },
+  ],
+
+  approvalTimeoutDays: { type: Number, default: 7 },
+  requireAllApprovals: { type: Boolean, default: false }, // true = all must approve; false = any can approve
+
+  autoApproveTemplateTypes: [{ type: String }], // Templates that auto-approve without review
+
+  notifyOnSubmit: { type: Boolean, default: true },
+  notifyOnApprove: { type: Boolean, default: true },
+  notifyOnReject: { type: Boolean, default: true },
+
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+whatsappTemplateApprovalSchema.index({ tenantId: 1, templateId: 1, status: 1 });
+whatsappTemplateApprovalSchema.index({ tenantId: 1, status: 1, submittedAt: -1 });
+whatsappApprovalConfigSchema.index({ tenantId: 1 });

@@ -143,6 +143,25 @@ export default function WhatsAppTemplateEditor() {
     }
   };
 
+  const submitForApproval = async (templateId: string, versionNumber: number) => {
+    try {
+      const response = await fetch(`/api/tenant/whatsapp-templates/${templateId}/submit-approval`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ versionNumber }),
+      });
+      if (!response.ok) throw new Error('Failed to submit');
+      const result = await response.json();
+      if (result.status === 'pending') {
+        toast({ title: 'Pending Approval', description: 'Template submitted for review' });
+      } else if (result.status === 'auto-approved' || result.status === 'approved') {
+        toast({ title: 'Auto-Approved', description: 'Template auto-approved and activated' });
+      }
+    } catch (error) {
+      console.error('Error submitting for approval:', error);
+    }
+  };
+
   if (templatesData) setTemplates(templatesData);
 
   const extractVariables = (text: string): string[] => {

@@ -11256,6 +11256,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return [...new Set(matches.map((m) => `{{${m[1]}}}`))] as string[];
   };
 
+  // WAVE 48A: Approval Workflow
+  app.get("/api/tenant/whatsapp-approvals/config", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppApprovalWorkflow = (await import('./services/whatsapp-approval-workflow')).default;
+      const config = await WhatsAppApprovalWorkflow.getApprovalConfig(req.tenantId);
+      res.json(config);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tenant/whatsapp-approvals/config", authenticateUser, requireTenant, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppApprovalWorkflow = (await import('./services/whatsapp-approval-workflow')).default;
+      const result = await WhatsAppApprovalWorkflow.saveApprovalConfig(req.tenantId, req.body);
+      res.json({ success: true, message: 'Config saved', result });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/tenant/whatsapp-approvals/pending", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppApprovalWorkflow = (await import('./services/whatsapp-approval-workflow')).default;
+      const approvals = await WhatsAppApprovalWorkflow.getPendingApprovals(req.tenantId);
+      res.json(approvals);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/tenant/whatsapp-templates/:templateId/approval-status", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { templateId } = req.params;
+      const versionNumber = req.query.version ? parseInt(req.query.version as string) : undefined;
+      const WhatsAppApprovalWorkflow = (await import('./services/whatsapp-approval-workflow')).default;
+      const status = await WhatsAppApprovalWorkflow.getApprovalStatus(req.tenantId, templateId, versionNumber);
+      res.json(status);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/tenant/whatsapp-templates/:templateId/approval-history", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { templateId } = req.params;
+      const WhatsAppApprovalWorkflow = (await import('./services/whatsapp-approval-workflow')).default;
+      const history = await WhatsAppApprovalWorkflow.getApprovalHistory(req.tenantId, templateId);
+      res.json(history);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tenant/whatsapp-templates/:templateId/submit-approval", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { templateId } = req.params;
+      const { versionNumber } = req.body;
+      const WhatsAppApprovalWorkflow = (await import('./services/whatsapp-approval-workflow')).default;
+      const result = await WhatsAppApprovalWorkflow.submitForApproval({
+        tenantId: req.tenantId,
+        templateId,
+        versionNumber,
+        submittedBy: req.user?.email || 'unknown',
+      });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tenant/whatsapp-templates/:templateId/approve", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { templateId } = req.params;
+      const { versionNumber, approvalNotes } = req.body;
+      const WhatsAppApprovalWorkflow = (await import('./services/whatsapp-approval-workflow')).default;
+      const result = await WhatsAppApprovalWorkflow.approveTemplate(req.tenantId, templateId, versionNumber, {
+        approvedBy: req.user?.email || 'unknown',
+        approvalNotes: approvalNotes || '',
+      });
+      res.json({ success: true, message: 'Template approved', result });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/tenant/whatsapp-templates/:templateId/reject", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { templateId } = req.params;
+      const { versionNumber, rejectionReason, requestedChanges } = req.body;
+      const WhatsAppApprovalWorkflow = (await import('./services/whatsapp-approval-workflow')).default;
+      const result = await WhatsAppApprovalWorkflow.rejectTemplate(req.tenantId, templateId, versionNumber, {
+        rejectedBy: req.user?.email || 'unknown',
+        rejectionReason: rejectionReason || '',
+        requestedChanges: requestedChanges || [],
+      });
+      res.json({ success: true, message: 'Template rejected', result });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // WAVE 47A: Template Versioning & History
   app.get("/api/tenant/whatsapp-templates/:templateId/versions", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
