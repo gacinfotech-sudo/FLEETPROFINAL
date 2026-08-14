@@ -77,6 +77,10 @@ export class BookingWhatsAppIntegration {
     payment: any,
     tenant: any
   ): Promise<void> {
+    const toll = booking.tollCharges ? `Toll: ₹${booking.tollCharges}\n` : '';
+    const parking = booking.parkingCharges ? `Parking: ₹${booking.parkingCharges}\n` : '';
+    const baseFare = (payment?.totalAmount || 0) - (booking.tollCharges || 0) - (booking.parkingCharges || 0);
+
     const variables = {
       companyName: tenant.companyName,
       bookingId: booking.bookingId || booking._id,
@@ -91,6 +95,9 @@ export class BookingWhatsAppIntegration {
       vehicleNumber: vehicle?.registrationNumber || 'TBD',
       driverName: driver?.name || 'TBD',
       driverPhone: driver?.phone || 'TBD',
+      baseFare: `₹${baseFare}`,
+      toll: toll,
+      parking: parking,
       bookingAmount: payment?.totalAmount ? `₹${payment.totalAmount}` : 'TBD',
       amountReceived: payment?.advanceAmount ? `₹${payment.advanceAmount}` : '₹0',
       balanceDue: payment?.balanceAmount ? `₹${payment.balanceAmount}` : 'TBD',
@@ -121,7 +128,15 @@ Vehicle No: {{vehicleNumber}}
 Driver: {{driverName}}
 Contact: {{driverPhone}}
 
-Booking Amount: {{bookingAmount}}
+━━━━━━━━━━━━━━━━
+Fare Breakdown
+━━━━━━━━━━━━━━━━
+
+Base Fare: {{baseFare}}
+{{toll}}{{parking}}
+━━━━━━━━
+Total: {{bookingAmount}}
+
 Amount Received: {{amountReceived}}
 Balance Due: {{balanceDue}}
 
@@ -158,6 +173,9 @@ Thank you for choosing {{companyName}}.`;
     vehicle: any,
     tenant: any
   ): Promise<void> {
+    const tollBreakdown = booking.tollCharges ? `Toll: ₹${booking.tollCharges}\n` : '';
+    const parkingBreakdown = booking.parkingCharges ? `Parking: ₹${booking.parkingCharges}\n` : '';
+
     const variables = {
       companyName: tenant.companyName,
       driverName: driver.name,
@@ -173,6 +191,8 @@ Thank you for choosing {{companyName}}.`;
       bookingAmount: booking.totalAmount ? `₹${booking.totalAmount}` : 'TBD',
       amountReceived: booking.advanceAmount ? `₹${booking.advanceAmount}` : '₹0',
       driverCollectAmount: booking.balanceAmount ? `₹${booking.balanceAmount}` : 'TBD',
+      tollBreakdown: tollBreakdown,
+      parkingBreakdown: parkingBreakdown,
       supportPhone: tenant.driverSupportNumber || tenant.bookingContactNumber,
     };
 
@@ -194,8 +214,13 @@ Pickup Time: {{pickupTime}}
 Vehicle: {{vehicleName}}
 Number: {{vehicleNumber}}
 
+━━━━━━━━━━━━━━━━
+Payment Breakdown
+━━━━━━━━━━━━━━━━
+
 Total Booking: {{bookingAmount}}
-Advance Received: {{amountReceived}}
+{{tollBreakdown}}{{parkingBreakdown}}
+Advance: {{amountReceived}}
 आपको लेना है: {{driverCollectAmount}}
 
 कृपया समय पर पहुँचें।

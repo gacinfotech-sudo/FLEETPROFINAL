@@ -3369,11 +3369,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // also performs the vehicle-overlap check; setting it here previously
       // meant two near-simultaneous requests could get the same
       // millisecond-based id.
+      const tollCharges = req.body.tollCharges || 0;
+      const parkingCharges = req.body.parkingCharges || 0;
+      const baseFare = req.body.amount || req.body.totalAmount || 0;
+      const totalWithCharges = baseFare + tollCharges + parkingCharges;
+
       const mappedData = {
         ...req.body,
         tenantId: req.tenantId,
-        // Map amount to totalAmount
-        totalAmount: req.body.amount || req.body.totalAmount,
+        // Map amount to totalAmount - INCLUDE toll + parking charges
+        totalAmount: totalWithCharges,
         // Ensure proper field names
         dropoffLocation: req.body.dropoffLocation || req.body.dropOffLocation,
         // Handle customer email - convert empty string to undefined
@@ -3388,8 +3393,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Handle totalKilometers for per-km pricing
         totalKilometers: req.body.totalKilometers || undefined,
         // Default values for optional fields
-        tollCharges: req.body.tollCharges || 0,
-        parkingCharges: req.body.parkingCharges || 0,
+        tollCharges: tollCharges,
+        parkingCharges: parkingCharges,
         // Add audit logging for who created the booking
         createdBy: {
           userId: req.userId!,
