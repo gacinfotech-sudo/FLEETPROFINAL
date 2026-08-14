@@ -12017,6 +12017,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // WAVE 51 PHASE 3: Predictive Analytics APIs (ML Models)
+  // Demand forecasting: predict next 7 days
+  app.get("/api/analytics/predictive/demand-forecast", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const PredictiveAnalyticsService = (await import('./services/predictive-analytics-service')).default;
+      const forecast = await PredictiveAnalyticsService.forecastDemand(req.tenantId);
+      res.json({ forecast });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Churn prediction: which customers will leave
+  app.get("/api/analytics/predictive/churn-risk", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const PredictiveAnalyticsService = (await import('./services/predictive-analytics-service')).default;
+      const predictions = await PredictiveAnalyticsService.predictChurn(req.tenantId);
+      const limit = parseInt(req.query.limit as string) || 20;
+      res.json({ predictions: predictions.slice(0, limit) });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Fraud detection: identify suspicious bookings
+  app.get("/api/analytics/predictive/fraud-detection", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const PredictiveAnalyticsService = (await import('./services/predictive-analytics-service')).default;
+      const fraudScores = await PredictiveAnalyticsService.detectFraud(req.tenantId);
+      res.json({ fraudScores });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Anomaly detection: unusual patterns
+  app.get("/api/analytics/predictive/anomalies", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const PredictiveAnalyticsService = (await import('./services/predictive-analytics-service')).default;
+      const anomalies = await PredictiveAnalyticsService.detectAnomalies(req.tenantId);
+      res.json({ anomalies });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // WAVE 50 PHASE 4: Booking Manager APIs
   // List all available managers for tenant
   app.get("/api/tenant/booking-managers", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
