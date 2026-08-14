@@ -68,6 +68,9 @@ import NotificationABTesting from "./pages/notification-ab-testing";
 import NotificationInsights from "./pages/notification-insights";
 import SMSOptimizer from "./pages/sms-optimizer";
 
+// Phase 4 WAVE Pages
+import PredictiveSendTime from "./pages/predictive-send-time";
+
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
 
@@ -361,6 +364,13 @@ function AuthenticatedApp() {
       <Route path="/notifications/sms-optimizer">
         <ProtectedRoute requiredRole="admin">
           <SMSOptimizer />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Predictive Send Time - WAVE 37A */}
+      <Route path="/notifications/predictive-send-time">
+        <ProtectedRoute requiredRole="admin">
+          <PredictiveSendTime />
         </ProtectedRoute>
       </Route>
 
