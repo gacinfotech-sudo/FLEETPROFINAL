@@ -843,6 +843,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== SESSION PERSISTENCE ROUTES ==========
+  // Refresh access token using refresh token
+  app.post("/api/auth/refresh", async (req, res) => {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(400).json({ message: "Refresh token required" });
+      }
+
+      // Import SessionPersistenceService
+      const SessionPersistenceService = (await import("./services/session-persistence-service")).default;
+
+      const tokens = SessionPersistenceService.refreshAccessToken(refreshToken);
+
+      if (!tokens) {
+        return res.status(401).json({ message: "Invalid or expired refresh token" });
+      }
+
+      res.json(tokens);
+    } catch (error) {
+      console.error("Error refreshing token:", error);
+      res.status(500).json({ message: "Failed to refresh token" });
+    }
+  });
+
+  // Logout - revoke refresh token
+  app.post("/api/auth/logout", authenticateUser, async (req: AuthRequest, res) => {
+    try {
+      const { refreshToken } = req.body;
+      const userId = (req as any).user?.userId;
+      const tenantId = (req as any).user?.tenantId;
+
+      if (!refreshToken || !userId || !tenantId) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const SessionPersistenceService = (await import("./services/session-persistence-service")).default;
+      await SessionPersistenceService.revokeRefreshToken(userId, tenantId, refreshToken);
+
+      res.json({ message: "Logged out successfully" });
+    } catch (error) {
+      console.error("Error logging out:", error);
+      res.status(500).json({ message: "Logout failed" });
+    }
+  });
+
+  // Logout from all devices
+  app.post("/api/auth/logout-all", authenticateUser, async (req: AuthRequest, res) => {
+    try {
+      const userId = (req as any).user?.userId;
+      const tenantId = (req as any).user?.tenantId;
+
+      if (!userId || !tenantId) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const SessionPersistenceService = (await import("./services/session-persistence-service")).default;
+      await SessionPersistenceService.revokeAllUserTokens(userId, tenantId);
+
+      res.json({ message: "Logged out from all devices" });
+    } catch (error) {
+      console.error("Error logging out from all devices:", error);
+      res.status(500).json({ message: "Logout failed" });
+    }
+  });
+
   // Fix tenant association for users without tenantId
   app.post("/api/admin/fix-tenant-links", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
     try {
@@ -3144,6 +3211,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "WhatsApp session logged out" });
     } catch (error: any) {
       res.status(500).json({ message: "Failed to log out WhatsApp session" });
+    }
+  });
+
+  // ========== WHATSAPP SESSION DURABILITY ROUTES ==========
+  // Store session (persists across restart)
+  app.post("/api/whatsapp/session/store", authenticateUser, requireTenant, requireWhatsAppAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { providerId, sessionData } = req.body;
+
+      if (!providerId) {
+        return res.status(400).json({ message: "Provider ID required" });
+      }
+
+      const WhatsAppSessionDurability = (await import("./services/whatsapp-session-durability")).default;
+      await WhatsAppSessionDurability.storeSession(req.tenantId!, providerId, sessionData);
+
+      res.json({ message: "Session stored successfully" });
+    } catch (error: any) {
+      console.error("Error storing WhatsApp session:", error);
+      res.status(500).json({ message: "Failed to store session" });
+    }
+  });
+
+  // Retrieve session (restored after restart)
+  app.get("/api/whatsapp/session/:providerId", authenticateUser, requireTenant, requireWhatsAppAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { providerId } = req.params;
+
+      const WhatsAppSessionDurability = (await import("./services/whatsapp-session-durability")).default;
+      const session = await WhatsAppSessionDurability.getSession(req.tenantId!, providerId);
+
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      res.json(session);
+    } catch (error: any) {
+      console.error("Error retrieving WhatsApp session:", error);
+      res.status(500).json({ message: "Failed to retrieve session" });
+    }
+  });
+
+  // Update session state
+  app.post("/api/whatsapp/session/:providerId/state", authenticateUser, requireTenant, requireWhatsAppAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { providerId } = req.params;
+      const { state } = req.body;
+
+      if (!['disconnected', 'connecting', 'connected', 'qr_pending'].includes(state)) {
+        return res.status(400).json({ message: "Invalid session state" });
+      }
+
+      const WhatsAppSessionDurability = (await import("./services/whatsapp-session-durability")).default;
+      await WhatsAppSessionDurability.updateSessionState(req.tenantId!, providerId, state);
+
+      res.json({ message: "Session state updated" });
+    } catch (error: any) {
+      console.error("Error updating session state:", error);
+      res.status(500).json({ message: "Failed to update session state" });
+    }
+  });
+
+  // Get all tenant sessions
+  app.get("/api/whatsapp/sessions", authenticateUser, requireTenant, requireWhatsAppAdmin, async (req: AuthRequest, res) => {
+    try {
+      const WhatsAppSessionDurability = (await import("./services/whatsapp-session-durability")).default;
+      const sessions = await WhatsAppSessionDurability.getTenantSessions(req.tenantId!);
+
+      res.json(sessions);
+    } catch (error: any) {
+      console.error("Error fetching tenant sessions:", error);
+      res.status(500).json({ message: "Failed to fetch sessions" });
     }
   });
 
