@@ -49,6 +49,7 @@ import { setTelephonyEventEmitter, type TelephonyEvent } from "./telephony/index
 import { startGpsPollingScheduler, stopGpsPollingScheduler } from "./gps/ingestion/pollingScheduler";
 import { startOperationsReminderScheduler, stopOperationsReminderScheduler } from "./operations/reminderEngine";
 import { initializeAutoSyncScheduler } from "./services/payrollAutoSyncScheduler";
+import SaaSSchedulerService from "./services/saas-scheduler-service";
 // TASK-ROOT-SUPPORT-03 (Root Control Plane) additive middleware — attaches
 // a correlation ID to every request (not just /api/root/**) before any
 // route/error path runs. See docs/root-control-plane/ROOT-INTEGRATION-report.md.
@@ -449,6 +450,23 @@ app.use((req, res, next) => {
     }
   });
 
+  // SaaS Platform Scheduler — automated metrics aggregation and data sync
+  // Runs hourly tenant metrics, billing every 6h, and comprehensive sync at 2 AM
+  if (mongoose.connection.readyState === 1) {
+    try {
+      await SaaSSchedulerService.initialize();
+    } catch (error) {
+      console.error('[SAAS-SCHEDULER] Failed to initialize SaaS scheduler:', error);
+    }
+  }
+  mongoose.connection.on('connected', async () => {
+    try {
+      await SaaSSchedulerService.initialize();
+    } catch (error) {
+      console.error('[SAAS-SCHEDULER] Failed to initialize SaaS scheduler on reconnect:', error);
+    }
+  });
+
   // NOTE: this in-process interval only runs once per Node process. If this
   // app is ever deployed with multiple instances/replicas, move this sweep
   // to a dedicated cron/worker process or use a distributed lock (e.g. a
@@ -460,6 +478,7 @@ app.use((req, res, next) => {
     clearInterval(backgroundJobInterval);
     stopGpsPollingScheduler();
     stopOperationsReminderScheduler();
+    SaaSSchedulerService.stop();
     process.exit(0);
   });
 
@@ -467,6 +486,7 @@ app.use((req, res, next) => {
     clearInterval(backgroundJobInterval);
     stopGpsPollingScheduler();
     stopOperationsReminderScheduler();
+    SaaSSchedulerService.stop();
     process.exit(0);
   });
 })();

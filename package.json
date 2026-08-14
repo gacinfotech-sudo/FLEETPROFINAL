@@ -88,6 +88,7 @@
     "multer": "^2.0.1",
     "nanoid": "^5.1.5",
     "next-themes": "^0.4.6",
+    "node-cron": "^4.6.0",
     "node-schedule": "^2.1.1",
     "nodemailer": "^9.0.5",
     "passport": "^0.7.0",
