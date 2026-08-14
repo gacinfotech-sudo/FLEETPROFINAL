@@ -17,7 +17,7 @@ import {
   CheckCircle2,
   DollarSign,
   Briefcase,
-  Bank,
+  Landmark,
   TrendingUp,
   Calendar,
   AlertTriangle,
@@ -285,7 +285,7 @@ export default function DriverSalarySetupPanel({
               <span className="hidden sm:inline">Allowances</span>
             </TabsTrigger>
             <TabsTrigger value="bank" className="text-xs sm:text-sm">
-              <Bank className="w-4 h-4 sm:mr-2" />
+              <Landmark className="w-4 h-4 sm:mr-2" />
               <span className="hidden sm:inline">Bank</span>
             </TabsTrigger>
           </TabsList>

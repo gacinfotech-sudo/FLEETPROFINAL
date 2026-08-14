@@ -28,7 +28,10 @@ export function SalaryLedger({ driverId }: { driverId: string }) {
   const fetchLedgerEntries = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/drivers/${driverId}/salary-ledger`, {
+      const currentDate = new Date();
+      const month = currentDate.getMonth() + 1;
+      const year = currentDate.getFullYear();
+      const response = await fetch(`/api/driver-salary/ledger/${driverId}?month=${month}&year=${year}`, {
         credentials: 'include',
       });
 

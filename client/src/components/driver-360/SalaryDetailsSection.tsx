@@ -8,7 +8,10 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, Calendar, DollarSign, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertCircle, Calendar, DollarSign, TrendingUp, Edit2 } from 'lucide-react';
+import { DriverSalarySetupPanel } from '@/components/onboarding';
 
 interface SalaryDetailsData {
   joiningBaseSalary: number;
@@ -29,6 +32,8 @@ export function SalaryDetailsSection({ driverId }: Props) {
   const [data, setData] = useState<SalaryDetailsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [driverName, setDriverName] = useState('Driver');
 
   useEffect(() => {
     fetchSalaryDetails();
@@ -59,6 +64,27 @@ export function SalaryDetailsSection({ driverId }: Props) {
       setLoading(false);
     }
   };
+
+  const fetchDriverName = async () => {
+    try {
+      const response = await fetch(`/api/drivers/${driverId}`);
+      if (response.ok) {
+        const result = await response.json();
+        setDriverName(result.data?.name || 'Driver');
+      }
+    } catch (err) {
+      console.error('Failed to fetch driver name:', err);
+    }
+  };
+
+  const handleSalarySetupComplete = () => {
+    setShowEditForm(false);
+    fetchSalaryDetails();
+  };
+
+  useEffect(() => {
+    fetchDriverName();
+  }, [driverId]);
 
   const formatCurrency = (amount: number | undefined) => {
     if (amount === undefined || amount === null) return 'N/A';
@@ -128,15 +154,46 @@ export function SalaryDetailsSection({ driverId }: Props) {
 
   if (error) {
     return (
-      <Card className="border-orange-200 bg-orange-50">
-        <CardContent className="pt-6 flex gap-3">
-          <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-orange-800">Salary Information</p>
-            <p className="text-sm text-orange-700 mt-1">{error}</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-4">
+        <Card className="border-orange-200 bg-orange-50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-orange-600" />
+                <h3 className="font-medium text-orange-800">Salary Information</h3>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEditForm(true)}
+                className="gap-2"
+              >
+                <Edit2 className="h-4 w-4" />
+                Create Salary
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-orange-700">{error}</p>
+            <p className="text-xs text-orange-600 mt-2">Click "Create Salary" to set up salary configuration for this driver</p>
+          </CardContent>
+        </Card>
+
+        {/* Edit/Create Salary Form Dialog */}
+        <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Create Salary Configuration</DialogTitle>
+            </DialogHeader>
+            <DriverSalarySetupPanel
+              driverId={driverId}
+              driverName={driverName}
+              onSalarySetupComplete={handleSalarySetupComplete}
+              onCancel={() => setShowEditForm(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
     );
   }
 
@@ -164,9 +221,20 @@ export function SalaryDetailsSection({ driverId }: Props) {
               <DollarSign className="h-5 w-5 text-blue-600" />
               <CardTitle className="text-lg">Salary Details</CardTitle>
             </div>
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(data.status)}`}>
-              {data.status.toUpperCase()}
-            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEditForm(true)}
+                className="gap-2"
+              >
+                <Edit2 className="h-4 w-4" />
+                Edit Salary
+              </Button>
+              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadgeClass(data.status)}`}>
+                {data.status.toUpperCase()}
+              </span>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -278,6 +346,21 @@ export function SalaryDetailsSection({ driverId }: Props) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Salary Form Dialog */}
+      <Dialog open={showEditForm} onOpenChange={setShowEditForm}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Salary Configuration</DialogTitle>
+          </DialogHeader>
+          <DriverSalarySetupPanel
+            driverId={driverId}
+            driverName={driverName}
+            onSalarySetupComplete={handleSalarySetupComplete}
+            onCancel={() => setShowEditForm(false)}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

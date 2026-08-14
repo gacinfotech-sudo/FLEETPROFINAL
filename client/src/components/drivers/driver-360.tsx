@@ -13,6 +13,7 @@ import { SalarySummary } from "../driver-360/SalarySummary";
 import { SalaryHistory } from "../driver-360/SalaryHistory";
 import { SalaryLedger } from "../driver-360/SalaryLedger";
 import { SalaryDetailsSection } from "../driver-360/SalaryDetailsSection";
+import { AttendanceCalendar } from "../driver-360/AttendanceCalendar";
 import {
   DEFAULT_LIFECYCLE_STAGE, LIFECYCLE_STAGE_LABELS, lifecycleStageBadgeClass,
   complianceBadgeClass, COMPLIANCE_STATUS_LABELS, documentComplianceStatus,
@@ -86,6 +87,7 @@ export default function Driver360({ driver, onOpenBooking }: Props) {
             <TabsTrigger value="contacts">Contacts</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="employment">Employment</TabsTrigger>
+            <TabsTrigger value="attendance">📅 Attendance</TabsTrigger>
             <TabsTrigger value="attendance-leave">Attendance &amp; Leave</TabsTrigger>
             <TabsTrigger value="salary">💰 Salary</TabsTrigger>
             <TabsTrigger value="lifecycle">Lifecycle</TabsTrigger>
@@ -205,6 +207,10 @@ export default function Driver360({ driver, onOpenBooking }: Props) {
 
         <TabsContent value="employment">
           <DriverEmploymentHistoryPanel driverId={driverId} />
+        </TabsContent>
+
+        <TabsContent value="attendance">
+          <AttendanceCalendar driverId={driverId} />
         </TabsContent>
 
         <TabsContent value="attendance-leave">

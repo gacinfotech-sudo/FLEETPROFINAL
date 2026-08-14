@@ -4723,6 +4723,16 @@ export interface IDriverSalary extends Document {
     overriddenAt?: Date;
     overriddenBy?: { userId: string; role: string };
   }>;
+  // PHASE 5: Attendance summary (auto-fetched from attendance service)
+  attendanceSummary?: {
+    presentDays: number;
+    idleDays: number;
+    paidLeaveDays: number;
+    unpaidLeaveDays: number;
+    absentDays: number;
+    weeklyOffDays: number;
+    bookingsServed: number;
+  };
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -4767,6 +4777,16 @@ const DriverSalarySchema = new Schema<IDriverSalary>({
     overriddenBy: { userId: { type: String }, role: { type: String }, _id: false },
     _id: false
   }],
+  attendanceSummary: {
+    presentDays: { type: Number, default: 0 },
+    idleDays: { type: Number, default: 0 },
+    paidLeaveDays: { type: Number, default: 0 },
+    unpaidLeaveDays: { type: Number, default: 0 },
+    absentDays: { type: Number, default: 0 },
+    weeklyOffDays: { type: Number, default: 0 },
+    bookingsServed: { type: Number, default: 0 },
+    _id: false
+  },
   notes: { type: String },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

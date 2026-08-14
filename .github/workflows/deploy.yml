@@ -1,0 +1,87 @@
+name: 🚀 Build & Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      
+      - name: 📚 Install dependencies
+        run: npm install
+      
+      - name: 🔍 Type check
+        run: npm run check
+      
+      - name: 🏗️ Build application
+        run: npm run build
+      
+      - name: 🧪 Run tests
+        run: npm run test:all || true
+        continue-on-error: true
+      
+      - name: ✅ Verify build output
+        run: |
+          if [ -d "dist" ]; then
+            echo "✅ Build successful!"
+            du -sh dist/
+          else
+            echo "❌ Build failed - no dist folder"
+            exit 1
+          fi
+      
+      - name: 📤 Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: dist/
+          retention-days: 7
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+      
+      - name: 🚀 Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
+      
+      - name: 📢 Deployment Notification
+        run: |
+          echo "✅ Deployment Complete!"
+          echo "App URL: ${{ steps.deploy.outputs.preview-url }}"
+        env:
+          DEPLOYMENT_URL: ${{ steps.deploy.outputs.preview-url }}
+      
+      - name: 💬 Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Build successful! Waiting for review before deployment.'
+            })

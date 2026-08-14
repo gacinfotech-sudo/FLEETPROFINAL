@@ -7,6 +7,7 @@ import express, { Router, Request, Response } from 'express';
 import mongoose from 'mongoose';
 import { authenticateUser, requireTenant } from '../middleware/auth';
 import {
+  Driver,
   DriverSalaryMaster,
   DriverSalary,
   DriverSalaryPayment,
@@ -47,6 +48,128 @@ router.get('/master/:driverId', authenticateUser, requireTenant, async (req: Req
   } catch (error) {
     console.error('Error fetching salary master:', error);
     res.status(500).json({ error: 'Failed to fetch salary master' });
+  }
+});
+
+/**
+ * POST /api/driver-salary/master
+ * Create or update salary master configuration for a driver
+ */
+router.post('/master', authenticateUser, requireTenant, async (req: Request, res: Response) => {
+  try {
+    const tenantId = (req as any).tenantId;
+    const userId = (req as any).userId;
+    let {
+      driverId,
+      name,
+      mobile,
+      joiningDate,
+      joiningBaseSalary,
+      currentBaseSalary,
+      employmentType,
+      salaryType,
+      baseSalary,
+      perDaySalary,
+      perTripSalary,
+      kmIncentivePerKm,
+      nightAllowancePerNight,
+      outstationAllowancePerDay,
+      foodAllowance,
+      perBookingFoodCharge,
+      overtimeRatePerHour,
+      extraDutyRate,
+      weeklyOffDays,
+      weeklyOffLeaveType,
+      salaryStartDate,
+      bankName,
+      accountNumber,
+      ifscCode,
+      upiId
+    } = req.body;
+
+    // Validation
+    if (!driverId || !joiningDate || !salaryType || !employmentType) {
+      return res.status(400).json({
+        error: 'Missing required fields: driverId, joiningDate, salaryType, employmentType'
+      });
+    }
+
+    // Fetch driver details if name/mobile not provided
+    if (!name || !mobile) {
+      const driver = await Driver.findById(driverId);
+      if (driver) {
+        name = name || driver.name || 'Driver';
+        mobile = mobile || driver.phone || driver.mobile || '0000000000';
+      } else {
+        name = name || 'Driver';
+        mobile = mobile || '0000000000';
+      }
+    }
+
+    // Check if salary master already exists
+    const existing = await DriverSalaryMaster.findOne({
+      tenantId: new mongoose.Types.ObjectId(tenantId),
+      driverId: new mongoose.Types.ObjectId(driverId)
+    });
+
+    const masterData = {
+      tenantId: new mongoose.Types.ObjectId(tenantId),
+      driverId: new mongoose.Types.ObjectId(driverId),
+      name: name || 'Driver',
+      mobile: mobile || '0000000000',
+      joiningDate: new Date(joiningDate),
+      joiningBaseSalary: joiningBaseSalary || 0,
+      currentBaseSalary: currentBaseSalary || baseSalary || 0,
+      baseSalary: baseSalary || 0,
+      employmentType,
+      salaryType,
+      perDaySalary: perDaySalary || 0,
+      perTripSalary: perTripSalary || 0,
+      kmIncentivePerKm: kmIncentivePerKm || 0,
+      nightAllowancePerNight: nightAllowancePerNight || 0,
+      outstationAllowancePerDay: outstationAllowancePerDay || 0,
+      foodAllowance: foodAllowance || 0,
+      perBookingFoodCharge: perBookingFoodCharge || 0,
+      overtimeRatePerHour: overtimeRatePerHour || 0,
+      extraDutyRate: extraDutyRate || 0,
+      weeklyOffDays: weeklyOffDays || [0],
+      weeklyOffLeaveType: weeklyOffLeaveType || 'unpaid',
+      salaryStartDate: new Date(salaryStartDate),
+      bankName: bankName || '',
+      accountNumber: accountNumber || '',
+      ifscCode: ifscCode || '',
+      upiId: upiId || '',
+      status: 'active',
+      createdBy: { userId, role: 'admin' },
+      createdAt: existing ? existing.createdAt : new Date(),
+      updatedAt: new Date()
+    };
+
+    let savedMaster;
+    if (existing) {
+      // Update existing
+      savedMaster = await DriverSalaryMaster.findByIdAndUpdate(
+        existing._id,
+        masterData,
+        { new: true }
+      );
+    } else {
+      // Create new
+      savedMaster = new DriverSalaryMaster(masterData);
+      await savedMaster.save();
+    }
+
+    res.json({
+      success: true,
+      message: existing ? 'Salary master updated successfully' : 'Salary master created successfully',
+      data: savedMaster
+    });
+  } catch (error: any) {
+    console.error('Error creating/updating salary master:', error);
+    res.status(500).json({
+      error: error.message || 'Failed to save salary master',
+      details: error.message
+    });
   }
 });
 
@@ -210,6 +333,15 @@ router.post('/generate', authenticateUser, requireTenant, async (req: Request, r
         status: 'calculated',
         calculatedBy: { userId, role: (req as any).userRole },
         calculatedAt: new Date(),
+        attendanceSummary: {
+          presentDays: salaryData.attendance.presentDays,
+          idleDays: salaryData.attendance.onDutyDays,
+          paidLeaveDays: salaryData.attendance.paidLeaveDays,
+          unpaidLeaveDays: salaryData.attendance.unpaidLeaveDays,
+          absentDays: salaryData.attendance.absentDays,
+          weeklyOffDays: salaryData.attendance.weeklyOffDays,
+          bookingsServed: salaryData.bookingServiceDays.totalBookingsServed || 0
+        },
         notes: `Auto-generated: ${finalPayableDays} payable days, ${salaryData.bookingServiceDays.uniqueServiceDays} booking service days`
       });
       driverSalary = await existingSalary.save();
@@ -238,6 +370,15 @@ router.post('/generate', authenticateUser, requireTenant, async (req: Request, r
         status: 'calculated',
         calculatedBy: { userId, role: (req as any).userRole },
         calculatedAt: new Date(),
+        attendanceSummary: {
+          presentDays: salaryData.attendance.presentDays,
+          idleDays: salaryData.attendance.onDutyDays,
+          paidLeaveDays: salaryData.attendance.paidLeaveDays,
+          unpaidLeaveDays: salaryData.attendance.unpaidLeaveDays,
+          absentDays: salaryData.attendance.absentDays,
+          weeklyOffDays: salaryData.attendance.weeklyOffDays,
+          bookingsServed: salaryData.bookingServiceDays.totalBookingsServed || 0
+        },
         notes: `Auto-generated: ${finalPayableDays} payable days, ${salaryData.bookingServiceDays.uniqueServiceDays} booking service days`
       });
       driverSalary = await driverSalary.save();

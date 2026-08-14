@@ -64,52 +64,38 @@ export async function fetchAttendanceData(
   startDate: Date,
   endDate: Date
 ): Promise<AttendanceDataResult> {
-  const tenantObjId = typeof tenantId === 'string' ? new mongoose.Types.ObjectId(tenantId) : tenantId;
-  const driverObjId = typeof driverId === 'string' ? new mongoose.Types.ObjectId(driverId) : driverId;
+  const driverIdStr = typeof driverId === 'string' ? driverId : driverId.toString();
 
-  const attendance = await DriverAttendance.find({
-    tenantId: tenantObjId,
-    driverId: driverObjId,
-    date: { $gte: startDate, $lte: endDate }
-  }).sort({ date: 1 });
+  // Get attendance from auto-calculated service (PHASE 4 auto-fetch)
+  // Use getMonthlyAttendanceSummary which auto-classifies attendance from bookings/leave/status
+  const { getMonthlyAttendanceSummary } = await import('./driverAttendanceService');
 
-  let presentDays = 0;
-  let paidLeaveDays = 0;
-  let unpaidLeaveDays = 0;
-  let weeklyOffDays = 0;
-  let halfDays = 0;
-  let absentDays = 0;
-  let onDutyDays = 0;
+  const year = startDate.getFullYear();
+  const month = startDate.getMonth() + 1;
 
-  for (const record of attendance) {
-    switch (record.status) {
-      case 'present':
-      case 'late':
-        presentDays++;
-        break;
-      case 'on_duty':
-        onDutyDays++;
-        break;
-      case 'paid_leave':
-        paidLeaveDays++;
-        break;
-      case 'unpaid_leave':
-        unpaidLeaveDays++;
-        break;
-      case 'weekly_off':
-        weeklyOffDays++;
-        break;
-      case 'half_day':
-        halfDays++;
-        break;
-      case 'absent':
-        absentDays++;
-        break;
-    }
-  }
+  const summary = await getMonthlyAttendanceSummary(driverIdStr, year, month, tenantId);
 
-  // Total working days calculation (exclude weekly offs)
-  const totalPeriodDays = attendance.length;
+  // Map auto-calculated attendance to our format
+  // Precedence: LEAVE > PRESENT > ABSENT > IDLE
+  let presentDays = summary.presentDays; // Booking served
+  let paidLeaveDays = summary.paidLeaveDays;
+  let unpaidLeaveDays = summary.unpaidLeaveDays;
+  let weeklyOffDays = summary.weeklyOffDays;
+  let absentDays = summary.absentDays;
+  let onDutyDays = 0; // Not in new service, idle counted separately
+  let halfDays = 0; // Not in new service
+
+  // Build details array from daily breakdown for backward compatibility
+  const attendance = summary.dailyBreakdown.map((daily: any) => ({
+    date: new Date(daily.date),
+    driverId: driverIdStr,
+    status: daily.status.toLowerCase(),
+    reason: daily.reason,
+    bookingsServed: daily.bookingsServed
+  }));
+
+  // Total employed days (exclude weekly off for working days calc)
+  const totalPeriodDays = summary.employmentDays;
 
   return {
     presentDays,

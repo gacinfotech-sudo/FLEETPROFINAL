@@ -105,7 +105,16 @@ export async function generateSalarySlip(
   yPosition += 5;
   pdf.setFont('helvetica', 'normal');
 
-  const attendanceSummary = [
+  // Use attendanceSummary if available (PHASE 5: auto-fetched), fall back to dayWiseBreakdown
+  const attendanceSummary = salary.attendanceSummary ? [
+    ['Present Days (Booking Served):', salary.attendanceSummary.presentDays.toString()],
+    ['Idle Days (No Booking):', salary.attendanceSummary.idleDays.toString()],
+    ['Paid Leave:', salary.attendanceSummary.paidLeaveDays.toString()],
+    ['Unpaid Leave:', salary.attendanceSummary.unpaidLeaveDays.toString()],
+    ['Absent Days:', salary.attendanceSummary.absentDays.toString()],
+    ['Weekly Off:', salary.attendanceSummary.weeklyOffDays.toString()],
+    ['Bookings Served:', salary.attendanceSummary.bookingsServed.toString()]
+  ] : [
     ['Total Days in Period:', salary.payrollDays.toString()],
     ['Payable Days:', salary.payableDays.toString()],
     ['Service Days (Bookings):', salary.dayWiseBreakdown?.filter((d: any) => d.dayType === 'booking_service').length.toString() || 'N/A'],
