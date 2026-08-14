@@ -12194,6 +12194,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // SAAS ADMIN ROUTES
+  // Dashboard & Analytics
+  app.get("/api/saas/admin/dashboard/summary", authenticateUser, async (req: AuthRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+      const SaaSDataSyncService = (await import('./services/saas-data-sync-service')).default;
+      const summary = await SaaSDataSyncService.getDashboardSummary();
+      res.json(summary);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Tenant Management
+  app.get("/api/saas/admin/tenants", authenticateUser, async (req: AuthRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+      const db = await storage.getDb();
+      const tenants = await db.collection('tenants').find({}).project({
+        name: 1, businessName: 1, subscriptionPlan: 1, isActive: 1, createdAt: 1,
+        monthlyRevenue: 1, activeUsers: 1, bookingsThisMonth: 1, maxManagers: 1
+      }).toArray();
+      res.json({ tenants, total: tenants.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Billing Management
+  app.get("/api/saas/admin/billing", authenticateUser, async (req: AuthRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+      const db = await storage.getDb();
+      const records = await db.collection('bookingPayments').find({}).sort({ createdAt: -1 }).limit(100).toArray();
+      const totalRevenue = records.reduce((sum, b) => sum + (b.amount || 0), 0);
+      const revenueByMonth = new Map();
+      for (const record of records) {
+        const date = new Date(record.createdAt);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        revenueByMonth.set(monthKey, (revenueByMonth.get(monthKey) || 0) + (record.amount || 0));
+      }
+      res.json({ records, totalRevenue, revenueByMonth: Object.fromEntries(revenueByMonth) });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Support Tickets
+  app.get("/api/saas/admin/support-tickets", authenticateUser, async (req: AuthRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+      const db = await storage.getDb();
+      const tickets = await db.collection('support_tickets').find({}).sort({ createdAt: -1 }).toArray();
+      const openTickets = tickets.filter(t => t.status === 'open').length;
+      const resolvedTickets = tickets.filter(t => t.status === 'resolved').length;
+      res.json({ tickets, openTickets, resolvedTickets, total: tickets.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Metrics
+  app.get("/api/saas/admin/metrics/revenue", authenticateUser, async (req: AuthRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+      const db = await storage.getDb();
+      const payments = await db.collection('bookingPayments').find({}).toArray();
+      const revenueByDay = new Map();
+      for (const payment of payments) {
+        const date = new Date(payment.createdAt);
+        const dayKey = date.toISOString().split('T')[0];
+        revenueByDay.set(dayKey, (revenueByDay.get(dayKey) || 0) + (payment.amount || 0));
+      }
+      const totalRevenue = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+      const avgPerTransaction = payments.length > 0 ? totalRevenue / payments.length : 0;
+      res.json({ totalRevenue, transactionCount: payments.length, averagePerTransaction: Math.round(avgPerTransaction), revenueByDay: Object.fromEntries(revenueByDay) });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/saas/admin/metrics/tenants", authenticateUser, async (req: AuthRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+      const db = await storage.getDb();
+      const tenants = await db.collection('tenants').find({}).toArray();
+      const activeTenants = tenants.filter(t => t.isActive).length;
+      const inactiveTenants = tenants.length - activeTenants;
+      const totalBookings = tenants.reduce((sum, t) => sum + (t.bookingsThisMonth || 0), 0);
+      const totalUsers = tenants.reduce((sum, t) => sum + (t.activeUsers || 0), 0);
+      const planDistribution = new Map();
+      for (const tenant of tenants) {
+        const plan = tenant.subscriptionPlan || 'unknown';
+        planDistribution.set(plan, (planDistribution.get(plan) || 0) + 1);
+      }
+      res.json({ totalTenants: tenants.length, activeTenants, inactiveTenants, totalBookings, totalUsers, averageUsersPerTenant: Math.round(totalUsers / tenants.length), planDistribution: Object.fromEntries(planDistribution) });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
