@@ -80,7 +80,7 @@ interface NavigationGroup {
   children: string[];
 }
 
-export function getNavigationStructure(role?: string, permissions?: string[]): NavigationGroup[] {
+export function getNavigationStructure(role?: string, permissions?: string[], platformRole?: string): NavigationGroup[] {
   const groups: NavigationGroup[] = [
     {
       id: 'dashboard',
@@ -156,8 +156,14 @@ export function getNavigationStructure(role?: string, permissions?: string[]): N
   };
 
   // Filter based on role and permissions
+  // Platform staff (ROOT, SUPER_ADMIN, etc.) see only SaaS admin panel
+  if (platformRole) {
+    return [saasSection]; // Platform staff sees ONLY SaaS section, no tenant menus
+  }
+
+  // Tenant-side roles
   if (role === 'admin') {
-    return [saasSection, ...groups]; // Admin sees SaaS admin panel first, then everything else
+    return groups; // Tenant admin sees all tenant operations
   }
 
   if (role === 'manager') {

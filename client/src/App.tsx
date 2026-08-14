@@ -73,8 +73,8 @@ function AuthenticatedApp() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : user ? (
-          // Route all authenticated users to Dashboard (which uses Sidebar with role-based navigation)
-          <Dashboard key={user.userId} />
+          // Route authenticated users based on account type
+          user.platformRole ? <SuperAdminDashboard key={user.userId} /> : <Dashboard key={user.userId} />
         ) : (
           <LoginPage />
         )}
@@ -252,8 +252,8 @@ function AuthenticatedApp() {
         </ProtectedRoute>
       </Route>
 
-      {/* Dashboard */}
-      <Route path="/dashboard/:section?">
+      {/* Dashboard - Tenant operations only */}
+      <Route path="/dashboard">
         <ProtectedRoute allowedRoles={["client", "manager"]}>
           {user && user.mustResetPassword ? (
             <ForcedPasswordResetPage />
@@ -270,8 +270,8 @@ function AuthenticatedApp() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : user ? (
-          // Redirect to appropriate dashboard based on role
-          user.role === "admin" ? <AdminPanel key={user.userId} /> : <Dashboard key={user.userId} />
+          // Redirect to appropriate dashboard based on account type
+          user.platformRole ? <SuperAdminDashboard key={user.userId} /> : <Dashboard key={user.userId} />
         ) : (
           <LoginPage />
         )}

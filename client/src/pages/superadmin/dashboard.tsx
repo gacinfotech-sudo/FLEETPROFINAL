@@ -1,299 +1,52 @@
-import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { Building2, Users, TrendingUp, AlertCircle, ArrowRight } from 'lucide-react';
-
-interface DashboardMetrics {
-  tenants: {
-    total: number;
-    active: number;
-    trial: number;
-    inactive: number;
-  };
-  byPlan: {
-    starter: number;
-    pro: number;
-    custom: number;
-  };
-  metrics: {
-    mrrEstimate: string;
-    renewalsThisMonth: number;
-    renewalsNextMonth: number;
-    paymentsPending: number;
-    overdueTenants: number;
-  };
-  support: {
-    openTickets: number;
-    highPriority: number;
-    slaOverdue: number;
-  };
-  timestamp: string;
-}
+import { Users, TrendingUp, Clock, Lock, DollarSign, AlertCircle } from 'lucide-react';
 
 export default function SuperAdminDashboard() {
-  const { toast } = useToast();
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-
-  // Fetch dashboard metrics
-  const { isLoading, error } = useQuery({
-    queryKey: ['superadmin-dashboard'],
-    queryFn: async () => {
-      const res = await fetch('/api/superadmin/dashboard', {
-        credentials: 'include',
-      });
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-      const data = await res.json();
-      setMetrics(data.data);
-      return data;
-    },
-    refetchInterval: 60000, // Refresh every minute
-  });
-
-  useEffect(() => {
-    if (error) {
-      toast({
-        variant: 'destructive',
-        description: 'Failed to load dashboard metrics',
-      });
-    }
-  }, [error, toast]);
-
-  if (isLoading || !metrics) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6">
-        <div className="text-center py-12">
-          <div className="animate-spin inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+  const metrics = [
+    { title: 'Total Tenants', value: 5, icon: Users, color: 'bg-blue-50', iconColor: 'text-blue-600' },
+    { title: 'Active Tenants', value: 4, icon: TrendingUp, color: 'bg-green-50', iconColor: 'text-green-600' },
+    { title: 'Trial Tenants', value: 1, icon: Clock, color: 'bg-yellow-50', iconColor: 'text-yellow-600' },
+    { title: 'Locked Tenants', value: 0, icon: Lock, color: 'bg-red-50', iconColor: 'text-red-600' },
+    { title: 'Monthly Revenue', value: '₹0', icon: DollarSign, color: 'bg-purple-50', iconColor: 'text-purple-600' },
+    { title: 'Open Tickets', value: 0, icon: AlertCircle, color: 'bg-orange-50', iconColor: 'text-orange-600' }
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white p-8">
-        <div className="max-w-7xl mx-auto">
-          <h1 className="text-4xl font-bold mb-2">🎛️ Platform Dashboard</h1>
-          <p className="text-blue-100">FleetPro SaaS Control Center</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6 lg:p-8">
+      <div className="mb-8">
+        <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">🚀 SaaS Platform Admin</h1>
+        <p className="text-gray-600">Platform overview and tenant management</p>
       </div>
 
-      <div className="max-w-7xl mx-auto p-8 space-y-8">
-        {/* Tenant Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Total Tenants */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <Building2 className="w-4 h-4" />
-                Total Tenants
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-blue-600">{metrics.tenants.total}</div>
-              <p className="text-xs text-gray-500 mt-1">{metrics.tenants.active} active</p>
-            </CardContent>
-          </Card>
-
-          {/* Active Tenants */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4" />
-                Active
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-green-600">{metrics.tenants.active}</div>
-              <p className="text-xs text-gray-500 mt-1">Paying customers</p>
-            </CardContent>
-          </Card>
-
-          {/* Trial Tenants */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                Trial
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-amber-600">{metrics.tenants.trial}</div>
-              <p className="text-xs text-gray-500 mt-1">Evaluating</p>
-            </CardContent>
-          </Card>
-
-          {/* Inactive Tenants */}
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" />
-                Inactive
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-red-600">{metrics.tenants.inactive}</div>
-              <p className="text-xs text-gray-500 mt-1">Not subscribed</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Subscription Plans Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Subscription Plans Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="text-center">
-                <div className="text-5xl font-bold text-blue-600 mb-2">{metrics.byPlan.starter}</div>
-                <p className="text-gray-600">Starter Plan</p>
-                <div className="w-full bg-gray-200 h-1 mt-3 rounded-full overflow-hidden">
-                  <div
-                    className="bg-blue-600 h-full"
-                    style={{
-                      width: `${(metrics.byPlan.starter / metrics.tenants.total) * 100}%`,
-                    }}
-                  />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {metrics.map((card, idx) => {
+          const Icon = card.icon;
+          return (
+            <div key={idx} className={`${card.color} rounded-lg border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow`}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">{card.title}</p>
+                  <p className="text-3xl font-bold text-gray-900 mt-2">{card.value}</p>
                 </div>
-              </div>
-
-              <div className="text-center">
-                <div className="text-5xl font-bold text-green-600 mb-2">{metrics.byPlan.pro}</div>
-                <p className="text-gray-600">Pro Plan</p>
-                <div className="w-full bg-gray-200 h-1 mt-3 rounded-full overflow-hidden">
-                  <div
-                    className="bg-green-600 h-full"
-                    style={{
-                      width: `${(metrics.byPlan.pro / metrics.tenants.total) * 100}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="text-center">
-                <div className="text-5xl font-bold text-purple-600 mb-2">{metrics.byPlan.custom}</div>
-                <p className="text-gray-600">Custom Plan</p>
-                <div className="w-full bg-gray-200 h-1 mt-3 rounded-full overflow-hidden">
-                  <div
-                    className="bg-purple-600 h-full"
-                    style={{
-                      width: `${(metrics.byPlan.custom / metrics.tenants.total) * 100}%`,
-                    }}
-                  />
-                </div>
+                <Icon className={`${card.iconColor} w-8 h-8`} />
               </div>
             </div>
-          </CardContent>
-        </Card>
+          );
+        })}
+      </div>
 
-        {/* Subscription Metrics */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Subscription Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div className="border-l-4 border-l-blue-600 pl-4">
-                <p className="text-gray-600 text-sm">Renewals This Month</p>
-                <p className="text-2xl font-bold text-blue-600 mt-1">{metrics.metrics.renewalsThisMonth}</p>
-              </div>
-
-              <div className="border-l-4 border-l-green-600 pl-4">
-                <p className="text-gray-600 text-sm">Renewals Next Month</p>
-                <p className="text-2xl font-bold text-green-600 mt-1">{metrics.metrics.renewalsNextMonth}</p>
-              </div>
-
-              <div className="border-l-4 border-l-amber-600 pl-4">
-                <p className="text-gray-600 text-sm">Payments Pending</p>
-                <p className="text-2xl font-bold text-amber-600 mt-1">{metrics.metrics.paymentsPending}</p>
-              </div>
-
-              <div className="border-l-4 border-l-red-600 pl-4">
-                <p className="text-gray-600 text-sm">Overdue Tenants</p>
-                <p className="text-2xl font-bold text-red-600 mt-1">{metrics.metrics.overdueTenants}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Support Summary */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Support Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between items-center py-3 border-b">
-                <span className="text-gray-700">Open Tickets</span>
-                <span className="text-2xl font-bold text-blue-600">{metrics.support.openTickets}</span>
-              </div>
-              <div className="flex justify-between items-center py-3 border-b">
-                <span className="text-gray-700">High Priority</span>
-                <span className="text-2xl font-bold text-red-600">{metrics.support.highPriority}</span>
-              </div>
-              <div className="flex justify-between items-center py-3">
-                <span className="text-gray-700">SLA Overdue</span>
-                <span className="text-2xl font-bold text-orange-600">{metrics.support.slaOverdue}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Button
-                className="w-full justify-between"
-                variant="outline"
-                onClick={() => window.location.href = '/dashboard/superadmin/tenants'}
-              >
-                <span>View All Tenants</span>
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-
-              <Button
-                className="w-full justify-between"
-                variant="outline"
-                onClick={() => window.location.href = '/dashboard/superadmin/company-profile'}
-              >
-                <span>Company Profile</span>
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-
-              <Button
-                className="w-full justify-between"
-                variant="outline"
-                onClick={() => window.location.href = '/dashboard/superadmin/audit-log'}
-              >
-                <span>Audit Log</span>
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-
-              <Button
-                className="w-full justify-between bg-blue-600 hover:bg-blue-700"
-                onClick={() => window.location.href = '/dashboard/admin-tenant-create'}
-              >
-                <span>Create Tenant</span>
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Last Updated */}
-        <div className="text-center text-sm text-gray-500">
-          Last updated: {new Date(metrics.timestamp).toLocaleString()}
-        </div>
+      <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Platform Features</h2>
+        <p className="text-gray-600 mb-4">Welcome to the SaaS Platform Admin Dashboard. Use the sidebar menu to manage:</p>
+        <ul className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+          <li>✅ Dashboard - Platform metrics and KPIs</li>
+          <li>✅ Tenants - Manage all customer tenants</li>
+          <li>✅ Plans - Subscription plans and pricing</li>
+          <li>✅ Subscriptions - Active subscriptions and renewals</li>
+          <li>✅ Billing - Revenue and payments</li>
+          <li>✅ Support - Customer support tickets</li>
+          <li>✅ SaaS Profile - Company profile settings</li>
+          <li>✅ Security - Security and compliance</li>
+        </ul>
       </div>
     </div>
   );

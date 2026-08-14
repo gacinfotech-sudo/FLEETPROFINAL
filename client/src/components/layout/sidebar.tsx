@@ -7,7 +7,7 @@ import GlobalCustomerSearch from "@/components/customers/global-customer-search"
 import { ThemeToggle } from "@/components/theme-toggle";
 // The final-canonical merge brought back this manifest-driven sidebar but
 // dropped the import that feeds it.
-import { SAAS_MODULES, getNavigationStructure } from "@/modules/manifest";
+import { SAAS_MODULES, SAAS_ADMIN_MODULES, getNavigationStructure } from "@/modules/manifest";
 import { ShieldCheck } from "lucide-react";
 
 // Root Control Plane (Wave 1) — platform Super Admin console. These are
@@ -54,11 +54,11 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
   const { logout, user } = useAuth();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['dashboard']));
 
-  const navStructure = getNavigationStructure(user?.role, user?.permissions);
+  const navStructure = getNavigationStructure(user?.role, user?.permissions, user?.platformRole);
 
   // Expand group if its child is currently active
   useEffect(() => {
-    const activeModule = SAAS_MODULES.find((m) => m.id === currentView);
+    const activeModule = SAAS_MODULES.find((m) => m.id === currentView) || SAAS_ADMIN_MODULES.find((m) => m.id === currentView);
     if (activeModule?.parentGroup) {
       const parentGroup = activeModule.parentGroup;
       setExpandedGroups((prev) => {
@@ -90,7 +90,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
   };
 
   const renderNavigationItem = (moduleId: string) => {
-    const module = SAAS_MODULES.find((m) => m.id === moduleId);
+    const module = SAAS_MODULES.find((m) => m.id === moduleId) || SAAS_ADMIN_MODULES.find((m) => m.id === moduleId);
     if (!module) return null;
 
     const Icon = icons[module.iconKey as keyof typeof icons];
@@ -217,8 +217,8 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
         {/* Root Control Plane (Wave 1) — see ROOT_NAV_ITEMS comment above
             for why this section uses real <a href> navigation instead of
             onViewChange. Client-side visibility only; real gating is
-            server-side. */}
-        {user?.role === 'admin' && (
+            server-side. Show ONLY for tenant admins, NOT for platform staff. */}
+        {user?.role === 'admin' && !user?.platformRole && (
           <div className="px-3 lg:px-4 py-2 border-t border-gray-200 space-y-1 lg:space-y-2 max-h-48 overflow-y-auto">
             <div className="flex items-center px-1 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
               <ShieldCheck className="mr-2 shrink-0" size={14} />

@@ -8,6 +8,7 @@ interface User {
   id: number;
   userId: string;
   role: string;
+  platformRole?: string;
   tenantId?: number;
   mustResetPassword?: boolean;
   hasCompletedOnboarding?: boolean;
@@ -162,8 +163,11 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       }));
       
       // Navigate to appropriate dashboard
-      if (data.user.role === "admin") {
-        setLocation("/admin");
+      // Platform owners/staff go to SaaS platform control panel
+      if (data.user.platformRole) {
+        setLocation("/superadmin/dashboard");
+      } else if (data.user.role === "admin") {
+        setLocation("/dashboard");
       } else {
         setLocation("/dashboard");
       }

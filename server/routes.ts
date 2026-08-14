@@ -819,11 +819,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Return minimal user info - no sensitive data in response
+        console.log(`🔐 Login response for ${user.userId}:`, {
+          role: user.role,
+          platformRole: user.platformRole,
+          tenantId: user.tenantId
+        });
         res.json({
           user: {
             id: user.id,
             userId: user.userId,
             role: user.role,
+            platformRole: user.platformRole,
             tenantId: user.tenantId,
             mustResetPassword: user.mustResetPassword,
             hasCompletedOnboarding: user.hasCompletedOnboarding || false,
@@ -898,6 +904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: user.id,
           userId: user.userId,
           role: user.role,
+          platformRole: user.platformRole,
           tenantId: user.tenantId,
           mustResetPassword: user.mustResetPassword,
           hasCompletedOnboarding: user.hasCompletedOnboarding || false,

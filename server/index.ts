@@ -134,7 +134,16 @@ app.use((req, res, next) => {
   } catch (error) {
     // Silently continue if emergency admin creation fails
   }
-  
+
+  // Migrate ROOT user to have platformRole
+  try {
+    const { migrateRootPlatformRole } = await import("./migrations/migrate-root-platform-role");
+    await migrateRootPlatformRole();
+  } catch (error) {
+    console.error('Migration error:', error);
+    // Silently continue if migration fails
+  }
+
   // Dashboard route - serve dashboard.html directly
   app.get('/dashboard.html', (req, res) => {
     const dashboardPath = path.join(__dirname, '../public/dashboard.html');
