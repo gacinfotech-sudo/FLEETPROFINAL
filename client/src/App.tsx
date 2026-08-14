@@ -61,6 +61,7 @@ import NotificationsAnalytics from "./pages/notifications-analytics";
 import NotificationPreferences from "./pages/notification-preferences";
 import NotificationAdminDashboard from "./pages/notification-admin-dashboard";
 import TemplateEditor from "./pages/template-editor";
+import ScheduledNotifications from "./pages/scheduled-notifications";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -313,6 +314,13 @@ function AuthenticatedApp() {
       <Route path="/notifications/templates">
         <ProtectedRoute requiredRole="admin">
           <TemplateEditor />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Scheduled Notifications - WAVE 31A */}
+      <Route path="/notifications/schedule">
+        <ProtectedRoute requiredRole="admin">
+          <ScheduledNotifications />
         </ProtectedRoute>
       </Route>
 
