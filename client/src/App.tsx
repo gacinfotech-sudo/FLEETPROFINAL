@@ -79,6 +79,7 @@ import CampaignJourneyBuilder from "./pages/campaign-journey-builder";
 import SmartChannelSelection from "./pages/smart-channel-selection";
 import TenantWhatsAppProfile from "./pages/tenant-whatsapp-profile";
 import WhatsAppTemplates from "./pages/whatsapp-templates";
+import WhatsAppTemplateEditor from "./pages/whatsapp-template-editor";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -429,6 +430,13 @@ function AuthenticatedApp() {
       <Route path="/settings/whatsapp-templates">
         <ProtectedRoute requiredRole="admin">
           <WhatsAppTemplates />
+        </ProtectedRoute>
+      </Route>
+
+      {/* WhatsApp Template Editor - WAVE 45A */}
+      <Route path="/settings/whatsapp-template-editor">
+        <ProtectedRoute requiredRole="admin">
+          <WhatsAppTemplateEditor />
         </ProtectedRoute>
       </Route>
 

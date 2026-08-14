@@ -11146,6 +11146,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // WAVE 45A: Full tenant-editable template endpoint
+  app.get("/api/tenant/whatsapp-templates/full", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const templates = await storage.client
+        ?.db("fleetpro")
+        .collection("whatsappTemplates")
+        .find({ tenantId: req.tenantId })
+        .sort({ category: 1, messageType: 1, updatedAt: -1 })
+        .toArray();
+      res.json({ templates: templates || [] });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/tenant/whatsapp-templates", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { body, variables, ...rest } = req.body;
