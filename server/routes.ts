@@ -9826,6 +9826,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== NOTIFICATION SCHEDULER ROUTES (WAVE 21A) ==========
+  app.get("/api/notifications/scheduled", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const notificationScheduler = require("./services/notification-scheduler").notificationScheduler;
+      const scheduled = await notificationScheduler.listScheduled(req.tenantId.toString());
+      res.json({ scheduled, count: scheduled.length });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/schedule", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { title, message, scheduledFor, timezone, channel, maxRetries } = req.body;
+      if (!title || !message || !scheduledFor || !channel) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      const notificationScheduler = require("./services/notification-scheduler").notificationScheduler;
+      const scheduled = await notificationScheduler.createSchedule(
+        req.user?.userId || "",
+        req.tenantId.toString(),
+        title,
+        message,
+        new Date(scheduledFor),
+        timezone || "UTC",
+        channel,
+        maxRetries || 3
+      );
+
+      res.status(201).json(scheduled);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/scheduled/:notificationId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const notificationScheduler = require("./services/notification-scheduler").notificationScheduler;
+      const notification = await notificationScheduler.getSchedule(req.params.notificationId);
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+      res.json(notification);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/notifications/scheduled/:notificationId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const notificationScheduler = require("./services/notification-scheduler").notificationScheduler;
+      await notificationScheduler.cancelSchedule(req.params.notificationId);
+      res.json({ message: "Notification cancelled successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ========== NOTIFICATION ANALYTICS ROUTES (WAVE 22A) ==========
+  app.get("/api/notifications/analytics", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const range = (req.query.range as string) || "7d";
+
+      const daysMap: { [key: string]: number } = { "24h": 1, "7d": 7, "30d": 30, "90d": 90 };
+      const days = daysMap[range] || 7;
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      // Mock data for analytics (will be replaced with real DB queries)
+      const totalSent = Math.floor(Math.random() * 500) + 100;
+      const totalFailed = Math.floor(Math.random() * 50) + 5;
+      const deliveryRate = totalSent / (totalSent + totalFailed) || 0;
+
+      const channelBreakdown = {
+        PUSH: Math.floor(totalSent * 0.4),
+        EMAIL: Math.floor(totalSent * 0.35),
+        SMS: Math.floor(totalSent * 0.15),
+        IN_APP: Math.floor(totalSent * 0.1),
+      };
+
+      const hourlyData = Array.from({ length: 24 }, (_, i) => ({
+        hour: `${i}:00`,
+        sent: Math.floor(Math.random() * 50) + 10,
+        failed: Math.floor(Math.random() * 5),
+      }));
+
+      const campaignPerformance = [
+        { campaign: "Welcome Campaign", sent: 450, delivered: 435, opened: 380, clicked: 120 },
+        { campaign: "Promotion Campaign", sent: 320, delivered: 310, opened: 240, clicked: 85 },
+        { campaign: "Re-engagement Campaign", sent: 280, delivered: 250, opened: 180, clicked: 60 },
+      ];
+
+      const topNotifications = [
+        { title: "New Feature Release", sent: 125, engagementRate: 0.68 },
+        { title: "Holiday Special Offer", sent: 98, engagementRate: 0.71 },
+        { title: "Account Security Alert", sent: 87, engagementRate: 0.82 },
+      ];
+
+      res.json({
+        totalSent,
+        totalFailed,
+        deliveryRate,
+        averageDeliveryTime: 245,
+        channelBreakdown,
+        hourlyData,
+        campaignPerformance,
+        topNotifications,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/export", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const format = (req.query.format as string) || "csv";
+
+      if (format === "csv") {
+        const csv = "Campaign,Sent,Delivered,Opened,Clicked\nWelcome Campaign,450,435,380,120\nPromotion Campaign,320,310,240,85\n";
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="notifications-analytics-${new Date().toISOString().split('T')[0]}.csv"`);
+        res.send(csv);
+      } else if (format === "pdf") {
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="notifications-analytics-${new Date().toISOString().split('T')[0]}.pdf"`);
+        res.send(Buffer.from("PDF export - placeholder for now"));
+      }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

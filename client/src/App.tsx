@@ -56,6 +56,9 @@ import SuperAdminBilling from "./pages/superadmin/billing";
 import SuperAdminSupportTickets from "./pages/superadmin/support-tickets";
 import SuperAdminErrorReports from "./pages/superadmin/error-reports";
 
+// Phase 3 WAVE Pages
+import NotificationsAnalytics from "./pages/notifications-analytics";
+
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
 
@@ -279,6 +282,13 @@ function AuthenticatedApp() {
       <Route path="/bookings/upcoming">
         <ProtectedRoute allowedRoles={["client", "manager"]}>
           <UpcomingBookings />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Notifications Analytics - WAVE 22A */}
+      <Route path="/notifications/analytics">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <NotificationsAnalytics />
         </ProtectedRoute>
       </Route>
 
