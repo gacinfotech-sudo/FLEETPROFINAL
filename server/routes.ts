@@ -12017,6 +12017,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // WAVE 50 PHASE 4: Booking Manager APIs
+  // List all available managers for tenant
+  app.get("/api/tenant/booking-managers", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const BookingManagerService = (await import('./services/booking-manager-service')).default;
+      const managers = await BookingManagerService.getTenantManagers(req.tenantId);
+      res.json({ managers });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get tenant's default booking manager
+  app.get("/api/tenant/booking-managers/default", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const BookingManagerService = (await import('./services/booking-manager-service')).default;
+      const defaultManager = await BookingManagerService.getTenantDefaultManager(req.tenantId);
+      res.json({ defaultManager });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Set tenant's default booking manager
+  app.post("/api/tenant/booking-managers/default", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { managerUserId } = req.body;
+      if (!managerUserId) {
+        return res.status(400).json({ message: 'Manager user ID required' });
+      }
+      const BookingManagerService = (await import('./services/booking-manager-service')).default;
+      await BookingManagerService.setDefaultManager(req.tenantId, managerUserId);
+      const updated = await BookingManagerService.getTenantDefaultManager(req.tenantId);
+      res.json({ success: true, defaultManager: updated });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Create new staff/manager
+  app.post("/api/tenant/staff", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { name, mobile, whatsapp, designation, role, branch } = req.body;
+      if (!name || !mobile || !designation || !role) {
+        return res.status(400).json({ message: 'Name, mobile, designation, and role required' });
+      }
+      const BookingManagerService = (await import('./services/booking-manager-service')).default;
+      const staff = await BookingManagerService.createStaff(req.tenantId, {
+        name,
+        mobile,
+        whatsapp,
+        designation,
+        role,
+        branch,
+      });
+      res.json({ success: true, staff });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Find staff by mobile number
+  app.get("/api/tenant/staff/by-mobile", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { mobile } = req.query;
+      if (!mobile) {
+        return res.status(400).json({ message: 'Mobile number required' });
+      }
+      const BookingManagerService = (await import('./services/booking-manager-service')).default;
+      const staff = await BookingManagerService.findStaffByMobile(req.tenantId, String(mobile));
+      res.json({ staff });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Assign manager to booking
+  app.post("/api/bookings/:id/assign-manager", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { managerUserId } = req.body;
+      if (!managerUserId) {
+        return res.status(400).json({ message: 'Manager user ID required' });
+      }
+      const BookingManagerService = (await import('./services/booking-manager-service')).default;
+      const assignment = await BookingManagerService.assignManagerToBooking(
+        req.tenantId,
+        id,
+        managerUserId,
+        false
+      );
+      res.json({ success: true, assignment });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Change manager for booking (with audit trail)
+  app.post("/api/bookings/:id/change-manager", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { managerUserId, reason } = req.body;
+      if (!managerUserId) {
+        return res.status(400).json({ message: 'Manager user ID required' });
+      }
+      const BookingManagerService = (await import('./services/booking-manager-service')).default;
+      const assignment = await BookingManagerService.changeBookingManager(
+        req.tenantId,
+        id,
+        managerUserId,
+        req.user?.email || 'unknown',
+        reason
+      );
+      res.json({ success: true, assignment });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get booking's assigned manager
+  app.get("/api/bookings/:id/manager", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const BookingManagerService = (await import('./services/booking-manager-service')).default;
+      const manager = await BookingManagerService.getBookingManager(req.tenantId, id);
+      res.json({ manager });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
