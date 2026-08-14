@@ -11012,6 +11012,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // WAVE 39A: CONTENT RECOMMENDATIONS
+  app.get("/api/notifications/content-recommendations", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const recs = [
+        { id: 'rec-1', type: 'subject_line', title: 'Subject Line Optimization', description: 'Personalization increases open rate by 22%', variants: [{ text: 'Hi {{name}}, your exclusive offer awaits', expectedLift: 0.22 }], confidence: 0.94, impactScore: 0.22, reasoning: 'Personalized subject lines drive 22% higher open rates vs generic text' },
+        { id: 'rec-2', type: 'cta', title: 'Call-to-Action Button Text', description: 'Action verbs increase click rates', variants: [{ text: 'Unlock My Exclusive Deal', expectedLift: 0.18 }], confidence: 0.91, impactScore: 0.18, reasoning: 'Action-oriented CTAs outperform passive text by 18% on average' },
+      ];
+      res.json({ recommendations: recs });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // WAVE 40A: CAMPAIGN PREDICTOR
+  app.get("/api/notifications/campaign-predictions", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const predictions = [
+        { campaignId: 'camp-1', campaignName: 'Summer Sale Push', predictedMetrics: { sent: 50000, delivered: 48500, opened: 15435, clicked: 3093, conversions: 1239 }, predictedRates: { deliveryRate: 0.97, openRate: 0.318, clickRate: 0.201, conversionRate: 0.0248 }, confidence: 0.93, riskFactors: ['Competing emails same day'], recommendations: ['Reschedule to avoid competition', 'Personalize subject line'] },
+        { campaignId: 'camp-2', campaignName: 'Reactivation Campaign', predictedMetrics: { sent: 25000, delivered: 22500, opened: 4500, clicked: 675, conversions: 135 }, predictedRates: { deliveryRate: 0.90, openRate: 0.20, clickRate: 0.15, conversionRate: 0.006 }, confidence: 0.88, riskFactors: ['Low engagement segment', 'Dated email list'], recommendations: ['Segment by recency', 'Refresh email list'] },
+      ];
+      res.json({ predictions });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

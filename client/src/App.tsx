@@ -71,6 +71,8 @@ import SMSOptimizer from "./pages/sms-optimizer";
 // Phase 4 WAVE Pages
 import PredictiveSendTime from "./pages/predictive-send-time";
 import AudienceSegmentation from "./pages/audience-segmentation";
+import ContentRecommendations from "./pages/content-recommendations";
+import CampaignPredictor from "./pages/campaign-predictor";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -379,6 +381,20 @@ function AuthenticatedApp() {
       <Route path="/notifications/segmentation">
         <ProtectedRoute requiredRole="admin">
           <AudienceSegmentation />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Content Recommendations - WAVE 39A */}
+      <Route path="/notifications/content-recommendations">
+        <ProtectedRoute requiredRole="admin">
+          <ContentRecommendations />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Campaign Predictor - WAVE 40A */}
+      <Route path="/notifications/campaign-predictor">
+        <ProtectedRoute requiredRole="admin">
+          <CampaignPredictor />
         </ProtectedRoute>
       </Route>
 
