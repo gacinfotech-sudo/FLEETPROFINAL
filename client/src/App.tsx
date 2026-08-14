@@ -63,6 +63,7 @@ import NotificationAdminDashboard from "./pages/notification-admin-dashboard";
 import TemplateEditor from "./pages/template-editor";
 import ScheduledNotifications from "./pages/scheduled-notifications";
 import NotificationMonitor from "./pages/notification-monitor";
+import EventTriggers from "./pages/event-triggers";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -329,6 +330,13 @@ function AuthenticatedApp() {
       <Route path="/notifications/monitor">
         <ProtectedRoute requiredRole="admin">
           <NotificationMonitor />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Event Triggers - WAVE 33A */}
+      <Route path="/notifications/triggers">
+        <ProtectedRoute requiredRole="admin">
+          <EventTriggers />
         </ProtectedRoute>
       </Route>
 

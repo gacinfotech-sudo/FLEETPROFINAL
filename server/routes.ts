@@ -10430,6 +10430,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============================================================================
+  // WAVE 33A: EVENT TRIGGERS
+  // ============================================================================
+  // Event-driven notification system
+
+  app.get("/api/notifications/triggers", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const triggers = db?.collection("eventTriggers")
+        .find({ tenantId: req.tenantId })
+        .sort({ createdAt: -1 })
+        .toArray();
+
+      const result = triggers || [];
+      res.json({ triggers: result });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/notifications/triggers", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { name, eventType, condition, template, channel, recipients, delay, retryCount } = req.body;
+
+      const trigger = {
+        id: `trigger-${Date.now()}`,
+        tenantId: req.tenantId,
+        name,
+        eventType,
+        condition,
+        template,
+        channel,
+        recipients: recipients || [],
+        delay: delay || 0,
+        retryCount: retryCount || 3,
+        enabled: true,
+        statistics: { triggered: 0, sent: 0, failed: 0 },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      await db?.collection("eventTriggers").insertOne(trigger);
+      res.json(trigger);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.put("/api/notifications/triggers/:triggerId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { triggerId } = req.params;
+      const updates = { ...req.body, updatedAt: new Date() };
+
+      await db?.collection("eventTriggers").updateOne(
+        { id: triggerId, tenantId: req.tenantId },
+        { $set: updates }
+      );
+
+      res.json({ message: "Trigger updated" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/notifications/triggers/:triggerId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { triggerId } = req.params;
+
+      await db?.collection("eventTriggers").deleteOne({
+        id: triggerId,
+        tenantId: req.tenantId,
+      });
+
+      res.json({ message: "Trigger deleted" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/notifications/triggers/:triggerId/toggle", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { triggerId } = req.params;
+
+      const trigger = await db?.collection("eventTriggers").findOne({
+        id: triggerId,
+        tenantId: req.tenantId,
+      });
+
+      if (!trigger) {
+        return res.status(404).json({ message: "Trigger not found" });
+      }
+
+      await db?.collection("eventTriggers").updateOne(
+        { id: triggerId, tenantId: req.tenantId },
+        { $set: { enabled: !trigger.enabled, updatedAt: new Date() } }
+      );
+
+      res.json({ enabled: !trigger.enabled });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/notifications/events", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { limit = 100 } = req.query;
+
+      const events = await db?.collection("notificationEvents")
+        .find({ tenantId: req.tenantId })
+        .sort({ timestamp: -1 })
+        .limit(parseInt(limit as string) || 100)
+        .toArray();
+
+      res.json({ events: events || [] });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
