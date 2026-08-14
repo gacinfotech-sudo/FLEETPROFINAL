@@ -688,12 +688,17 @@ export default function DriverSalarySetupPanel({
 
                   <div>
                     <Label htmlFor="dedDate" className="text-xs font-medium">
-                      Date *
+                      Date * (📅 Click to pick)
                     </Label>
                     <Input
                       id="dedDate"
                       type="date"
-                      className="mt-1 h-9 text-sm"
+                      className="mt-1 h-9 text-sm cursor-pointer"
+                      style={{
+                        colorScheme: 'light',
+                        paddingRight: '8px'
+                      }}
+                      required
                     />
                   </div>
 
