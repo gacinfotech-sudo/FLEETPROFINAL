@@ -11256,6 +11256,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return [...new Set(matches.map((m) => `{{${m[1]}}}`))] as string[];
   };
 
+  // FLEETPRO ZERO-DUPLICATE CUSTOMER LOOKUP (WAVE 50+)
+  // Customer lookup by normalized mobile phone
+  app.get("/api/tenant/customers/lookup", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { mobile } = req.query;
+      if (!mobile) {
+        return res.status(400).json({ message: 'Mobile number required' });
+      }
+
+      const { normalizeIndianPhone } = await import('./utils/phone-normalization');
+      const normalized = normalizeIndianPhone(mobile as string);
+
+      if (!normalized) {
+        return res.status(400).json({ message: 'Invalid phone format' });
+      }
+
+      const db = await storage.getDb();
+      const customer = await db.collection('customers').findOne({
+        tenantId: new mongoose.Types.ObjectId(req.tenantId),
+        primaryMobile: normalized,
+      });
+
+      if (customer) {
+        return res.json({
+          found: true,
+          customer: {
+            _id: customer._id,
+            name: customer.name,
+            mobile: customer.primaryMobile,
+            email: customer.email,
+            bookingCount: customer.totalBookings || 0,
+            lastBookingDate: customer.lastBookingDate,
+            totalSpending: customer.totalSpending || 0,
+          },
+        });
+      }
+
+      // Check if this mobile matches any aliases to detect potential duplicates
+      const aliasMatch = await db.collection('customers').findOne({
+        tenantId: new mongoose.Types.ObjectId(req.tenantId),
+        $or: [
+          { alternateMobile: normalized },
+          { whatsappNumber: normalized },
+          { phoneAliases: normalized },
+        ],
+      });
+
+      if (aliasMatch) {
+        return res.json({
+          found: true,
+          customer: {
+            _id: aliasMatch._id,
+            name: aliasMatch.name,
+            mobile: aliasMatch.primaryMobile,
+            email: aliasMatch.email,
+            bookingCount: aliasMatch.totalBookings || 0,
+            lastBookingDate: aliasMatch.lastBookingDate,
+            totalSpending: aliasMatch.totalSpending || 0,
+            aliasMatch: true,
+          },
+        });
+      }
+
+      return res.json({
+        found: false,
+        mobile: normalized,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // WAVE 49A: Template Tags & Categories
   app.get("/api/tenant/whatsapp-tags", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
