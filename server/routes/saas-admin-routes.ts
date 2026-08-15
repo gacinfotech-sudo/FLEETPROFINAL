@@ -1,16 +1,25 @@
 /**
  * SAAS ADMIN MANAGEMENT ROUTES
  * APIs for managing tenants, subscriptions, billing, and analytics
+ *
+ * P1 SECURITY FIX: All routes now require PLATFORM_ADMIN or PLATFORM_SUPER_ADMIN role
+ * Previous: Only checked tenant-scoped 'admin' role (allowed any authenticated tenant admin)
+ * Now: Requires platform-level authentication (cross-tenant access control)
  */
 
 import { Router, Request, Response } from 'express';
 import { storage } from '../storage-mongodb';
 import mongoose from 'mongoose';
 import SaaSDataSyncService from '../services/saas-data-sync-service';
+import { rootAccessService } from '../root/services/rootAccessService';
+import { authenticateUser } from '../middleware/auth';
 
 const router = Router();
 
-// Middleware: Verify admin access
+// Middleware: Require platform admin role (PLATFORM_ADMIN or PLATFORM_SUPER_ADMIN)
+const requirePlatformAdmin = rootAccessService.requirePlatformRole(['PLATFORM_ADMIN', 'PLATFORM_SUPER_ADMIN', 'PLATFORM_ROOT']);
+
+// Legacy fallback: Verify tenant-scoped admin access (kept for backward compatibility)
 const adminOnly = (req: any, res: Response, next: Function) => {
   if (req.user?.role !== 'admin') {
     return res.status(403).json({ message: 'Admin access required' });
@@ -23,8 +32,9 @@ const adminOnly = (req: any, res: Response, next: Function) => {
 /**
  * GET /api/saas/admin/dashboard/summary
  * Get overall SaaS platform summary
+ * SECURITY: Requires PLATFORM_ADMIN+ role
  */
-router.get('/admin/dashboard/summary', adminOnly, async (req: any, res) => {
+router.get('/admin/dashboard/summary', authenticateUser, requirePlatformAdmin, async (req: any, res) => {
   try {
     const summary = await SaaSDataSyncService.getDashboardSummary();
     res.json(summary);
@@ -39,7 +49,7 @@ router.get('/admin/dashboard/summary', adminOnly, async (req: any, res) => {
  * GET /api/saas/admin/tenants
  * List all tenants with metrics
  */
-router.get('/admin/tenants', adminOnly, async (req: any, res) => {
+router.get('/admin/tenants', authenticateUser, requirePlatformAdmin, async (req: any, res) => {
   try {
     const db = await storage.getDb();
 
@@ -69,7 +79,7 @@ router.get('/admin/tenants', adminOnly, async (req: any, res) => {
  * GET /api/saas/admin/tenants/:id
  * Get tenant details
  */
-router.get('/admin/tenants/:id', adminOnly, async (req: any, res) => {
+router.get('/admin/tenants/:id', authenticateUser, requirePlatformAdmin, async (req: any, res) => {
   try {
     const db = await storage.getDb();
 
@@ -91,7 +101,7 @@ router.get('/admin/tenants/:id', adminOnly, async (req: any, res) => {
  * PUT /api/saas/admin/tenants/:id
  * Update tenant (lock/unlock, change plan, etc)
  */
-router.put('/admin/tenants/:id', adminOnly, async (req: any, res) => {
+router.put('/admin/tenants/:id', authenticateUser, requirePlatformAdmin, async (req: any, res) => {
   try {
     const db = await storage.getDb();
     const { isActive, subscriptionPlan, monthlyRevenue } = req.body;
@@ -119,7 +129,7 @@ router.put('/admin/tenants/:id', adminOnly, async (req: any, res) => {
  * GET /api/saas/admin/subscription-plans
  * Get all subscription plans
  */
-router.get('/admin/subscription-plans', adminOnly, async (req: any, res) => {
+router.get('/admin/subscription-plans', authenticateUser, requirePlatformAdmin, async (req: any, res) => {
   try {
     const db = await storage.getDb();
 
@@ -138,7 +148,7 @@ router.get('/admin/subscription-plans', adminOnly, async (req: any, res) => {
  * POST /api/saas/admin/subscription-plans
  * Create new subscription plan
  */
-router.post('/admin/subscription-plans', adminOnly, async (req: any, res) => {
+router.post('/admin/subscription-plans', authenticateUser, requirePlatformAdmin, async (req: any, res) => {
   try {
     const db = await storage.getDb();
     const { name, price, features, billingCycle } = req.body;
@@ -171,7 +181,7 @@ router.post('/admin/subscription-plans', adminOnly, async (req: any, res) => {
  * GET /api/saas/admin/billing
  * Get billing records and revenue
  */
-router.get('/admin/billing', adminOnly, async (req: any, res) => {
+router.get('/admin/billing', authenticateUser, requirePlatformAdmin, async (req: any, res) => {
   try {
     const db = await storage.getDb();
 
@@ -211,7 +221,7 @@ router.get('/admin/billing', adminOnly, async (req: any, res) => {
  * GET /api/saas/admin/billing/tenant/:tenantId
  * Get billing records for specific tenant
  */
-router.get('/admin/billing/tenant/:tenantId', adminOnly, async (req: any, res) => {
+router.get('/admin/billing/tenant/:tenantId', authenticateUser, requirePlatformAdmin, async (req: any, res) => {
   try {
     const db = await storage.getDb();
 
@@ -235,7 +245,7 @@ router.get('/admin/billing/tenant/:tenantId', adminOnly, async (req: any, res) =
  * GET /api/saas/admin/support-tickets
  * Get all support tickets
  */
-router.get('/admin/support-tickets', adminOnly, async (req: any, res) => {
+router.get('/admin/support-tickets', authenticateUser, requirePlatformAdmin, async (req: any, res) => {
   try {
     const db = await storage.getDb();
 
@@ -258,7 +268,7 @@ router.get('/admin/support-tickets', adminOnly, async (req: any, res) => {
  * PUT /api/saas/admin/support-tickets/:id
  * Update ticket status
  */
-router.put('/admin/support-tickets/:id', adminOnly, async (req: any, res) => {
+router.put('/admin/support-tickets/:id', authenticateUser, requirePlatformAdmin, async (req: any, res) => {
   try {
     const db = await storage.getDb();
     const { status, resolution } = req.body;
@@ -287,7 +297,7 @@ router.put('/admin/support-tickets/:id', adminOnly, async (req: any, res) => {
  * POST /api/saas/admin/sync
  * Trigger full data sync
  */
-router.post('/admin/sync', adminOnly, async (req: any, res) => {
+router.post('/admin/sync', authenticateUser, requirePlatformAdmin, async (req: any, res) => {
   try {
     const result = await SaaSDataSyncService.fullSync();
     res.json({ success: true, syncResult: result });
@@ -300,7 +310,7 @@ router.post('/admin/sync', adminOnly, async (req: any, res) => {
  * GET /api/saas/admin/metrics/revenue
  * Get revenue metrics
  */
-router.get('/admin/metrics/revenue', adminOnly, async (req: any, res) => {
+router.get('/admin/metrics/revenue', authenticateUser, requirePlatformAdmin, async (req: any, res) => {
   try {
     const db = await storage.getDb();
 
@@ -338,7 +348,7 @@ router.get('/admin/metrics/revenue', adminOnly, async (req: any, res) => {
  * GET /api/saas/admin/metrics/tenants
  * Get tenant metrics
  */
-router.get('/admin/metrics/tenants', adminOnly, async (req: any, res) => {
+router.get('/admin/metrics/tenants', authenticateUser, requirePlatformAdmin, async (req: any, res) => {
   try {
     const db = await storage.getDb();
 

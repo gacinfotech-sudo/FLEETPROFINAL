@@ -869,33 +869,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Logout - destroy session cookie (session-based auth, not token-based)
-  app.post("/api/auth/logout", authenticateUser, async (req: AuthRequest, res) => {
-    try {
-      const userId = (req as any).user?.userId;
-
-      if (!userId) {
-        return res.status(401).json({ message: "Not authenticated" });
-      }
-
-      // Destroy the session (express-session will clear the session cookie)
-      req.session.destroy((err) => {
-        if (err) {
-          console.error("Error destroying session:", err);
-          return res.status(500).json({ message: "Logout failed" });
-        }
-
-        // Clear the session cookie on the response
-        res.clearCookie('connect.sid', { path: '/', httpOnly: true, secure: false, sameSite: 'lax' });
-
-        res.json({ message: "Logged out successfully" });
-      });
-    } catch (error) {
-      console.error("Error logging out:", error);
-      res.status(500).json({ message: "Logout failed" });
-    }
-  });
-
   // Logout from all devices
   app.post("/api/auth/logout-all", authenticateUser, async (req: AuthRequest, res) => {
     try {
