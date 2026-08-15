@@ -66,8 +66,6 @@ import orchestrationRouter from "./routes/orchestration";
 import fraudDetectionRouter from "./routes/fraud-detection";
 import supportRouter from "./routes/support";
 import feedbackRouter from "./routes/feedback";
-import phase5Router from "./routes/phase5-routes";
-import phase6RBACRouter from "./routes/phase6-rbac-routes";
 import driverEarningsRouter from "./routes/driver-earnings";
 import driversRouter from "./routes/drivers";
 import driverSalaryRouter from "./routes/driverSalaryRoutes";
@@ -12391,11 +12389,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========== PHASE 5: ADVANCED FEATURES ==========
-  app.use(phase5Router);
+  // Consolidated into main routes
 
   // ========== PHASE 6: RBAC MANAGEMENT ==========
-  app.use(phase6RBACRouter);
-
+  // Consolidated into main routes
   const httpServer = createServer(app);
 
   return httpServer;
