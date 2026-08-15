@@ -97,49 +97,49 @@ function AuthenticatedApp() {
         </ProtectedRoute>
       </Route>
 
-      {/* SaaS Admin Routes - Tenant Admin Panel */}
+      {/* SaaS Admin Routes - PLATFORM ADMINS ONLY (SaaS Management) */}
       <Route path="/superadmin/dashboard">
-        <ProtectedRoute requiredRole="admin">
+        <ProtectedRoute requiredRole="admin" requirePlatformRole={true}>
           <SuperAdminDashboard />
         </ProtectedRoute>
       </Route>
       <Route path="/superadmin/tenants/:tenantId">
-        <ProtectedRoute requiredRole="admin">
+        <ProtectedRoute requiredRole="admin" requirePlatformRole={true}>
           <SuperAdminTenant360 />
         </ProtectedRoute>
       </Route>
       <Route path="/superadmin/tenants">
-        <ProtectedRoute requiredRole="admin">
+        <ProtectedRoute requiredRole="admin" requirePlatformRole={true}>
           <SuperAdminTenantsList />
         </ProtectedRoute>
       </Route>
       <Route path="/superadmin/plans">
-        <ProtectedRoute requiredRole="admin">
+        <ProtectedRoute requiredRole="admin" requirePlatformRole={true}>
           <SuperAdminPlans />
         </ProtectedRoute>
       </Route>
       <Route path="/superadmin/subscriptions">
-        <ProtectedRoute requiredRole="admin">
+        <ProtectedRoute requiredRole="admin" requirePlatformRole={true}>
           <SuperAdminSubscriptions />
         </ProtectedRoute>
       </Route>
       <Route path="/superadmin/billing">
-        <ProtectedRoute requiredRole="admin">
+        <ProtectedRoute requiredRole="admin" requirePlatformRole={true}>
           <SuperAdminBilling />
         </ProtectedRoute>
       </Route>
       <Route path="/superadmin/support">
-        <ProtectedRoute requiredRole="admin">
+        <ProtectedRoute requiredRole="admin" requirePlatformRole={true}>
           <SuperAdminSupportTickets />
         </ProtectedRoute>
       </Route>
       <Route path="/superadmin/errors">
-        <ProtectedRoute requiredRole="admin">
+        <ProtectedRoute requiredRole="admin" requirePlatformRole={true}>
           <SuperAdminErrorReports />
         </ProtectedRoute>
       </Route>
       <Route path="/superadmin/company-profile">
-        <ProtectedRoute requiredRole="admin">
+        <ProtectedRoute requiredRole="admin" requirePlatformRole={true}>
           <SuperAdminCompanyProfile />
         </ProtectedRoute>
       </Route>

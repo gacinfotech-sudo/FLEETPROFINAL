@@ -6,12 +6,14 @@ interface ProtectedRouteProps {
   children: ReactNode;
   requiredRole?: "admin" | "client" | "manager";
   allowedRoles?: ("admin" | "client" | "manager")[];
+  requirePlatformRole?: boolean;
 }
 
-export default function ProtectedRoute({ 
-  children, 
-  requiredRole, 
-  allowedRoles 
+export default function ProtectedRoute({
+  children,
+  requiredRole,
+  allowedRoles,
+  requirePlatformRole
 }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
@@ -28,6 +30,12 @@ export default function ProtectedRoute({
   // Redirect to login if not authenticated
   if (!user) {
     setLocation("/login");
+    return null;
+  }
+
+  // Check if platform role is required (SaaS Admin only)
+  if (requirePlatformRole && !user.platformRole) {
+    setLocation("/dashboard");
     return null;
   }
 

@@ -105,7 +105,6 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
       return (
         <div key={group.id} className="px-3 lg:px-4 space-y-1">
           {renderNavigationItem('dashboard')}
-          {user?.role === 'admin' && renderNavigationItem('admin-dashboard')}
         </div>
       );
     }
@@ -195,8 +194,8 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
           </div>
         </nav>
 
-        {/* SaaS Admin Panel - For Tenant Admins Only */}
-        {user?.role === 'admin' && (
+        {/* SaaS Admin Panel - For PLATFORM ADMINS Only (SaaS Management) */}
+        {user?.platformRole && (
           <div className="px-3 lg:px-4 py-2 border-t border-gray-200 space-y-1 lg:space-y-2">
             <div className="flex items-center px-1 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
               <ShieldCheck className="mr-2 shrink-0" size={14} />

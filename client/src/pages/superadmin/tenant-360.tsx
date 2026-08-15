@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRoute } from 'wouter';
-import TenantUsersTab from '@/components/superadmin/tenant-users';
+
 
 export default function Tenant360() {
   const [match, params] = useRoute('/superadmin/tenants/:tenantId');
