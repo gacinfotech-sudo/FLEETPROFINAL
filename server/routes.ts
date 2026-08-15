@@ -9984,7 +9984,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========== SAAS TENANTS ROUTES - REAL DATABASE ==========
   app.get("/api/saas/tenants", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
     try {
-      const tenants = await storage.getAllTenants();
+      const tenants = await storage.getTenants();
       const enrichedTenants = await Promise.all(tenants.map(async (tenant: any) => {
         const userCount = await storage.getUserCountByTenant(tenant._id);
         const vehicleCount = await storage.getVehicleCountByTenant(tenant._id);
