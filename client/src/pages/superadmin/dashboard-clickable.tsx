@@ -19,7 +19,7 @@ export default function SuperAdminDashboard() {
   };
 
   useEffect(() => {
-    fetch('/api/saas/dashboard/stats')
+    fetch('/api/root/dashboard')
       .then(r => r.json())
       .then(data => {
         setStats(data);
