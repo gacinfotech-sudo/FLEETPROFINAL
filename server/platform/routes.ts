@@ -3,6 +3,8 @@
 
 import express, { Router } from 'express';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 
 // Services
 import { platformAuthService } from './auth/platformAuthService';
@@ -21,21 +23,95 @@ import { notificationService } from './notifications/notificationService';
 
 const router = Router();
 
+// Store valid tokens in memory (replace with Redis in production)
+const validTokens = new Map<string, { userId: string; expiresAt: number }>();
+
 // Middleware: Verify Platform Auth
 const requirePlatformAuth = (req: any, res: any, next: any) => {
   const token = req.headers.authorization?.replace('Bearer ', '');
   if (!token) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  // TODO: Verify token
-  req.userId = 'platform-root'; // Mock for now
+
+  const tokenData = validTokens.get(token);
+  if (!tokenData || tokenData.expiresAt < Date.now()) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  req.userId = tokenData.userId;
   next();
 };
 
+// ============ AUTH (No auth required) ============
+router.post('/auth/login', async (req: any, res: any) => {
+  try {
+    const { email, password, userId } = req.body;
+    console.log('Login attempt:', { email, userId, hasPassword: !!password });
+
+    // Support both email and userId login
+    const User = mongoose.model('User');
+    let user;
+
+    if (email) {
+      user = await User.findOne({ email });
+    } else if (userId) {
+      user = await User.findOne({ userId });
+    } else {
+      return res.status(400).json({ error: 'Email or userId required' });
+    }
+
+    if (!user) {
+      console.log('User not found');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // For development: accept 'password' or any password if no hash is set
+    const isValidPassword = password === 'password' || !user.password;
+
+    if (!isValidPassword) {
+      console.log('Password invalid');
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Generate token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+    validTokens.set(token, { userId: user._id.toString(), expiresAt });
+
+    console.log('Login successful for user:', user._id);
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        userId: user.userId,
+        role: user.role,
+        platformRole: user.platformRole
+      }
+    });
+  } catch (error: any) {
+    console.error('Login error:', error.message);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/auth/logout', async (req: any, res: any) => {
+  try {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      validTokens.delete(token);
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Apply auth middleware to all other routes
 router.use(requirePlatformAuth);
 
 // ============ DASHBOARD ============
-router.get('/api/platform/dashboard/kpis', async (req: any, res: any) => {
+router.get('/dashboard/kpis', async (req: any, res: any) => {
   try {
     const kpis = await dashboardService.getKPIs();
     res.json(kpis);
@@ -44,7 +120,7 @@ router.get('/api/platform/dashboard/kpis', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/dashboard/stats', async (req: any, res: any) => {
+router.get('/dashboard/stats', async (req: any, res: any) => {
   try {
     const period = req.query.period || 'month';
     const stats = await dashboardService.getExtendedStats(period as any);
@@ -55,7 +131,7 @@ router.get('/api/platform/dashboard/stats', async (req: any, res: any) => {
 });
 
 // ============ TENANTS ============
-router.get('/api/platform/tenants', async (req: any, res: any) => {
+router.get('/tenants', async (req: any, res: any) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -71,7 +147,7 @@ router.get('/api/platform/tenants', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/tenants/:tenantId', async (req: any, res: any) => {
+router.get('/tenants/:tenantId', async (req: any, res: any) => {
   try {
     const result = await tenantManagementService.getTenant360(req.params.tenantId);
     res.json(result);
@@ -80,7 +156,7 @@ router.get('/api/platform/tenants/:tenantId', async (req: any, res: any) => {
   }
 });
 
-router.post('/api/platform/tenants', async (req: any, res: any) => {
+router.post('/tenants', async (req: any, res: any) => {
   try {
     const { businessName, email, country, createdBy } = req.body;
 
@@ -100,7 +176,7 @@ router.post('/api/platform/tenants', async (req: any, res: any) => {
   }
 });
 
-router.patch('/api/platform/tenants/:tenantId', async (req: any, res: any) => {
+router.patch('/tenants/:tenantId', async (req: any, res: any) => {
   try {
     const updated = await tenantManagementService.updateTenant(req.params.tenantId, req.body);
     res.json(updated);
@@ -109,7 +185,7 @@ router.patch('/api/platform/tenants/:tenantId', async (req: any, res: any) => {
   }
 });
 
-router.post('/api/platform/tenants/:tenantId/lock', async (req: any, res: any) => {
+router.post('/tenants/:tenantId/lock', async (req: any, res: any) => {
   try {
     const locked = await tenantManagementService.lockTenant(req.params.tenantId, req.body.reason || 'Admin action');
     res.json(locked);
@@ -118,7 +194,7 @@ router.post('/api/platform/tenants/:tenantId/lock', async (req: any, res: any) =
   }
 });
 
-router.post('/api/platform/tenants/:tenantId/unlock', async (req: any, res: any) => {
+router.post('/tenants/:tenantId/unlock', async (req: any, res: any) => {
   try {
     const unlocked = await tenantManagementService.unlockTenant(req.params.tenantId);
     res.json(unlocked);
@@ -128,7 +204,7 @@ router.post('/api/platform/tenants/:tenantId/unlock', async (req: any, res: any)
 });
 
 // ============ PLANS ============
-router.get('/api/platform/plans', async (req: any, res: any) => {
+router.get('/plans', async (req: any, res: any) => {
   try {
     const plans = await planService.listPlans();
     res.json(plans);
@@ -137,7 +213,7 @@ router.get('/api/platform/plans', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/plans/:planId', async (req: any, res: any) => {
+router.get('/plans/:planId', async (req: any, res: any) => {
   try {
     const plan = await planService.getPlan(req.params.planId);
     res.json(plan);
@@ -146,7 +222,7 @@ router.get('/api/platform/plans/:planId', async (req: any, res: any) => {
   }
 });
 
-router.post('/api/platform/plans', async (req: any, res: any) => {
+router.post('/plans', async (req: any, res: any) => {
   try {
     const plan = await planService.createPlan(req.body);
     res.status(201).json(plan);
@@ -156,7 +232,7 @@ router.post('/api/platform/plans', async (req: any, res: any) => {
 });
 
 // ============ SUBSCRIPTIONS ============
-router.get('/api/platform/subscriptions', async (req: any, res: any) => {
+router.get('/subscriptions', async (req: any, res: any) => {
   try {
     const subs = await subscriptionService.listSubscriptions({ status: req.query.status });
     res.json(subs);
@@ -165,7 +241,7 @@ router.get('/api/platform/subscriptions', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/tenants/:tenantId/subscription', async (req: any, res: any) => {
+router.get('/tenants/:tenantId/subscription', async (req: any, res: any) => {
   try {
     const sub = await subscriptionService.getTenantSubscription(req.params.tenantId);
     res.json(sub);
@@ -174,7 +250,7 @@ router.get('/api/platform/tenants/:tenantId/subscription', async (req: any, res:
   }
 });
 
-router.post('/api/platform/subscriptions', async (req: any, res: any) => {
+router.post('/subscriptions', async (req: any, res: any) => {
   try {
     const sub = await subscriptionService.createSubscription({
       tenantId: new mongoose.Types.ObjectId(req.body.tenantId),
@@ -189,7 +265,7 @@ router.post('/api/platform/subscriptions', async (req: any, res: any) => {
   }
 });
 
-router.post('/api/platform/subscriptions/:subscriptionId/change-plan', async (req: any, res: any) => {
+router.post('/subscriptions/:subscriptionId/change-plan', async (req: any, res: any) => {
   try {
     const updated = await subscriptionService.changePlan(
       new mongoose.Types.ObjectId(req.params.subscriptionId),
@@ -202,7 +278,7 @@ router.post('/api/platform/subscriptions/:subscriptionId/change-plan', async (re
   }
 });
 
-router.post('/api/platform/subscriptions/:subscriptionId/renew', async (req: any, res: any) => {
+router.post('/subscriptions/:subscriptionId/renew', async (req: any, res: any) => {
   try {
     const renewed = await subscriptionService.forceRenewal(
       new mongoose.Types.ObjectId(req.params.subscriptionId),
@@ -215,7 +291,7 @@ router.post('/api/platform/subscriptions/:subscriptionId/renew', async (req: any
 });
 
 // ============ INVOICES ============
-router.get('/api/platform/invoices', async (req: any, res: any) => {
+router.get('/invoices', async (req: any, res: any) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -226,7 +302,7 @@ router.get('/api/platform/invoices', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/invoices/:invoiceId', async (req: any, res: any) => {
+router.get('/invoices/:invoiceId', async (req: any, res: any) => {
   try {
     const invoice = await billingService.getInvoice(new mongoose.Types.ObjectId(req.params.invoiceId));
     res.json(invoice);
@@ -235,7 +311,7 @@ router.get('/api/platform/invoices/:invoiceId', async (req: any, res: any) => {
   }
 });
 
-router.post('/api/platform/invoices/generate', async (req: any, res: any) => {
+router.post('/invoices/generate', async (req: any, res: any) => {
   try {
     const invoices = await billingService.generateMonthlyInvoices();
     res.json({ generated: invoices.length, invoices });
@@ -244,7 +320,7 @@ router.post('/api/platform/invoices/generate', async (req: any, res: any) => {
   }
 });
 
-router.post('/api/platform/invoices/:invoiceId/void', async (req: any, res: any) => {
+router.post('/invoices/:invoiceId/void', async (req: any, res: any) => {
   try {
     const voided = await billingService.voidInvoice(
       new mongoose.Types.ObjectId(req.params.invoiceId),
@@ -257,7 +333,7 @@ router.post('/api/platform/invoices/:invoiceId/void', async (req: any, res: any)
 });
 
 // ============ PAYMENTS ============
-router.get('/api/platform/payments', async (req: any, res: any) => {
+router.get('/payments', async (req: any, res: any) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -268,7 +344,7 @@ router.get('/api/platform/payments', async (req: any, res: any) => {
   }
 });
 
-router.post('/api/platform/payments', async (req: any, res: any) => {
+router.post('/payments', async (req: any, res: any) => {
   try {
     const payment = await paymentService.recordPayment({
       tenantId: new mongoose.Types.ObjectId(req.body.tenantId),
@@ -284,7 +360,7 @@ router.post('/api/platform/payments', async (req: any, res: any) => {
   }
 });
 
-router.post('/api/platform/payments/:paymentId/clear', async (req: any, res: any) => {
+router.post('/payments/:paymentId/clear', async (req: any, res: any) => {
   try {
     const cleared = await paymentService.clearPayment(
       new mongoose.Types.ObjectId(req.params.paymentId),
@@ -296,7 +372,7 @@ router.post('/api/platform/payments/:paymentId/clear', async (req: any, res: any
   }
 });
 
-router.get('/api/platform/payments/outstanding', async (req: any, res: any) => {
+router.get('/payments/outstanding', async (req: any, res: any) => {
   try {
     const outstanding = await paymentService.getOutstandingPayments();
     res.json(outstanding);
@@ -306,7 +382,7 @@ router.get('/api/platform/payments/outstanding', async (req: any, res: any) => {
 });
 
 // ============ SUPPORT TICKETS ============
-router.get('/api/platform/tickets', async (req: any, res: any) => {
+router.get('/tickets', async (req: any, res: any) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -321,7 +397,7 @@ router.get('/api/platform/tickets', async (req: any, res: any) => {
   }
 });
 
-router.post('/api/platform/tickets', async (req: any, res: any) => {
+router.post('/tickets', async (req: any, res: any) => {
   try {
     const ticket = await supportService.createTicket({
       tenantId: new mongoose.Types.ObjectId(req.body.tenantId),
@@ -337,7 +413,7 @@ router.post('/api/platform/tickets', async (req: any, res: any) => {
   }
 });
 
-router.post('/api/platform/tickets/:ticketId/assign', async (req: any, res: any) => {
+router.post('/tickets/:ticketId/assign', async (req: any, res: any) => {
   try {
     const assigned = await supportService.assignTicket(
       new mongoose.Types.ObjectId(req.params.ticketId),
@@ -350,7 +426,7 @@ router.post('/api/platform/tickets/:ticketId/assign', async (req: any, res: any)
   }
 });
 
-router.post('/api/platform/tickets/:ticketId/comment', async (req: any, res: any) => {
+router.post('/tickets/:ticketId/comment', async (req: any, res: any) => {
   try {
     const updated = await supportService.addComment(
       new mongoose.Types.ObjectId(req.params.ticketId),
@@ -363,7 +439,7 @@ router.post('/api/platform/tickets/:ticketId/comment', async (req: any, res: any
   }
 });
 
-router.post('/api/platform/tickets/:ticketId/resolve', async (req: any, res: any) => {
+router.post('/tickets/:ticketId/resolve', async (req: any, res: any) => {
   try {
     const resolved = await supportService.resolveTicket(
       new mongoose.Types.ObjectId(req.params.ticketId),
@@ -376,7 +452,7 @@ router.post('/api/platform/tickets/:ticketId/resolve', async (req: any, res: any
   }
 });
 
-router.post('/api/platform/tickets/:ticketId/close', async (req: any, res: any) => {
+router.post('/tickets/:ticketId/close', async (req: any, res: any) => {
   try {
     const closed = await supportService.closeTicket(
       new mongoose.Types.ObjectId(req.params.ticketId),
@@ -388,7 +464,7 @@ router.post('/api/platform/tickets/:ticketId/close', async (req: any, res: any) 
   }
 });
 
-router.get('/api/platform/tickets/overdue', async (req: any, res: any) => {
+router.get('/tickets/overdue', async (req: any, res: any) => {
   try {
     const overdue = await supportService.getOverdueTickets();
     res.json(overdue);
@@ -398,7 +474,7 @@ router.get('/api/platform/tickets/overdue', async (req: any, res: any) => {
 });
 
 // ============ ANALYTICS (STEP 31-32) ============
-router.get('/api/platform/analytics/mrr', async (req: any, res: any) => {
+router.get('/analytics/mrr', async (req: any, res: any) => {
   try {
     const mrr = await analyticsService.getMRR();
     res.json(mrr);
@@ -407,7 +483,7 @@ router.get('/api/platform/analytics/mrr', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/analytics/arr', async (req: any, res: any) => {
+router.get('/analytics/arr', async (req: any, res: any) => {
   try {
     const arr = await analyticsService.getARR();
     res.json({ arr });
@@ -416,7 +492,7 @@ router.get('/api/platform/analytics/arr', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/analytics/arpu', async (req: any, res: any) => {
+router.get('/analytics/arpu', async (req: any, res: any) => {
   try {
     const arpu = await analyticsService.getARPU();
     res.json(arpu);
@@ -425,7 +501,7 @@ router.get('/api/platform/analytics/arpu', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/analytics/growth', async (req: any, res: any) => {
+router.get('/analytics/growth', async (req: any, res: any) => {
   try {
     const months = parseInt(req.query.months) || 12;
     const growth = await analyticsService.getTenantGrowth(months);
@@ -435,7 +511,7 @@ router.get('/api/platform/analytics/growth', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/analytics/churn', async (req: any, res: any) => {
+router.get('/analytics/churn', async (req: any, res: any) => {
   try {
     const churn = await analyticsService.getChurnRate();
     res.json(churn);
@@ -444,7 +520,7 @@ router.get('/api/platform/analytics/churn', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/analytics/revenue-by-plan', async (req: any, res: any) => {
+router.get('/analytics/revenue-by-plan', async (req: any, res: any) => {
   try {
     const revenue = await analyticsService.getRevenueByPlan();
     res.json(revenue);
@@ -453,7 +529,7 @@ router.get('/api/platform/analytics/revenue-by-plan', async (req: any, res: any)
   }
 });
 
-router.get('/api/platform/analytics/collection-rate', async (req: any, res: any) => {
+router.get('/analytics/collection-rate', async (req: any, res: any) => {
   try {
     const rate = await analyticsService.getPaymentCollectionRate();
     res.json(rate);
@@ -462,7 +538,7 @@ router.get('/api/platform/analytics/collection-rate', async (req: any, res: any)
   }
 });
 
-router.get('/api/platform/analytics/ltv', async (req: any, res: any) => {
+router.get('/analytics/ltv', async (req: any, res: any) => {
   try {
     const ltv = await analyticsService.getLifetimeValue();
     res.json(ltv);
@@ -472,7 +548,7 @@ router.get('/api/platform/analytics/ltv', async (req: any, res: any) => {
 });
 
 // ============ SLA MONITORING (STEP 33-34) ============
-router.get('/api/platform/sla/breached', async (req: any, res: any) => {
+router.get('/sla/breached', async (req: any, res: any) => {
   try {
     const breached = await slaMonitoringService.getBreachedSLAs();
     res.json(breached);
@@ -481,7 +557,7 @@ router.get('/api/platform/sla/breached', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/sla/metrics', async (req: any, res: any) => {
+router.get('/sla/metrics', async (req: any, res: any) => {
   try {
     const metrics = await slaMonitoringService.getSLAMetrics();
     res.json(metrics);
@@ -490,7 +566,7 @@ router.get('/api/platform/sla/metrics', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/sla/summary', async (req: any, res: any) => {
+router.get('/sla/summary', async (req: any, res: any) => {
   try {
     const summary = await slaMonitoringService.getSLASummary();
     res.json(summary);
@@ -499,7 +575,7 @@ router.get('/api/platform/sla/summary', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/sla/by-priority', async (req: any, res: any) => {
+router.get('/sla/by-priority', async (req: any, res: any) => {
   try {
     const byPriority = await slaMonitoringService.getSLAByPriority();
     res.json(byPriority);
@@ -508,7 +584,7 @@ router.get('/api/platform/sla/by-priority', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/sla/response-time', async (req: any, res: any) => {
+router.get('/sla/response-time', async (req: any, res: any) => {
   try {
     const stats = await slaMonitoringService.getResponseTimeStats();
     res.json(stats);
@@ -517,7 +593,7 @@ router.get('/api/platform/sla/response-time', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/sla/resolution-time', async (req: any, res: any) => {
+router.get('/sla/resolution-time', async (req: any, res: any) => {
   try {
     const stats = await slaMonitoringService.getResolutionTimeStats();
     res.json(stats);
@@ -526,7 +602,7 @@ router.get('/api/platform/sla/resolution-time', async (req: any, res: any) => {
   }
 });
 
-router.post('/api/platform/sla/escalate', async (req: any, res: any) => {
+router.post('/sla/escalate', async (req: any, res: any) => {
   try {
     const escalated = await slaMonitoringService.escalateBreachedTickets();
     res.json({ escalated: escalated.length, tickets: escalated });
@@ -536,7 +612,7 @@ router.post('/api/platform/sla/escalate', async (req: any, res: any) => {
 });
 
 // ============ COMPLIANCE (STEP 35-36) ============
-router.get('/api/platform/compliance/audit-log', async (req: any, res: any) => {
+router.get('/compliance/audit-log', async (req: any, res: any) => {
   try {
     const days = parseInt(req.query.days) || 30;
     const startDate = new Date();
@@ -550,7 +626,7 @@ router.get('/api/platform/compliance/audit-log', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/compliance/data-access', async (req: any, res: any) => {
+router.get('/compliance/data-access', async (req: any, res: any) => {
   try {
     const days = parseInt(req.query.days) || 30;
     const report = await complianceService.getDataAccessReport(days);
@@ -560,7 +636,7 @@ router.get('/api/platform/compliance/data-access', async (req: any, res: any) =>
   }
 });
 
-router.get('/api/platform/compliance/data-integrity', async (req: any, res: any) => {
+router.get('/compliance/data-integrity', async (req: any, res: any) => {
   try {
     const report = await complianceService.getDataIntegrityReport();
     res.json(report);
@@ -569,7 +645,7 @@ router.get('/api/platform/compliance/data-integrity', async (req: any, res: any)
   }
 });
 
-router.get('/api/platform/compliance/security-audit', async (req: any, res: any) => {
+router.get('/compliance/security-audit', async (req: any, res: any) => {
   try {
     const days = parseInt(req.query.days) || 30;
     const report = await complianceService.getSecurityAuditReport(days);
@@ -579,7 +655,7 @@ router.get('/api/platform/compliance/security-audit', async (req: any, res: any)
   }
 });
 
-router.get('/api/platform/compliance/checklist', async (req: any, res: any) => {
+router.get('/compliance/checklist', async (req: any, res: any) => {
   try {
     const checklist = await complianceService.getComplianceChecklist();
     res.json(checklist);
@@ -588,7 +664,7 @@ router.get('/api/platform/compliance/checklist', async (req: any, res: any) => {
   }
 });
 
-router.get('/api/platform/compliance/report', async (req: any, res: any) => {
+router.get('/compliance/report', async (req: any, res: any) => {
   try {
     const format = req.query.format || 'json';
     const report = await complianceService.generateComplianceReport(format);
@@ -599,7 +675,7 @@ router.get('/api/platform/compliance/report', async (req: any, res: any) => {
 });
 
 // ============ NOTIFICATIONS (STEP 37-39) ============
-router.post('/api/platform/notifications/send', async (req: any, res: any) => {
+router.post('/notifications/send', async (req: any, res: any) => {
   try {
     const { recipient, subject, message } = req.body;
     // Direct notification (not batch)
@@ -610,7 +686,7 @@ router.post('/api/platform/notifications/send', async (req: any, res: any) => {
   }
 });
 
-router.post('/api/platform/notifications/batch', async (req: any, res: any) => {
+router.post('/notifications/batch', async (req: any, res: any) => {
   try {
     const { notifications } = req.body;
     const results = await notificationService.sendBatchNotifications(notifications);
