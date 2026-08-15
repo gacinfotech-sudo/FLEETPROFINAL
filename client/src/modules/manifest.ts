@@ -6,6 +6,7 @@
 export const SAAS_ADMIN_MODULES = [
   { id: 'saas-dashboard', label: 'Dashboard', iconKey: 'dashboard', parentGroup: 'saas' },
   { id: 'saas-tenants', label: 'Tenants', iconKey: 'customers', parentGroup: 'saas' },
+  { id: 'saas-platform-admins', label: 'Platform Admins', iconKey: 'users', parentGroup: 'saas' },
   { id: 'saas-plans', label: 'Plans', iconKey: 'alert', parentGroup: 'saas' },
   { id: 'saas-subscriptions', label: 'Subscriptions', iconKey: 'booking', parentGroup: 'saas' },
   { id: 'saas-billing', label: 'Billing', iconKey: 'revenue', parentGroup: 'saas' },
@@ -152,7 +153,7 @@ export function getNavigationStructure(role?: string, permissions?: string[], pl
     id: 'saas-platform',
     label: 'SaaS Platform Admin',
     iconKey: 'dashboard',
-    children: ['saas-dashboard', 'saas-tenants', 'saas-plans', 'saas-subscriptions', 'saas-billing', 'saas-support', 'saas-profile', 'saas-security']
+    children: ['saas-dashboard', 'saas-tenants', 'saas-platform-admins', 'saas-plans', 'saas-subscriptions', 'saas-billing', 'saas-support', 'saas-profile', 'saas-security']
   };
 
   // Filter based on role and permissions

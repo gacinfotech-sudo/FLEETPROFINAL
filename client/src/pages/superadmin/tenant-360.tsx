@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRoute } from 'wouter';
+import TenantUsersTab from '@/components/superadmin/tenant-users';
 
 export default function Tenant360() {
   const [match, params] = useRoute('/superadmin/tenants/:tenantId');
@@ -131,28 +132,13 @@ export default function Tenant360() {
         )}
 
         {activeTab === 'users' && (
-          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="px-6 py-3 text-left text-sm font-semibold">Name</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold">Email</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold">Role</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tenant.users?.map(user => (
-                  <tr key={user.id} className="border-b hover:bg-gray-50">
-                    <td className="px-6 py-4">{user.name}</td>
-                    <td className="px-6 py-4">{user.email}</td>
-                    <td className="px-6 py-4"><span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">{user.role}</span></td>
-                    <td className="px-6 py-4"><span className="text-green-600">Active</span></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TenantUsersTab
+            tenantId={params?.tenantId}
+            tenantName={tenant.overview?.name}
+            onUserCreated={() => {
+              // Refresh tenant data if needed
+            }}
+          />
         )}
 
         {activeTab === 'billing' && (

@@ -55,6 +55,7 @@ import SuperAdminSubscriptions from "./pages/superadmin/subscriptions";
 import SuperAdminBilling from "./pages/superadmin/billing";
 import SuperAdminSupportTickets from "./pages/superadmin/support-tickets";
 import SuperAdminErrorReports from "./pages/superadmin/error-reports";
+import SuperAdminUsers from "./pages/superadmin/users";
 
 // Phase 3 WAVE Pages
 import NotificationsAnalytics from "./pages/notifications-analytics";
@@ -247,6 +248,11 @@ function AuthenticatedApp() {
       <Route path="/superadmin/errors">
         <ProtectedRoute requiredRole="admin">
           <SuperAdminErrorReports />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/superadmin/platform-admins">
+        <ProtectedRoute requiredRole="admin">
+          <SuperAdminUsers />
         </ProtectedRoute>
       </Route>
       <Route path="/superadmin/company-profile">
