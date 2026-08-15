@@ -289,13 +289,6 @@ function AuthenticatedApp() {
         </ProtectedRoute>
       </Route>
 
-      {/* Platform Admin 360 - Root/Super Admin */}
-      <Route path="/platform-admin">
-        <ProtectedRoute requiredRole="admin">
-          <PlatformAdmin360 />
-        </ProtectedRoute>
-      </Route>
-
       {/* Operations Center - Command Center */}
       <Route path="/operations">
         <ProtectedRoute allowedRoles={["client", "manager"]}>
