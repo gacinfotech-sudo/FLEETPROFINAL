@@ -19,7 +19,17 @@
     "test:health": "MONITOR_DURATION=60 tsx tests/health-monitor-autofix.ts",
     "test:orchestrate": "tsx tests/test-orchestrator.ts",
     "test:orchestrate:verbose": "tsx tests/test-orchestrator.ts --verbose",
-    "test:all": "npm run test:orchestrate"
+    "test:all": "npm run test:orchestrate",
+    "test:regression": "playwright test",
+    "test:regression:auth": "playwright test test/auth.spec.ts",
+    "test:regression:admin": "playwright test test/platform-admin.spec.ts",
+    "test:regression:core": "playwright test test/tenant-core.spec.ts",
+    "test:regression:integrity": "playwright test test/data-integrity.spec.ts",
+    "test:regression:isolation": "playwright test test/multi-tenant.spec.ts",
+    "test:regression:errors": "playwright test test/error-handling.spec.ts",
+    "test:regression:reports": "playwright test test/reports-dashboard.spec.ts",
+    "test:regression:coverage": "playwright test --reporter=json",
+    "test:regression:ui": "playwright test --ui"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
