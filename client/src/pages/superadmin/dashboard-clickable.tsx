@@ -22,10 +22,23 @@ export default function SuperAdminDashboard() {
     fetch('/api/root/dashboard')
       .then(r => r.json())
       .then(data => {
-        setStats(data);
+        setStats({
+          totalTenants: data.tenants?.total || 0,
+          activeTenants: data.tenants?.active || 0,
+          trialTenants: data.tenants?.trial || 0,
+          lockedTenants: data.tenants?.suspended || 0,
+          monthlyRevenue: data.revenue?.total || 0,
+          openTickets: data.support?.open || 0,
+          criticalErrors: data.errors?.critical || 0,
+          paymentsDue: data.billing?.paymentsDue || 0,
+          renewalsDue: data.billing?.renewalsDue || 0,
+        });
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(err => {
+        console.error('Error fetching dashboard:', err);
+        setLoading(false);
+      });
   }, []);
 
   if (loading) {
