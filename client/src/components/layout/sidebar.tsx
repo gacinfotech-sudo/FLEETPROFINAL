@@ -7,7 +7,7 @@ import GlobalCustomerSearch from "@/components/customers/global-customer-search"
 import { ThemeToggle } from "@/components/theme-toggle";
 // The final-canonical merge brought back this manifest-driven sidebar but
 // dropped the import that feeds it.
-import { TENANT_MODULES, SAAS_ADMIN_MODULES, getNavigationStructure } from "@/modules/manifest";
+import { TENANT_MODULES, getNavigationStructure } from "@/modules/manifest";
 import { ShieldCheck } from "lucide-react";
 
 interface SidebarProps {

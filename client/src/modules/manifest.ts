@@ -2,16 +2,6 @@
 // Combines tenant operations with admin panel features
 
 // SaaS Admin Features for Tenant Admins
-export const SAAS_ADMIN_MODULES = [
-  { id: 'saas-dashboard', label: 'Dashboard', iconKey: 'dashboard', parentGroup: 'saas' },
-  { id: 'saas-tenants', label: 'Tenants', iconKey: 'customers', parentGroup: 'saas' },
-  { id: 'saas-plans', label: 'Plans', iconKey: 'alert', parentGroup: 'saas' },
-  { id: 'saas-subscriptions', label: 'Subscriptions', iconKey: 'booking', parentGroup: 'saas' },
-  { id: 'saas-billing', label: 'Billing', iconKey: 'revenue', parentGroup: 'saas' },
-  { id: 'saas-support', label: 'Support', iconKey: 'contact', parentGroup: 'saas' },
-  { id: 'saas-profile', label: 'Profile', iconKey: 'profile', parentGroup: 'saas' },
-  { id: 'saas-errors', label: 'Errors', iconKey: 'alert', parentGroup: 'saas' },
-];
 
 export const TENANT_MODULES = [
   // Dashboard
