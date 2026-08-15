@@ -75,7 +75,7 @@ import vehicleTrackingRouter from "./routes/vehicle-tracking";
 import safetyIncidentsRouter from "./routes/safety-incidents";
 import loyaltyRewardsRouter from "./routes/loyalty-rewards";
 import adminDashboardRouter from "./routes/admin-dashboard";
-import tenantAdminRouter from "./admin/routes";
+// DELETED: import tenantAdminRouter from "./admin/routes"; (orphaned route, cleanup 2026-08-16)
 import superadminRouter from "./routes/superadmin";
 import plansRouter from "./routes/plans";
 import subscriptionsRouter from "./routes/subscriptions";
@@ -224,20 +224,9 @@ import { registerVehicleFastagRoutes } from "./vehicle/fastag/routes";
 import { registerVehicleIncidentRoutes } from "./vehicle/incidents/routes";
 import { registerVehicleInspectionRoutes } from "./vehicle/inspections/routes";
 // Root Control Plane (Wave 1) additive imports — new /api/root/** namespace
-// only, no existing route/import in this file was touched. See
-// docs/root-control-plane/ROOT-INTEGRATION-report.md for the full mount list.
+// NOTE: Orphaned route imports removed (legacy SaaS cleanup 2026-08-16)
+// Fresh Platform routes will be added separately when implemented
 import { isPlatformRole } from "./root/types";
-import { registerRootDashboardRoutes } from "./root/routes/dashboard";
-import { registerRootTenantRoutes } from "./root/routes/tenants";
-import { registerPlatformTenantRoutes } from "./root/routes/platform-tenants";
-import { registerRootCustomerRoutes } from "./root/routes/customers";
-import { securityRouter } from "./root/routes/security";
-import { auditRouter } from "./root/routes/audit";
-import { registerSupportRoutes } from "./root/routes/support";
-import { registerErrorRoutes } from "./root/routes/errors";
-import { registerSalesRoutes } from "./root/routes/sales";
-import { registerConfigRoutes } from "./root/routes/config";
-import { registerFeatureFlagRoutes } from "./root/routes/features";
 import { resolveOwnFleetEligibility } from "./vehicle/core/ownFleetEligibility";
 
 // Statuses where the booking has been financially finalized — further
@@ -611,19 +600,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // never a second booking store.
   registerOperationsRoutes(app);
 
-  // Root Control Plane (Wave 1) additive registration — new /api/root/**
-  // namespace only. See docs/root-control-plane/ROOT-INTEGRATION-report.md.
-  registerRootDashboardRoutes(app);
-  registerRootTenantRoutes(app);
-  registerPlatformTenantRoutes(app);
-  registerRootCustomerRoutes(app);
-  app.use('/api/root', authenticateUser, securityRouter);
-  app.use('/api/root', authenticateUser, auditRouter);
-  registerSupportRoutes(app);
-  registerErrorRoutes(app);
-  registerSalesRoutes(app);
-  registerConfigRoutes(app);
-  registerFeatureFlagRoutes(app);
+  // LEGACY SAAS CLEANUP (2026-08-16): Orphaned route registrations removed
+  // Fresh Platform routes will be registered separately when implemented
+  // All routes below were never actually wired into the live API
+  // (imports were broken, functions were never called in app flow)
+  // NOTE: isPlatformRole from ./root/types.ts is still imported and used above
 
   // Multer configuration for logo uploads
   const logoStorage = multer.diskStorage({
@@ -9388,8 +9369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register admin dashboard API routes
   app.use("/api/admin", adminDashboardRouter);
 
-  // Register tenant admin API routes (Phase 14: Multi-Tenant Admin)
-  app.use("/api/admin", tenantAdminRouter);
+  // DELETED: Tenant admin routes (orphaned, cleanup 2026-08-16)
 
   // Register super admin portal routes (Phase 1: SaaS Control Layer)
   app.use("/api/superadmin", superadminRouter);
