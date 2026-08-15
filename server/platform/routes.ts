@@ -14,6 +14,10 @@ import { billingService } from './billing/billingService';
 import { paymentService } from './payments/paymentService';
 import { supportService } from './support/supportService';
 import { dashboardService } from './dashboard/dashboardService';
+import { analyticsService } from './analytics/analyticsService';
+import { slaMonitoringService } from './sla/slaMonitoringService';
+import { complianceService } from './compliance/complianceService';
+import { notificationService } from './notifications/notificationService';
 
 const router = Router();
 
@@ -388,6 +392,229 @@ router.get('/api/platform/tickets/overdue', async (req: any, res: any) => {
   try {
     const overdue = await supportService.getOverdueTickets();
     res.json(overdue);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ ANALYTICS (STEP 31-32) ============
+router.get('/api/platform/analytics/mrr', async (req: any, res: any) => {
+  try {
+    const mrr = await analyticsService.getMRR();
+    res.json(mrr);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/analytics/arr', async (req: any, res: any) => {
+  try {
+    const arr = await analyticsService.getARR();
+    res.json({ arr });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/analytics/arpu', async (req: any, res: any) => {
+  try {
+    const arpu = await analyticsService.getARPU();
+    res.json(arpu);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/analytics/growth', async (req: any, res: any) => {
+  try {
+    const months = parseInt(req.query.months) || 12;
+    const growth = await analyticsService.getTenantGrowth(months);
+    res.json(growth);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/analytics/churn', async (req: any, res: any) => {
+  try {
+    const churn = await analyticsService.getChurnRate();
+    res.json(churn);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/analytics/revenue-by-plan', async (req: any, res: any) => {
+  try {
+    const revenue = await analyticsService.getRevenueByPlan();
+    res.json(revenue);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/analytics/collection-rate', async (req: any, res: any) => {
+  try {
+    const rate = await analyticsService.getPaymentCollectionRate();
+    res.json(rate);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/analytics/ltv', async (req: any, res: any) => {
+  try {
+    const ltv = await analyticsService.getLifetimeValue();
+    res.json(ltv);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ SLA MONITORING (STEP 33-34) ============
+router.get('/api/platform/sla/breached', async (req: any, res: any) => {
+  try {
+    const breached = await slaMonitoringService.getBreachedSLAs();
+    res.json(breached);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/sla/metrics', async (req: any, res: any) => {
+  try {
+    const metrics = await slaMonitoringService.getSLAMetrics();
+    res.json(metrics);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/sla/summary', async (req: any, res: any) => {
+  try {
+    const summary = await slaMonitoringService.getSLASummary();
+    res.json(summary);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/sla/by-priority', async (req: any, res: any) => {
+  try {
+    const byPriority = await slaMonitoringService.getSLAByPriority();
+    res.json(byPriority);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/sla/response-time', async (req: any, res: any) => {
+  try {
+    const stats = await slaMonitoringService.getResponseTimeStats();
+    res.json(stats);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/sla/resolution-time', async (req: any, res: any) => {
+  try {
+    const stats = await slaMonitoringService.getResolutionTimeStats();
+    res.json(stats);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/api/platform/sla/escalate', async (req: any, res: any) => {
+  try {
+    const escalated = await slaMonitoringService.escalateBreachedTickets();
+    res.json({ escalated: escalated.length, tickets: escalated });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ COMPLIANCE (STEP 35-36) ============
+router.get('/api/platform/compliance/audit-log', async (req: any, res: any) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    const endDate = new Date();
+
+    const report = await complianceService.getAuditLogReport(startDate, endDate);
+    res.json(report);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/compliance/data-access', async (req: any, res: any) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const report = await complianceService.getDataAccessReport(days);
+    res.json(report);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/compliance/data-integrity', async (req: any, res: any) => {
+  try {
+    const report = await complianceService.getDataIntegrityReport();
+    res.json(report);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/compliance/security-audit', async (req: any, res: any) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const report = await complianceService.getSecurityAuditReport(days);
+    res.json(report);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/compliance/checklist', async (req: any, res: any) => {
+  try {
+    const checklist = await complianceService.getComplianceChecklist();
+    res.json(checklist);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/api/platform/compliance/report', async (req: any, res: any) => {
+  try {
+    const format = req.query.format || 'json';
+    const report = await complianceService.generateComplianceReport(format);
+    res.json(report);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============ NOTIFICATIONS (STEP 37-39) ============
+router.post('/api/platform/notifications/send', async (req: any, res: any) => {
+  try {
+    const { recipient, subject, message } = req.body;
+    // Direct notification (not batch)
+    await notificationService.notifyInvoiceGenerated(recipient, subject, 0);
+    res.json({ sent: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/api/platform/notifications/batch', async (req: any, res: any) => {
+  try {
+    const { notifications } = req.body;
+    const results = await notificationService.sendBatchNotifications(notifications);
+    res.json({ sent: results.filter((r: any) => r.success).length, total: results.length });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
