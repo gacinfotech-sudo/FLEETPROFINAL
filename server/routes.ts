@@ -12225,11 +12225,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calculate revenue (sum monthlyRevenue from all tenants)
       const monthlyRevenue = tenants.reduce((sum: number, t: any) => sum + (t.monthlyRevenue || 0), 0);
 
-      // Get metrics from aggregated data
-      const openTickets = 0; // TODO: query from tickets table when implemented
-      const criticalErrors = 0; // TODO: query from error logs when implemented
-      const paymentDue = 0; // TODO: query from subscriptions when implemented
-      const renewalsDue = 0; // TODO: query from subscriptions when implemented
+      // Get real metrics from database
+      const db = await storage.getDb();
+
+      // Count open support tickets
+      const openTickets = await db.collection('support_tickets')
+        .countDocuments({ status: { $in: ['open', 'pending'] } })
+        .catch(() => 0);
+
+      // Count critical errors (high severity)
+      const criticalErrors = await db.collection('error_logs')
+        .countDocuments({ severity: 'critical', resolved: false })
+        .catch(() => 0);
+
+      // Count pending payments (overdue invoices)
+      const paymentDue = await db.collection('bookingPayments')
+        .countDocuments({ status: 'pending', dueDate: { $lt: new Date() } })
+        .catch(() => 0);
+
+      // Count subscriptions due for renewal (within 30 days)
+      const renewalDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const renewalsDue = await db.collection('subscriptions')
+        .countDocuments({ renew_date: { $lte: renewalDate, $gte: new Date() } })
+        .catch(() => 0);
 
       res.json({
         totalTenants,
