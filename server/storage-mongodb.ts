@@ -201,19 +201,26 @@ export class MongoDBStorage implements IStorage {
   // Auth methods
   async getUserByCredentials(userId: string, password: string): Promise<IUser | undefined> {
     try {
-      // userId is always stored lowercase (see createUser); matching the same
-      // way lets this use the {userId: 1} index instead of an unindexed
-      // case-insensitive regex scan of the whole collection.
-      const user = await User.findOne({
+      // Use MongoDB driver to handle string tenantId from data restoration
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('users');
+
+      const user = await collection.findOne({
         userId: userId.toLowerCase()
-      }).populate('tenantId');
+      }) as unknown as any;
 
       if (!user) return undefined;
 
       // Password remains case-sensitive
       const isValidPassword = await bcrypt.compare(password, user.password);
       if (!isValidPassword) return undefined;
-      return user;
+
+      // Map _id to id for backward compatibility with routes code
+      if (user._id && !user.id) {
+        user.id = user._id.toString();
+      }
+
+      return user as IUser;
     } catch (error) {
       console.error('Error getting user by credentials:', error);
       return undefined;
@@ -283,11 +290,20 @@ export class MongoDBStorage implements IStorage {
 
   async getUserBySessionId(sessionId: string): Promise<IUser | undefined> {
     try {
-      const user = await User.findOne({
+      // Use MongoDB driver to handle string tenantId from data restoration
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('users');
+
+      const user = await collection.findOne({
         $or: [{ sessionId }, { 'activeSessions.sessionId': sessionId }],
-      }).populate('tenantId') || undefined;
+      }) as unknown as any;
 
       if (user) {
+        // Map _id to id for backward compatibility
+        if (user._id && !user.id) {
+          user.id = user._id.toString();
+        }
+
         console.log('User loaded by sessionId:', {
           userId: user.userId,
           role: user.role,
@@ -296,7 +312,7 @@ export class MongoDBStorage implements IStorage {
         });
       }
 
-      return user;
+      return user as IUser || undefined;
     } catch (error) {
       // SA-01 root cause: this previously swallowed every error (including a
       // transient MongoDB disconnect/reconnect blip — this app's session
@@ -453,14 +469,21 @@ export class MongoDBStorage implements IStorage {
       const collection = db.collection('users');
 
       // Try by _id first (for both ObjectId and string _id)
-      let user = await collection.findOne({_id: id}) as unknown as IUser;
+      let user = await collection.findOne({_id: id}) as unknown as any;
 
       // If not found by _id and id looks like userId, search by userId
       if (!user) {
-        user = await collection.findOne({userId: id}) as unknown as IUser;
+        user = await collection.findOne({userId: id}) as unknown as any;
       }
 
-      return user || undefined;
+      if (!user) return undefined;
+
+      // Map _id to id for backward compatibility with routes code
+      if (user._id && !user.id) {
+        user.id = user._id.toString();
+      }
+
+      return user as IUser || undefined;
     } catch (error) {
       console.error('Error getting user:', error);
       return undefined;
