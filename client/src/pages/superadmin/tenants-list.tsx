@@ -8,10 +8,10 @@ export default function TenantsList() {
 
   useEffect(() => {
     // Fetch tenants from API
-    fetch('/api/saas/tenants')
+    fetch('/api/platform/tenants')
       .then(r => r.json())
       .then(data => {
-        setTenants(data.tenants || []);
+        setTenants(Array.isArray(data) ? data : data.tenants || []);
         setLoading(false);
       })
       .catch(err => {

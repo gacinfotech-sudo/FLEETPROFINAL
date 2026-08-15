@@ -50,9 +50,9 @@ export default function TenantUsersTab({
       setLoading(true);
       // Try multiple endpoints to find tenant users
       const endpoints = [
+        `/api/platform/tenants/${tenantId}/users`,
         `/api/root/tenants/${tenantId}/tabs/users`,
         `/api/admin/tenants/${tenantId}/users`,
-        `/api/saas/tenants/${tenantId}/users`,
       ];
 
       let data = null;

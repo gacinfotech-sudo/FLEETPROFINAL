@@ -10,7 +10,7 @@ export default function Tenant360() {
 
   useEffect(() => {
     if (params?.tenantId) {
-      fetch(`/api/saas/tenants/${params.tenantId}`)
+      fetch(`/api/platform/tenants/${params.tenantId}`)
         .then(r => r.json())
         .then(data => {
           setTenant(data);
