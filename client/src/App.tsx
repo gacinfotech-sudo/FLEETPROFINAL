@@ -40,7 +40,6 @@ import FeatureFlagsPage from "./pages/root/feature-flags";
 import SupportAccessBanner from "@/components/root/support-access-banner";
 import DriverPayrollDashboard from "./pages/driver-payroll-dashboard";
 import VendorSettlementPortal from "./pages/vendor-settlement-portal";
-import PlatformAdmin360 from "./pages/platform-admin-360";
 import OperationsCenter from "./pages/operations-center";
 import LiveBookings from "./pages/live-bookings";
 import UpcomingBookings from "./pages/upcoming-bookings";
@@ -84,7 +83,6 @@ import WhatsAppTemplateEditor from "./pages/whatsapp-template-editor";
 import WhatsAppTemplateHistory from "./pages/whatsapp-template-history";
 import WhatsAppApprovalQueue from "./pages/whatsapp-approval-queue";
 import WhatsAppApprovalConfig from "./pages/whatsapp-approval-config";
-import SaaSAdminDashboard from "./pages/saas-admin-dashboard";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
