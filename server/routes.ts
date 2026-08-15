@@ -81,7 +81,7 @@ import plansRouter from "./routes/plans";
 import subscriptionsRouter from "./routes/subscriptions";
 import entitlementsRouter from "./routes/entitlements";
 import billingRouter from "./routes/billing";
-import supportRouter from "./routes/support";
+import platformRoutes from "./platform/routes";
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -9248,6 +9248,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch vendor ratings" });
     }
   });
+
+  // ========== PLATFORM CONTROL PLANE (FRESH SaaS ARCHITECTURE) ==========
+  // STEPS 16-25: Subscription management + Billing + Support + Invoicing
+  app.use("/api/platform", platformRoutes);
 
   // Register recommendations API routes
   app.use("/api/recommendations", recommendationsRouter);
