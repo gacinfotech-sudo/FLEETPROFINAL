@@ -146,6 +146,51 @@ app.use((req, res, next) => {
     // Silently continue if migration fails
   }
 
+  // Initialize database with default data if empty
+  try {
+    console.log("🔄 Checking database initialization...");
+
+    // Check if root user exists
+    let rootUser = await storage.getUser('fleet_root_admin_1d2af76b');
+    if (!rootUser) {
+      // Create root user with default password
+      const hashedPassword = await bcrypt.hash('Change@123', 12);
+      rootUser = await storage.createUser({
+        userId: 'fleet_root_admin_1d2af76b',
+        email: 'fleet_root_admin_1d2af76b@fleetpro.local',
+        passwordHash: hashedPassword,
+        platformRole: 'PLATFORM_ROOT',
+        name: 'Root Admin',
+        status: 'ACTIVE',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      console.log("✅ Root user created during initialization");
+    }
+
+    // Check if platform company exists
+    const companies = await storage.getCompanies?.() || [];
+    if (!companies || companies.length === 0) {
+      try {
+        const platformCompany = await storage.createPlatformCompany({
+          name: 'FleetPro Platform',
+          status: 'ACTIVE',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        console.log("✅ Platform company initialized");
+      } catch (err) {
+        // Platform company creation may fail if schema doesn't support it
+        console.log("ℹ️  Platform company initialization skipped (not applicable)");
+      }
+    }
+
+    console.log("✅ Database initialization complete");
+  } catch (error) {
+    console.error("Database initialization error:", error instanceof Error ? error.message : error);
+    // Don't throw - allow app to continue even if initialization fails
+  }
+
   // Dashboard route - serve dashboard.html directly
   app.get('/dashboard.html', (req, res) => {
     const dashboardPath = path.join(__dirname, '../public/dashboard.html');
