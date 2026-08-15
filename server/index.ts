@@ -91,12 +91,6 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: false }));
 app.use(correlationIdMiddleware);
 
-// DIAGNOSTIC FINGERPRINT: FLEETPRO-RUNTIME-PROOF-001 (Commit: 362cf64, Built: recovery/saas-final-integration)
-app.use((req, res, next) => {
-  res.setHeader('X-FleetPro-Runtime', 'FLEETPRO-RUNTIME-PROOF-001-COMMIT-362cf64');
-  next();
-});
-
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
