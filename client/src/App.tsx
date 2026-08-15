@@ -10,8 +10,18 @@ import ErrorBoundary from "@/components/error-boundary";
 import LandingPage from "./pages/landing";
 import LoginPage from "./pages/login";
 import AdminPanel from "./pages/admin-panel";
-import AdminDashboard from "./pages/admin-dashboard";
 import Dashboard from "./pages/dashboard";
+
+// SaaS Admin Pages
+import SuperAdminDashboard from "./pages/superadmin/dashboard-clickable";
+import SuperAdminTenantsList from "./pages/superadmin/tenants-list";
+import SuperAdminTenant360 from "./pages/superadmin/tenant-360";
+import SuperAdminPlans from "./pages/superadmin/plans";
+import SuperAdminSubscriptions from "./pages/superadmin/subscriptions";
+import SuperAdminBilling from "./pages/superadmin/billing";
+import SuperAdminSupportTickets from "./pages/superadmin/support-tickets";
+import SuperAdminErrorReports from "./pages/superadmin/error-reports";
+import SuperAdminCompanyProfile from "./pages/superadmin/company-profile";
 import TenantDashboard360 from "./pages/tenant-360";
 import Vehicle360Page from "./pages/vehicle-360";
 import ForcedPasswordResetPage from "./pages/forced-password-reset";
@@ -87,10 +97,50 @@ function AuthenticatedApp() {
         </ProtectedRoute>
       </Route>
 
-      {/* Tenant Admin Dashboard - shows tenant's own metrics */}
-      <Route path="/admin-dashboard">
+      {/* SaaS Admin Routes - Tenant Admin Panel */}
+      <Route path="/superadmin/dashboard">
         <ProtectedRoute requiredRole="admin">
-          <AdminDashboard />
+          <SuperAdminDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/superadmin/tenants/:tenantId">
+        <ProtectedRoute requiredRole="admin">
+          <SuperAdminTenant360 />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/superadmin/tenants">
+        <ProtectedRoute requiredRole="admin">
+          <SuperAdminTenantsList />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/superadmin/plans">
+        <ProtectedRoute requiredRole="admin">
+          <SuperAdminPlans />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/superadmin/subscriptions">
+        <ProtectedRoute requiredRole="admin">
+          <SuperAdminSubscriptions />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/superadmin/billing">
+        <ProtectedRoute requiredRole="admin">
+          <SuperAdminBilling />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/superadmin/support">
+        <ProtectedRoute requiredRole="admin">
+          <SuperAdminSupportTickets />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/superadmin/errors">
+        <ProtectedRoute requiredRole="admin">
+          <SuperAdminErrorReports />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/superadmin/company-profile">
+        <ProtectedRoute requiredRole="admin">
+          <SuperAdminCompanyProfile />
         </ProtectedRoute>
       </Route>
 

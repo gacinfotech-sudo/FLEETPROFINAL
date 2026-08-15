@@ -1,11 +1,21 @@
-// Tenant Module Manifest - Defines navigation structure and permissions
-// ADMIN/ROOT/SAAS navigation completely removed
-// Pure tenant-only structure
+// Tenant + SaaS Admin Manifest - Defines navigation structure
+// Combines tenant operations with admin panel features
+
+// SaaS Admin Features for Tenant Admins
+export const SAAS_ADMIN_MODULES = [
+  { id: 'saas-dashboard', label: 'Dashboard', iconKey: 'dashboard', parentGroup: 'saas' },
+  { id: 'saas-tenants', label: 'Tenants', iconKey: 'customers', parentGroup: 'saas' },
+  { id: 'saas-plans', label: 'Plans', iconKey: 'alert', parentGroup: 'saas' },
+  { id: 'saas-subscriptions', label: 'Subscriptions', iconKey: 'booking', parentGroup: 'saas' },
+  { id: 'saas-billing', label: 'Billing', iconKey: 'revenue', parentGroup: 'saas' },
+  { id: 'saas-support', label: 'Support', iconKey: 'contact', parentGroup: 'saas' },
+  { id: 'saas-profile', label: 'Profile', iconKey: 'profile', parentGroup: 'saas' },
+  { id: 'saas-errors', label: 'Errors', iconKey: 'alert', parentGroup: 'saas' },
+];
 
 export const TENANT_MODULES = [
   // Dashboard
   { id: 'dashboard', label: 'Dashboard', iconKey: 'dashboard', parentGroup: 'dashboard' },
-  { id: 'admin-dashboard', label: 'Admin Panel', iconKey: 'dashboard', parentGroup: 'dashboard' },
 
   // Customers Group
   { id: 'customers', label: 'All Customers', iconKey: 'customers', parentGroup: 'customers' },
@@ -131,7 +141,7 @@ export function getNavigationStructure(role?: string, permissions?: string[]): N
   ];
 
   // Filter based on role and permissions
-  // Tenant-side roles only (no platformRole / admin tier)
+  // Tenant-side roles only
   if (role === 'admin') {
     return groups; // Tenant admin sees all tenant operations
   }

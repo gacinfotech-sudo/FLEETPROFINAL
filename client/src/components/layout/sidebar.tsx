@@ -7,7 +7,8 @@ import GlobalCustomerSearch from "@/components/customers/global-customer-search"
 import { ThemeToggle } from "@/components/theme-toggle";
 // The final-canonical merge brought back this manifest-driven sidebar but
 // dropped the import that feeds it.
-import { TENANT_MODULES, getNavigationStructure } from "@/modules/manifest";
+import { TENANT_MODULES, SAAS_ADMIN_MODULES, getNavigationStructure } from "@/modules/manifest";
+import { ShieldCheck } from "lucide-react";
 
 interface SidebarProps {
   currentView: string;
@@ -193,6 +194,34 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
             </div>
           </div>
         </nav>
+
+        {/* SaaS Admin Panel - For Tenant Admins Only */}
+        {user?.role === 'admin' && (
+          <div className="px-3 lg:px-4 py-2 border-t border-gray-200 space-y-1 lg:space-y-2">
+            <div className="flex items-center px-1 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <ShieldCheck className="mr-2 shrink-0" size={14} />
+              Admin Panel
+            </div>
+            {SAAS_ADMIN_MODULES.map((module) => {
+              const Icon = icons[module.iconKey as keyof typeof icons];
+              return (
+                <button
+                  key={module.id}
+                  onClick={() => {
+                    onViewChange(module.id);
+                    if (window.innerWidth < 1024) {
+                      setTimeout(() => onToggle(), 200);
+                    }
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm rounded-md text-gray-700 hover:bg-gray-100 transition-colors truncate flex items-center gap-2"
+                >
+                  {Icon && <Icon size={16} />}
+                  {module.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Theme Toggle & Logout */}
         <div className="p-3 lg:p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
