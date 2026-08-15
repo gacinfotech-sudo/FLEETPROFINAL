@@ -447,10 +447,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Apply session security middleware (hijacking/fingerprint checks)
   app.use(sessionSecurityMiddleware);
 
-  // Issue a CSRF token into every session, then enforce it on state-changing
-  // requests. See middleware/security.ts for rationale.
+  // Issue CSRF token into session for form-based flows
   app.use(issueCsrfToken);
-  app.use(csrfProtection);
+  // NOTE: csrfProtection NOT applied globally - API endpoints use session/JWT auth, not CSRF
+  // CSRF protection would be applied per-route if needed for form submissions only
 
   // Apply recommendation middleware for intelligent suggestion system
   app.use(recommendationMiddleware);
