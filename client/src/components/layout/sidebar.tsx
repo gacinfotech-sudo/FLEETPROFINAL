@@ -103,7 +103,8 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
     if (group.id === 'dashboard') {
       return (
         <div key={group.id} className="px-3 lg:px-4 space-y-1">
-          {renderNavigationItem(group.children[0])}
+          {renderNavigationItem('dashboard')}
+          {user?.role === 'admin' && renderNavigationItem('admin-dashboard')}
         </div>
       );
     }

@@ -5,6 +5,7 @@
 export const TENANT_MODULES = [
   // Dashboard
   { id: 'dashboard', label: 'Dashboard', iconKey: 'dashboard', parentGroup: 'dashboard' },
+  { id: 'admin-dashboard', label: 'Admin Panel', iconKey: 'dashboard', parentGroup: 'dashboard' },
 
   // Customers Group
   { id: 'customers', label: 'All Customers', iconKey: 'customers', parentGroup: 'customers' },

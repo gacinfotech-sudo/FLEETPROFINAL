@@ -10,6 +10,7 @@ import ErrorBoundary from "@/components/error-boundary";
 import LandingPage from "./pages/landing";
 import LoginPage from "./pages/login";
 import AdminPanel from "./pages/admin-panel";
+import AdminDashboard from "./pages/admin-dashboard";
 import Dashboard from "./pages/dashboard";
 import TenantDashboard360 from "./pages/tenant-360";
 import Vehicle360Page from "./pages/vehicle-360";
@@ -83,6 +84,13 @@ function AuthenticatedApp() {
           ) : (
             <Dashboard key={user?.userId} />
           )}
+        </ProtectedRoute>
+      </Route>
+
+      {/* Tenant Admin Dashboard - shows tenant's own metrics */}
+      <Route path="/admin-dashboard">
+        <ProtectedRoute requiredRole="admin">
+          <AdminDashboard />
         </ProtectedRoute>
       </Route>
 
