@@ -57,12 +57,6 @@ function AuthenticatedApp() {
 
   return (
     <>
-      {/* TASK-ROOT-SECURITY-05 — rendered once here (not per-route) so it's
-          visible across the whole authenticated app shell while a Support
-          Access grant is active. Self-gates to null via its own
-          server-derived query for any non-platform-staff/unauthenticated
-          user — see the component's own header comment. */}
-      {user && <SupportAccessBanner />}
       <Switch>
       {/* Public Landing Page */}
       <Route path="/" component={LandingPage} />
