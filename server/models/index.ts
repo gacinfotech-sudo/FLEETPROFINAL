@@ -590,7 +590,7 @@ const TenantSchema = new Schema<ITenant>({
 const UserSchema = new Schema<IUser>({
   userId: { type: String, required: true, unique: true },
   name: { type: String },
-  password: { type: String, required: true },
+  password: { type: String, required: true, select: false },
   role: { type: String, enum: ['root', 'admin', 'client', 'manager', 'tenant_owner', 'tenant_admin', 'staff'], default: 'client' },
   // TASK-ROOT-DOMAIN-01 (Root Control Plane) — additive, optional, no
   // default/required. Populated only via scripts/migrate-admin-to-platform-role.ts

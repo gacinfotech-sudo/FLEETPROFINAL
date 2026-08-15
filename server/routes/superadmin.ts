@@ -51,19 +51,70 @@ router.get(
   async (req: AuthRequest, res: Response) => {
     try {
       const tenants = await storage.getTenants();
+      const subscriptions = await storage.listSubscriptions({ status: 'ACTIVE' });
+      const invoices = await storage.listInvoices();
 
-      // Calculate metrics
+      // Calculate tenant metrics
       const totalTenants = tenants.length;
       const activeTenants = tenants.filter(t => t.isActive).length;
       const trialTenants = tenants.filter(t => t.trialEndsAt && t.trialEndsAt > new Date()).length;
       const inactiveTenants = tenants.filter(t => !t.isActive).length;
 
       // Group by subscription plan
-      const byPlan = {
-        starter: tenants.filter(t => t.subscriptionPlan === 'starter').length,
-        pro: tenants.filter(t => t.subscriptionPlan === 'pro').length,
-        custom: tenants.filter(t => t.subscriptionPlan === 'custom').length,
-      };
+      const byPlan: any = {};
+      for (const sub of subscriptions) {
+        const plan = (sub.planId as any);
+        const planCode = plan?.code || 'unknown';
+        byPlan[planCode] = (byPlan[planCode] || 0) + 1;
+      }
+
+      // FIXED P2-002: Calculate MRR and renewal metrics correctly
+      let totalMRR = 0;
+      let renewalsThisMonth = 0;
+      let renewalsNextMonth = 0;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const monthEnd = new Date(today);
+      monthEnd.setMonth(monthEnd.getMonth() + 1);
+      monthEnd.setDate(0); // Last day of current month
+
+      const nextMonthEnd = new Date(monthEnd);
+      nextMonthEnd.setMonth(nextMonthEnd.getMonth() + 1);
+
+      for (const sub of subscriptions) {
+        const plan = (sub.planId as any);
+        if (plan?.pricing) {
+          if (sub.billingCycle === 'monthly' && plan.pricing.monthly) {
+            totalMRR += plan.pricing.monthly;
+          } else if (sub.billingCycle === 'annual' && plan.pricing.annual) {
+            totalMRR += Math.floor(plan.pricing.annual / 12);
+          }
+        }
+
+        if (sub.renewalDate >= today && sub.renewalDate <= monthEnd) {
+          renewalsThisMonth++;
+        } else if (sub.renewalDate > monthEnd && sub.renewalDate <= nextMonthEnd) {
+          renewalsNextMonth++;
+        }
+      }
+
+      // Calculate outstanding payments
+      let paymentsPending = 0;
+      let overdueTenants = 0;
+
+      for (const invoice of invoices) {
+        if (invoice.balanceDue && invoice.balanceDue > 0) {
+          paymentsPending++;
+
+          // Check if overdue (> 30 days)
+          const dueDate = new Date(invoice.invoiceDate);
+          dueDate.setDate(dueDate.getDate() + 30);
+          if (dueDate < today) {
+            overdueTenants++;
+          }
+        }
+      }
 
       res.json({
         success: true,
@@ -75,13 +126,13 @@ router.get(
             inactive: inactiveTenants,
           },
           byPlan,
-          // TODO: Implement when subscription model is ready
+          // FIXED P2-002: Real billing metrics from subscriptions and invoices
           metrics: {
-            mrrEstimate: 'PENDING',
-            renewalsThisMonth: 0,
-            renewalsNextMonth: 0,
-            paymentsPending: 0,
-            overdueTenants: 0,
+            mrrEstimate: totalMRR,
+            renewalsThisMonth,
+            renewalsNextMonth,
+            paymentsPending,
+            overdueTenants,
           },
           // TODO: Implement when support ticket model is ready
           support: {

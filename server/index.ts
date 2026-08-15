@@ -50,6 +50,7 @@ import { startGpsPollingScheduler, stopGpsPollingScheduler } from "./gps/ingesti
 import { startOperationsReminderScheduler, stopOperationsReminderScheduler } from "./operations/reminderEngine";
 import { initializeAutoSyncScheduler } from "./services/payrollAutoSyncScheduler";
 import SaaSSchedulerService from "./services/saas-scheduler-service";
+import BillingScheduler from "./services/billing-scheduler";
 // TASK-ROOT-SUPPORT-03 (Root Control Plane) additive middleware — attaches
 // a correlation ID to every request (not just /api/root/**) before any
 // route/error path runs. See docs/root-control-plane/ROOT-INTEGRATION-report.md.
@@ -464,6 +465,23 @@ app.use((req, res, next) => {
       await SaaSSchedulerService.initialize();
     } catch (error) {
       console.error('[SAAS-SCHEDULER] Failed to initialize SaaS scheduler on reconnect:', error);
+    }
+  });
+
+  // Billing Scheduler — PHASE 4: Auto-invoicing for subscription renewals (P0-001 fix)
+  // Generates monthly invoices at renewal dates, processes revenue metrics
+  if (mongoose.connection.readyState === 1) {
+    try {
+      BillingScheduler.startScheduler();
+    } catch (error) {
+      console.error('[BILLING-SCHEDULER] Failed to initialize billing scheduler:', error);
+    }
+  }
+  mongoose.connection.on('connected', () => {
+    try {
+      BillingScheduler.startScheduler();
+    } catch (error) {
+      console.error('[BILLING-SCHEDULER] Failed to initialize billing scheduler on reconnect:', error);
     }
   });
 
