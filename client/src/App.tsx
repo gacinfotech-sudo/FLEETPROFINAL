@@ -203,11 +203,6 @@ function AuthenticatedApp() {
       </Route>
 
       {/* SaaS Platform Admin Routes — Complete Suite */}
-      <Route path="/saas/admin">
-        <ProtectedRoute requiredRole="admin">
-          <SaaSAdminDashboard />
-        </ProtectedRoute>
-      </Route>
       <Route path="/superadmin/dashboard">
         <ProtectedRoute requiredRole="admin">
           <SuperAdminDashboard />
