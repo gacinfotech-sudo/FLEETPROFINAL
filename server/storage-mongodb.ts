@@ -252,10 +252,20 @@ export class MongoDBStorage implements IStorage {
       // Use MongoDB driver to handle string _id from data restoration
       const db = mongoose.connection.getClient().db('fleetpro');
       const collection = db.collection('users');
+      const ObjectId = require('mongodb').ObjectId;
+
+      // Convert string ID to ObjectId
+      let userId: any;
+      try {
+        userId = new ObjectId(id);
+      } catch (err) {
+        console.error('Invalid user ID format:', id);
+        return;
+      }
 
       if (sessionId === null) {
         // Clear ALL sessions (password reset / deactivation paths).
-        await collection.updateOne({_id: id}, {$set: { sessionId: null, activeSessions: [] }});
+        await collection.updateOne({_id: userId}, {$set: { sessionId: null, activeSessions: [] }});
         return;
       }
       // Multi-device: append this login's session (cap 5, oldest evicted)
@@ -274,7 +284,7 @@ export class MongoDBStorage implements IStorage {
       if (deviceInfo) {
         updateData.$set.deviceInfo = deviceInfo;
       }
-      await collection.updateOne({_id: id}, updateData);
+      await collection.updateOne({_id: userId}, updateData);
     } catch (error) {
       console.error('Error updating user session:', error);
       throw error;
