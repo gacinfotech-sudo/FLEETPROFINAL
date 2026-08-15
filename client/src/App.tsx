@@ -60,7 +60,7 @@ function AuthenticatedApp() {
       <Switch>
       {/* Public Landing Page */}
       <Route path="/" component={LandingPage} />
-      
+
       {/* Login Page */}
       <Route path="/login">
         {loading ? (
@@ -74,7 +74,7 @@ function AuthenticatedApp() {
           <LoginPage />
         )}
       </Route>
-      
+
       {/* Password Reset Page */}
       <Route path="/reset-password">
         <ProtectedRoute allowedRoles={["client", "manager"]}>
@@ -86,3 +86,270 @@ function AuthenticatedApp() {
         </ProtectedRoute>
       </Route>
 
+      {/* Driver portal — deliberately outside the staff AuthProvider/
+          ProtectedRoute context above (separate session mechanism, see
+          server/middleware/driverAuth.ts); each page manages its own
+          driver-auth state independently. */}
+      <Route path="/driver-login" component={DriverLoginPage} />
+      <Route path="/driver" component={DriverPortalPage} />
+
+      {/* Vehicle 360 (TASK-VEHICLE-360-UI-06) */}
+      <Route path="/vehicles/:vehicleId">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <Vehicle360Page />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Tenant Dashboard 360 */}
+      <Route path="/tenant-360">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <TenantDashboard360 />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Driver Payroll Dashboard */}
+      <Route path="/driver-payroll">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <DriverPayrollDashboard />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Vendor Settlement Portal */}
+      <Route path="/vendor-settlement">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <VendorSettlementPortal />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Operations Center - Command Center */}
+      <Route path="/operations">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <OperationsCenter />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Bookings */}
+      <Route path="/bookings/live">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <LiveBookings />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/bookings/upcoming">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <UpcomingBookings />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Notifications Analytics - WAVE 22A */}
+      <Route path="/notifications/analytics">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <NotificationsAnalytics />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Notification Preferences - WAVE 24A */}
+      <Route path="/notifications/preferences">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          <NotificationPreferences />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Notification Admin Dashboard - WAVE 29A */}
+      <Route path="/notifications/admin">
+        <ProtectedRoute requiredRole="admin">
+          <NotificationAdminDashboard />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Template Editor - WAVE 30A */}
+      <Route path="/notifications/templates">
+        <ProtectedRoute requiredRole="admin">
+          <TemplateEditor />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Scheduled Notifications - WAVE 31A */}
+      <Route path="/notifications/schedule">
+        <ProtectedRoute requiredRole="admin">
+          <ScheduledNotifications />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Notification Monitor - WAVE 32A */}
+      <Route path="/notifications/monitor">
+        <ProtectedRoute requiredRole="admin">
+          <NotificationMonitor />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Event Triggers - WAVE 33A */}
+      <Route path="/notifications/triggers">
+        <ProtectedRoute requiredRole="admin">
+          <EventTriggers />
+        </ProtectedRoute>
+      </Route>
+
+      {/* A/B Testing - WAVE 34A */}
+      <Route path="/notifications/ab-testing">
+        <ProtectedRoute requiredRole="admin">
+          <NotificationABTesting />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Insights & Analytics - WAVE 35A */}
+      <Route path="/notifications/insights">
+        <ProtectedRoute requiredRole="admin">
+          <NotificationInsights />
+        </ProtectedRoute>
+      </Route>
+
+      {/* SMS Optimizer - WAVE 36A */}
+      <Route path="/notifications/sms-optimizer">
+        <ProtectedRoute requiredRole="admin">
+          <SMSOptimizer />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Predictive Send Time - WAVE 37A */}
+      <Route path="/notifications/predictive-send-time">
+        <ProtectedRoute requiredRole="admin">
+          <PredictiveSendTime />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Audience Segmentation - WAVE 38A */}
+      <Route path="/notifications/segmentation">
+        <ProtectedRoute requiredRole="admin">
+          <AudienceSegmentation />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Content Recommendations - WAVE 39A */}
+      <Route path="/notifications/content-recommendations">
+        <ProtectedRoute requiredRole="admin">
+          <ContentRecommendations />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Campaign Predictor - WAVE 40A */}
+      <Route path="/notifications/campaign-predictor">
+        <ProtectedRoute requiredRole="admin">
+          <CampaignPredictor />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Campaign Journey Builder - WAVE 41A */}
+      <Route path="/notifications/journey-builder">
+        <ProtectedRoute requiredRole="admin">
+          <CampaignJourneyBuilder />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Smart Channel Selection - WAVE 42A */}
+      <Route path="/notifications/channel-selection">
+        <ProtectedRoute requiredRole="admin">
+          <SmartChannelSelection />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Tenant WhatsApp Profile - WAVE 43A */}
+      <Route path="/settings/whatsapp-profile">
+        <ProtectedRoute requiredRole="admin">
+          <TenantWhatsAppProfile />
+        </ProtectedRoute>
+      </Route>
+
+      {/* WhatsApp Templates - WAVE 44A */}
+      <Route path="/settings/whatsapp-templates">
+        <ProtectedRoute requiredRole="admin">
+          <WhatsAppTemplates />
+        </ProtectedRoute>
+      </Route>
+
+      {/* WhatsApp Template Editor - WAVE 45A */}
+      <Route path="/settings/whatsapp-template-editor">
+        <ProtectedRoute requiredRole="admin">
+          <WhatsAppTemplateEditor />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/settings/whatsapp-template-history/:templateId*">
+        <ProtectedRoute requiredRole="admin">
+          <WhatsAppTemplateHistory />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/settings/whatsapp-approvals">
+        <ProtectedRoute requiredRole="admin">
+          <WhatsAppApprovalQueue />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/settings/whatsapp-approval-config">
+        <ProtectedRoute requiredRole="admin">
+          <WhatsAppApprovalConfig />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Dashboard - Tenant operations only */}
+      <Route path="/dashboard">
+        <ProtectedRoute allowedRoles={["client", "manager"]}>
+          {user && user.mustResetPassword ? (
+            <ForcedPasswordResetPage />
+          ) : (
+            <Dashboard key={user?.userId} />
+          )}
+        </ProtectedRoute>
+      </Route>
+
+      {/* Fallback route for any unknown paths - redirects to dashboard */}
+      <Route>
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user ? (
+          <Dashboard key={user.userId} />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+      </Switch>
+    </>
+  );
+}
+
+function ProtectedRouterShell() {
+  return (
+    <ErrorBoundary>
+      <AuthenticatedApp />
+    </ErrorBoundary>
+  );
+}
+
+function Router() {
+  return (
+    <AuthProvider>
+      {/* One provider for the ONE Unified Booking Workspace — every booking
+          surface (queues, upcoming, live, history, Customer 360, dashboard,
+          search, Vehicle 360) opens the same canonical editor through it. */}
+      <BookingWorkspaceProvider>
+        <ProtectedRouterShell />
+      </BookingWorkspaceProvider>
+    </AuthProvider>
+  );
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <OfflineNotification />
+        <Router />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
