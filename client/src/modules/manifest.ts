@@ -1,21 +1,8 @@
-// SaaS Module Manifest - Defines navigation structure and permissions
-// Restored to match the good state (1be6ca8) comprehensive navigation
-// This includes all 42+ items that were present before simplification
+// Tenant Module Manifest - Defines navigation structure and permissions
+// ADMIN/ROOT/SAAS navigation completely removed
+// Pure tenant-only structure
 
-// Platform Admin SaaS Modules (for Super Admin only)
-export const SAAS_ADMIN_MODULES = [
-  { id: 'saas-dashboard', label: 'Dashboard', iconKey: 'dashboard', parentGroup: 'saas' },
-  { id: 'saas-tenants', label: 'Tenants', iconKey: 'customers', parentGroup: 'saas' },
-  { id: 'saas-platform-admins', label: 'Platform Admins', iconKey: 'users', parentGroup: 'saas' },
-  { id: 'saas-plans', label: 'Plans', iconKey: 'alert', parentGroup: 'saas' },
-  { id: 'saas-subscriptions', label: 'Subscriptions', iconKey: 'booking', parentGroup: 'saas' },
-  { id: 'saas-billing', label: 'Billing', iconKey: 'revenue', parentGroup: 'saas' },
-  { id: 'saas-support', label: 'Support', iconKey: 'contact', parentGroup: 'saas' },
-  { id: 'saas-profile', label: 'SaaS Profile', iconKey: 'profile', parentGroup: 'saas' },
-  { id: 'saas-security', label: 'Security', iconKey: 'alert', parentGroup: 'saas' },
-];
-
-export const SAAS_MODULES = [
+export const TENANT_MODULES = [
   // Dashboard
   { id: 'dashboard', label: 'Dashboard', iconKey: 'dashboard', parentGroup: 'dashboard' },
 
@@ -53,9 +40,6 @@ export const SAAS_MODULES = [
   { id: 'gps-tracking', label: 'GPS Tracking', iconKey: 'alert', parentGroup: 'vehicles' },
   { id: 'vehicle-performance', label: 'Vehicle Performance', iconKey: 'vehicle-performance', parentGroup: 'vehicles' },
 
-  // Customer Extended Services
-  { id: 'rewards-referrals', label: 'Rewards & Referrals', iconKey: 'alert', parentGroup: null },
-
   // Vendor Management
   { id: 'vendors', label: 'Vendors', iconKey: 'contact', parentGroup: 'vendors' },
   { id: 'vendor-settlement', label: 'Settlement Portal', iconKey: 'revenue', parentGroup: 'vendors' },
@@ -81,7 +65,7 @@ interface NavigationGroup {
   children: string[];
 }
 
-export function getNavigationStructure(role?: string, permissions?: string[], platformRole?: string): NavigationGroup[] {
+export function getNavigationStructure(role?: string, permissions?: string[]): NavigationGroup[] {
   const groups: NavigationGroup[] = [
     {
       id: 'dashboard',
@@ -111,7 +95,7 @@ export function getNavigationStructure(role?: string, permissions?: string[], pl
       id: 'drivers',
       label: 'Driver Management',
       iconKey: 'drivers',
-      children: ['drivers', 'drivers-add', 'driver-attendance', 'driver-leave', 'driver-performance']
+      children: ['drivers', 'drivers-add', 'driver-attendance', 'driver-leave', 'driver-performance', 'driver-payroll']
     },
     {
       id: 'vehicles',
@@ -123,7 +107,7 @@ export function getNavigationStructure(role?: string, permissions?: string[], pl
       id: 'vendors',
       label: 'Vendors',
       iconKey: 'contact',
-      children: ['vendors', 'vendor-settlement']
+      children: ['vendors', 'vendor-settlement', 'vendor-invoices']
     },
     {
       id: 'finance',
@@ -145,24 +129,8 @@ export function getNavigationStructure(role?: string, permissions?: string[], pl
     }
   ];
 
-  // Collect top-level items (those with parentGroup: null) that should render as individual items
-  const topLevelItems = ['rewards-referrals'];
-
-  // Add SaaS Platform Admin section for admin users
-  const saasSection: NavigationGroup = {
-    id: 'saas-platform',
-    label: 'SaaS Platform Admin',
-    iconKey: 'dashboard',
-    children: ['saas-dashboard', 'saas-tenants', 'saas-platform-admins', 'saas-plans', 'saas-subscriptions', 'saas-billing', 'saas-support', 'saas-profile', 'saas-security']
-  };
-
   // Filter based on role and permissions
-  // Platform staff (ROOT, SUPER_ADMIN, etc.) see only SaaS admin panel
-  if (platformRole) {
-    return [saasSection]; // Platform staff sees ONLY SaaS section, no tenant menus
-  }
-
-  // Tenant-side roles
+  // Tenant-side roles only (no platformRole / admin tier)
   if (role === 'admin') {
     return groups; // Tenant admin sees all tenant operations
   }
@@ -174,7 +142,7 @@ export function getNavigationStructure(role?: string, permissions?: string[], pl
 
   if (role === 'operator') {
     // Operators see operations, bookings, drivers, customers
-    return groups.filter(g => ['dashboard', 'booking', 'drivers', 'customers'].includes(g.id));
+    return groups.filter(g => ['dashboard', 'booking', 'drivers', 'customers', 'vehicles'].includes(g.id));
   }
 
   // Default: return all (will be further restricted by backend permissions)

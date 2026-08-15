@@ -7,28 +7,7 @@ import GlobalCustomerSearch from "@/components/customers/global-customer-search"
 import { ThemeToggle } from "@/components/theme-toggle";
 // The final-canonical merge brought back this manifest-driven sidebar but
 // dropped the import that feeds it.
-import { SAAS_MODULES, SAAS_ADMIN_MODULES, getNavigationStructure } from "@/modules/manifest";
-import { ShieldCheck } from "lucide-react";
-
-// Root Control Plane (Wave 1) — platform Super Admin console. These are
-// genuine top-level routes (client/src/App.tsx), not `onViewChange` SPA
-// sections like everything above, so they navigate with a real <a href>
-// rather than the section-switch callback. Gated on role==='admin' as a
-// client-side visibility stopgap only (matches App.tsx's ProtectedRoute
-// requiredRole="admin" stopgap) — the actual authorization boundary is
-// server-side, on every /api/root/** route, via platformRole.
-const ROOT_NAV_ITEMS = [
-  { href: "/root/dashboard", label: "Root Dashboard" },
-  { href: "/root/tenants", label: "Tenant Database" },
-  { href: "/root/customers", label: "Global Customers" },
-  { href: "/root/sales", label: "Sales Pipeline" },
-  { href: "/root/product-config", label: "Product Configuration" },
-  { href: "/root/support-tickets", label: "Support Center" },
-  { href: "/root/error-center", label: "Error Center" },
-  { href: "/root/diagnostics", label: "Support Diagnostics" },
-  { href: "/root/security", label: "Security" },
-  { href: "/root/audit-log", label: "Audit Log" },
-];
+import { TENANT_MODULES, getNavigationStructure } from "@/modules/manifest";
 
 interface SidebarProps {
   currentView: string;
@@ -54,11 +33,11 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
   const { logout, user } = useAuth();
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['dashboard']));
 
-  const navStructure = getNavigationStructure(user?.role, user?.permissions, user?.platformRole);
+  const navStructure = getNavigationStructure(user?.role, user?.permissions);
 
   // Expand group if its child is currently active
   useEffect(() => {
-    const activeModule = SAAS_MODULES.find((m) => m.id === currentView) || SAAS_ADMIN_MODULES.find((m) => m.id === currentView);
+    const activeModule = TENANT_MODULES.find((m) => m.id === currentView);
     if (activeModule?.parentGroup) {
       const parentGroup = activeModule.parentGroup;
       setExpandedGroups((prev) => {
@@ -90,7 +69,7 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
   };
 
   const renderNavigationItem = (moduleId: string) => {
-    const module = SAAS_MODULES.find((m) => m.id === moduleId) || SAAS_ADMIN_MODULES.find((m) => m.id === moduleId);
+    const module = TENANT_MODULES.find((m) => m.id === moduleId);
     if (!module) return null;
 
     const Icon = icons[module.iconKey as keyof typeof icons];
@@ -207,50 +186,12 @@ export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }:
 
             {/* Top-level items (those with parentGroup: null) */}
             <div className="space-y-1">
-              {SAAS_MODULES
+              {TENANT_MODULES
                 .filter((m) => m.parentGroup === null && m.id !== 'dashboard')
                 .map((module) => renderNavigationItem(module.id))}
             </div>
           </div>
         </nav>
-
-        {/* SaaS Platform Admin — Full SaaS management dashboard */}
-        {(user?.role === 'admin' || user?.platformRole) && (
-          <div className="px-3 lg:px-4 py-2 border-t border-gray-200 space-y-1 lg:space-y-2">
-            <div className="flex items-center px-1 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-              <ShieldCheck className="mr-2 shrink-0" size={14} />
-              SaaS Platform
-            </div>
-            <a
-              href="/saas/admin"
-              className="block rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-cyan-50 hover:to-transparent hover:text-cyan-700 transition-colors truncate"
-            >
-              📊 Admin Dashboard
-            </a>
-          </div>
-        )}
-
-        {/* Root Control Plane (Wave 1) — see ROOT_NAV_ITEMS comment above
-            for why this section uses real <a href> navigation instead of
-            onViewChange. Client-side visibility only; real gating is
-            server-side. Show ONLY for tenant admins, NOT for platform staff. */}
-        {user?.role === 'admin' && !user?.platformRole && (
-          <div className="px-3 lg:px-4 py-2 border-t border-gray-200 space-y-1 lg:space-y-2 max-h-48 overflow-y-auto">
-            <div className="flex items-center px-1 py-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-              <ShieldCheck className="mr-2 shrink-0" size={14} />
-              Root / Platform
-            </div>
-            {ROOT_NAV_ITEMS.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="block rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors truncate"
-              >
-                {item.label}
-              </a>
-            ))}
-          </div>
-        )}
 
         {/* Theme Toggle & Logout */}
         <div className="p-3 lg:p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
