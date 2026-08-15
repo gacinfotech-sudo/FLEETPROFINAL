@@ -3230,7 +3230,8 @@ InvoiceSchema.index(
 InvoiceSchema.index({ tenantId: 1, sourceKey: 1 }, { unique: true, sparse: true });
 InvoiceSchema.index({ tenantId: 1, customerId: 1, createdAt: -1 });
 InvoiceSchema.index({ tenantId: 1, bookingId: 1, status: 1 });
-export const Invoice = mongoose.model<IInvoice>('Invoice', InvoiceSchema);
+// NOTE: Invoice moved to server/platform/models/PlatformInvoice.ts for Platform Control Plane
+export const Invoice = mongoose.models['PlatformInvoice'] ? null : mongoose.model<IInvoice>('Invoice_Legacy', InvoiceSchema);
 
 // Generic atomic per-tenant sequence generator — `findOneAndUpdate` with
 // `$inc` is a single atomic Mongo operation, so concurrent invoice
@@ -5035,7 +5036,8 @@ PlatformCompanySchema.pre('save', function (next) {
   next();
 });
 
-export const PlatformCompany = mongoose.model<IPlatformCompany>('PlatformCompany', PlatformCompanySchema);
+// NOTE: PlatformCompany model moved to server/platform/models/PlatformCompany.ts for Platform Control Plane
+export const PlatformCompany = mongoose.models['PlatformCompany'] || mongoose.model<IPlatformCompany>('PlatformCompany_Legacy', PlatformCompanySchema);
 
 // ============================================================================
 // SUBSCRIPTION PLAN — Configurable SaaS Plans (Phase 2)
@@ -5156,7 +5158,8 @@ PlanSchema.pre('save', function (next) {
   next();
 });
 
-export const Plan = mongoose.model<IPlan>('Plan', PlanSchema);
+// NOTE: Plan model moved to server/platform/models/Plan.ts for Platform Control Plane
+export const Plan = mongoose.models['Plan'] || mongoose.model<IPlan>('Plan_Legacy', PlanSchema);
 
 // ============================================================================
 // SUBSCRIPTION — Tenant Subscription to Plans (Phase 3)
@@ -5240,7 +5243,9 @@ SubscriptionSchema.pre('save', function (next) {
   next();
 });
 
-export const Subscription = mongoose.model<ISubscription>('Subscription', SubscriptionSchema);
+// NOTE: Subscription model moved to server/platform/models/Subscription.ts for Platform Control Plane
+// This export kept for backwards compatibility with legacy code
+export const Subscription = mongoose.models['Subscription'] || mongoose.model<ISubscription>('Subscription_Legacy', SubscriptionSchema);
 
 // ============================================================================
 // SUPPORT TICKET — Customer Support Tickets (Phase 6)
@@ -5302,4 +5307,5 @@ const SupportTicketSchema = new Schema<ISupportTicket>({
 SupportTicketSchema.index({ tenantId: 1, createdAt: -1 });
 SupportTicketSchema.index({ status: 1, priority: 1 });
 SupportTicketSchema.index({ ticketNumber: 1 });
-export const SupportTicket = mongoose.model<ISupportTicket>('SupportTicket', SupportTicketSchema);
+// NOTE: SupportTicket model moved to server/platform/models/SupportTicket.ts for Platform Control Plane
+export const SupportTicket = mongoose.models['SupportTicket'] || mongoose.model<ISupportTicket>('SupportTicket_Legacy', SupportTicketSchema);

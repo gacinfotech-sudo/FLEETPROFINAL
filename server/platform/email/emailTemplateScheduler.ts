@@ -4,11 +4,9 @@
 import { notificationService } from '../notifications/notificationService';
 import { subscriptionService } from '../subscriptions/subscriptionService';
 import { supportService } from '../support/supportService';
-import mongoose from 'mongoose';
-
-const Subscription = mongoose.model('Subscription');
-const Tenant = mongoose.model('Tenant');
-const SupportTicket = mongoose.model('SupportTicket');
+import { Subscription } from '../models/Subscription';
+import { SupportTicket } from '../models/SupportTicket';
+import { Tenant } from '../../models';
 
 export class EmailTemplateScheduler {
   // Run every hour

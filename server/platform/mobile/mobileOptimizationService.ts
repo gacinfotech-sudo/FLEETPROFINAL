@@ -2,6 +2,7 @@
 // Reduce payload sizes, optimize response times
 
 import mongoose from 'mongoose';
+import { Subscription } from '../models/Subscription';
 
 export class MobileOptimizationService {
   // Compress tenant response for mobile
@@ -86,7 +87,6 @@ export class MobileOptimizationService {
   async getDashboardKPIsMobile() {
     try {
       const Tenant = mongoose.model('Tenant');
-      const Subscription = mongoose.model('Subscription');
       const PlatformPayment = mongoose.model('PlatformPayment');
 
       const [totalTenants, activeTenants, monthlyRevenue] = await Promise.all([
