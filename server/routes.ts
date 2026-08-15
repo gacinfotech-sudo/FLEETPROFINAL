@@ -12207,6 +12207,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // SAAS ADMIN ROUTES
   // Dashboard & Analytics
+  app.get("/api/saas/dashboard/stats", authenticateUser, async (req: AuthRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+      // Get real data from database
+      const tenants = await storage.getTenants();
+      const users = await storage.getUsers();
+
+      // Calculate metrics
+      const totalTenants = tenants.length;
+      const activeTenants = tenants.filter((t: any) => t.isActive).length;
+      const trialTenants = tenants.filter((t: any) => t.subscriptionPlan === 'trial').length;
+      const lockedTenants = tenants.filter((t: any) => !t.isActive).length;
+
+      // Calculate revenue (sum monthlyRevenue from all tenants)
+      const monthlyRevenue = tenants.reduce((sum: number, t: any) => sum + (t.monthlyRevenue || 0), 0);
+
+      // Get metrics from aggregated data
+      const openTickets = 0; // TODO: query from tickets table when implemented
+      const criticalErrors = 0; // TODO: query from error logs when implemented
+      const paymentDue = 0; // TODO: query from subscriptions when implemented
+      const renewalsDue = 0; // TODO: query from subscriptions when implemented
+
+      res.json({
+        totalTenants,
+        activeTenants,
+        trialTenants,
+        lockedTenants,
+        monthlyRevenue,
+        openTickets,
+        criticalErrors,
+        paymentDue,
+        renewalsDue
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/saas/admin/dashboard/summary", authenticateUser, async (req: AuthRequest, res) => {
     try {
       if (req.user?.role !== 'admin') {
