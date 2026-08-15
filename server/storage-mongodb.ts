@@ -374,7 +374,9 @@ export class MongoDBStorage implements IStorage {
 
   async getTenant(id: string): Promise<ITenant | undefined> {
     try {
-      return await Tenant.findById(id) || undefined;
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('tenants');
+      return await collection.findOne({_id: id}) as unknown as ITenant || undefined;
     } catch (error) {
       console.error('Error getting tenant:', error);
       return undefined;
@@ -447,13 +449,18 @@ export class MongoDBStorage implements IStorage {
 
   async getUser(id: string): Promise<IUser | undefined> {
     try {
-      // Check if id is a valid ObjectId, if not search by userId
-      if (mongoose.Types.ObjectId.isValid(id)) {
-        return await User.findById(id).populate('tenantId') || undefined;
-      } else {
-        // Search by userId field for non-ObjectId strings like "admin"
-        return await User.findOne({ userId: id }).populate('tenantId') || undefined;
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('users');
+
+      // Try by _id first (for both ObjectId and string _id)
+      let user = await collection.findOne({_id: id}) as unknown as IUser;
+
+      // If not found by _id and id looks like userId, search by userId
+      if (!user) {
+        user = await collection.findOne({userId: id}) as unknown as IUser;
       }
+
+      return user || undefined;
     } catch (error) {
       console.error('Error getting user:', error);
       return undefined;
@@ -462,7 +469,9 @@ export class MongoDBStorage implements IStorage {
 
   async getUsersByTenant(tenantId: string): Promise<IUser[]> {
     try {
-      return await User.find({ tenantId }).populate('tenantId');
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('users');
+      return await collection.find({ tenantId }).toArray() as unknown as IUser[];
     } catch (error) {
       console.error('Error getting users by tenant:', error);
       throw error;
@@ -519,7 +528,9 @@ export class MongoDBStorage implements IStorage {
 
   async getVehiclesByTenant(tenantId: string): Promise<IVehicle[]> {
     try {
-      return await Vehicle.find({ tenantId }).sort({ createdAt: -1 });
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('vehicles');
+      return await collection.find({ tenantId }).sort({ createdAt: -1 }).toArray() as unknown as IVehicle[];
     } catch (error) {
       console.error('Error getting vehicles by tenant:', error);
       throw error;
@@ -630,7 +641,9 @@ export class MongoDBStorage implements IStorage {
 
   async getDriversByTenant(tenantId: string): Promise<IDriver[]> {
     try {
-      return await Driver.find({ tenantId }).sort({ createdAt: -1 });
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('drivers');
+      return await collection.find({ tenantId }).sort({ createdAt: -1 }).toArray() as unknown as IDriver[];
     } catch (error) {
       console.error('Error getting drivers by tenant:', error);
       throw error;
@@ -890,11 +903,9 @@ export class MongoDBStorage implements IStorage {
 
   async getBookingsByTenant(tenantId: string): Promise<IBooking[]> {
     try {
-      return await Booking.find({ tenantId })
-        .populate('vehicleId')
-        .populate('driverId')
-        .sort({ createdAt: -1 })
-        .lean() as unknown as IBooking[]; // populated lean objects intentionally cross the document interface boundary
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('bookings');
+      return await collection.find({ tenantId }).sort({ createdAt: -1 }).toArray() as unknown as IBooking[];
     } catch (error) {
       console.error('Error getting bookings by tenant:', error);
       throw error;
@@ -1972,15 +1983,18 @@ export class MongoDBStorage implements IStorage {
   ): Promise<{ rows: IBooking[]; total: number }> {
     const limit = Math.min(500, Math.max(1, options.limit ?? 100));
     const skip = Math.max(0, options.skip ?? 0);
+
+    const db = mongoose.connection.getClient().db('fleetpro');
+    const collection = db.collection('bookings');
+
     const [rows, total] = await Promise.all([
-      Booking.find({ tenantId })
-        .populate('vehicleId')
-        .populate('driverId')
+      collection
+        .find({ tenantId })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .lean() as unknown as Promise<IBooking[]>,
-      Booking.countDocuments({ tenantId }),
+        .toArray() as unknown as Promise<IBooking[]>,
+      collection.countDocuments({ tenantId }),
     ]);
     return { rows, total };
   }
@@ -2003,10 +2017,27 @@ export class MongoDBStorage implements IStorage {
     const limit = Math.min(500, Math.max(1, options.limit ?? 50));
     const skip = Math.max(0, options.skip ?? 0);
     const sort = options.sort ?? { lastBookingDate: -1, createdAt: -1 };
+
+    // Use raw MongoDB driver since Mongoose isn't matching string tenantId against ObjectId schema
+    const db = mongoose.connection.getClient().db('fleetpro');
+    const collection = db.collection('customers');
+
+    // Build sort object: MongoDB expects {field: 1 or -1}
+    const mongoSort: Record<string, 1 | -1> = {};
+    for (const [k, v] of Object.entries(sort)) {
+      mongoSort[k] = v as (1 | -1);
+    }
+
     const [rows, total] = await Promise.all([
-      Customer.find(query).sort(sort).skip(skip).limit(limit).lean() as unknown as Promise<ICustomer[]>,
-      Customer.countDocuments(query),
+      collection
+        .find(query)
+        .sort(mongoSort)
+        .skip(skip)
+        .limit(limit)
+        .toArray() as Promise<ICustomer[]>,
+      collection.countDocuments(query),
     ]);
+
     return { rows, total };
   }
 

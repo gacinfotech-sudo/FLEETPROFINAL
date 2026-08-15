@@ -59,11 +59,14 @@ export async function getBooking360(
   tenantId: string | mongoose.Types.ObjectId,
   bookingId: string | mongoose.Types.ObjectId
 ): Promise<Booking360Data | null> {
-  const booking = await Booking.findOne({
-    _id: bookingId,
-    tenantId,
+  // Use MongoDB driver to handle string _ids and tenantIds from data restoration
+  const db = mongoose.connection.getClient().db('fleetpro');
+  const collection = db.collection('bookings');
+  const booking = await collection.findOne({
+    _id: bookingId.toString(),
+    tenantId: tenantId.toString(),
     isDeleted: { $ne: true }
-  });
+  }) as unknown as IBooking;
 
   if (!booking) return null;
 
