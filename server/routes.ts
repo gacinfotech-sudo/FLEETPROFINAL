@@ -9982,7 +9982,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========== SAAS TENANTS ROUTES - REAL DATABASE ==========
   app.get("/api/saas/tenants", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
     try {
-      const tenants = await storage.getTenants();
+      // Use MongoDB driver directly (bypass Mongoose model issues)
+      const db = await storage.getDb();
+      const tenants = await db.collection('tenants').find({}).toArray();
       const enrichedTenants = await Promise.all(tenants.map(async (tenant: any) => {
         const userCount = await storage.getUserCountByTenant(tenant._id);
         const vehicleCount = await storage.getVehicleCountByTenant(tenant._id);
@@ -12210,21 +12212,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.user?.role !== 'admin') {
         return res.status(403).json({ message: 'Admin access required' });
       }
-      // Get real data from database
-      const tenants = await storage.getTenants();
-      const users = await storage.getUsers();
+      // Get real data directly from MongoDB (bypass Mongoose model issues)
+      const db = await storage.getDb();
+      const tenants = await db.collection('tenants').find({}).toArray();
 
       // Calculate metrics
       const totalTenants = tenants.length;
-      const activeTenants = tenants.filter((t: any) => t.isActive).length;
+      const activeTenants = tenants.filter((t: any) => t.active || t.isActive).length;
       const trialTenants = tenants.filter((t: any) => t.subscriptionPlan === 'trial').length;
-      const lockedTenants = tenants.filter((t: any) => !t.isActive).length;
+      const lockedTenants = tenants.filter((t: any) => !t.active && !t.isActive).length;
 
       // Calculate revenue (sum monthlyRevenue from all tenants)
       const monthlyRevenue = tenants.reduce((sum: number, t: any) => sum + (t.monthlyRevenue || 0), 0);
-
-      // Get real metrics from database
-      const db = await storage.getDb();
 
       // Count open support tickets
       const openTickets = await db.collection('support_tickets')
