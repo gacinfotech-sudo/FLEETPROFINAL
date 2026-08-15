@@ -55,6 +55,20 @@ function isValidObjectId(id: string): boolean {
   return mongoose.Types.ObjectId.isValid(id);
 }
 
+// Helper: Map API plan names to database plan names
+function mapPlanToDatabase(apiPlan?: string): 'starter' | 'pro' | 'custom' {
+  if (!apiPlan) return 'starter';
+  const mapping: Record<string, 'starter' | 'pro' | 'custom'> = {
+    'BASIC': 'starter',
+    'STANDARD': 'pro',
+    'PREMIUM': 'custom',
+    'basic': 'starter',
+    'standard': 'pro',
+    'premium': 'custom',
+  };
+  return mapping[apiPlan] || 'starter';
+}
+
 export function registerPlatformTenantRoutes(app: Express): void {
   // =========================================================================
   // PHASE 1: CREATE TENANT
@@ -79,7 +93,7 @@ export function registerPlatformTenantRoutes(app: Express): void {
         email: data.email,
         phone: data.mobile,
         address: data.address,
-        subscriptionPlan: data.plan?.toLowerCase() || 'basic',
+        subscriptionPlan: mapPlanToDatabase(data.plan),
       });
 
       const tenant = await storage.createTenant(tenantData);

@@ -229,6 +229,7 @@ import { registerVehicleInspectionRoutes } from "./vehicle/inspections/routes";
 import { isPlatformRole } from "./root/types";
 import { registerRootDashboardRoutes } from "./root/routes/dashboard";
 import { registerRootTenantRoutes } from "./root/routes/tenants";
+import { registerPlatformTenantRoutes } from "./root/routes/platform-tenants";
 import { registerRootCustomerRoutes } from "./root/routes/customers";
 import { securityRouter } from "./root/routes/security";
 import { auditRouter } from "./root/routes/audit";
@@ -614,6 +615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // namespace only. See docs/root-control-plane/ROOT-INTEGRATION-report.md.
   registerRootDashboardRoutes(app);
   registerRootTenantRoutes(app);
+  registerPlatformTenantRoutes(app);
   registerRootCustomerRoutes(app);
   app.use('/api/root', authenticateUser, securityRouter);
   app.use('/api/root', authenticateUser, auditRouter);

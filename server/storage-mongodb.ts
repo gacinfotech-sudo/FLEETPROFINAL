@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import { nanoid } from 'nanoid';
 import mongoose from 'mongoose';
+import { ObjectId } from 'mongodb';
 import { Tenant, User, Vehicle, Driver, Booking, Expense, VehicleBookingLock, PlatformCompany, Plan, Subscription, BillingEntry, Invoice, ITenant, IUser, IVehicle, IDriver, IBooking, IExpense, IPlatformCompany, IPlan, ISubscription, IBillingEntry, IInvoice } from './models';
 import { findVehicleConflicts, findDriverConflicts, findTentativeDraftConflicts, combineDateTime } from './services/availability';
 import { generateUniqueBookingCode } from './services/bookingCodeService';
@@ -252,7 +253,6 @@ export class MongoDBStorage implements IStorage {
       // Use MongoDB driver to handle string _id from data restoration
       const db = mongoose.connection.getClient().db('fleetpro');
       const collection = db.collection('users');
-      const ObjectId = require('mongodb').ObjectId;
 
       // Convert string ID to ObjectId
       let userId: any;
