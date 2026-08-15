@@ -12274,6 +12274,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Error Reports
+  app.get("/api/saas/errors", authenticateUser, async (req: AuthRequest, res) => {
+    try {
+      if (req.user?.role !== 'admin') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+      // Return empty errors list (error collection not yet implemented)
+      // TODO: Implement error tracking and collection system
+      res.json({ errors: [], total: 0 });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Metrics
   app.get("/api/saas/admin/metrics/revenue", authenticateUser, async (req: AuthRequest, res) => {
     try {
