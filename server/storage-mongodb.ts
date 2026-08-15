@@ -589,17 +589,17 @@ export class MongoDBStorage implements IStorage {
 
   async updateVehicle(id: string, data: any, tenantId?: string): Promise<IVehicle | undefined> {
     try {
-      if (!mongoose.Types.ObjectId.isValid(id)) return undefined;
-      // Convert tenantId string to ObjectId if provided
-      if (data.tenantId && typeof data.tenantId === 'string') {
-        // data.tenantId = new mongoose.Types.ObjectId(data.tenantId); - REMOVED: Keep tenantId as STRING
-      }
-      // Never allow a request body to move a record to a different tenant.
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('vehicles');
+
+      // Keep tenantId as STRING (matching create/list operations)
       if (tenantId) delete data.tenantId;
 
       const query: any = { _id: id };
       if (tenantId) query.tenantId = tenantId;
-      return await Vehicle.findOneAndUpdate(query, data, { new: true }) || undefined;
+
+      const result = await collection.findOneAndUpdate(query, { $set: data }, { returnDocument: 'after' });
+      return result.value as unknown as IVehicle | undefined;
     } catch (error) {
       console.error('Error updating vehicle:', error);
       return undefined;
@@ -608,10 +608,12 @@ export class MongoDBStorage implements IStorage {
 
   async deleteVehicle(id: string, tenantId?: string): Promise<void> {
     try {
-      if (!mongoose.Types.ObjectId.isValid(id)) return;
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('vehicles');
+
       const query: any = { _id: id };
       if (tenantId) query.tenantId = tenantId;
-      await Vehicle.findOneAndDelete(query);
+      await collection.deleteOne(query);
     } catch (error) {
       console.error('Error deleting vehicle:', error);
       throw error;
@@ -695,16 +697,20 @@ export class MongoDBStorage implements IStorage {
 
   async updateDriver(id: string, data: any, tenantId?: string): Promise<IDriver | undefined> {
     try {
-      if (!mongoose.Types.ObjectId.isValid(id)) return undefined;
-      // Convert tenantId string to ObjectId if provided
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('drivers');
+
+      // Keep tenantId as STRING (matching create/list operations)
       if (data.tenantId && typeof data.tenantId === 'string') {
-        // data.tenantId = new mongoose.Types.ObjectId(data.tenantId); - REMOVED: Keep tenantId as STRING
+        // Keep as STRING - don't convert to ObjectId
       }
       if (tenantId) delete data.tenantId;
 
       const query: any = { _id: id };
       if (tenantId) query.tenantId = tenantId;
-      return await Driver.findOneAndUpdate(query, data, { new: true }) || undefined;
+
+      const result = await collection.findOneAndUpdate(query, { $set: data }, { returnDocument: 'after' });
+      return result.value as unknown as IDriver | undefined;
     } catch (error) {
       console.error('Error updating driver:', error);
       return undefined;
@@ -713,10 +719,12 @@ export class MongoDBStorage implements IStorage {
 
   async deleteDriver(id: string, tenantId?: string): Promise<void> {
     try {
-      if (!mongoose.Types.ObjectId.isValid(id)) return;
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('drivers');
+
       const query: any = { _id: id };
       if (tenantId) query.tenantId = tenantId;
-      await Driver.findOneAndDelete(query);
+      await collection.deleteOne(query);
     } catch (error) {
       console.error('Error deleting driver:', error);
       throw error;
@@ -960,25 +968,18 @@ export class MongoDBStorage implements IStorage {
 
   async updateBooking(id: string, data: any, tenantId?: string): Promise<IBooking | undefined> {
     try {
-      if (!mongoose.Types.ObjectId.isValid(id)) return undefined;
-      // Convert string IDs to ObjectIds if provided
-      if (data.tenantId && typeof data.tenantId === 'string') {
-        // data.tenantId = new mongoose.Types.ObjectId(data.tenantId); - REMOVED: Keep tenantId as STRING
-      }
-      if (data.vehicleId && typeof data.vehicleId === 'string') {
-        data.vehicleId = new mongoose.Types.ObjectId(data.vehicleId);
-      }
-      if (data.driverId && typeof data.driverId === 'string') {
-        data.driverId = new mongoose.Types.ObjectId(data.driverId);
-      }
-      // Never allow a request body to move a record to a different tenant.
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('bookings');
+
+      // Keep tenantId as STRING (not ObjectId)
+      // Keep vehicleId/driverId as STRING for consistency (app handles string IDs)
       if (tenantId) delete data.tenantId;
 
       const query: any = { _id: id };
       if (tenantId) query.tenantId = tenantId;
-      return await Booking.findOneAndUpdate(query, data, { new: true })
-        .populate('vehicleId')
-        .populate('driverId') || undefined;
+
+      const result = await collection.findOneAndUpdate(query, { $set: data }, { returnDocument: 'after' });
+      return result.value as unknown as IBooking | undefined;
     } catch (error) {
       console.error('Error updating booking:', error);
       return undefined;
@@ -987,10 +988,12 @@ export class MongoDBStorage implements IStorage {
 
   async deleteBooking(id: string, tenantId?: string): Promise<void> {
     try {
-      if (!mongoose.Types.ObjectId.isValid(id)) return;
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('bookings');
+
       const query: any = { _id: id };
       if (tenantId) query.tenantId = tenantId;
-      await Booking.findOneAndDelete(query);
+      await collection.deleteOne(query);
     } catch (error) {
       console.error('Error deleting booking:', error);
       throw error;
