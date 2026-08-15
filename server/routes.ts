@@ -2033,21 +2033,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard Stats
-  app.get("/api/dashboard/stats", async (req: AuthRequest, res) => {
+  app.get("/api/dashboard/stats", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      let tenantId = req.tenantId;
-      if (!tenantId) {
-        const tenants = await storage.getTenants();
-        if (tenants && tenants.length > 0) {
-          tenantId = tenants[0]._id?.toString();
-        }
-      }
-      if (!tenantId) {
-        return res.json({ totalRevenue: 0, totalBookings: 0, fleetSize: 0, activeDrivers: 0 });
-      }
-      const stats = await storage.getTenantStats(tenantId);
+      const stats = await storage.getTenantStats(req.tenantId!);
       res.json(stats);
     } catch (error) {
+      console.error('Dashboard stats error:', error);
       res.status(500).json({ message: "Failed to fetch stats" });
     }
   });
