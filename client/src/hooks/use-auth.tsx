@@ -181,8 +181,13 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       await apiRequest("POST", "/api/auth/logout");
       setUser(null);
 
-      // Clear PWA localStorage data
+      // Clear all auth-related storage to prevent stale auth state
       localStorage.removeItem('fleetpro_user');
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_state');
+      sessionStorage.removeItem('fleetpro_user');
+      sessionStorage.removeItem('auth_state');
+      sessionStorage.removeItem('auth_token');
 
       // Use direct URL redirect to ensure it happens before reload
       // (setLocation is async and reload would fire first)
@@ -192,8 +197,13 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       // Even if logout API fails, clear local state and redirect
       setUser(null);
 
-      // Clear PWA localStorage data
+      // Clear all auth-related storage to prevent stale auth state
       localStorage.removeItem('fleetpro_user');
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_state');
+      sessionStorage.removeItem('fleetpro_user');
+      sessionStorage.removeItem('auth_state');
+      sessionStorage.removeItem('auth_token');
 
       // Use direct URL redirect to ensure it happens before reload
       window.location.href = "/login";
