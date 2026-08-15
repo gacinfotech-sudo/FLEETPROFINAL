@@ -66,6 +66,8 @@ import orchestrationRouter from "./routes/orchestration";
 import fraudDetectionRouter from "./routes/fraud-detection";
 import supportRouter from "./routes/support";
 import feedbackRouter from "./routes/feedback";
+import phase5Router from "./routes/phase5-routes";
+import phase6RBACRouter from "./routes/phase6-rbac-routes";
 import driverEarningsRouter from "./routes/driver-earnings";
 import driversRouter from "./routes/drivers";
 import driverSalaryRouter from "./routes/driverSalaryRoutes";
@@ -869,21 +871,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Logout - revoke refresh token
+  // Logout - destroy session cookie (session-based auth, not token-based)
   app.post("/api/auth/logout", authenticateUser, async (req: AuthRequest, res) => {
     try {
-      const { refreshToken } = req.body;
       const userId = (req as any).user?.userId;
-      const tenantId = (req as any).user?.tenantId;
 
-      if (!refreshToken || !userId || !tenantId) {
-        return res.status(400).json({ message: "Missing required fields" });
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
       }
 
-      const SessionPersistenceService = (await import("./services/session-persistence-service")).default;
-      await SessionPersistenceService.revokeRefreshToken(userId, tenantId, refreshToken);
+      // Destroy the session (express-session will clear the session cookie)
+      req.session.destroy((err) => {
+        if (err) {
+          console.error("Error destroying session:", err);
+          return res.status(500).json({ message: "Logout failed" });
+        }
 
-      res.json({ message: "Logged out successfully" });
+        // Clear the session cookie on the response
+        res.clearCookie('connect.sid', { path: '/', httpOnly: true, secure: false, sameSite: 'lax' });
+
+        res.json({ message: "Logged out successfully" });
+      });
     } catch (error) {
       console.error("Error logging out:", error);
       res.status(500).json({ message: "Logout failed" });
@@ -2046,8 +2054,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User Management Routes (for admins and clients to manage sub-users)
   app.post("/api/users/sub-users", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      // Only allow admin and client users to create sub-users
-      if (req.user?.role !== 'admin' && req.user?.role !== 'client') {
+      // Allow root, admin, and client users to create sub-users (root can create for any tenant)
+      const canCreate = req.user?.role === 'root' || req.user?.role === 'admin' || req.user?.role === 'client';
+      if (!canCreate) {
         return res.status(403).json({ message: "Access denied. Only admins and clients can create sub-users." });
       }
 
@@ -12308,6 +12317,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: error.message });
     }
   });
+
+  // ========== PHASE 5: ADVANCED FEATURES ==========
+  app.use(phase5Router);
+
+  // ========== PHASE 6: RBAC MANAGEMENT ==========
+  app.use(phase6RBACRouter);
 
   const httpServer = createServer(app);
 

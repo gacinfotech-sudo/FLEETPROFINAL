@@ -180,24 +180,23 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
     try {
       await apiRequest("POST", "/api/auth/logout");
       setUser(null);
-      
+
       // Clear PWA localStorage data
       localStorage.removeItem('fleetpro_user');
-      
-      setLocation("/login");
-      // Force page refresh to clear all cached state
-      window.location.reload();
+
+      // Use direct URL redirect to ensure it happens before reload
+      // (setLocation is async and reload would fire first)
+      window.location.href = "/login";
     } catch (error) {
       console.error("Logout failed:", error);
       // Even if logout API fails, clear local state and redirect
       setUser(null);
-      
+
       // Clear PWA localStorage data
       localStorage.removeItem('fleetpro_user');
-      
-      setLocation("/login");
-      // Force page refresh to clear all cached state
-      window.location.reload();
+
+      // Use direct URL redirect to ensure it happens before reload
+      window.location.href = "/login";
     }
   };
 

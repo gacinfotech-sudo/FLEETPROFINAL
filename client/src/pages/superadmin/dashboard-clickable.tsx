@@ -1,11 +1,22 @@
 import { useLocation } from 'wouter';
-import { Users, TrendingUp, Clock, Lock, DollarSign, AlertCircle, CheckCircle, Clock as ClockIcon } from 'lucide-react';
+import { Users, TrendingUp, Clock, Lock, DollarSign, AlertCircle, CheckCircle, Clock as ClockIcon, LogOut } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/use-auth';
+import { Button } from '@/components/ui/button';
 
 export default function SuperAdminDashboard() {
   const [, setLocation] = useLocation();
+  const { logout } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
 
   useEffect(() => {
     fetch('/api/saas/dashboard/stats')
@@ -99,9 +110,19 @@ export default function SuperAdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6 lg:p-8">
-      <div className="mb-8">
-        <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">🚀 SaaS Platform Admin</h1>
-        <p className="text-gray-600">Platform overview and management</p>
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-2">🚀 SaaS Platform Admin</h1>
+          <p className="text-gray-600">Platform overview and management</p>
+        </div>
+        <Button
+          variant="ghost"
+          className="text-red-600 hover:bg-red-50 hover:text-red-700 transition-all h-10 px-4"
+          onClick={handleLogout}
+        >
+          <LogOut size={18} className="mr-2" />
+          Logout
+        </Button>
       </div>
 
       {/* MAIN METRICS - ALL CLICKABLE */}
