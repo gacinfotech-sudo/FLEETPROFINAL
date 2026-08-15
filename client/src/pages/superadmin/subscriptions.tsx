@@ -5,10 +5,14 @@ export default function Subscriptions() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/saas/subscriptions')
+    fetch('/api/subscription/admin/all')
       .then(r => r.json())
       .then(data => {
-        setSubscriptions(data.subscriptions || []);
+        setSubscriptions(data.subscriptions || data || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch subscriptions:', err);
         setLoading(false);
       });
   }, []);

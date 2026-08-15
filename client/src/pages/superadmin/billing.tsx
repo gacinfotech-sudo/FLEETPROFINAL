@@ -5,10 +5,14 @@ export default function Billing() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/saas/billing')
+    fetch('/api/saas/admin/billing')
       .then(r => r.json())
       .then(data => {
         setBilling(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch billing:', err);
         setLoading(false);
       });
   }, []);

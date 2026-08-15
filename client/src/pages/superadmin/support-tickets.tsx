@@ -7,10 +7,14 @@ export default function SupportTickets() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    fetch('/api/saas/support/tickets')
+    fetch('/api/saas/admin/support-tickets')
       .then(r => r.json())
       .then(data => {
         setTickets(data.tickets || []);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to fetch tickets:', err);
         setLoading(false);
       });
   }, []);
