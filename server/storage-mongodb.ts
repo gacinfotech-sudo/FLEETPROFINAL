@@ -443,7 +443,7 @@ export class MongoDBStorage implements IStorage {
       // Convert tenantId string to ObjectId if provided
       if (userData.tenantId && typeof userData.tenantId === 'string') {
         console.log('Converting tenantId from string to ObjectId:', userData.tenantId);
-        userData.tenantId = new mongoose.Types.ObjectId(userData.tenantId);
+        // userData.tenantId = new mongoose.Types.ObjectId(userData.tenantId); - REMOVED: Keep tenantId as STRING
       }
 
       console.log('Creating user with data:', { ...userData, password: '[HIDDEN]' });
@@ -524,7 +524,7 @@ export class MongoDBStorage implements IStorage {
 
       // Convert tenantId string to ObjectId if provided
       if (data.tenantId && typeof data.tenantId === 'string') {
-        data.tenantId = new mongoose.Types.ObjectId(data.tenantId);
+        // data.tenantId = new mongoose.Types.ObjectId(data.tenantId); - REMOVED: Keep tenantId as STRING
       }
 
       return await User.findByIdAndUpdate(id, data, { new: true }).populate('tenantId') || undefined;
@@ -548,7 +548,7 @@ export class MongoDBStorage implements IStorage {
     try {
       // Convert tenantId string to ObjectId if provided
       if (vehicleData.tenantId && typeof vehicleData.tenantId === 'string') {
-        vehicleData.tenantId = new mongoose.Types.ObjectId(vehicleData.tenantId);
+        // vehicleData.tenantId = new mongoose.Types.ObjectId(vehicleData.tenantId); - REMOVED: Keep tenantId as STRING
       }
 
       const vehicle = new Vehicle(vehicleData);
@@ -592,7 +592,7 @@ export class MongoDBStorage implements IStorage {
       if (!mongoose.Types.ObjectId.isValid(id)) return undefined;
       // Convert tenantId string to ObjectId if provided
       if (data.tenantId && typeof data.tenantId === 'string') {
-        data.tenantId = new mongoose.Types.ObjectId(data.tenantId);
+        // data.tenantId = new mongoose.Types.ObjectId(data.tenantId); - REMOVED: Keep tenantId as STRING
       }
       // Never allow a request body to move a record to a different tenant.
       if (tenantId) delete data.tenantId;
@@ -659,11 +659,8 @@ export class MongoDBStorage implements IStorage {
   // Driver methods
   async createDriver(driverData: any): Promise<IDriver> {
     try {
-      // Convert tenantId string to ObjectId if provided
-      if (driverData.tenantId && typeof driverData.tenantId === 'string') {
-        driverData.tenantId = new mongoose.Types.ObjectId(driverData.tenantId);
-      }
-
+      // Keep tenantId as STRING to match getDriversByTenant query
+      // (which queries with string tenantId, not ObjectId)
       const driver = new Driver(driverData);
       return await driver.save();
     } catch (error) {
@@ -701,7 +698,7 @@ export class MongoDBStorage implements IStorage {
       if (!mongoose.Types.ObjectId.isValid(id)) return undefined;
       // Convert tenantId string to ObjectId if provided
       if (data.tenantId && typeof data.tenantId === 'string') {
-        data.tenantId = new mongoose.Types.ObjectId(data.tenantId);
+        // data.tenantId = new mongoose.Types.ObjectId(data.tenantId); - REMOVED: Keep tenantId as STRING
       }
       if (tenantId) delete data.tenantId;
 
@@ -789,7 +786,7 @@ export class MongoDBStorage implements IStorage {
 
     // Convert string IDs to ObjectIds if provided
     if (bookingData.tenantId && typeof bookingData.tenantId === 'string') {
-      bookingData.tenantId = new mongoose.Types.ObjectId(bookingData.tenantId);
+      // bookingData.tenantId = new mongoose.Types.ObjectId(bookingData.tenantId); - REMOVED: Keep tenantId as STRING
     }
     if (bookingData.vehicleId && typeof bookingData.vehicleId === 'string') {
       bookingData.vehicleId = new mongoose.Types.ObjectId(bookingData.vehicleId);
@@ -966,7 +963,7 @@ export class MongoDBStorage implements IStorage {
       if (!mongoose.Types.ObjectId.isValid(id)) return undefined;
       // Convert string IDs to ObjectIds if provided
       if (data.tenantId && typeof data.tenantId === 'string') {
-        data.tenantId = new mongoose.Types.ObjectId(data.tenantId);
+        // data.tenantId = new mongoose.Types.ObjectId(data.tenantId); - REMOVED: Keep tenantId as STRING
       }
       if (data.vehicleId && typeof data.vehicleId === 'string') {
         data.vehicleId = new mongoose.Types.ObjectId(data.vehicleId);
@@ -1320,7 +1317,7 @@ export class MongoDBStorage implements IStorage {
 
       // Convert tenantId string to ObjectId if provided
       if (userData.tenantId && typeof userData.tenantId === 'string') {
-        userData.tenantId = new mongoose.Types.ObjectId(userData.tenantId);
+        // userData.tenantId = new mongoose.Types.ObjectId(userData.tenantId); - REMOVED: Keep tenantId as STRING
       }
 
       console.log('Creating sub-user with data:', { ...userData, password: '[HIDDEN]' });
@@ -1648,7 +1645,7 @@ export class MongoDBStorage implements IStorage {
     try {
       const expense = new Expense({
         ...expenseData,
-        tenantId: new mongoose.Types.ObjectId(expenseData.tenantId),
+        tenantId: expenseData.tenantId, // REMOVED ObjectId conversion
         vehicleId: new mongoose.Types.ObjectId(expenseData.vehicleId),
         createdAt: new Date()
       });
