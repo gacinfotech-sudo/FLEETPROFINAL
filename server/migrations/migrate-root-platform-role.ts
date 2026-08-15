@@ -7,10 +7,8 @@ export async function migrateRootPlatformRole() {
   try {
     console.log("🔄 Checking ROOT user platformRole...");
 
-    // Get ROOT user
-    const rootUser = await (storage as any).collection('users').findOne({
-      userId: 'fleet_root_admin_1d2af76b'
-    });
+    // Get ROOT user using storage method
+    const rootUser = await storage.getUser('fleet_root_admin_1d2af76b');
 
     if (!rootUser) {
       console.log("⚠️  ROOT user not found, skipping migration");
@@ -23,20 +21,14 @@ export async function migrateRootPlatformRole() {
     }
 
     // Update ROOT user with platformRole
-    const result = await (storage as any).collection('users').updateOne(
-      { userId: 'fleet_root_admin_1d2af76b' },
-      {
-        $set: {
-          platformRole: 'PLATFORM_ROOT',
-          updatedAt: new Date()
-        }
-      }
-    );
+    const updatedUser = await storage.updateUser(rootUser._id.toString(), {
+      platformRole: 'PLATFORM_ROOT'
+    });
 
-    if (result.modifiedCount > 0) {
+    if (updatedUser) {
       console.log("✅ ROOT user updated: platformRole set to PLATFORM_ROOT");
     } else {
-      console.log("ℹ️  ROOT user not modified (already correct)");
+      console.log("ℹ️  ROOT user not modified (update failed)");
     }
 
   } catch (error) {
