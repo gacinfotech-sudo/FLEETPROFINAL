@@ -1,0 +1,23 @@
+
+> rest-express@1.0.0 test:smoke
+> tsx tests/smoke.test.ts
+
+node:internal/modules/package_json_reader:301
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'node-fetch' imported from /Users/pradeep/fleetpro-final-recovery/tests/smoke.test.ts
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:301:9)
+    at packageResolve (node:internal/modules/esm/resolve:768:81)
+    at moduleResolve (node:internal/modules/esm/resolve:859:18)
+    at defaultResolve (node:internal/modules/esm/resolve:992:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:701:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:721:38)
+    at nextStep (node:internal/modules/customization_hooks:189:26)
+    at resolveBaseSync (file:///Users/pradeep/fleetpro-final-recovery/node_modules/tsx/dist/register-B_kKY3fL.mjs:2:9102)
+    at resolveDirectorySync (file:///Users/pradeep/fleetpro-final-recovery/node_modules/tsx/dist/register-B_kKY3fL.mjs:2:10315)
+    at resolveTsPathsSync (file:///Users/pradeep/fleetpro-final-recovery/node_modules/tsx/dist/register-B_kKY3fL.mjs:2:11547) {
+  code: 'ERR_MODULE_NOT_FOUND'
+}
+
+Node.js v24.19.0

@@ -1,0 +1,45 @@
+(node:4833) [MONGOOSE] Warning: Duplicate schema index on {"code":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4833) [MONGOOSE] Warning: Duplicate schema index on {"ticketNumber":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+[dotenv@17.0.0] injecting env (13) from .env – 🔐 encrypt with dotenvx: https://dotenvx.com
+[dotenv@17.0.0] injecting env (13) from .env – 🔐 encrypt with dotenvx: https://dotenvx.com
+[dotenv@17.0.0] injecting env (13) from .env – 🔐 encrypt with dotenvx: https://dotenvx.com
+Error: driver-fixtures.ts: MONGODB_URI (mongodb://127.0.0.1:27017/fleetpro) resolves to the shared dev 'fleetpro' database. This task requires a genuinely separate database name — see TASK-DRIVER-QA-SECURITY-07's Wave 1 objective. Fix this worktree's .env.
+
+   at tests/e2e/helpers/driver-fixtures.ts:50
+
+  48 |
+  49 | if (/\/fleetpro$/.test(ISOLATED_MONGODB_URI.split('?')[0])) {
+> 50 |   throw new Error(
+     |         ^
+  51 |     `driver-fixtures.ts: MONGODB_URI (${ISOLATED_MONGODB_URI}) resolves to the shared dev ` +
+  52 |     `'fleetpro' database. This task requires a genuinely separate database name — see ` +
+  53 |     `TASK-DRIVER-QA-SECURITY-07's Wave 1 objective. Fix this worktree's .env.`
+    at /Users/pradeep/fleetpro-final-recovery/tests/e2e/helpers/driver-fixtures.ts:50:9
+
+Error: driver-fixtures.ts: MONGODB_URI (mongodb://127.0.0.1:27017/fleetpro) resolves to the shared dev 'fleetpro' database. This task requires a genuinely separate database name — see TASK-DRIVER-QA-SECURITY-07's Wave 1 objective. Fix this worktree's .env.
+
+   at tests/e2e/helpers/driver-fixtures.ts:50
+
+  48 |
+  49 | if (/\/fleetpro$/.test(ISOLATED_MONGODB_URI.split('?')[0])) {
+> 50 |   throw new Error(
+     |         ^
+  51 |     `driver-fixtures.ts: MONGODB_URI (${ISOLATED_MONGODB_URI}) resolves to the shared dev ` +
+  52 |     `'fleetpro' database. This task requires a genuinely separate database name — see ` +
+  53 |     `TASK-DRIVER-QA-SECURITY-07's Wave 1 objective. Fix this worktree's .env.`
+    at /Users/pradeep/fleetpro-final-recovery/tests/e2e/helpers/driver-fixtures.ts:50:9
+
+Error: driver-fixtures.ts: MONGODB_URI (mongodb://127.0.0.1:27017/fleetpro) resolves to the shared dev 'fleetpro' database. This task requires a genuinely separate database name — see TASK-DRIVER-QA-SECURITY-07's Wave 1 objective. Fix this worktree's .env.
+
+   at tests/e2e/helpers/driver-fixtures.ts:50
+
+  48 |
+  49 | if (/\/fleetpro$/.test(ISOLATED_MONGODB_URI.split('?')[0])) {
+> 50 |   throw new Error(
+     |         ^
+  51 |     `driver-fixtures.ts: MONGODB_URI (${ISOLATED_MONGODB_URI}) resolves to the shared dev ` +
+  52 |     `'fleetpro' database. This task requires a genuinely separate database name — see ` +
+  53 |     `TASK-DRIVER-QA-SECURITY-07's Wave 1 objective. Fix this worktree's .env.`
+    at /Users/pradeep/fleetpro-final-recovery/tests/e2e/helpers/driver-fixtures.ts:50:9
+

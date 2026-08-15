@@ -1,0 +1,165 @@
+[2026-08-15T19:58:16.360Z] [VAPIDConfig:WARN] VAPID keys not configured. Push notifications will be disabled. { hasPublicKey: false, hasPrivateKey: false }
+[2026-08-15T19:58:16.361Z] [ProductionHardening:INFO] Production hardening initialized 
+[dotenv@17.0.0] injecting env (13) from .env – 🔐 encrypt with dotenvx: https://dotenvx.com
+🔗 Connecting to MongoDB (attempt 1/3)...
+(node:4629) [MONGOOSE] Warning: Duplicate schema index on {"code":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4629) [MONGOOSE] Warning: Duplicate schema index on {"ticketNumber":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+✅ MongoDB Connected: 127.0.0.1
+📊 Database: fleetpro
+[2026-08-15T19:58:16.509Z] [Server:INFO] MongoDB connected successfully { database: 'fleetpro' }
+[2026-08-15T19:58:16.509Z] [Server:INFO] Using existing secure admin credentials 
+⚠️  No emergency admin credentials found in environment variables
+🔄 Checking ROOT user platformRole...
+✅ ROOT user already has platformRole: PLATFORM_ROOT
+🔄 Checking database initialization...
+✅ Platform company initialized
+✅ Database initialization complete
+[2026-08-15T19:58:16.556Z] [NotificationIndexes:INFO] Ensuring notification system indexes 
+[2026-08-15T19:58:16.558Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'scheduled_notifications',
+  index: 'idx_scheduled_status_scheduledFor'
+}
+[2026-08-15T19:58:16.559Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'scheduled_notifications',
+  index: 'idx_scheduled_scheduledFor'
+}
+[2026-08-15T19:58:16.559Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'scheduled_notifications',
+  index: 'idx_scheduled_recurrenceEndDate_status'
+}
+[2026-08-15T19:58:16.559Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'scheduled_notifications',
+  index: 'idx_scheduled_ttl_90days'
+}
+[2026-08-15T19:58:16.559Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_notificationId' }
+[2026-08-15T19:58:16.559Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_userId_sentAt' }
+[2026-08-15T19:58:16.560Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_status_sentAt' }
+[2026-08-15T19:58:16.560Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_sentAt' }
+[2026-08-15T19:58:16.560Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'notification_logs',
+  index: 'idx_logs_notificationType_sentAt'
+}
+[2026-08-15T19:58:16.561Z] [NotificationIndexes:WARN] Failed to create index {
+  collection: 'notification_logs',
+  index: 'idx_logs_ttl_30days',
+  error: MongoServerError: An equivalent index already exists with a different name and options. Requested index: { v: 2, key: { sentAt: 1 }, name: "idx_logs_ttl_30days", expireAfterSeconds: 2592000 }, existing index: { v: 2, key: { sentAt: 1 }, name: "idx_logs_sentAt", sparse: false }
+      at Connection.sendCommand (/Users/pradeep/fleetpro-final-recovery/node_modules/mongodb/src/cmap/connection.ts:559:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Connection.command (/Users/pradeep/fleetpro-final-recovery/node_modules/mongodb/src/cmap/connection.ts:633:22)
+      at async Server.command (/Users/pradeep/fleetpro-final-recovery/node_modules/mongodb/src/sdam/server.ts:350:21)
+      at async tryOperation (/Users/pradeep/fleetpro-final-recovery/node_modules/mongodb/src/operations/execute_operation.ts:289:24)
+      at async executeOperation (/Users/pradeep/fleetpro-final-recovery/node_modules/mongodb/src/operations/execute_operation.ts:119:12)
+      at async Collection.createIndex (/Users/pradeep/fleetpro-final-recovery/node_modules/mongodb/src/collection.ts:640:21)
+      at async NotificationIndexManager.ensureCollectionIndexes (/Users/pradeep/fleetpro-final-recovery/server/utils/notificationIndexes.ts:140:11)
+      at async NotificationIndexManager.ensureIndexes (/Users/pradeep/fleetpro-final-recovery/server/utils/notificationIndexes.ts:122:7)
+      at async <anonymous> (/Users/pradeep/fleetpro-final-recovery/server/index.ts:222:5) {
+    errorLabelSet: Set(0) {},
+    errorResponse: {
+      ok: 0,
+      errmsg: 'An equivalent index already exists with a different name and options. Requested index: { v: 2, key: { sentAt: 1 }, name: "idx_logs_ttl_30days", expireAfterSeconds: 2592000 }, existing index: { v: 2, key: { sentAt: 1 }, name: "idx_logs_sentAt", sparse: false }',
+      code: 85,
+      codeName: 'IndexOptionsConflict'
+    },
+    ok: 0,
+    code: 85,
+    codeName: 'IndexOptionsConflict'
+  }
+}
+[2026-08-15T19:58:16.563Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_analytics' }
+[2026-08-15T19:58:16.563Z] [NotificationIndexes:INFO] All notification indexes verified 
+[2026-08-15T19:58:16.563Z] [Server:INFO] Notification indexes verified 
+[2026-08-15T19:58:16.564Z] [Server:INFO] Notification templates initialized 
+[2026-08-15T19:58:16.564Z] [NotificationScheduler:INFO] Notification scheduler started 
+[2026-08-15T19:58:16.564Z] [Server:INFO] Notification scheduler started 
+[2026-08-15T19:58:16.564Z] [NotificationRetry:INFO] Notification retry manager started 
+[2026-08-15T19:58:16.564Z] [Server:INFO] Notification retry manager started 
+[2026-08-15T19:58:16.564Z] [NotificationRateLimiter:INFO] Notification rate limiter started 
+[2026-08-15T19:58:16.565Z] [Server:INFO] Notification rate limiter started 
+[2026-08-15T19:58:16.565Z] [NotificationWebhooks:INFO] Notification webhook manager started 
+[2026-08-15T19:58:16.565Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 
+[2026-08-15T19:58:16.565Z] [Server:INFO] Notification webhook manager started 
+[2026-08-15T19:58:16.565Z] [NotificationBatchProcessor:INFO] Notification batch processor started 
+[2026-08-15T19:58:16.565Z] [Server:INFO] Notification batch processor started 
+1:28:16 AM [express] MongoDB connected - starting background job
+[operations] booking-end reminder scheduler started (every 60000ms)
+[SCHEDULER] Initializing auto-sync scheduler...
+[SCHEDULER] ✅ Hourly sync job scheduled (every hour)
+[SCHEDULER] ✅ Monthly payroll job scheduled (1st of month at 1 AM)
+[SCHEDULER] ✅ Daily cleanup job scheduled (daily at 2 AM)
+[SCHEDULER] ✅ All jobs initialized successfully
+🚀 Initializing SaaS Scheduler...
+
+📅 Scheduled: Hourly tenant metrics sync (0 * * * *)
+📅 Scheduled: Billing data sync every 6 hours (0 */6 * * *)
+📅 Scheduled: Daily comprehensive sync at 2 AM (0 2 * * *)
+📅 Scheduled: Customer analytics refresh every 30 min (*/30 * * * *)
+✅ All SaaS scheduled jobs initialized
+
+[Billing Scheduler] Started (runs daily at 00:01 UTC)
+1:28:16 AM [express] 🔒 serving HTTPS on 0.0.0.0:5050
+[2026-08-15T19:58:16.599Z] [Server:INFO] HTTPS server started { host: '0.0.0.0', port: 5050, ssl: true }
+[RequestLogger:DEBUG] [POST] /api/auth/login { ip: '127.0.0.1', userAgent: 'curl/8.7.1' }
+✅ Secure login: user=fleet_root_admin_1d2af76b, role=admin, ip=127.0.0.1, time=2026-08-15T19:58:19.579Z
+🔐 Login response for fleet_root_admin_1d2af76b: { role: 'admin', platformRole: 'PLATFORM_ROOT', tenantId: undefined }
+[RequestLogger:DEBUG] [POST] /api/auth/login - 200 { duration: '226ms' }
+1:28:19 AM [express] POST /api/auth/login 200 in 221ms :: {"user":{"id":"6a7ef89a191f4d2bb61e4ecf","…
+[RequestLogger:DEBUG] [GET] /api/auth/me { ip: '127.0.0.1', userAgent: 'curl/8.7.1' }
+User authenticated: { userId: 'fleet_root_admin_1d2af76b', role: 'admin' }
+[RequestLogger:DEBUG] [GET] /api/auth/me - 200 { duration: '6ms' }
+1:28:19 AM [express] GET /api/auth/me 200 in 10ms :: {"user":{"id":"6a7ef89a191f4d2bb61e4ecf","userI…
+[RequestLogger:DEBUG] [POST] /api/auth/login { ip: '127.0.0.1', userAgent: 'curl/8.7.1' }
+✅ Secure login: user=gate4_tenant_user, role=client, ip=127.0.0.1, time=2026-08-15T19:58:19.823Z
+🔐 Login response for gate4_tenant_user: {
+  role: 'client',
+  platformRole: undefined,
+  tenantId: new ObjectId('6a80c3aa82225e7b129c1062')
+}
+[RequestLogger:DEBUG] [POST] /api/auth/login - 200 { duration: '198ms' }
+1:28:20 AM [express] POST /api/auth/login 200 in 198ms :: {"user":{"id":"6a80c3aa82225e7b129c1063","…
+[RequestLogger:DEBUG] [GET] /api/auth/me { ip: '127.0.0.1', userAgent: 'curl/8.7.1' }
+User authenticated: { userId: 'gate4_tenant_user', role: 'client' }
+[RequestLogger:DEBUG] [GET] /api/auth/me - 200 { duration: '5ms' }
+1:28:20 AM [express] GET /api/auth/me 200 in 8ms :: {"user":{"id":"6a80c3aa82225e7b129c1063","userId…
+[RequestLogger:DEBUG] [POST] /api/auth/login { ip: '127.0.0.1', userAgent: 'curl/8.7.1' }
+✅ Secure login: user=fleet_root_admin_1d2af76b, role=admin, ip=127.0.0.1, time=2026-08-15T19:58:28.163Z
+🔐 Login response for fleet_root_admin_1d2af76b: { role: 'admin', platformRole: 'PLATFORM_ROOT', tenantId: undefined }
+[RequestLogger:DEBUG] [POST] /api/auth/login - 200 { duration: '740ms' }
+1:28:28 AM [express] POST /api/auth/login 200 in 740ms :: {"user":{"id":"6a7ef89a191f4d2bb61e4ecf","…
+[RequestLogger:DEBUG] [GET] /api/root/dashboard { ip: '127.0.0.1', userAgent: 'curl/8.7.1' }
+User authenticated: { userId: 'fleet_root_admin_1d2af76b', role: 'admin' }
+[root-audit-placeholder] {"actorUserId":"fleet_root_admin_1d2af76b","actorPlatformRole":"PLATFORM_ROOT","action":"root.dashboard.view","at":"2026-08-15T19:58:28.424Z"}
+[RequestLogger:DEBUG] [GET] /api/root/dashboard - 200 { duration: '16ms' }
+1:28:28 AM [express] GET /api/root/dashboard 200 in 18ms :: {"tenants":{"total":8,"active":7,"trial"…
+[RequestLogger:DEBUG] [POST] /api/root/tenants { ip: '127.0.0.1', userAgent: 'curl/8.7.1' }
+User authenticated: { userId: 'fleet_root_admin_1d2af76b', role: 'admin' }
+User authenticated: { userId: 'fleet_root_admin_1d2af76b', role: 'admin' }
+1:28:28 AM [express] POST /api/root/tenants 404 in 8ms
+[RequestLogger:DEBUG] [POST] /api/auth/login { ip: '127.0.0.1', userAgent: 'curl/8.7.1' }
+✅ Secure login: user=fleet_root_admin_1d2af76b, role=admin, ip=127.0.0.1, time=2026-08-15T19:58:46.313Z
+🔐 Login response for fleet_root_admin_1d2af76b: { role: 'admin', platformRole: 'PLATFORM_ROOT', tenantId: undefined }
+[RequestLogger:DEBUG] [POST] /api/auth/login - 200 { duration: '729ms' }
+1:28:46 AM [express] POST /api/auth/login 200 in 729ms :: {"user":{"id":"6a7ef89a191f4d2bb61e4ecf","…
+[RequestLogger:DEBUG] [POST] /api/platform/tenants { ip: '127.0.0.1', userAgent: 'curl/8.7.1' }
+User authenticated: { userId: 'fleet_root_admin_1d2af76b', role: 'admin' }
+[RequestLogger:DEBUG] [POST] /api/platform/tenants - 201 { duration: '8ms' }
+1:28:46 AM [express] POST /api/platform/tenants 201 in 10ms :: {"success":true,"id":"6a80c4f68e97e77…
+[2026-08-15T19:59:16.566Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 
+⏰ [2026-08-15T20:00:00.003Z] Running customer analytics update...
+Error syncing customer analytics: TypeError: storage.getDb is not a function
+    at SaaSDataSyncService.syncCustomerAnalytics (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:174:32)
+    at <anonymous> (/Users/pradeep/fleetpro-final-recovery/server/services/saas-scheduler-service.ts:94:50)
+    at Runner.onMatch (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/tasks/inline-scheduled-task.ts:111:14)
+    at execute (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:194:37)
+    at runTask (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:237:15)
+    at async Runner.runCoordinated (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:125:7)
+    at async <anonymous> (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:275:13)
+❌ Customer analytics update failed: TypeError: storage.getDb is not a function
+    at SaaSDataSyncService.syncCustomerAnalytics (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:174:32)
+    at <anonymous> (/Users/pradeep/fleetpro-final-recovery/server/services/saas-scheduler-service.ts:94:50)
+    at Runner.onMatch (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/tasks/inline-scheduled-task.ts:111:14)
+    at execute (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:194:37)
+    at runTask (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:237:15)
+    at async Runner.runCoordinated (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:125:7)
+    at async <anonymous> (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:275:13)
+[2026-08-15T20:00:16.567Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 

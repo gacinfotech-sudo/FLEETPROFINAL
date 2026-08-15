@@ -1,0 +1,1552 @@
+[2026-08-15T20:24:10.320Z] [VAPIDConfig:WARN] VAPID keys not configured. Push notifications will be disabled. { hasPublicKey: false, hasPrivateKey: false }
+[2026-08-15T20:24:10.320Z] [ProductionHardening:INFO] Production hardening initialized 
+[dotenv@17.0.0] injecting env (13) from .env – 🔐 encrypt with dotenvx: https://dotenvx.com
+🔗 Connecting to MongoDB (attempt 1/3)...
+(node:5591) [MONGOOSE] Warning: Duplicate schema index on {"code":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:5591) [MONGOOSE] Warning: Duplicate schema index on {"ticketNumber":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+✅ MongoDB Connected: 127.0.0.1
+📊 Database: fleetpro
+[2026-08-15T20:24:10.461Z] [Server:INFO] MongoDB connected successfully { database: 'fleetpro' }
+[2026-08-15T20:24:10.461Z] [Server:INFO] Using existing secure admin credentials 
+⚠️  No emergency admin credentials found in environment variables
+🔄 Checking ROOT user platformRole...
+✅ ROOT user already has platformRole: PLATFORM_ROOT
+🔄 Checking database initialization...
+✅ Platform company initialized
+✅ Database initialization complete
+[2026-08-15T20:24:10.511Z] [NotificationIndexes:INFO] Ensuring notification system indexes 
+[2026-08-15T20:24:10.512Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'scheduled_notifications',
+  index: 'idx_scheduled_status_scheduledFor'
+}
+[2026-08-15T20:24:10.512Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'scheduled_notifications',
+  index: 'idx_scheduled_scheduledFor'
+}
+[2026-08-15T20:24:10.512Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'scheduled_notifications',
+  index: 'idx_scheduled_recurrenceEndDate_status'
+}
+[2026-08-15T20:24:10.513Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'scheduled_notifications',
+  index: 'idx_scheduled_ttl_90days'
+}
+[2026-08-15T20:24:10.513Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_notificationId' }
+[2026-08-15T20:24:10.513Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_userId_sentAt' }
+[2026-08-15T20:24:10.514Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_status_sentAt' }
+[2026-08-15T20:24:10.514Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_sentAt' }
+[2026-08-15T20:24:10.514Z] [NotificationIndexes:INFO] Index created/verified {
+  collection: 'notification_logs',
+  index: 'idx_logs_notificationType_sentAt'
+}
+[2026-08-15T20:24:10.515Z] [NotificationIndexes:WARN] Failed to create index {
+  collection: 'notification_logs',
+  index: 'idx_logs_ttl_30days',
+  error: MongoServerError: An equivalent index already exists with a different name and options. Requested index: { v: 2, key: { sentAt: 1 }, name: "idx_logs_ttl_30days", expireAfterSeconds: 2592000 }, existing index: { v: 2, key: { sentAt: 1 }, name: "idx_logs_sentAt", sparse: false }
+      at Connection.sendCommand (/Users/pradeep/fleetpro-final-recovery/node_modules/mongodb/src/cmap/connection.ts:559:17)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Connection.command (/Users/pradeep/fleetpro-final-recovery/node_modules/mongodb/src/cmap/connection.ts:633:22)
+      at async Server.command (/Users/pradeep/fleetpro-final-recovery/node_modules/mongodb/src/sdam/server.ts:350:21)
+      at async tryOperation (/Users/pradeep/fleetpro-final-recovery/node_modules/mongodb/src/operations/execute_operation.ts:289:24)
+      at async executeOperation (/Users/pradeep/fleetpro-final-recovery/node_modules/mongodb/src/operations/execute_operation.ts:119:12)
+      at async Collection.createIndex (/Users/pradeep/fleetpro-final-recovery/node_modules/mongodb/src/collection.ts:640:21)
+      at async NotificationIndexManager.ensureCollectionIndexes (/Users/pradeep/fleetpro-final-recovery/server/utils/notificationIndexes.ts:140:11)
+      at async NotificationIndexManager.ensureIndexes (/Users/pradeep/fleetpro-final-recovery/server/utils/notificationIndexes.ts:122:7)
+      at async <anonymous> (/Users/pradeep/fleetpro-final-recovery/server/index.ts:216:5) {
+    errorLabelSet: Set(0) {},
+    errorResponse: {
+      ok: 0,
+      errmsg: 'An equivalent index already exists with a different name and options. Requested index: { v: 2, key: { sentAt: 1 }, name: "idx_logs_ttl_30days", expireAfterSeconds: 2592000 }, existing index: { v: 2, key: { sentAt: 1 }, name: "idx_logs_sentAt", sparse: false }',
+      code: 85,
+      codeName: 'IndexOptionsConflict'
+    },
+    ok: 0,
+    code: 85,
+    codeName: 'IndexOptionsConflict'
+  }
+}
+[2026-08-15T20:24:10.517Z] [NotificationIndexes:INFO] Index created/verified { collection: 'notification_logs', index: 'idx_logs_analytics' }
+[2026-08-15T20:24:10.517Z] [NotificationIndexes:INFO] All notification indexes verified 
+[2026-08-15T20:24:10.517Z] [Server:INFO] Notification indexes verified 
+[2026-08-15T20:24:10.519Z] [Server:INFO] Notification templates initialized 
+[2026-08-15T20:24:10.519Z] [NotificationScheduler:INFO] Notification scheduler started 
+[2026-08-15T20:24:10.519Z] [Server:INFO] Notification scheduler started 
+[2026-08-15T20:24:10.519Z] [NotificationRetry:INFO] Notification retry manager started 
+[2026-08-15T20:24:10.519Z] [Server:INFO] Notification retry manager started 
+[2026-08-15T20:24:10.519Z] [NotificationRateLimiter:INFO] Notification rate limiter started 
+[2026-08-15T20:24:10.521Z] [Server:INFO] Notification rate limiter started 
+[2026-08-15T20:24:10.521Z] [NotificationWebhooks:INFO] Notification webhook manager started 
+[2026-08-15T20:24:10.521Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 
+[2026-08-15T20:24:10.521Z] [Server:INFO] Notification webhook manager started 
+[2026-08-15T20:24:10.521Z] [NotificationBatchProcessor:INFO] Notification batch processor started 
+[2026-08-15T20:24:10.521Z] [Server:INFO] Notification batch processor started 
+1:54:10 AM [express] MongoDB connected - starting background job
+[operations] booking-end reminder scheduler started (every 60000ms)
+[SCHEDULER] Initializing auto-sync scheduler...
+[SCHEDULER] ✅ Hourly sync job scheduled (every hour)
+[SCHEDULER] ✅ Monthly payroll job scheduled (1st of month at 1 AM)
+[SCHEDULER] ✅ Daily cleanup job scheduled (daily at 2 AM)
+[SCHEDULER] ✅ All jobs initialized successfully
+🚀 Initializing SaaS Scheduler...
+
+📅 Scheduled: Hourly tenant metrics sync (0 * * * *)
+📅 Scheduled: Billing data sync every 6 hours (0 */6 * * *)
+📅 Scheduled: Daily comprehensive sync at 2 AM (0 2 * * *)
+📅 Scheduled: Customer analytics refresh every 30 min (*/30 * * * *)
+✅ All SaaS scheduled jobs initialized
+
+[Billing Scheduler] Started (runs daily at 00:01 UTC)
+1:54:10 AM [express] 🔒 serving HTTPS on 0.0.0.0:5050
+[2026-08-15T20:24:10.548Z] [Server:INFO] HTTPS server started { host: '0.0.0.0', port: 5050, ssl: true }
+[RequestLogger:DEBUG] [GET] / {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@vite/client {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+Browserslist: browsers data (caniuse-lite) is 14 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+[RequestLogger:DEBUG] [GET] /src/main.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@react-refresh {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /manifest.json {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/react_jsx-dev-runtime.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/react-dom_client.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/index.css {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/vite/dist/client/env.mjs {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/App.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/wouter.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@tanstack_react-query.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/queryClient.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/toaster.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] / {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/tooltip.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/use-auth.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/booking-workspace-context.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/offline-notification.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/error-boundary.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/landing.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/login.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/admin-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/dashboard.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/tenant-360.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/vehicle-360.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/forced-password-reset.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/auth/protected-route.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-login.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-portal.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/dashboard.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/tenants.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/tenant-360.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/global-customers.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/customer-360.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/security-center.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/audit-log.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/support-tickets.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/error-center.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/diagnostics.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/sales-pipeline.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/product-config.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/root/feature-flags.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/root/support-access-banner.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-payroll-dashboard.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/vendor-settlement-portal.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/platform-admin-360.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/operations-center.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/live-bookings.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/upcoming-bookings.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/superadmin/dashboard-clickable.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/superadmin/tenants-list.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/superadmin/tenant-360.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/superadmin/plans.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/superadmin/company-profile.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/superadmin/subscriptions.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/superadmin/billing.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/superadmin/support-tickets.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/superadmin/error-reports.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/superadmin/users.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/notifications-analytics.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/notification-preferences.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/notification-admin-dashboard.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/template-editor.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/scheduled-notifications.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/notification-monitor.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/event-triggers.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/notification-ab-testing.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/notification-insights.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/sms-optimizer.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/predictive-send-time.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/audience-segmentation.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/content-recommendations.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/campaign-predictor.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/campaign-journey-builder.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/smart-channel-selection.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/tenant-whatsapp-profile.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/whatsapp-templates.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/whatsapp-template-editor.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/whatsapp-template-history.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/whatsapp-approval-queue.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/whatsapp-approval-config.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/saas-admin-dashboard.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/api.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/use-toast.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/toast.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/react.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-tooltip.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/utils.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/booking-workspace.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/use-offline.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/lucide-react.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/button.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/card.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/badge.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/dialog.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/input.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/label.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/table.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/admin/client-form.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/admin/manager-control-modal.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/admin/plan-management-modal.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/skeleton.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/recharts.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/smart-recommendations.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/critical-alerts.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/quick-actions.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/notification-center.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/command-palette.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/keyboard-shortcuts-help.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/useKeyboardShortcuts.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/use-permissions.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/layout/sidebar.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/overview.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/enhanced-booking-form.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/fleet/vehicle-form.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/fleet/vehicle-feedback-profile.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-form.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-360.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/revenue-report.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-salary-payroll.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/vendor-settlement.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/booking-history-pdf.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/invoice/enhanced-invoice-generator.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/user-management.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/business-profile.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/invoice/invoice-settings-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/settings/reward-referral-settings-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/onboarding/onboarding-wizard.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/manage-expenses.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/live-operations.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/self-drive.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/operations/operations-alert-strip.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/customers.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/after-sales.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/campaigns.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/rewards-referrals-dashboard.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/inquiries.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/leads.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/followups.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/vendors.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking-queues/booking-queues-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/payment-dues.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-leave.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/leave/today-on-leave-strip.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-attendance.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/driver-performance.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/vehicle-performance.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/gps-settings.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/pages/whatsapp-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/dashboard/daily-operations-popup.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/select.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/textarea.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/alert.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/handover/DriverHandoverAcceptance.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/tabs.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-RPCDYKBN.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-QCHXOAYK.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-WOOG5QLI.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-KBTYAULA.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/superadmin/tenant-users.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/accessibility-helpers.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/clsx.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/tailwind-merge.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-toast.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/class-variance-authority.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-UPVX7IVH.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-66POQVUH.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-TZCCVYTS.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-6QPFT4VN.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-TQ7UC74J.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-7QZBBLXT.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-DBBQJ3JE.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-2QGE5M3T.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-OXZDJRWN.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-AXMZZQ2X.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-2K77HOHX.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-slot.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/alert-dialog.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/separator.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/booking-state.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/schedule-editor.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/payment-section.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/trip-cost-summary.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/resource-fulfilment-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/assign-vendor-dialog.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/extend-booking-dialog.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/booking-communication.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/self-drive-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/pipeline/pipeline-stepper.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/pipelineStages.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-dialog.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-label.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/react-hook-form.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@hookform_resolvers_zod.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/zod.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/switch.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/form.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/forms/form-enhancements.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/checkbox.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/progress.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/theme-toggle.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/modules/manifest.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-U7P2NEEE.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/radio-group.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/collapsible.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/html2pdf__js.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/booking-confirmation-pdf.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/useSmartBookingNavigation.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/booking-highlighting.css {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-contacts-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-documents-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-employment-history-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-lifecycle-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/set-driver-pin-dialog.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-feedback-profile.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-attendance-leave-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/driver-360/SalarySummary.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/driver-360/SalaryHistory.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/driver-360/SalaryLedger.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/driver-360/SalaryDetailsSection.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/driver-360/AttendanceCalendar.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/driver-domain-constants.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/jspdf.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/jspdf-autotable.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/revenue-dashboard-header.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/revenue-dashboard-theme.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/revenue-dashboard-charts.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/revenue-kpi-cards.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/top-vehicles-revenue-source.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/revenue-dashboard-utils.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/date-fns.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/self-drive/process-refund-dialog.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/operations/extend-booking-dialog.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/operations/collect-payment-dialog.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/operations/reminder-settings-dialog.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/sheet.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-dashboard.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/inquiries/quick-inquiry-form.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/use-debounced-value.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/inquiries/detailed-requirement-form.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/pipeline/contextual-action-bar.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking-queues/queue-table.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/vendors/vendor-drivers.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/vendors/vendor-vehicles.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/vendors/vendor-duties.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/leads/quotation-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/leads/followup-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/drivers/leave/leave-domain.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/live-map-view.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/vehicle-mapping-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/connection-setup-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-select.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-tabs.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-TPYHSINA.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-alert-dialog.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-separator.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/lib/whatsapp-error.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking/duty-slip.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/self-drive/fuel-gauge.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-M4QVPB2K.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-DT5BUL23.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-4BFJKWC4.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-switch.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-checkbox.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-progress.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/dropdown-menu.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/hooks/use-theme.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-radio-group.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/utils/bookingValidation.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/utils/fieldHighlighting.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/onboarding/index.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/reports/analytics-drilldown-drawer.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-D7ZASVPN.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-service.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-timeline.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-consent.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-rewards-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-referral-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-message-center.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-requirements.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/booking-queues/previous-booking-reuse.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-duplicate-review.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-payment-receipt.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-invoices.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-drivers.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-vehicles.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-google-reviews.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/customers/customer-self-drive.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/inquiries/vehicle-selector.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/leads/quotation-document.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/scroll-area.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/api.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/capabilities.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/fleet-map.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/status-summary-cards.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/vehicle-status-card.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/vehicle-detail-dialog.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-Z64KYZ2F.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-4RO2SXZU.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/assign-device-dialog.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/unassign-device-dialog.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/connection-form-dialog.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/connection-sync-health-badge.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-6ZMM2PAV.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-43G6IMPT.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-dropdown-menu.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/onboarding/DriverSalarySetupPanel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/qrcode.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-scroll-area.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/leaflet-fleet-map.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/map-adapter.ts {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/gps/route-replay-panel.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/react-leaflet.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/leaflet.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/leaflet/dist/leaflet.css {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /src/components/ui/slider.tsx {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/chunk-JQURRHX6.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /@fs/Users/pradeep/fleetpro-final-recovery/node_modules/.vite/deps/@radix-ui_react-slider.js {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /favicon.ico {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[RequestLogger:DEBUG] [GET] /api/auth/me {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+[2026-08-15T20:24:39.228Z] [RequestLogger:WARN] [GET] /api/auth/me - 401 { duration: '21ms', ip: '127.0.0.1', size: 37 }
+1:54:39 AM [express] GET /api/auth/me 401 in 22ms :: {"message":"Authentication required"}
+[RequestLogger:DEBUG] [POST] /api/auth/login {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+✅ Secure login: user=fleet_root_admin_1d2af76b, role=admin, ip=127.0.0.1, time=2026-08-15T20:24:53.611Z
+🔐 Login response for fleet_root_admin_1d2af76b: { role: 'admin', platformRole: 'PLATFORM_ROOT', tenantId: undefined }
+[RequestLogger:DEBUG] [POST] /api/auth/login - 200 { duration: '243ms' }
+1:54:53 AM [express] POST /api/auth/login 200 in 229ms :: {"user":{"id":"6a7ef89a191f4d2bb61e4ecf","…
+[RequestLogger:DEBUG] [GET] /api/root/support-access/status {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+User authenticated: { userId: 'fleet_root_admin_1d2af76b', role: 'admin' }
+[RequestLogger:DEBUG] [GET] /api/root/support-access/status - 200 { duration: '12ms' }
+[RequestLogger:DEBUG] [GET] /api/saas/dashboard/stats {
+  ip: '127.0.0.1',
+  userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Code/1.133.0 Chrome/148.0.7778.280 Electron/42.8.0 Safari/537.36'
+}
+1:54:53 AM [express] GET /api/root/support-access/status 200 in 16ms :: {"active":false}
+User authenticated: { userId: 'fleet_root_admin_1d2af76b', role: 'admin' }
+[2026-08-15T20:24:53.865Z] [RequestLogger:WARN] [GET] /api/saas/dashboard/stats - 500 { duration: '5ms', ip: '127.0.0.1', size: 45 }
+1:54:53 AM [express] GET /api/saas/dashboard/stats 500 in 4ms :: {"message":"storage.getDb is not a …
+[2026-08-15T20:25:10.523Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 
+[RequestLogger:DEBUG] [POST] /api/auth/login { ip: '127.0.0.1', userAgent: 'curl/8.7.1' }
+✅ Secure login: user=fleet_root_admin_1d2af76b, role=admin, ip=127.0.0.1, time=2026-08-15T20:26:07.652Z
+🔐 Login response for fleet_root_admin_1d2af76b: { role: 'admin', platformRole: 'PLATFORM_ROOT', tenantId: undefined }
+[RequestLogger:DEBUG] [POST] /api/auth/login - 200 { duration: '211ms' }
+1:56:07 AM [express] POST /api/auth/login 200 in 210ms :: {"user":{"id":"6a7ef89a191f4d2bb61e4ecf","…
+[RequestLogger:DEBUG] [POST] /api/platform/tenants { ip: '127.0.0.1', userAgent: 'curl/8.7.1' }
+User authenticated: { userId: 'fleet_root_admin_1d2af76b', role: 'admin' }
+[RequestLogger:DEBUG] [POST] /api/platform/tenants - 201 { duration: '10ms' }
+1:56:07 AM [express] POST /api/platform/tenants 201 in 13ms :: {"success":true,"id":"6a80cb5f6531778…
+[2026-08-15T20:26:10.522Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 
+[2026-08-15T20:27:10.524Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 
+[2026-08-15T20:28:10.525Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 
+[2026-08-15T20:29:10.526Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 
+1:59:29 AM [vite] hmr update /src/pages/superadmin/tenants-list.tsx, /src/index.css?v=YTPB_MJ3alG3zmUE_DT65
+[SCHEDULER] Starting daily cleanup job...
+[CLEANUP] Starting daily cleanup...
+[CLEANUP] ✅ Cleanup completed
+⏰ [2026-08-15T20:30:00.014Z] Running hourly tenant metrics sync...
+Error syncing tenant metrics: TypeError: storage.getDb is not a function
+    at SaaSDataSyncService.syncTenantMetrics (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:16:32)
+    at <anonymous> (/Users/pradeep/fleetpro-final-recovery/server/services/saas-scheduler-service.ts:40:50)
+    at Runner.onMatch (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/tasks/inline-scheduled-task.ts:111:14)
+    at execute (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:194:37)
+    at runTask (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:237:15)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:597:9)
+    at process.processTimers (node:internal/timers:571:7)
+    at async Runner.runCoordinated (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:125:7)
+    at async <anonymous> (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:275:13)
+❌ Hourly sync failed: TypeError: storage.getDb is not a function
+    at SaaSDataSyncService.syncTenantMetrics (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:16:32)
+    at <anonymous> (/Users/pradeep/fleetpro-final-recovery/server/services/saas-scheduler-service.ts:40:50)
+    at Runner.onMatch (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/tasks/inline-scheduled-task.ts:111:14)
+    at execute (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:194:37)
+    at runTask (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:237:15)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:597:9)
+    at process.processTimers (node:internal/timers:571:7)
+    at async Runner.runCoordinated (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:125:7)
+    at async <anonymous> (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:275:13)
+⏰ [2026-08-15T20:30:00.022Z] Running daily comprehensive sync...
+🔄 Starting full SaaS data sync...
+
+Error syncing tenant metrics: TypeError: storage.getDb is not a function
+    at SaaSDataSyncService.syncTenantMetrics (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:16:32)
+    at SaaSDataSyncService.fullSync (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:235:14)
+    at <anonymous> (/Users/pradeep/fleetpro-final-recovery/server/services/saas-scheduler-service.ts:76:50)
+    at Runner.onMatch (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/tasks/inline-scheduled-task.ts:111:14)
+    at execute (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:194:37)
+    at runTask (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:237:15)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:597:9)
+    at process.processTimers (node:internal/timers:571:7)
+    at async Runner.runCoordinated (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:125:7)
+    at async <anonymous> (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:275:13)
+Error syncing billing data: TypeError: storage.getDb is not a function
+    at SaaSDataSyncService.syncBillingData (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:124:32)
+    at SaaSDataSyncService.fullSync (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:236:14)
+    at <anonymous> (/Users/pradeep/fleetpro-final-recovery/server/services/saas-scheduler-service.ts:76:50)
+    at Runner.onMatch (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/tasks/inline-scheduled-task.ts:111:14)
+    at execute (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:194:37)
+    at runTask (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:237:15)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:597:9)
+    at process.processTimers (node:internal/timers:571:7)
+    at async Runner.runCoordinated (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:125:7)
+    at async <anonymous> (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:275:13)
+Error syncing customer analytics: TypeError: storage.getDb is not a function
+    at SaaSDataSyncService.syncCustomerAnalytics (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:174:32)
+    at SaaSDataSyncService.fullSync (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:237:14)
+    at <anonymous> (/Users/pradeep/fleetpro-final-recovery/server/services/saas-scheduler-service.ts:76:50)
+    at Runner.onMatch (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/tasks/inline-scheduled-task.ts:111:14)
+    at execute (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:194:37)
+    at runTask (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:237:15)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:597:9)
+    at process.processTimers (node:internal/timers:571:7)
+    at async Runner.runCoordinated (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:125:7)
+    at async <anonymous> (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:275:13)
+Error during full sync: TypeError: storage.getDb is not a function
+    at SaaSDataSyncService.syncTenantMetrics (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:16:32)
+    at SaaSDataSyncService.fullSync (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:235:14)
+    at <anonymous> (/Users/pradeep/fleetpro-final-recovery/server/services/saas-scheduler-service.ts:76:50)
+    at Runner.onMatch (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/tasks/inline-scheduled-task.ts:111:14)
+    at execute (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:194:37)
+    at runTask (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:237:15)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:597:9)
+    at process.processTimers (node:internal/timers:571:7)
+    at async Runner.runCoordinated (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:125:7)
+    at async <anonymous> (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:275:13)
+❌ Daily sync failed: TypeError: storage.getDb is not a function
+    at SaaSDataSyncService.syncTenantMetrics (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:16:32)
+    at SaaSDataSyncService.fullSync (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:235:14)
+    at <anonymous> (/Users/pradeep/fleetpro-final-recovery/server/services/saas-scheduler-service.ts:76:50)
+    at Runner.onMatch (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/tasks/inline-scheduled-task.ts:111:14)
+    at execute (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:194:37)
+    at runTask (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:237:15)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at listOnTimeout (node:internal/timers:597:9)
+    at process.processTimers (node:internal/timers:571:7)
+    at async Runner.runCoordinated (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:125:7)
+    at async <anonymous> (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:275:13)
+⏰ [2026-08-15T20:30:00.023Z] Running customer analytics update...
+Error syncing customer analytics: TypeError: storage.getDb is not a function
+    at SaaSDataSyncService.syncCustomerAnalytics (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:174:32)
+    at <anonymous> (/Users/pradeep/fleetpro-final-recovery/server/services/saas-scheduler-service.ts:94:50)
+    at Runner.onMatch (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/tasks/inline-scheduled-task.ts:111:14)
+    at execute (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:194:37)
+    at runTask (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:237:15)
+    at async Runner.runCoordinated (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:125:7)
+    at async <anonymous> (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:275:13)
+❌ Customer analytics update failed: TypeError: storage.getDb is not a function
+    at SaaSDataSyncService.syncCustomerAnalytics (/Users/pradeep/fleetpro-final-recovery/server/services/saas-data-sync-service.ts:174:32)
+    at <anonymous> (/Users/pradeep/fleetpro-final-recovery/server/services/saas-scheduler-service.ts:94:50)
+    at Runner.onMatch (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/tasks/inline-scheduled-task.ts:111:14)
+    at execute (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:194:37)
+    at runTask (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:237:15)
+    at async Runner.runCoordinated (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:125:7)
+    at async <anonymous> (/Users/pradeep/fleetpro-final-recovery/node_modules/node-cron/src/scheduler/runner.ts:275:13)
+[SCHEDULER] Starting hourly auto-sync job...
+[SYNC-ALL] Syncing data for all active drivers...
+[SYNC-ALL] Found 6 tenants with active drivers
+[SYNC-ALL] Syncing 0 drivers for tenant 6a75ea6fc4ea664be337cc3d
+[SYNC-ALL] Syncing 0 drivers for tenant 6a7ca324cc3292e6c7e9b85c
+[SYNC-ALL] Syncing 0 drivers for tenant 6a7de0fe232bde7e03296177
+[SYNC-ALL] Syncing 0 drivers for tenant 6a7deecd946ff963dfc3e96c
+[SYNC-ALL] Syncing 0 drivers for tenant 6a7df0231d5a37a2420192fb
+[SYNC-ALL] Syncing 0 drivers for tenant 6a7f8976dcd87a258b08990c
+[SYNC-ALL] ✅ Sync job completed in 12ms
+[2026-08-15T20:30:10.527Z] [NotificationWebhooks:WARN] Database not initialized, skipping webhook retry check 
+
+🛑 Stopping all SaaS scheduled jobs...
+✅ Stopped: hourly-sync
+✅ Stopped: billing-sync
+✅ Stopped: daily-sync
+✅ Stopped: customer-analytics
+✅ All jobs stopped
+

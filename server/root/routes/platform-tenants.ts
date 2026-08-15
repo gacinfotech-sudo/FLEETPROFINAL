@@ -8,6 +8,7 @@
 import type { Express, Response } from 'express';
 import { z } from 'zod';
 import mongoose from 'mongoose';
+import { randomBytes } from 'crypto';
 import { authenticateUser, type AuthRequest } from '../../middleware/auth';
 import { storage } from '../../storage-mongodb';
 import { rootAccessService } from '../services/rootAccessService';
@@ -47,7 +48,7 @@ const createUserSchema = z.object({
 
 // Helper: Generate secure random token
 function generateToken(): string {
-  return require('crypto').randomBytes(32).toString('hex');
+  return randomBytes(32).toString('hex');
 }
 
 // Helper: Check if valid ObjectId
@@ -70,6 +71,39 @@ function mapPlanToDatabase(apiPlan?: string): 'starter' | 'pro' | 'custom' {
 }
 
 export function registerPlatformTenantRoutes(app: Express): void {
+  // =========================================================================
+  // PHASE 0: LIST ALL TENANTS
+  // =========================================================================
+  app.get('/api/platform/tenants', authenticateUser, requirePlatformRoot, async (req: AuthRequest, res: Response) => {
+    try {
+      const tenants = await Tenant.find({}).lean();
+      res.json(tenants || []);
+    } catch (error) {
+      console.error('Error listing tenants:', error);
+      res.status(500).json({ success: false, message: 'Failed to list tenants' });
+    }
+  });
+
+  // =========================================================================
+  // PHASE 0B: GET SINGLE TENANT
+  // =========================================================================
+  app.get('/api/platform/tenants/:tenantId', authenticateUser, requirePlatformRoot, async (req: AuthRequest, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      if (!isValidObjectId(tenantId)) {
+        return res.status(400).json({ success: false, message: 'Invalid tenantId format' });
+      }
+      const tenant = await Tenant.findById(tenantId).lean();
+      if (!tenant) {
+        return res.status(404).json({ success: false, message: 'Tenant not found' });
+      }
+      res.json(tenant);
+    } catch (error) {
+      console.error('Error fetching tenant:', error);
+      res.status(500).json({ success: false, message: 'Failed to fetch tenant' });
+    }
+  });
+
   // =========================================================================
   // PHASE 1: CREATE TENANT
   // =========================================================================
@@ -221,7 +255,7 @@ export function registerPlatformTenantRoutes(app: Express): void {
         setupUrl: `/setup?token=${setupToken}`,
         setupTokenExpiry: ownerData.setupTokenExpiry,
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           success: false,
@@ -229,10 +263,10 @@ export function registerPlatformTenantRoutes(app: Express): void {
           errors: error.errors,
         });
       }
-      console.error('Error creating owner:', error);
+      console.error('Error creating owner:', error.message || error);
       res.status(500).json({
         success: false,
-        message: 'Failed to create owner',
+        message: error.message || 'Failed to create owner',
       });
     }
   });
@@ -324,7 +358,7 @@ export function registerPlatformTenantRoutes(app: Express): void {
         setupUrl: `/setup?token=${setupToken}`,
         setupTokenExpiry: userData.setupTokenExpiry,
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({
           success: false,
@@ -332,10 +366,10 @@ export function registerPlatformTenantRoutes(app: Express): void {
           errors: error.errors,
         });
       }
-      console.error('Error creating user:', error);
+      console.error('Error creating user:', error.message || error);
       res.status(500).json({
         success: false,
-        message: 'Failed to create user',
+        message: error.message || 'Failed to create user',
       });
     }
   });
