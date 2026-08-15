@@ -233,7 +233,7 @@ export class MongoDBStorage implements IStorage {
       if (!user) return undefined;
 
       // Password remains case-sensitive
-      const isValidPassword = await bcrypt.compare(password, user.password);
+      const isValidPassword = await bcrypt.compare(password, user.passwordHash);
       if (!isValidPassword) return undefined;
 
       // Map _id to id for backward compatibility with routes code
@@ -508,10 +508,20 @@ export class MongoDBStorage implements IStorage {
       const db = mongoose.connection.getClient().db('fleetpro');
       const collection = db.collection('users');
 
-      // Try by _id first (for both ObjectId and string _id)
+      // Try by _id first (database has mixed types: some String, some ObjectId)
       let user = await collection.findOne({_id: id}) as unknown as any;
 
-      // If not found by _id and id looks like userId, search by userId
+      // If not found as string, try as ObjectId
+      if (!user) {
+        try {
+          const objectId = new ObjectId(id);
+          user = await collection.findOne({_id: objectId}) as unknown as any;
+        } catch (e) {
+          // Not a valid ObjectId format, continue
+        }
+      }
+
+      // If still not found, search by userId field
       if (!user) {
         user = await collection.findOne({userId: id}) as unknown as any;
       }
@@ -523,7 +533,7 @@ export class MongoDBStorage implements IStorage {
         user.id = user._id.toString();
       }
 
-      return user as IUser || undefined;
+      return user as IUser;
     } catch (error) {
       console.error('Error getting user:', error);
       return undefined;
