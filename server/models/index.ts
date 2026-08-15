@@ -591,12 +591,12 @@ const UserSchema = new Schema<IUser>({
   userId: { type: String, required: true, unique: true },
   name: { type: String },
   password: { type: String, required: true },
-  role: { type: String, enum: ['admin', 'client', 'manager'], default: 'client' },
+  role: { type: String, enum: ['root', 'admin', 'client', 'manager', 'tenant_owner', 'tenant_admin', 'staff'], default: 'client' },
   // TASK-ROOT-DOMAIN-01 (Root Control Plane) — additive, optional, no
   // default/required. Populated only via scripts/migrate-admin-to-platform-role.ts
   // or explicit platform-staff provisioning.
   platformRole: { type: String, enum: PLATFORM_ROLES },
-  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant' },
+  tenantId: { type: String },
   sessionId: { type: String },
   deviceInfo: {
     userAgent: { type: String },

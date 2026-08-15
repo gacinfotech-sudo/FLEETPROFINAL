@@ -15,9 +15,9 @@ export const authenticateUser = async (req: AuthRequest, res: Response, next: Ne
       return res.status(401).json({ message: "Authentication required" });
     }
 
-    const sessionId = (req.session as any)?.userId;
+    const userId = (req.session as any)?.userId;
 
-    if (!sessionId) {
+    if (!userId) {
       return res.status(401).json({ message: "Authentication required" });
     }
 
@@ -29,7 +29,7 @@ export const authenticateUser = async (req: AuthRequest, res: Response, next: Ne
     // permanently force-log-out a user who was validly logged in.
     let user;
     try {
-      user = await storage.getUserBySessionId(sessionId);
+      user = await storage.getUser(userId);
     } catch (lookupError) {
       console.error('Session lookup failed (transient?), not destroying session:', lookupError);
       return res.status(503).json({ message: "Temporarily unavailable, please retry." });

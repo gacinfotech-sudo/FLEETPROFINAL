@@ -804,7 +804,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Set session cookie with enhanced security attributes
-      (req.session as any).userId = sessionId;
+      (req.session as any).userId = user.id;
       (req.session as any).loginTime = loginTimestamp.getTime();
       (req.session as any).deviceFingerprint = {
         ip: clientIP,
