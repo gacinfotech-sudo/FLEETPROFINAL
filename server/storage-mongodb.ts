@@ -229,9 +229,13 @@ export class MongoDBStorage implements IStorage {
 
   async updateUserSession(id: string, sessionId: string | null, deviceInfo?: any): Promise<void> {
     try {
+      // Use MongoDB driver to handle string _id from data restoration
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('users');
+
       if (sessionId === null) {
         // Clear ALL sessions (password reset / deactivation paths).
-        await User.findByIdAndUpdate(id, { sessionId: null, activeSessions: [] });
+        await collection.updateOne({_id: id}, {$set: { sessionId: null, activeSessions: [] }});
         return;
       }
       // Multi-device: append this login's session (cap 5, oldest evicted)
@@ -250,7 +254,7 @@ export class MongoDBStorage implements IStorage {
       if (deviceInfo) {
         updateData.$set.deviceInfo = deviceInfo;
       }
-      await User.findByIdAndUpdate(id, updateData);
+      await collection.updateOne({_id: id}, updateData);
     } catch (error) {
       console.error('Error updating user session:', error);
       throw error;
@@ -357,10 +361,16 @@ export class MongoDBStorage implements IStorage {
 
   async updateUserLoginInfo(id: string, ip: string, userAgent: string): Promise<void> {
     try {
-      await User.findByIdAndUpdate(id, {
-        lastLogin: new Date(),
-        lastLoginIP: ip,
-        lastLoginUserAgent: userAgent
+      // Use MongoDB driver to handle string _id from data restoration
+      const db = mongoose.connection.getClient().db('fleetpro');
+      const collection = db.collection('users');
+
+      await collection.updateOne({_id: id}, {
+        $set: {
+          lastLogin: new Date(),
+          lastLoginIP: ip,
+          lastLoginUserAgent: userAgent
+        }
       });
     } catch (error) {
       console.error('Error updating user login info:', error);
