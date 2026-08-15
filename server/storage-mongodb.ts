@@ -1047,26 +1047,27 @@ export class MongoDBStorage implements IStorage {
     activeDrivers: number;
   }> {
     try {
+      const db = mongoose.connection.getClient().db('fleetpro');
       const [revenueResult, totalBookings, fleetSize, activeDrivers] = await Promise.all([
-        Booking.aggregate([
+        db.collection('bookings').aggregate([
           {
             $match: {
-              tenantId: new mongoose.Types.ObjectId(tenantId),
+              tenantId: tenantId,
               status: { $in: ['confirmed', 'completed'] }
             }
           },
           {
             $group: {
               _id: null,
-              totalRevenue: { 
+              totalRevenue: {
                 $sum: { $ifNull: ['$totalAmount', 0] }
               }
             }
           }
-        ]),
-        Booking.countDocuments({ tenantId }),
-        Vehicle.countDocuments({ tenantId, status: 'available' }),
-        Driver.countDocuments({ tenantId, status: 'available' })
+        ]).toArray(),
+        db.collection('bookings').countDocuments({ tenantId }),
+        db.collection('vehicles').countDocuments({ tenantId, status: 'available' }),
+        db.collection('drivers').countDocuments({ tenantId, status: 'available' })
       ]);
 
       return {
@@ -1097,7 +1098,7 @@ export class MongoDBStorage implements IStorage {
     try {
       // Base condition: Only completed bookings for revenue calculation
       const matchConditions: any = {
-        tenantId: new mongoose.Types.ObjectId(tenantId),
+        tenantId: tenantId,
         status: 'completed'
       };
 
@@ -1110,7 +1111,7 @@ export class MongoDBStorage implements IStorage {
       }
 
       // Expense date filter (matching booking date range)
-      let expenseQuery: any = { tenantId: new mongoose.Types.ObjectId(tenantId) };
+      let expenseQuery: any = { tenantId: tenantId };
       if (startDate && endDate) {
         expenseQuery.date = {
           $gte: new Date(startDate),
@@ -1343,7 +1344,7 @@ export class MongoDBStorage implements IStorage {
 
   async getSubUsersByTenant(tenantId: string): Promise<IUser[]> {
     try {
-      const tenantObjectId = new mongoose.Types.ObjectId(tenantId);
+      const tenantObjectId = tenantId;
       return await User.find({ 
         tenantId: tenantObjectId, 
         role: { $in: ['manager'] } // Only get sub-users, not admins or clients
@@ -1466,7 +1467,7 @@ export class MongoDBStorage implements IStorage {
   // Enhanced Admin Methods for Manager Control
   async getManagersByTenant(tenantId: string): Promise<IUser[]> {
     try {
-      const objectId = new mongoose.Types.ObjectId(tenantId);
+      const objectId = tenantId;
       const managers = await User.find({ 
         tenantId: objectId,
         role: 'manager'
@@ -1480,7 +1481,7 @@ export class MongoDBStorage implements IStorage {
 
   async deactivateClientAndManagers(tenantId: string): Promise<void> {
     try {
-      const objectId = new mongoose.Types.ObjectId(tenantId);
+      const objectId = tenantId;
 
       // Deactivate tenant
       await Tenant.findByIdAndUpdate(objectId, { isActive: false });
@@ -1500,7 +1501,7 @@ export class MongoDBStorage implements IStorage {
 
   async activateClientAndManagers(tenantId: string): Promise<void> {
     try {
-      const objectId = new mongoose.Types.ObjectId(tenantId);
+      const objectId = tenantId;
 
       // Activate tenant
       await Tenant.findByIdAndUpdate(objectId, { isActive: true });
@@ -1536,7 +1537,7 @@ export class MongoDBStorage implements IStorage {
   // Subscription Plan Management Methods
   async updateTenantServiceModes(tenantId: string, serviceModes: { selfDrive: boolean; withDriver: boolean; }): Promise<ITenant | undefined> {
     try {
-      const objectId = new mongoose.Types.ObjectId(tenantId);
+      const objectId = tenantId;
       const updatedTenant = await Tenant.findByIdAndUpdate(
         objectId,
         { $set: { serviceModes } },
@@ -1551,7 +1552,7 @@ export class MongoDBStorage implements IStorage {
 
   async updateTenantPlan(tenantId: string, plan: string, limits: { vehicles: number; drivers: number; managers: number; }): Promise<ITenant | undefined> {
     try {
-      const objectId = new mongoose.Types.ObjectId(tenantId);
+      const objectId = tenantId;
       const updatedTenant = await Tenant.findByIdAndUpdate(
         objectId,
         { 
@@ -1570,7 +1571,7 @@ export class MongoDBStorage implements IStorage {
 
   async getTenantLimits(tenantId: string): Promise<{ vehicles: number; drivers: number; managers: number; } | null> {
     try {
-      const objectId = new mongoose.Types.ObjectId(tenantId);
+      const objectId = tenantId;
       const tenant = await Tenant.findById(objectId);
       if (!tenant) return null;
       
@@ -1587,7 +1588,7 @@ export class MongoDBStorage implements IStorage {
 
   async checkVehicleLimit(tenantId: string): Promise<{ current: number; limit: number; canAdd: boolean; }> {
     try {
-      const objectId = new mongoose.Types.ObjectId(tenantId);
+      const objectId = tenantId;
       const vehicleCount = await Vehicle.countDocuments({ tenantId: objectId });
       const limits = await this.getTenantLimits(tenantId);
       const limit = limits?.vehicles || 6;
@@ -1605,7 +1606,7 @@ export class MongoDBStorage implements IStorage {
 
   async checkDriverLimit(tenantId: string): Promise<{ current: number; limit: number; canAdd: boolean; }> {
     try {
-      const objectId = new mongoose.Types.ObjectId(tenantId);
+      const objectId = tenantId;
       const driverCount = await Driver.countDocuments({ tenantId: objectId });
       const limits = await this.getTenantLimits(tenantId);
       const limit = limits?.drivers || 3;
@@ -1623,7 +1624,7 @@ export class MongoDBStorage implements IStorage {
 
   async checkManagerLimit(tenantId: string): Promise<{ current: number; limit: number; canAdd: boolean; }> {
     try {
-      const objectId = new mongoose.Types.ObjectId(tenantId);
+      const objectId = tenantId;
       const managerCount = await User.countDocuments({ 
         tenantId: objectId,
         role: 'manager'
@@ -1661,7 +1662,7 @@ export class MongoDBStorage implements IStorage {
 
   async getExpensesByTenant(tenantId: string): Promise<IExpense[]> {
     try {
-      const objectId = new mongoose.Types.ObjectId(tenantId);
+      const objectId = tenantId;
       const expenses = await Expense.find({ tenantId: objectId })
         .populate('vehicleId', 'make vehicleModel licensePlate')
         .sort({ date: -1, createdAt: -1 });
@@ -1720,7 +1721,7 @@ export class MongoDBStorage implements IStorage {
 
   async getTotalExpenses(tenantId: string, startDate?: string, endDate?: string): Promise<number> {
     try {
-      const objectId = new mongoose.Types.ObjectId(tenantId);
+      const objectId = tenantId;
       
       let query: any = { tenantId: objectId };
       
