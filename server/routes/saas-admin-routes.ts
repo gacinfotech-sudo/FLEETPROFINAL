@@ -2,7 +2,7 @@
  * SAAS ADMIN MANAGEMENT ROUTES
  * APIs for managing tenants, subscriptions, billing, and analytics
  *
- * P1 SECURITY FIX: All routes now require PLATFORM_ADMIN or PLATFORM_SUPER_ADMIN role
+ * P1 SECURITY FIX: All routes now require PLATFORM_ROOT, PLATFORM_SUPER_ADMIN, or PLATFORM_FINANCE_ADMIN role
  * Previous: Only checked tenant-scoped 'admin' role (allowed any authenticated tenant admin)
  * Now: Requires platform-level authentication (cross-tenant access control)
  */
@@ -16,8 +16,8 @@ import { authenticateUser } from '../middleware/auth';
 
 const router = Router();
 
-// Middleware: Require platform admin role (PLATFORM_ADMIN or PLATFORM_SUPER_ADMIN)
-const requirePlatformAdmin = rootAccessService.requirePlatformRole(['PLATFORM_ADMIN', 'PLATFORM_SUPER_ADMIN', 'PLATFORM_ROOT']);
+// Middleware: Require platform admin role (PLATFORM_SUPER_ADMIN, PLATFORM_ROOT, or PLATFORM_FINANCE_ADMIN for billing)
+const requirePlatformAdmin = rootAccessService.requirePlatformRole(['PLATFORM_ROOT', 'PLATFORM_SUPER_ADMIN', 'PLATFORM_FINANCE_ADMIN']);
 
 // Legacy fallback: Verify tenant-scoped admin access (kept for backward compatibility)
 const adminOnly = (req: any, res: Response, next: Function) => {
