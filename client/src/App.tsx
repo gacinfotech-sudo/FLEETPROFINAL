@@ -80,7 +80,8 @@ function AuthenticatedApp() {
           </div>
         ) : user ? (
           // Route authenticated users based on account type
-          <Dashboard key={user.userId} />
+          // Platform admins go to SaaS admin, tenants go to dashboard
+          user.platformRole ? <SuperAdminDashboard key={user.userId} /> : <Dashboard key={user.userId} />
         ) : (
           <LoginPage />
         )}
@@ -368,7 +369,8 @@ function AuthenticatedApp() {
           </div>
         ) : user ? (
           // Redirect to appropriate dashboard based on account type
-          <Dashboard key={user.userId} />
+          // Platform admins go to SaaS admin, tenants go to dashboard
+          user.platformRole ? <SuperAdminDashboard key={user.userId} /> : <Dashboard key={user.userId} />
         ) : (
           <LoginPage />
         )}
