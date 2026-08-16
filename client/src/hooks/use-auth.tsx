@@ -43,17 +43,19 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
     const currentPath = window.location.pathname;
     const isLoginPage = currentPath === '/login' || currentPath === '/driver-login';
 
-    // Skip auth check on login pages - no need to validate sessions there
-    if (!isLoginPage) {
-      checkAuthStatus().catch(error => {
-        console.error("Initial auth check failed:", error);
-      });
-    } else {
-      console.log("On login page - skipping auth status check");
+    if (isLoginPage) {
+      console.log("On login page - skipping all auth checks");
       setLoading(false);
+      // Don't register session expiry handlers on login page
+      return;
     }
 
-    // Register global session expiry handlers
+    // Only do auth checks on protected pages
+    checkAuthStatus().catch(error => {
+      console.error("Initial auth check failed:", error);
+    });
+
+    // Register global session expiry handlers (protected pages only)
     setSessionExpiryHandler(handleSessionExpiry);
     setQuerySessionExpiryHandler(handleSessionExpiry);
   }, []); // Only run once on mount
