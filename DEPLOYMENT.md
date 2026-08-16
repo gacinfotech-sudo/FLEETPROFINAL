@@ -1,97 +1,146 @@
-# FleetPro Deployment Guide
+# FleetPro - Deployment Checklist
 
-## For Git-based Deployment (Render, Vercel, etc.)
+## Pre-Deployment (Development → Staging)
 
-### Required Environment Variables
-Set these environment variables in your deployment platform:
+### 1. Environment Setup
+- [ ] Copy `.env.example` to `.env.staging`
+- [ ] Set `NODE_ENV=staging`
+- [ ] Update `MONGODB_URI` to staging database
+- [ ] Generate new `SESSION_SECRET` (32+ char random string)
+- [ ] Set `PORT=5051` or desired port
 
-```
-DATABASE_URL=your_mongodb_connection_string
-SESSION_SECRET=your_secure_session_secret_key
+### 2. Database
+- [ ] Create staging MongoDB database
+- [ ] Run migrations: `npm run migrate`
+- [ ] Verify collections created
+- [ ] Load sample data
+- [ ] Backup initial database state
+
+### 3. SSL/TLS Certificates
+- [ ] For staging: Generate self-signed cert
+- [ ] For production: Use Let's Encrypt or purchased certificate
+- [ ] Update certificate paths in config
+
+### 4. Security
+- [ ] Change all default passwords
+- [ ] Set strong `SESSION_SECRET`
+- [ ] Enable CORS properly
+- [ ] Configure rate limiting
+- [ ] Setup firewall rules
+- [ ] Enable HTTPS only
+
+### 5. Testing
+- [ ] Run all E2E tests
+- [ ] Smoke test all APIs
+- [ ] Test login flow
+- [ ] Test dashboard
+- [ ] Load testing
+- [ ] Security scanning
+
+### 6. Monitoring & Logging
+- [ ] Setup log aggregation (CloudWatch, DataDog)
+- [ ] Configure error tracking (Sentry)
+- [ ] Setup uptime monitoring
+- [ ] Configure alerts
+- [ ] Enable debug logging in staging only
+
+### 7. Backups
+- [ ] Configure automated backups
+- [ ] Test backup restore
+- [ ] Document backup procedure
+- [ ] Set retention policy
+
+---
+
+## Production Deployment Checklist
+
+### Infrastructure
+- [ ] Choose cloud provider (AWS/GCP/Azure)
+- [ ] Setup VPC/networking
+- [ ] Configure load balancer
+- [ ] Setup CDN for static assets
+- [ ] Configure auto-scaling
+
+### Database
+- [ ] Use managed database (MongoDB Atlas/AWS RDS)
+- [ ] Configure high availability
+- [ ] Enable automated backups
+- [ ] Setup read replicas
+- [ ] Configure connection pooling
+
+### Server
+- [ ] Deploy application code
+- [ ] Install Node.js & npm
+- [ ] Configure PM2 for process management
+- [ ] Setup systemd service
+- [ ] Configure auto-restart
+
+### SSL/TLS
+- [ ] Install valid SSL certificate
+- [ ] Configure certificate auto-renewal
+- [ ] Enable HSTS headers
+- [ ] Test SSL configuration
+
+### Domains & DNS
+- [ ] Register domain
+- [ ] Configure DNS records
+- [ ] Setup email MX records
+- [ ] Configure SPF/DKIM/DMARC
+- [ ] Setup CDN CNAME
+
+### Integrations
+- [ ] Setup payment gateway
+- [ ] Configure email service
+- [ ] Setup SMS provider
+- [ ] Configure analytics
+
+### Monitoring
+- [ ] Setup centralized logging
+- [ ] Configure APM
+- [ ] Setup health checks
+- [ ] Configure alerting
+- [ ] Create dashboards
+
+### Security
+- [ ] Setup WAF
+- [ ] Configure DDoS protection
+- [ ] Enable intrusion detection
+- [ ] Run security audit
+- [ ] Penetration testing
+
+### Backup & Disaster Recovery
+- [ ] Configure automated backups
+- [ ] Setup cross-region backup
+- [ ] Document RTO/RPO
+- [ ] Test restore procedures
+
+---
+
+## Environment Variables
+
+```bash
 NODE_ENV=production
+PORT=5051
+MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/fleetpro
+SESSION_SECRET=your-32-char-random-secret
+JWT_SECRET=your-32-char-jwt-secret
+CORS_ORIGIN=https://yourdomain.com
+SENTRY_DSN=your-sentry-dsn
 ```
 
-### Build Configuration
-- **Build Command**: `npm run build`
-- **Start Command**: `npm run start`
-- **Node Version**: 20.x
-- **Install Command**: `npm install`
+---
 
-### Platform-Specific Instructions
+## Performance Targets
 
-#### Render
-1. Connect your GitHub repository
-2. Set Build Command: `npm run build`
-3. Set Start Command: `npm run start`
-4. Add environment variables listed above
-5. Set Node version to 20.x in Environment settings
+- API Response Time: < 100ms (p95)
+- Uptime: 99.9%+
+- Error Rate: < 0.1%
+- Concurrent Users: 1,000+
 
-#### Vercel (Detailed Guide)
+---
 
-**Step 1: Import Project**
-1. Go to [vercel.com](https://vercel.com) and sign in
-2. Click "New Project" 
-3. Import from your Git repository (GitHub/GitLab/Bitbucket)
-4. Select your FleetPro repository
+## Go/No-Go Decision
 
-**Step 2: Configure Project Settings**
-- **Framework Preset**: Select "Other" (not Vite, since we have a custom full-stack setup)
-- **Root Directory**: Leave as `./` (root)
-- **Project Name**: Choose your preferred name (e.g., "fleetpro" or "car-rental-master")
-
-**Step 3: Build and Output Settings**
-Click "Build and Output Settings" to expand:
-- **Build Command**: `npm run build`
-- **Output Directory**: `dist`
-- **Install Command**: `npm install` (default)
-
-**Step 4: Environment Variables**
-Click "Environment Variables" to expand and add:
-```
-DATABASE_URL = your_mongodb_atlas_connection_string
-SESSION_SECRET = your_secure_random_key_here
-NODE_ENV = production
-```
-
-**Step 5: Deploy**
-Click "Deploy" button and wait for the build to complete.
-
-**Important Notes for Vercel:**
-- Vercel automatically detects Node.js and will use the correct version
-- The build process will install all dependencies and create the production build
-- Your app will be available at `https://your-project-name.vercel.app`
-- Vercel provides automatic HTTPS and global CDN
-
-**Troubleshooting Vercel Deployment:**
-- If build fails, check the build logs in Vercel dashboard
-- Ensure all environment variables are set correctly
-- MongoDB Atlas must allow connections from 0.0.0.0/0 (all IPs) for Vercel's serverless functions
-
-#### Railway
-1. Deploy from GitHub
-2. Add environment variables
-3. Railway will auto-detect the build configuration
-
-### Database Setup
-1. Create a MongoDB Atlas cluster
-2. Whitelist your deployment platform's IP addresses (or use 0.0.0.0/0 for simplicity)
-3. Create a database user with read/write permissions
-4. Get the connection string and set it as DATABASE_URL
-
-### Security Notes
-- All security features are production-ready including rate limiting, CSP headers, and brute force protection
-- Make sure to use HTTPS in production (most platforms handle this automatically)
-- Use a strong SESSION_SECRET (generate with `openssl rand -base64 32`)
-
-### Troubleshooting
-- If build fails with "vite not found", the dependencies have been moved to production packages
-- If authentication fails, check that SESSION_SECRET is set correctly
-- For database connection issues, verify the DATABASE_URL format and IP whitelist
-
-### Features Included in Production Build
-- Comprehensive security system with helmet, rate limiting, and brute force protection
-- Multi-tenant fleet management with role-based access control
-- Subscription plan management (Starter, Pro, Custom)
-- Invoice generation and PDF export functionality
-- Real-time booking management and revenue tracking
-- Mobile-responsive admin panel and client dashboard
+**Deployment Date:** ___________  
+**Status:** ☐ GO ☐ NO-GO  
+**Approved By:** ___________
