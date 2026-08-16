@@ -67,12 +67,18 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
 
   const checkAuthStatus = async () => {
     try {
+      const token = localStorage.getItem('fleetpro_token');
+      const headers: Record<string, string> = {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch("/api/auth/me", {
         credentials: "include",
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
+        headers
       });
       
       if (response.ok) {
@@ -164,16 +170,26 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       }
       
       const data = await response.json();
-      
+
       // Set user data immediately
       setUser(data.user);
       setLoading(false);
-      
-      // Store user data locally
-      localStorage.setItem('fleetpro_user', JSON.stringify({
-        ...data.user,
-        lastValidated: Date.now()
-      }));
+
+      // Store token AND user data locally
+      if (data.token) {
+        localStorage.setItem('fleetpro_token', data.token);
+        localStorage.setItem('fleetpro_user', JSON.stringify({
+          ...data.user,
+          token: data.token,
+          lastValidated: Date.now()
+        }));
+      } else {
+        // Fallback for endpoints that use cookies
+        localStorage.setItem('fleetpro_user', JSON.stringify({
+          ...data.user,
+          lastValidated: Date.now()
+        }));
+      }
       
       // Navigate to appropriate dashboard
       // Platform owners/staff go to SaaS platform control panel

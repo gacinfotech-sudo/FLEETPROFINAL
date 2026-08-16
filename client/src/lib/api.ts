@@ -74,6 +74,11 @@ export async function apiRequest(
     if (needsCsrf && csrfTokenCache) {
       headers["X-CSRF-Token"] = csrfTokenCache;
     }
+    // Add JWT token if available (from localStorage)
+    const token = typeof window !== 'undefined' ? localStorage.getItem('fleetpro_token') : null;
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
     return headers;
   };
 
