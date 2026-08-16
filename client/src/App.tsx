@@ -59,7 +59,7 @@ import CreateTenant from "./pages/superadmin/create-tenant";
 import Tenant360 from "./pages/superadmin/tenant-360";
 import TenantBilling from "./pages/superadmin/tenant-billing";
 import TenantAdvanced from "./pages/superadmin/tenant-advanced";
-import AdvancedConsole from "./pages/superadmin/advanced-console";
+import AdvancedConsole from "./pages/superadmin/advanced-console-live";
 import PlansPage from "./pages/superadmin/plans";
 import SubscriptionsPage from "./pages/superadmin/subscriptions";
 import BillingPage from "./pages/superadmin/billing";
