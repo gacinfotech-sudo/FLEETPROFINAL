@@ -29,7 +29,7 @@ export default function CreateTenant() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('fleetpro_token');
 
   function validateForm(): boolean {
     const newErrors: FormErrors = {};

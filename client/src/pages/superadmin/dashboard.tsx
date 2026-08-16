@@ -16,7 +16,7 @@ export default function SuperAdminDashboard() {
     inactive: 0,
   });
   const [loading, setLoading] = useState(true);
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('fleetpro_token');
 
   useEffect(() => {
     async function fetchStats() {

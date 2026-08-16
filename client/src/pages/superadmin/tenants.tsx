@@ -18,7 +18,7 @@ export default function SuperAdminTenants() {
   const [, setLocation] = useLocation();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('fleetpro_token');
 
   useEffect(() => {
     fetchTenants();

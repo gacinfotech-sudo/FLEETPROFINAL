@@ -1807,15 +1807,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/tenants", authenticateUser, requireAdmin, async (req, res) => {
     try {
-      // Clean the data before validation
-      const cleanedData = { ...req.body };
-      if (cleanedData.email === "") delete cleanedData.email;
-      if (cleanedData.phone === "") delete cleanedData.phone;
-      if (cleanedData.address === "") delete cleanedData.address;
-      
-      const tenantData = mongoTenantSchema.parse(cleanedData);
+      // Extract owner details if provided (new SuperAdmin flow)
+      const { ownerName, ownerEmail, ownerMobile, name, businessName, city, status } = req.body;
+
+      let tenantData;
+      let tempPassword;
+
+      if (ownerEmail && ownerName && ownerMobile) {
+        // SuperAdmin flow: Create tenant + owner account
+        tempPassword = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        const passwordHash = await import('bcrypt').then(bcrypt => bcrypt.hash(tempPassword, 12));
+
+        tenantData = {
+          name: businessName || name,
+          businessName: businessName || name,
+          email: ownerEmail,
+          phone: ownerMobile,
+          ownerName,
+          ownerEmail,
+          ownerMobile,
+          city,
+          status: status || 'active',
+          tenantId: 'TENANT_' + Date.now(),
+        };
+      } else {
+        // Regular admin flow: just create tenant
+        const cleanedData = { ...req.body };
+        if (cleanedData.email === "") delete cleanedData.email;
+        if (cleanedData.phone === "") delete cleanedData.phone;
+        if (cleanedData.address === "") delete cleanedData.address;
+
+        tenantData = mongoTenantSchema.parse(cleanedData);
+      }
+
       const tenant = await storage.createTenant(tenantData);
-      res.json(tenant);
+
+      // If owner credentials provided, create owner account
+      if (ownerEmail && ownerName && ownerMobile && tempPassword) {
+        const passwordHash = await import('bcrypt').then(bcrypt => bcrypt.hash(tempPassword, 12));
+        await storage.createUser({
+          userId: ownerEmail,
+          email: ownerEmail,
+          password: passwordHash,
+          name: ownerName,
+          phone: ownerMobile,
+          role: 'admin',
+          tenantId: tenant.tenantId || tenant._id,
+          isActive: true,
+          createdAt: new Date(),
+        });
+
+        res.status(201).json({
+          message: 'Tenant created successfully',
+          tenantId: tenant.tenantId || tenant._id,
+          tenant: {
+            _id: tenant._id,
+            tenantId: tenant.tenantId,
+            name: tenant.name,
+            businessName: tenant.businessName,
+            ownerName,
+            ownerEmail,
+            ownerMobile,
+            city,
+            status: tenant.status || 'active',
+            createdAt: tenant.createdAt,
+          },
+          ownerCredentials: {
+            userId: ownerEmail,
+            tempPassword: tempPassword,
+            note: 'Share these credentials with the tenant owner.',
+          },
+        });
+      } else {
+        // Regular response for admin-only tenant creation
+        res.json(tenant);
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         console.log('Validation errors:', error.errors);
