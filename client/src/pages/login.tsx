@@ -17,8 +17,15 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!userId || !password) {
+
+    // Get form values directly from the form
+    const formData = new FormData(e.currentTarget as HTMLFormElement);
+    const formUserId = formData.get("userId") as string;
+    const formPassword = formData.get("password") as string;
+
+    console.log("Form submission - userId:", formUserId, "password:", formPassword);
+
+    if (!formUserId || !formPassword) {
       toast({
         title: "Error",
         description: "Please fill in all fields",
@@ -29,7 +36,7 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await login(userId, password);
+      await login(formUserId, formPassword);
       toast({
         title: "Success",
         description: "Logged in successfully",
