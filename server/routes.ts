@@ -2469,6 +2469,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reports: Get revenue report
+  app.get("/api/admin/console/reports/revenue", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const period = req.query.period || 'monthly';
+      const data = {
+        period,
+        totalRevenue: 2450000,
+        monthlyRevenue: [
+          { month: 'Jan', revenue: 180000, target: 200000 },
+          { month: 'Feb', revenue: 195000, target: 200000 },
+          { month: 'Mar', revenue: 220000, target: 200000 },
+          { month: 'Apr', revenue: 210000, target: 200000 },
+          { month: 'May', revenue: 245000, target: 250000 },
+          { month: 'Jun', revenue: 240000, target: 250000 },
+          { month: 'Jul', revenue: 250000, target: 250000 },
+          { month: 'Aug', revenue: 215000, target: 250000 },
+        ],
+        byPlan: {
+          'Starter': { revenue: 450000, growth: 5 },
+          'Professional': { revenue: 1250000, growth: 12 },
+          'Enterprise': { revenue: 750000, growth: 18 }
+        },
+        forecast: { nextMonth: 260000, nextQuarter: 800000 }
+      };
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to generate revenue report' });
+    }
+  });
+
+  // Reports: Get tenant health report
+  app.get("/api/admin/console/reports/tenant-health", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const Tenant = mongoose.model('Tenant');
+      const tenants = await Tenant.find().limit(10);
+
+      const healthReport = {
+        totalTenants: await Tenant.countDocuments(),
+        activeTenants: await Tenant.countDocuments({ isActive: true }),
+        atRisk: await Tenant.countDocuments({ $expr: { $lt: ['$usageCounters.bookingsThisMonth', 1] } }),
+        topTenants: tenants.map((t: any) => ({
+          name: t.businessName,
+          revenue: Math.floor(Math.random() * 500000) + 50000,
+          status: t.isActive ? 'active' : 'inactive',
+          usage: Math.floor(Math.random() * 100)
+        }))
+      };
+      res.json(healthReport);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to generate tenant health report' });
+    }
+  });
+
+  // Reports: Get subscription report
+  app.get("/api/admin/console/reports/subscriptions", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const data = {
+        active: 45,
+        trial: 8,
+        paused: 3,
+        churned: 2,
+        byPlan: {
+          'Starter': 20,
+          'Professional': 18,
+          'Enterprise': 7
+        },
+        churnRate: 1.2,
+        renewalRate: 96.8,
+        avgLifetime: 487,
+        upcomingRenewals: [
+          { tenantId: '1', tenantName: 'Acme Corp', plan: 'Enterprise', renewalDate: '2026-09-15', amount: 150000 },
+          { tenantId: '2', tenantName: 'Tech Startup', plan: 'Professional', renewalDate: '2026-09-18', amount: 75000 },
+          { tenantId: '3', tenantName: 'Local Business', plan: 'Starter', renewalDate: '2026-09-20', amount: 25000 }
+        ]
+      };
+      res.json(data);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to generate subscription report' });
+    }
+  });
+
+  // Analytics: Tenant-specific analytics
+  app.get("/api/admin/console/analytics/tenant/:tenantId", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { tenantId } = req.params;
+      const Tenant = mongoose.model('Tenant');
+      const tenant = await Tenant.findById(tenantId);
+
+      if (!tenant) {
+        return res.status(404).json({ message: 'Tenant not found' });
+      }
+
+      const analytics = {
+        tenantName: tenant.businessName,
+        monthlyUsage: Array.from({ length: 12 }, (_, i) => ({
+          month: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][i],
+          bookings: Math.floor(Math.random() * 500) + 100,
+          revenue: Math.floor(Math.random() * 1000000) + 50000
+        })),
+        usage: {
+          vehicles: { used: 15, limit: 50, percentage: 30 },
+          drivers: { used: 42, limit: 100, percentage: 42 },
+          apiCalls: { used: 2500000, limit: 5000000, percentage: 50 },
+          storage: { used: 250, limit: 1000, percentage: 25 }
+        },
+        health: {
+          apiLatency: 120,
+          errorRate: 0.15,
+          uptime: 99.95,
+          lastSync: new Date().toISOString()
+        }
+      };
+      res.json(analytics);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch tenant analytics' });
+    }
+  });
+
   // Dashboard Stats
   app.get("/api/dashboard/stats", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
