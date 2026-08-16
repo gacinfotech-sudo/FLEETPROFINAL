@@ -62,10 +62,12 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
 
   const handleSessionExpiry = () => {
     const currentPath = window.location.pathname;
+    console.log("handleSessionExpiry called from path:", currentPath);
 
-    // NEVER show session expiry message on login/driver-login pages
+    // NEVER show toast on login pages
     if (currentPath === '/login' || currentPath === '/driver-login') {
-      return; // Just silently return - don't do anything
+      console.log("✅ On login page - blocking session expiry completely");
+      return;
     }
 
     console.log("Session expired from protected page:", currentPath);
@@ -73,11 +75,12 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
     localStorage.removeItem('fleetpro_token');
     localStorage.removeItem('fleetpro_user');
 
-    toast({
-      variant: "destructive",
-      title: "Session Expired",
-      description: "Your session has expired. Please login again.",
-    });
+    // DISABLED TEMPORARILY: Don't show toast to debug
+    // toast({
+    //   variant: "destructive",
+    //   title: "Session Expired",
+    //   description: "Your session has expired. Please login again.",
+    // });
 
     setTimeout(() => {
       setLocation("/login");

@@ -1,43 +1,33 @@
 import { useState } from "react";
-import { useAuth } from "../hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Car, Shield, Users, BarChart3, Eye, EyeOff } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const { login } = useAuth();
-  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
 
-    // Use state variables directly
     const trimmedUserId = userId?.trim() || "";
     const trimmedPassword = password?.trim() || "";
 
-    console.log("Form submission attempt:", { userId: trimmedUserId, hasPassword: !!trimmedPassword });
-
     if (!trimmedUserId || !trimmedPassword) {
-      toast({
-        title: "Error",
-        description: "Please fill in all fields",
-        variant: "destructive",
-      });
+      setError("Please fill in all fields");
       return;
     }
 
     setLoading(true);
     try {
-      console.log("Direct login attempt with:", trimmedUserId);
+      console.log("🔐 LOGIN: Attempting login with:", trimmedUserId);
 
-      // Direct fetch to avoid any middleware/hooks complexity
       const response = await fetch("/api/platform/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -45,36 +35,40 @@ export default function LoginPage() {
       });
 
       const data = await response.json();
-      console.log("Login response:", { status: response.status, hasToken: !!data.token });
+      console.log("🔐 LOGIN: Response status:", response.status);
 
       if (!response.ok) {
-        throw new Error(data.error || data.message || "Login failed");
-      }
-
-      if (data.token) {
-        console.log("Storing token and redirecting...");
-        localStorage.setItem('fleetpro_token', data.token);
-        localStorage.setItem('fleetpro_user', JSON.stringify({
-          ...data.user,
-          token: data.token,
-          lastValidated: Date.now()
-        }));
-
-        // Direct redirect without using auth context
-        window.location.href = '/superadmin/dashboard';
+        console.error("🔐 LOGIN: Failed -", data);
+        setError(data.error || data.message || "Login failed");
+        setLoading(false);
         return;
-      } else {
-        throw new Error("No token received");
       }
-    } catch (error: any) {
-      console.error("Login error:", error);
-      setLoading(false);
 
-      toast({
-        title: "Login Failed",
-        description: error.message || "Invalid credentials",
-        variant: "destructive",
-      });
+      if (!data.token) {
+        console.error("🔐 LOGIN: No token in response");
+        setError("No token received from server");
+        setLoading(false);
+        return;
+      }
+
+      console.log("🔐 LOGIN: Success! Token received, storing...");
+      localStorage.clear();
+      localStorage.setItem('fleetpro_token', data.token);
+      localStorage.setItem('fleetpro_user', JSON.stringify({
+        ...data.user,
+        token: data.token,
+        lastValidated: Date.now()
+      }));
+
+      console.log("🔐 LOGIN: Redirecting to dashboard...");
+      // Hard redirect - bypass React routing entirely
+      setTimeout(() => {
+        window.location.href = '/superadmin/dashboard';
+      }, 500);
+    } catch (error: any) {
+      console.error("🔐 LOGIN: Error -", error);
+      setError(error.message || "Login failed");
+      setLoading(false);
     }
   };
 
@@ -179,6 +173,11 @@ export default function LoginPage() {
             </CardHeader>
             
             <CardContent className="space-y-4 lg:space-y-8 px-4 lg:px-8 pb-6 lg:pb-10">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
               <form onSubmit={handleSubmit} className="space-y-4 lg:space-y-8" noValidate autoComplete="off">
                 <div className="space-y-2 lg:space-y-3">
                   <Label htmlFor="userId" className="text-sm lg:text-base font-semibold text-slate-700">
