@@ -133,14 +133,27 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
 
   const login = async (userId: string, password: string) => {
     try {
-      const response = await fetch("/api/auth/login", {
+      // Try platform auth first (email or userId)
+      let response = await fetch("/api/platform/auth/login", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ userId, password }),
+        body: JSON.stringify({ email: userId, password }),
         credentials: "include",
       });
+
+      // If platform auth fails, try tenant auth as fallback
+      if (!response.ok) {
+        response = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ userId, password }),
+          credentials: "include",
+        });
+      }
       
       if (!response.ok) {
         const errorData = await response.json();
