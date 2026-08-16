@@ -35,28 +35,46 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      console.log("Calling login with:", trimmedUserId);
-      await login(trimmedUserId, trimmedPassword);
-      console.log("Login successful");
-      toast({
-        title: "Success",
-        description: "Logged in successfully",
+      console.log("Direct login attempt with:", trimmedUserId);
+
+      // Direct fetch to avoid any middleware/hooks complexity
+      const response = await fetch("/api/platform/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmedUserId, password: trimmedPassword }),
       });
+
+      const data = await response.json();
+      console.log("Login response:", { status: response.status, hasToken: !!data.token });
+
+      if (!response.ok) {
+        throw new Error(data.error || data.message || "Login failed");
+      }
+
+      if (data.token) {
+        console.log("Storing token and redirecting...");
+        localStorage.setItem('fleetpro_token', data.token);
+        localStorage.setItem('fleetpro_user', JSON.stringify({
+          ...data.user,
+          token: data.token,
+          lastValidated: Date.now()
+        }));
+
+        // Direct redirect without using auth context
+        window.location.href = '/superadmin/dashboard';
+        return;
+      } else {
+        throw new Error("No token received");
+      }
     } catch (error: any) {
       console.error("Login error:", error);
-      let errorMessage = error?.message || "Invalid credentials";
-
-      if (error?.status === 403 && error?.code === "ACCOUNT_INACTIVE") {
-        errorMessage = error.message;
-      }
+      setLoading(false);
 
       toast({
         title: "Login Failed",
-        description: errorMessage,
+        description: error.message || "Invalid credentials",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
