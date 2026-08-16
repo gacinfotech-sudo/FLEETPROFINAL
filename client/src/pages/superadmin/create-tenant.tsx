@@ -29,7 +29,6 @@ export default function CreateTenant() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const token = localStorage.getItem('fleetpro_token');
 
   function validateForm(): boolean {
     const newErrors: FormErrors = {};
@@ -44,9 +43,7 @@ export default function CreateTenant() {
       newErrors.ownerMobile = 'Mobile is required';
     }
     if (!formData.ownerEmail.trim()) {
-      newErrors.ownerEmail = 'Login ID / Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.ownerEmail) && !/^\d{10,}$/.test(formData.ownerMobile)) {
-      // Allow either email format or just use as username
+      newErrors.ownerEmail = 'Email is required';
     }
 
     setErrors(newErrors);
@@ -61,7 +58,16 @@ export default function CreateTenant() {
     }
 
     setLoading(true);
+    setErrors({});
+
     try {
+      const token = localStorage.getItem('fleetpro_token');
+      if (!token) {
+        setErrors({ submit: 'No authentication token found. Please login again.' });
+        setLoading(false);
+        return;
+      }
+
       const response = await fetch('https://localhost:5050/api/admin/tenants', {
         method: 'POST',
         headers: {
@@ -72,28 +78,27 @@ export default function CreateTenant() {
           name: formData.businessName,
           businessName: formData.businessName,
           ownerName: formData.ownerName,
-          ownerMobile: formData.ownerMobile,
           ownerEmail: formData.ownerEmail,
+          ownerMobile: formData.ownerMobile,
           city: formData.city,
           status: formData.status,
         }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setSuccess(true);
-        setSuccessMessage(`Tenant "${formData.businessName}" created successfully! Tenant ID: ${data.tenantId}`);
+      const data = await response.json();
 
+      if (response.ok || response.status === 201) {
+        setSuccess(true);
+        setSuccessMessage(`Tenant "${formData.businessName}" created successfully!`);
         setTimeout(() => {
           setLocation('/superadmin/tenants');
         }, 2000);
       } else {
-        const error = await response.json();
-        setErrors({ submit: error.message || 'Failed to create tenant' });
+        setErrors({ submit: data.message || 'Failed to create tenant' });
       }
-    } catch (error) {
-      setErrors({ submit: 'Failed to create tenant. Please try again.' });
-      console.error('Failed to create tenant:', error);
+    } catch (error: any) {
+      setErrors({ submit: error.message || 'Failed to create tenant. Please try again.' });
+      console.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -115,16 +120,13 @@ export default function CreateTenant() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-2xl mx-auto p-8">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Create New Tenant</h1>
           <p className="text-gray-600">Add a new customer tenant to the platform</p>
         </div>
 
-        {/* Form */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Company Name */}
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">
                 Company Name *
@@ -143,7 +145,6 @@ export default function CreateTenant() {
               )}
             </div>
 
-            {/* Owner Name */}
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">
                 Owner Name *
@@ -162,7 +163,6 @@ export default function CreateTenant() {
               )}
             </div>
 
-            {/* Mobile */}
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">
                 Mobile *
@@ -181,7 +181,6 @@ export default function CreateTenant() {
               )}
             </div>
 
-            {/* Email / Login ID */}
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">
                 Email / Login ID *
@@ -200,7 +199,6 @@ export default function CreateTenant() {
               )}
             </div>
 
-            {/* City */}
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">
                 City
@@ -214,7 +212,6 @@ export default function CreateTenant() {
               />
             </div>
 
-            {/* Status */}
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">
                 Status
@@ -229,7 +226,6 @@ export default function CreateTenant() {
               </select>
             </div>
 
-            {/* Error Message */}
             {errors.submit && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -237,7 +233,6 @@ export default function CreateTenant() {
               </div>
             )}
 
-            {/* Buttons */}
             <div className="flex items-center gap-4 pt-4">
               <button
                 type="submit"
