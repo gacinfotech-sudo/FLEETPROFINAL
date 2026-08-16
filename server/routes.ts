@@ -454,6 +454,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ csrfToken: req.session.csrfToken });
   });
 
+  // Simple dashboard page (fallback, no React)
+  app.get("/simple-dashboard", authenticateUser, (req: any, res) => {
+    const user = req.user;
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FleetPro Dashboard</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+    .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    h1 { font-size: 32px; margin-bottom: 10px; }
+    .user-info { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+    .stat { display: inline-block; padding: 20px; background: white; border-radius: 8px; margin-right: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .stat-value { font-size: 32px; font-weight: bold; color: #667eea; }
+    .stat-label { color: #666; font-size: 14px; }
+    button { background: #667eea; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #5568d3; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="container">
+      <h1>🚗 FleetPro Dashboard</h1>
+      <p>Welcome, ${user.userId}!</p>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="user-info card">
+      <h2>User Information</h2>
+      <p><strong>User ID:</strong> ${user.userId}</p>
+      <p><strong>Role:</strong> ${user.role}</p>
+      <p><strong>Platform Role:</strong> ${user.platformRole || 'N/A'}</p>
+      <p><strong>Status:</strong> <span style="color: green;">✅ Active</span></p>
+    </div>
+
+    <h2>Key Metrics</h2>
+    <div class="stat">
+      <div class="stat-value">0</div>
+      <div class="stat-label">Total Vehicles</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">0</div>
+      <div class="stat-label">Active Drivers</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">0</div>
+      <div class="stat-label">Bookings Today</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">₹0</div>
+      <div class="stat-label">Revenue</div>
+    </div>
+
+    <div class="card" style="margin-top: 40px;">
+      <h2>Next Steps</h2>
+      <p>✅ Login successful</p>
+      <p>✅ Authentication working</p>
+      <p>📱 System ready for fleet management</p>
+      <button onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <script>
+    function logout() {
+      localStorage.clear();
+      window.location.href = '/api/simple-login-page';
+    }
+  </script>
+</body>
+</html>`;
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  });
+
   // Simple standalone login page (no React, pure HTML+JS)
   app.get("/api/simple-login-page", (req: any, res) => {
     const html = `
@@ -516,7 +597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         localStorage.setItem('fleetpro_user', JSON.stringify(data.user));
         document.getElementById('success').textContent = '✅ Login successful! Redirecting...';
         document.getElementById('success').style.display = 'block';
-        setTimeout(() => { window.location.href = '/dashboard'; }, 1000);
+        setTimeout(() => { window.location.href = '/simple-dashboard'; }, 1000);
       } catch (err) {
         document.getElementById('error').textContent = err.message;
         document.getElementById('error').style.display = 'block';
