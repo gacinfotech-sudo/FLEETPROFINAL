@@ -40,11 +40,19 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Only check auth status once on mount
-    checkAuthStatus().catch(error => {
-      console.error("Initial auth check failed:", error);
-    });
-    
+    const currentPath = window.location.pathname;
+    const isLoginPage = currentPath === '/login' || currentPath === '/driver-login';
+
+    // Skip auth check on login pages - no need to validate sessions there
+    if (!isLoginPage) {
+      checkAuthStatus().catch(error => {
+        console.error("Initial auth check failed:", error);
+      });
+    } else {
+      console.log("On login page - skipping auth status check");
+      setLoading(false);
+    }
+
     // Register global session expiry handlers
     setSessionExpiryHandler(handleSessionExpiry);
     setQuerySessionExpiryHandler(handleSessionExpiry);
