@@ -52,6 +52,11 @@ import WhatsAppTemplateHistory from "./pages/whatsapp-template-history";
 import WhatsAppApprovalQueue from "./pages/whatsapp-approval-queue";
 import WhatsAppApprovalConfig from "./pages/whatsapp-approval-config";
 
+// SuperAdmin Pages
+import SuperAdminDashboard from "./pages/superadmin/dashboard";
+import SuperAdminTenants from "./pages/superadmin/tenants";
+import CreateTenant from "./pages/superadmin/create-tenant";
+
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
 
@@ -61,6 +66,55 @@ function AuthenticatedApp() {
       {/* Public Landing Page */}
       <Route path="/" component={LandingPage} />
 
+      {/* SuperAdmin Tenant Management */}
+      <Route path="/superadmin">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <SuperAdminDashboard />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      <Route path="/superadmin/tenants">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <SuperAdminTenants />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      <Route path="/superadmin/tenants/create">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <CreateTenant />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      <Route path="/superadmin/tenants/:id/edit">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <CreateTenant />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
       {/* Login Page */}
       <Route path="/login">
         {loading ? (
@@ -68,8 +122,8 @@ function AuthenticatedApp() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : user ? (
-          // Route authenticated users to dashboard
-          <Dashboard key={user.userId} />
+          // Route authenticated users to dashboard or superadmin based on platformRole
+          user.platformRole ? <SuperAdminDashboard key={user.userId} /> : <Dashboard key={user.userId} />
         ) : (
           <LoginPage />
         )}
