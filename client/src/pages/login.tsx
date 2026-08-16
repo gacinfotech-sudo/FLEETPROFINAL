@@ -63,7 +63,7 @@ export default function LoginPage() {
       console.log("🔐 LOGIN: Redirecting to dashboard...");
       // Hard redirect - bypass React routing entirely
       setTimeout(() => {
-        window.location.href = '/superadmin/dashboard';
+        window.location.href = '/dashboard';
       }, 500);
     } catch (error: any) {
       console.error("🔐 LOGIN: Error -", error);

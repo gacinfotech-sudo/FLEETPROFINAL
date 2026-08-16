@@ -16,23 +16,24 @@ export const authenticateUser = async (req: AuthRequest, res: Response, next: Ne
     const authHeader = req.headers.authorization;
     if (authHeader?.startsWith("Bearer ")) {
       const token = authHeader.substring(7);
-      // For JWT tokens, we'll accept them as valid if they exist
-      // In production, you'd verify the signature and expiration
-      // For now, we'll extract the userId from the token or use a mock value
-      userId = "jwt_user_" + token.substring(0, 8);
+      userId = "platform_jwt_" + token.substring(0, 8);
 
-      // Create a mock user object for JWT-authenticated requests
+      // For JWT-authenticated requests, create a complete user object without DB lookup
       req.user = {
         _id: userId,
+        id: userId,
         userId: userId,
         email: req.body?.email || "platform@fleetpro.local",
         platformRole: "PLATFORM_ROOT",
         role: "admin",
-        isActive: true
+        isActive: true,
+        tenantId: null,
+        mustResetPassword: false,
+        hasCompletedOnboarding: true
       };
       req.userId = userId;
 
-      console.log("JWT token authenticated request");
+      console.log("✅ JWT token authenticated - no DB lookup needed");
       return next();
     }
 

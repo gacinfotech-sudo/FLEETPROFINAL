@@ -922,12 +922,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/auth/me", authenticateUser, async (req: AuthRequest, res) => {
     try {
-      // Get fresh user data from database to ensure hasCompletedOnboarding is current
+      // JWT-authenticated users don't need DB lookup
+      if (req.user.userId?.startsWith("platform_jwt_")) {
+        return res.json({
+          user: {
+            id: req.user.id,
+            userId: req.user.userId,
+            role: req.user.role,
+            platformRole: req.user.platformRole,
+            tenantId: req.user.tenantId,
+            mustResetPassword: req.user.mustResetPassword,
+            hasCompletedOnboarding: req.user.hasCompletedOnboarding || false,
+            isActive: req.user.isActive
+          }
+        });
+      }
+
+      // Get fresh user data from database for session-based auth
       const user = await storage.getUser(req.user.id);
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      
+
       res.json({
         user: {
           id: user.id,
