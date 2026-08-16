@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, LogIn, ToggleLeft } from 'lucide-react';
+import { Plus, Edit2, LogIn, ToggleLeft, Eye } from 'lucide-react';
 import { useLocation } from 'wouter';
 import SuperAdminLayout from '@/components/superadmin-layout';
 
@@ -137,6 +137,13 @@ export default function SuperAdminTenants() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setLocation(`/superadmin/tenants/${tenant._id}/360`)}
+                          className="p-2 hover:bg-purple-100 rounded text-purple-600 transition-colors"
+                          title="View tenant 360"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => openTenant(tenant.tenantId)}
                           className="p-2 hover:bg-blue-100 rounded text-blue-600 transition-colors"

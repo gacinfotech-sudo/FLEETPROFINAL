@@ -702,4 +702,104 @@ router.delete('/tenants/:id', authenticateUser, requirePlatformRoot, async (req:
   }
 });
 
+// ============================================================================
+// TENANT USER MANAGEMENT
+// ============================================================================
+
+/**
+ * GET /api/admin/tenants/:id/users
+ * Get all users for a tenant
+ */
+router.get('/tenants/:id/users', authenticateUser, requirePlatformRoot, async (req: AuthRequest, res: any) => {
+  try {
+    const tenantId = req.params.id;
+    const users = await storage.getUsersByTenant(tenantId);
+
+    res.json(users || []);
+  } catch (error) {
+    console.error('Error fetching tenant users:', error);
+    res.status(500).json({ message: 'Failed to fetch users' });
+  }
+});
+
+/**
+ * POST /api/admin/tenants/:id/users
+ * Create new user for tenant
+ */
+router.post('/tenants/:id/users', authenticateUser, requirePlatformRoot, async (req: AuthRequest, res: any) => {
+  try {
+    const { name, email, role, password } = req.body;
+    const tenantId = req.params.id;
+
+    if (!name || !email || !role) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    // Generate temporary password if not provided
+    const tempPassword = password || Math.random().toString(36).substring(2, 15);
+    const bcrypt = await import('bcrypt');
+    const passwordHash = await bcrypt.default.hash(tempPassword, 12);
+
+    const user = await storage.createUser({
+      userId: email,
+      email,
+      password: passwordHash,
+      name,
+      role: role as any,
+      tenantId,
+      isActive: true,
+      createdAt: new Date(),
+    });
+
+    res.status(201).json({
+      message: 'User created successfully',
+      user,
+      tempPassword: !password ? tempPassword : undefined,
+    });
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ message: 'Failed to create user' });
+  }
+});
+
+/**
+ * DELETE /api/admin/tenants/:id/users/:userId
+ * Delete user from tenant
+ */
+router.delete('/tenants/:id/users/:userId', authenticateUser, requirePlatformRoot, async (req: AuthRequest, res: any) => {
+  try {
+    const { userId } = req.params;
+    await storage.deleteUser(userId);
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Failed to delete user' });
+  }
+});
+
+/**
+ * POST /api/admin/tenants/:id/users/:userId/reset-password
+ * Reset user password
+ */
+router.post('/tenants/:id/users/:userId/reset-password', authenticateUser, requirePlatformRoot, async (req: AuthRequest, res: any) => {
+  try {
+    const { userId } = req.params;
+
+    const tempPassword = Math.random().toString(36).substring(2, 15);
+    const bcrypt = await import('bcrypt');
+    const passwordHash = await bcrypt.default.hash(tempPassword, 12);
+
+    await storage.updateUser(userId, { password: passwordHash });
+
+    res.json({
+      message: 'Password reset successfully',
+      tempPassword,
+    });
+  } catch (error) {
+    console.error('Error resetting password:', error);
+    res.status(500).json({ message: 'Failed to reset password' });
+  }
+});
+
 export default router;

@@ -56,6 +56,7 @@ import WhatsAppApprovalConfig from "./pages/whatsapp-approval-config";
 import SuperAdminDashboard from "./pages/superadmin/dashboard";
 import SuperAdminTenants from "./pages/superadmin/tenants";
 import CreateTenant from "./pages/superadmin/create-tenant";
+import Tenant360 from "./pages/superadmin/tenant-360";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -110,6 +111,18 @@ function AuthenticatedApp() {
           </div>
         ) : user?.platformRole ? (
           <CreateTenant />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      <Route path="/superadmin/tenants/:id/360">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <Tenant360 />
         ) : (
           <LoginPage />
         )}
