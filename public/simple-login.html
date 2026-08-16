@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FleetPro Login</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      background: white;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      width: 100%;
+      max-width: 400px;
+    }
+    h1 {
+      font-size: 28px;
+      margin-bottom: 10px;
+      color: #333;
+    }
+    p {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+    }
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .error {
+      background: #fee;
+      color: #c33;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+    .success {
+      background: #efe;
+      color: #3c3;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: none;
+    }
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚗 FleetPro</h1>
+    <p>Professional Fleet Management</p>
+
+    <div id="error" class="error"></div>
+    <div id="success" class="success"></div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="text" id="email" name="email" value="root@fleetpro.local" required>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" value="password" required>
+      </div>
+
+      <button type="submit" id="submitBtn">
+        <span id="btnText">Sign In</span>
+      </button>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const errorDiv = document.getElementById('error');
+    const successDiv = document.getElementById('success');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnText = document.getElementById('btnText');
+
+    function showError(msg) {
+      errorDiv.textContent = msg;
+      errorDiv.style.display = 'block';
+      successDiv.style.display = 'none';
+    }
+
+    function showSuccess(msg) {
+      successDiv.textContent = msg;
+      successDiv.style.display = 'block';
+      errorDiv.style.display = 'none';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorDiv.style.display = 'none';
+      successDiv.style.display = 'none';
+
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
+
+      if (!email || !password) {
+        showError('Email and password required');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      btnText.innerHTML = '<span class="spinner"></span> Signing In...';
+
+      try {
+        console.log('🔐 Login: Sending to /api/platform/auth/login');
+        console.log('Email:', email);
+
+        const response = await fetch('/api/platform/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        console.log('🔐 Response status:', response.status);
+
+        if (!response.ok) {
+          const text = await response.text();
+          console.error('🔐 Error:', text);
+          showError(`Login failed: ${response.status}`);
+          submitBtn.disabled = false;
+          btnText.textContent = 'Sign In';
+          return;
+        }
+
+        const data = await response.json();
+        console.log('🔐 Got token:', data.token ? 'YES' : 'NO');
+
+        if (!data.token) {
+          showError('No token received');
+          submitBtn.disabled = false;
+          btnText.textContent = 'Sign In';
+          return;
+        }
+
+        console.log('🔐 Storing token in localStorage');
+        localStorage.clear();
+        localStorage.setItem('fleetpro_token', data.token);
+        localStorage.setItem('fleetpro_user', JSON.stringify(data.user));
+
+        showSuccess('✅ Login successful! Redirecting...');
+        console.log('🔐 Redirecting to /dashboard');
+
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1000);
+
+      } catch (error) {
+        console.error('🔐 Exception:', error);
+        showError(`Error: ${error.message}`);
+        submitBtn.disabled = false;
+        btnText.textContent = 'Sign In';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -454,6 +454,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ csrfToken: req.session.csrfToken });
   });
 
+  // Simple standalone login page (no React, pure HTML+JS)
+  app.get("/api/simple-login-page", (req: any, res) => {
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FleetPro Login</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .container { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%; max-width: 400px; }
+    h1 { font-size: 28px; margin-bottom: 10px; color: #333; }
+    p { color: #666; margin-bottom: 30px; font-size: 14px; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; font-size: 14px; }
+    input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
+    button { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error { background: #fee; color: #c33; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; display: none; }
+    .success { background: #efe; color: #3c3; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚗 FleetPro</h1>
+    <p>Professional Fleet Management</p>
+    <div id="error" class="error"></div>
+    <div id="success" class="success"></div>
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="text" id="email" value="root@fleetpro.local" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" value="password" required>
+      </div>
+      <button type="submit" id="submitBtn">Sign In</button>
+    </form>
+  </div>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/platform/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        if (!res.ok) throw new Error(\`Login failed: \${res.status}\`);
+        const data = await res.json();
+        localStorage.setItem('fleetpro_token', data.token);
+        localStorage.setItem('fleetpro_user', JSON.stringify(data.user));
+        document.getElementById('success').textContent = '✅ Login successful! Redirecting...';
+        document.getElementById('success').style.display = 'block';
+        setTimeout(() => { window.location.href = '/dashboard'; }, 1000);
+      } catch (err) {
+        document.getElementById('error').textContent = err.message;
+        document.getElementById('error').style.display = 'block';
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>`;
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  });
+
   // ============ PUBLIC DEMO ENDPOINTS (No Auth Required) ============
   // These are for the live dashboard to display demo data without login
 
