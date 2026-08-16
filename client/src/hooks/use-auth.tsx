@@ -51,6 +51,15 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   }, []); // Only run once on mount
 
   const handleSessionExpiry = () => {
+    const currentPath = window.location.pathname;
+
+    // Don't show session expiry message on login page
+    if (currentPath === '/login' || currentPath === '/driver-login') {
+      console.log("Session check on login page - silently clearing");
+      setUser(null);
+      return;
+    }
+
     console.log("Session expired - redirecting to login");
     setUser(null);
     toast({
@@ -58,7 +67,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       title: "Session Expired",
       description: "Your session has expired. Please login again.",
     });
-    
+
     // Redirect to login after a brief delay to show the toast
     setTimeout(() => {
       setLocation("/login");
