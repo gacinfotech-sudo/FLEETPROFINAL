@@ -34,12 +34,18 @@ export async function apiRequest(
     const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
     const buildBody = () => (data === undefined ? undefined : isFormData ? (data as FormData) : JSON.stringify(data));
     const buildHeaders = () => {
-      // Never set Content-Type for FormData — the browser must set its own
-      // multipart boundary, or the upload silently fails to parse server-side.
       const headers: Record<string, string> = data && !isFormData ? { "Content-Type": "application/json" } : {};
-      const token = getCachedCsrfToken();
-      if (needsCsrf && token) {
-        headers["X-CSRF-Token"] = token;
+
+      // Add JWT token from localStorage
+      const jwtToken = typeof window !== 'undefined' ? localStorage.getItem('fleetpro_token') : null;
+      if (jwtToken) {
+        headers["Authorization"] = `Bearer ${jwtToken}`;
+      }
+
+      // Add CSRF token if needed
+      const csrfToken = getCachedCsrfToken();
+      if (needsCsrf && csrfToken) {
+        headers["X-CSRF-Token"] = csrfToken;
       }
       return headers;
     };
@@ -90,8 +96,15 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     try {
+      const headers: Record<string, string> = {};
+      const jwtToken = typeof window !== 'undefined' ? localStorage.getItem('fleetpro_token') : null;
+      if (jwtToken) {
+        headers["Authorization"] = `Bearer ${jwtToken}`;
+      }
+
       const res = await fetch(queryKey[0] as string, {
         credentials: "include",
+        headers,
       });
 
       if (res.status === 401) {
