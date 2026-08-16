@@ -5,11 +5,12 @@ import { setQuerySessionExpiryHandler } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 interface User {
-  id: number;
+  id: number | string;
   userId: string;
   role: string;
+  accountType?: 'PLATFORM' | 'TENANT';
   platformRole?: string;
-  tenantId?: number;
+  tenantId?: string | number | null;
   mustResetPassword?: boolean;
   hasCompletedOnboarding?: boolean;
   lastLogin?: Date;
@@ -89,24 +90,20 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
 
   const checkAuthStatus = async () => {
     try {
-      const token = localStorage.getItem('fleetpro_token');
-      const headers: Record<string, string> = {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
+      // P0 FIX: Session-based authentication only
+      // Backend uses httpOnly cookies, NOT bearer tokens
       const response = await fetch("/api/auth/me", {
         credentials: "include",
-        headers
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
-        
+
         // Store user data locally for PWA persistence
         localStorage.setItem('fleetpro_user', JSON.stringify({
           ...data.user,
@@ -115,20 +112,19 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       } else if (response.status === 401) {
         // Clear local storage on session expiry
         localStorage.removeItem('fleetpro_user');
-        
+        localStorage.removeItem('fleetpro_token');
+
         // Only trigger session expiry if user was previously authenticated
-        // This prevents the immediate logout issue after login
         if (user) {
           console.log("Session expired for authenticated user");
           handleSessionExpiry();
         } else {
-          // No user session, just clear the user state silently
           setUser(null);
         }
       }
     } catch (error) {
       console.error("Auth check failed:", error);
-      
+
       // For PWA: Try to restore user from localStorage during network errors
       if (!user && !navigator.onLine) {
         const storedUser = localStorage.getItem('fleetpro_user');
@@ -136,8 +132,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
           try {
             const parsedUser = JSON.parse(storedUser);
             const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
-            
-            // Only restore if stored less than a week ago
+
             if (parsedUser.lastValidated && parsedUser.lastValidated > oneWeekAgo) {
               setUser(parsedUser);
               console.log("Restored user from localStorage for offline use");
@@ -149,8 +144,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
           }
         }
       }
-      
-      // Only show session expiry if user was previously authenticated
+
       if (user && navigator.onLine) {
         handleSessionExpiry();
       }
@@ -161,8 +155,9 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
 
   const login = async (userId: string, password: string) => {
     try {
-      // Try platform auth first (email or userId)
-      let response = await fetch("/api/platform/auth/login", {
+      // P0 FIX: Use canonical auth endpoint only
+      // Backend returns authoritative accountType and redirectUrl
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -171,18 +166,6 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
         credentials: "include",
       });
 
-      // If platform auth fails, try tenant auth as fallback
-      if (!response.ok) {
-        response = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ userId, password }),
-          credentials: "include",
-        });
-      }
-      
       if (!response.ok) {
         const errorData = await response.json();
         const error = new Error(errorData.message || "Login failed");
@@ -190,38 +173,31 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
         (error as any).code = errorData.code;
         throw error;
       }
-      
+
       const data = await response.json();
 
       // Set user data immediately
       setUser(data.user);
       setLoading(false);
 
-      // Store token AND user data locally
-      if (data.token) {
-        localStorage.setItem('fleetpro_token', data.token);
-        localStorage.setItem('fleetpro_user', JSON.stringify({
-          ...data.user,
-          token: data.token,
-          lastValidated: Date.now()
-        }));
-      } else {
-        // Fallback for endpoints that use cookies
-        localStorage.setItem('fleetpro_user', JSON.stringify({
-          ...data.user,
-          lastValidated: Date.now()
-        }));
-      }
-      
-      // Navigate to appropriate dashboard
-      // Platform owners/staff go to SaaS platform control panel
-      if (data.user.platformRole) {
-        setLocation("/superadmin/dashboard");
-      } else if (data.user.role === "admin") {
-        setLocation("/dashboard");
-      } else {
-        setLocation("/dashboard");
-      }
+      // P0 FIX: Backend uses session cookies, not bearer tokens
+      // Do NOT store token in localStorage (it doesn't exist)
+      localStorage.setItem('fleetpro_user', JSON.stringify({
+        ...data.user,
+        lastValidated: Date.now()
+      }));
+
+      // P0 FIX: TRUST BACKEND COMPLETELY for redirect decision
+      // Backend has determined the authoritative accountType
+      // and calculated the correct redirect URL
+      const redirectUrl = data.redirectUrl || (
+        data.user.accountType === 'PLATFORM'
+          ? "/superadmin/dashboard"
+          : "/dashboard"
+      );
+
+      console.log(`✅ P0 LOGIN: accountType=${data.user.accountType}, redirecting to ${redirectUrl}`);
+      setLocation(redirectUrl);
     } catch (error) {
       throw error;
     }

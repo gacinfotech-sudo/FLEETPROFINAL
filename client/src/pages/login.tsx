@@ -1,16 +1,33 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Car, Shield, Users, BarChart3, Eye, EyeOff } from "lucide-react";
+import { Car, Shield, Users, BarChart3, Eye, EyeOff, ArrowLeft } from "lucide-react";
 
 export default function LoginPage() {
+  const [isTenantMode, setIsTenantMode] = useState(false);
+  const [tenantId, setTenantId] = useState("");
   const [email, setEmail] = useState("root@fleetpro.local");
+  const [userId, setUserId] = useState("root@fleetpro.local");
   const [password, setPassword] = useState("password");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    // Check query params for tenant mode
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    const tid = params.get('tenantId');
+
+    if (mode === 'tenant' && tid) {
+      setIsTenantMode(true);
+      setTenantId(tid);
+      setEmail('');
+      setUserId('');
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,44 +39,82 @@ export default function LoginPage() {
     }
 
     setLoading(true);
-    console.log("🔐 LOGIN: Starting login with email:", email);
+
+    if (isTenantMode) {
+      console.log("🔐 TENANT LOGIN: Starting login for tenant:", tenantId);
+    } else {
+      console.log("🔐 PLATFORM LOGIN: Starting login with email:", email);
+    }
 
     try {
-      const response = await fetch("/api/platform/auth/login", {
+      // P0 FIX: UNIFIED LOGIN - Backend determines account type
+      // Support both email and userId
+      // The form field is "User ID" which updates userId state
+      const endpoint = "/api/auth/login";
+
+      // Determine if input is email or userId based on '@' character
+      const isEmail = userId.includes('@');
+      const body = {
+        email: isEmail ? userId : undefined,
+        userId: !isEmail ? userId : undefined,
+        password
+      };
+
+      console.log("🔐 P0 LOGIN: Sending to backend for canonical auth...");
+
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        credentials: "include",
+        body: JSON.stringify(body),
       });
-
-      console.log("🔐 LOGIN: Got response, status:", response.status);
 
       if (!response.ok) {
         const text = await response.text();
-        console.error("🔐 LOGIN: Error response:", text);
-        setError(`Login failed: ${response.status}`);
+        console.error("🔴 LOGIN FAILED:", { status: response.status, body: text });
+        setError("Invalid credentials");
         setLoading(false);
         return;
       }
 
       const data = await response.json();
-      console.log("🔐 LOGIN: Response data:", data);
 
-      if (!data.token) {
-        setError("No token from server");
+      console.log("🔐 P0 LOGIN RESPONSE:", {
+        accountType: data.accountType,
+        redirectUrl: data.redirectUrl
+      });
+
+      if (!data.user || !data.accountType) {
+        setError("Invalid server response");
         setLoading(false);
         return;
       }
 
-      console.log("🔐 LOGIN: Token received, clearing storage and storing new token");
+      // CLEAR ALL old session state
       localStorage.clear();
-      localStorage.setItem("fleetpro_token", data.token);
-      localStorage.setItem("fleetpro_user", JSON.stringify(data.user));
+      sessionStorage.clear();
 
-      console.log("🔐 LOGIN: Stored! Redirecting to /dashboard");
-      window.location.href = "/dashboard";
+      // Store CANONICAL identity from backend (SESSION-BASED AUTH)
+      // Backend sets httpOnly cookie, we just store user data for app state
+      localStorage.setItem("fleetpro_user", JSON.stringify(data.user));
+      localStorage.setItem("accountType", data.accountType);
+      localStorage.setItem("tenantId", data.user.tenantId || "");
+
+      console.log(`✅ P0 LOGIN SUCCESS: accountType=${data.accountType}`);
+
+      // REDIRECT based on BACKEND-determined accountType
+      // NEVER trust frontend logic for this decision
+      const redirectUrl = data.redirectUrl || (
+        data.accountType === 'PLATFORM'
+          ? "/superadmin/dashboard"
+          : "/dashboard"
+      );
+
+      console.log(`🚀 Redirecting to: ${redirectUrl}`);
+      window.location.href = redirectUrl;
     } catch (err: any) {
-      console.error("🔐 LOGIN: Exception:", err);
-      setError(`Failed to fetch: ${err.message}`);
+      console.error("❌ P0 LOGIN FAILED:", err);
+      setError(`Login failed: ${err.message}`);
       setLoading(false);
     }
   };
@@ -155,11 +210,23 @@ export default function LoginPage() {
               </div>
               
               <div>
+                {isTenantMode && (
+                  <button
+                    onClick={() => window.location.href = '/login'}
+                    className="mb-4 flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    <ArrowLeft size={16} />
+                    Back to Root
+                  </button>
+                )}
                 <CardTitle className="text-2xl lg:text-3xl font-bold text-slate-800 mb-2 lg:mb-4">
-                  Welcome Back
+                  {isTenantMode ? 'Tenant Login' : 'Welcome Back'}
                 </CardTitle>
                 <CardDescription className="text-base lg:text-lg text-slate-600 leading-relaxed">
-                  Sign in to access your fleet management dashboard
+                  {isTenantMode
+                    ? 'Sign in to access your fleet management dashboard'
+                    : 'Sign in to access your fleet management dashboard'
+                  }
                 </CardDescription>
               </div>
             </CardHeader>

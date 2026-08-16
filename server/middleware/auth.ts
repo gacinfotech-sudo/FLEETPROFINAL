@@ -12,32 +12,10 @@ export const authenticateUser = async (req: AuthRequest, res: Response, next: Ne
   try {
     let userId: string | undefined;
 
-    // Try to get userId from JWT token first (Authorization: Bearer <token>)
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith("Bearer ")) {
-      const token = authHeader.substring(7);
-      userId = "platform_jwt_" + token.substring(0, 8);
+    // P0 FIX: SESSION-BASED AUTHENTICATION ONLY
+    // The canonical auth service uses session cookies, not bearer tokens
 
-      // For JWT-authenticated requests, create a complete user object without DB lookup
-      req.user = {
-        _id: userId,
-        id: userId,
-        userId: userId,
-        email: req.body?.email || "platform@fleetpro.local",
-        platformRole: "PLATFORM_ROOT",
-        role: "admin",
-        isActive: true,
-        tenantId: null,
-        mustResetPassword: false,
-        hasCompletedOnboarding: true
-      };
-      req.userId = userId;
-
-      console.log("✅ JWT token authenticated - no DB lookup needed");
-      return next();
-    }
-
-    // Fall back to session-based authentication
+    // Check for session-based authentication
     if (!req.session) {
       return res.status(401).json({ message: "Authentication required" });
     }

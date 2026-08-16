@@ -62,19 +62,12 @@ export default function CreateTenant() {
     setErrors({});
 
     try {
-      const token = localStorage.getItem('fleetpro_token');
-      if (!token) {
-        setErrors({ submit: 'No authentication token found. Please login again.' });
-        setLoading(false);
-        return;
-      }
-
       const response = await fetch('https://localhost:5050/api/admin/tenants', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           name: formData.businessName,
           businessName: formData.businessName,

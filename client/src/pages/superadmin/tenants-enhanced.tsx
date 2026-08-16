@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, LogIn, Eye, DollarSign, Calendar, CheckCircle, AlertCircle, RefreshCw, FileText, CreditCard, Copy, Key } from 'lucide-react';
+import { Plus, Edit2, LogIn, Eye, DollarSign, Calendar, CheckCircle, AlertCircle, RefreshCw, FileText, CreditCard } from 'lucide-react';
 import { useLocation } from 'wouter';
 import SuperAdminLayout from '@/components/superadmin-layout';
 
@@ -58,30 +58,13 @@ export default function SuperAdminTenants() {
 
   async function fetchTenants() {
     try {
-      console.log('Fetching tenants...');
       const response = await fetch('/api/admin/tenants', {
         credentials: 'include',
       });
-
-      console.log('Response status:', response.status);
-
       if (response.ok) {
         const data = await response.json();
-        console.log('Tenants data received:', data);
-
-        // Handle both array and object responses
-        const tenantsList = Array.isArray(data) ? data : data.tenants || data || [];
-        console.log('Parsed tenants list:', tenantsList);
-
-        if (tenantsList.length === 0) {
-          console.warn('No tenants found in response');
-          setTenants([]);
-          setLoading(false);
-          return;
-        }
-
-        // Add mock billing data and credentials for demo
-        const tenantsWithData = tenantsList.map((t: any, idx: number) => ({
+        // Add mock billing data for demo
+        const tenantsWithBilling = (Array.isArray(data) ? data : data.tenants || []).map((t: Tenant, idx: number) => ({
           ...t,
           billing: {
             subscriptionPlan: ['starter', 'professional', 'enterprise'][idx % 3] as any,
@@ -93,24 +76,12 @@ export default function SuperAdminTenants() {
             paymentMethod: ['Credit Card', 'UPI', 'Bank Transfer'][idx % 3],
             nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
             lastPaymentDate: new Date(Date.now() - (idx % 30) * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          credentials: {
-            loginId: t.ownerEmail || `admin_${t.tenantId}`,
-            password: 'password123!',
-            firstTimePassword: true
           }
         }));
-
-        console.log('Tenants with data:', tenantsWithData);
-        setTenants(tenantsWithData);
-      } else {
-        const errorText = await response.text();
-        console.error('Failed to fetch tenants:', response.status, errorText);
-        setTenants([]);
+        setTenants(tenantsWithBilling);
       }
     } catch (error) {
-      console.error('Fetch error:', error);
-      setTenants([]);
+      console.error('Failed to fetch tenants:', error);
     } finally {
       setLoading(false);
     }
@@ -313,76 +284,18 @@ export default function SuperAdminTenants() {
                   </button>
                 </div>
 
-                {/* Login Credentials Section */}
-                <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border-2 border-orange-300 p-4 mb-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Key className="w-4 h-4 text-orange-600" />
-                    <span className="text-sm font-bold text-orange-900">LOGIN CREDENTIALS</span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="bg-white rounded p-2 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-gray-600">Login ID</p>
-                        <p className="text-sm font-mono font-bold text-gray-900">{(tenant as any).credentials?.loginId || tenant.ownerEmail}</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText((tenant as any).credentials?.loginId || tenant.ownerEmail || '');
-                          alert('Copied!');
-                        }}
-                        className="p-2 hover:bg-gray-100 rounded transition-colors"
-                        title="Copy Login ID"
-                      >
-                        <Copy className="w-4 h-4 text-blue-600" />
-                      </button>
-                    </div>
-                    <div className="bg-white rounded p-2 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-gray-600">Password</p>
-                        <p className="text-sm font-mono font-bold text-gray-900">••••••••••</p>
-                        <p className="text-xs text-orange-600 mt-1">
-                          {(tenant as any).credentials?.firstTimePassword ? '🔔 First time - must change' : '✓ Set'}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText((tenant as any).credentials?.password || 'password123!');
-                          alert('Password copied!');
-                        }}
-                        className="p-2 hover:bg-gray-100 rounded transition-colors"
-                        title="Copy Password"
-                      >
-                        <Copy className="w-4 h-4 text-green-600" />
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-orange-700 mt-3 bg-orange-100 rounded px-2 py-1">
-                    ⚠️ Share these credentials securely with tenant owner. Password must be changed on first login.
-                  </p>
-                </div>
-
                 {/* Action Buttons */}
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     onClick={() => setLocation(`/superadmin/tenants/${tenant._id}/billing`)}
                     className="flex items-center justify-center gap-1 bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
-                    title="Billing & Subscriptions"
                   >
                     <DollarSign className="w-4 h-4" />
                     Billing
                   </button>
                   <button
-                    onClick={() => setLocation(`/superadmin/tenants/${tenant._id}/advanced`)}
-                    className="flex items-center justify-center gap-1 bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
-                    title="Advanced Settings"
-                  >
-                    ⚙️
-                    Settings
-                  </button>
-                  <button
                     onClick={() => setLocation(`/superadmin/tenants/${tenant._id}/invoices`)}
                     className="flex items-center justify-center gap-1 bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
-                    title="Invoices & Payments"
                   >
                     <FileText className="w-4 h-4" />
                     Invoices
@@ -391,7 +304,6 @@ export default function SuperAdminTenants() {
                     <button
                       onClick={() => openTenant(tenant._id)}
                       className="flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
-                      title="Access Tenant Dashboard"
                     >
                       <LogIn className="w-4 h-4" />
                       Access

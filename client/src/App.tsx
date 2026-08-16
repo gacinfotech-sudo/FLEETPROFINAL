@@ -57,6 +57,12 @@ import SuperAdminDashboard from "./pages/superadmin/dashboard";
 import SuperAdminTenants from "./pages/superadmin/tenants";
 import CreateTenant from "./pages/superadmin/create-tenant";
 import Tenant360 from "./pages/superadmin/tenant-360";
+import TenantBilling from "./pages/superadmin/tenant-billing";
+import TenantAdvanced from "./pages/superadmin/tenant-advanced";
+import AdvancedConsole from "./pages/superadmin/advanced-console";
+import PlansPage from "./pages/superadmin/plans";
+import SubscriptionsPage from "./pages/superadmin/subscriptions";
+import BillingPage from "./pages/superadmin/billing";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -67,16 +73,48 @@ function AuthenticatedApp() {
       {/* Public Landing Page */}
       <Route path="/" component={LandingPage} />
 
+      {/* Login Page */}
+      <Route path="/login">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : (
+          // P0 FIX: BACKEND is authoritative
+          // Login page only shows login form, backend handles redirect via window.location
+          <LoginPage />
+        )}
+      </Route>
+
       {/* SuperAdmin Tenant Management */}
       <Route path="/superadmin">
         {loading ? (
           <div className="min-h-screen flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
-        ) : user?.platformRole ? (
-          <SuperAdminDashboard />
-        ) : (
+        ) : !user ? (
           <LoginPage />
+        ) : user.platformRole !== 'PLATFORM_ROOT' ? (
+          // P0 FIX: Tenant users MUST NOT access /superadmin
+          <Dashboard key={user.userId} />
+        ) : (
+          // Root users only
+          <SuperAdminDashboard />
+        )}
+      </Route>
+
+      <Route path="/superadmin/dashboard">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : !user ? (
+          <LoginPage />
+        ) : user.platformRole !== 'PLATFORM_ROOT' ? (
+          // P0 FIX: Tenant users redirected to their dashboard
+          <Dashboard key={user.userId} />
+        ) : (
+          <SuperAdminDashboard />
         )}
       </Route>
 
@@ -128,15 +166,73 @@ function AuthenticatedApp() {
         )}
       </Route>
 
-      {/* Login Page */}
-      <Route path="/login">
+      <Route path="/superadmin/tenants/:tenantId/billing">
         {loading ? (
           <div className="min-h-screen flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
-        ) : user ? (
-          // Route authenticated users to dashboard or superadmin based on platformRole
-          user.platformRole ? <SuperAdminDashboard key={user.userId} /> : <Dashboard key={user.userId} />
+        ) : user?.platformRole ? (
+          <TenantBilling />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      <Route path="/superadmin/tenants/:tenantId/advanced">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <TenantAdvanced />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      <Route path="/superadmin/console">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <AdvancedConsole />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      <Route path="/superadmin/plans">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <PlansPage />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      <Route path="/superadmin/subscriptions">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <SubscriptionsPage />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      <Route path="/superadmin/billing">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <BillingPage />
         ) : (
           <LoginPage />
         )}
@@ -360,25 +456,39 @@ function AuthenticatedApp() {
 
       {/* Dashboard - Tenant operations only */}
       <Route path="/dashboard">
-        <ProtectedRoute allowedRoles={["client", "manager"]}>
-          {user && user.mustResetPassword ? (
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : !user ? (
+          <LoginPage />
+        ) : user.platformRole === 'PLATFORM_ROOT' ? (
+          // P0 FIX: Root users MUST NOT access /dashboard
+          <SuperAdminDashboard key={user.userId} />
+        ) : (
+          // Tenant users only
+          user.mustResetPassword ? (
             <ForcedPasswordResetPage />
           ) : (
             <Dashboard key={user?.userId} />
-          )}
-        </ProtectedRoute>
+          )
+        )}
       </Route>
 
-      {/* Fallback route for any unknown paths - redirects to dashboard */}
+      {/* Fallback route for any unknown paths */}
       <Route>
         {loading ? (
           <div className="min-h-screen flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
-        ) : user ? (
-          <Dashboard key={user.userId} />
-        ) : (
+        ) : !user ? (
           <LoginPage />
+        ) : user.platformRole === 'PLATFORM_ROOT' ? (
+          // P0 FIX: Root redirects to superadmin
+          <SuperAdminDashboard key={user.userId} />
+        ) : (
+          // Tenant redirects to dashboard
+          <Dashboard key={user.userId} />
         )}
       </Route>
       </Switch>

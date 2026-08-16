@@ -42,24 +42,23 @@ export default function Tenant360() {
   const [loading, setLoading] = useState(true);
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUserForm, setNewUserForm] = useState({ name: '', email: '', role: 'manager' });
-  const token = localStorage.getItem('fleetpro_token');
 
   useEffect(() => {
     fetchTenantData();
-  }, [id, token]);
+  }, [id]);
 
   async function fetchTenantData() {
     try {
       // Get tenant details
       const tenantRes = await fetch(`https://localhost:5050/api/admin/tenants/${id}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
       });
       const tenantData = await tenantRes.json();
       setTenant(tenantData);
 
       // Get tenant users
       const usersRes = await fetch(`https://localhost:5050/api/admin/tenants/${id}/users`, {
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
       });
       const usersData = await usersRes.json();
       setUsers(Array.isArray(usersData) ? usersData : []);
@@ -85,9 +84,9 @@ export default function Tenant360() {
       const response = await fetch(`https://localhost:5050/api/admin/tenants/${id}/users`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           name: newUserForm.name,
           email: newUserForm.email,
@@ -112,7 +111,7 @@ export default function Tenant360() {
     try {
       await fetch(`https://localhost:5050/api/admin/tenants/${id}/users/${userId}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
       });
       fetchTenantData();
     } catch (error) {
@@ -124,7 +123,7 @@ export default function Tenant360() {
     try {
       const response = await fetch(`https://localhost:5050/api/admin/tenants/${id}/users/${userId}/reset-password`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
+        credentials: 'include',
       });
 
       if (response.ok) {

@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { useLocation } from 'wouter';
-import { LogOut, LayoutDashboard, Building2, Menu } from 'lucide-react';
+import { LogOut, LayoutDashboard, Building2, Menu, DollarSign, CreditCard, Package, Settings } from 'lucide-react';
 import { useState } from 'react';
 
 interface SuperAdminLayoutProps {
@@ -35,20 +35,24 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
       <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-blue-900 text-white transition-all duration-300 flex flex-col`}>
-        {/* Logo */}
-        <div className="p-6 border-b border-blue-800">
+        {/* Logo - Clickable */}
+        <button
+          onClick={() => setLocation('/superadmin/dashboard')}
+          className="p-6 border-b border-blue-800 hover:bg-blue-800 transition-colors text-left w-full"
+          title="Go to Dashboard"
+        >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-lg">
+            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center font-bold text-lg hover:bg-blue-500 transition-colors">
               FP
             </div>
             {sidebarOpen && (
               <div>
-                <div className="font-bold text-lg">FleetPro</div>
+                <div className="font-bold text-lg hover:text-blue-200 transition-colors">FleetPro</div>
                 <div className="text-xs text-blue-200">Admin Panel</div>
               </div>
             )}
           </div>
-        </div>
+        </button>
 
         {/* Menu */}
         <nav className="flex-1 p-4 space-y-2">
@@ -62,6 +66,30 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
             icon={<Building2 size={20} />}
             label="Tenants"
             onClick={() => setLocation('/superadmin/tenants')}
+            open={sidebarOpen}
+          />
+          <NavItem
+            icon={<Package size={20} />}
+            label="Plans"
+            onClick={() => setLocation('/superadmin/plans')}
+            open={sidebarOpen}
+          />
+          <NavItem
+            icon={<CreditCard size={20} />}
+            label="Subscriptions"
+            onClick={() => setLocation('/superadmin/subscriptions')}
+            open={sidebarOpen}
+          />
+          <NavItem
+            icon={<DollarSign size={20} />}
+            label="Billing"
+            onClick={() => setLocation('/superadmin/billing')}
+            open={sidebarOpen}
+          />
+          <NavItem
+            icon={<Settings size={20} />}
+            label="Advanced Console"
+            onClick={() => setLocation('/superadmin/console')}
             open={sidebarOpen}
           />
         </nav>

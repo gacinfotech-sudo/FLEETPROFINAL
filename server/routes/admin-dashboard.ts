@@ -802,4 +802,418 @@ router.post('/tenants/:id/users/:userId/reset-password', authenticateUser, requi
   }
 });
 
+// ============================================================================
+// SAAS PLANS & SUBSCRIPTIONS MANAGEMENT
+// ============================================================================
+
+/**
+ * POST /api/admin/plans
+ * Create a new pricing plan
+ */
+router.post('/plans', authenticateUser, async (req: AuthRequest, res: any) => {
+  try {
+    if (!isPlatformRole(req.user?.platformRole)) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const {
+      name,
+      code,
+      description,
+      pricing,
+      limits,
+      features,
+      trialDays,
+      setupFee,
+      taxPercent,
+    } = req.body;
+
+    if (!name || !code || !pricing) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    const { Plan } = await import('../models');
+
+    const plan = new Plan({
+      name,
+      code,
+      description,
+      pricing,
+      limits,
+      features,
+      trial: { enabled: trialDays > 0, daysCount: trialDays || 0 },
+      setupFee,
+      taxPercent,
+      active: true,
+      createdAt: new Date(),
+    });
+
+    await plan.save();
+
+    res.status(201).json({
+      message: 'Plan created successfully',
+      data: plan,
+    });
+  } catch (error: any) {
+    console.error('Error creating plan:', error);
+    res.status(500).json({ message: 'Failed to create plan', error: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/plans
+ * List all plans with pagination and filtering
+ */
+router.get('/plans', authenticateUser, async (req: AuthRequest, res: any) => {
+  try {
+    if (!isPlatformRole(req.user?.platformRole)) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const { skip = 0, limit = 10, active } = req.query;
+    const { Plan } = await import('../models');
+
+    const filter: any = {};
+    if (active !== undefined) filter.active = active === 'true';
+
+    const total = await Plan.countDocuments(filter);
+    const plans = await Plan.find(filter)
+      .skip(parseInt(skip as string))
+      .limit(parseInt(limit as string))
+      .sort({ createdAt: -1 });
+
+    res.json({
+      message: 'Plans fetched successfully',
+      data: plans,
+      pagination: {
+        total,
+        skip: parseInt(skip as string),
+        limit: parseInt(limit as string),
+      },
+    });
+  } catch (error: any) {
+    console.error('Error fetching plans:', error);
+    res.status(500).json({ message: 'Failed to fetch plans', error: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/plans/:id
+ * Get single plan details
+ */
+router.get('/plans/:id', authenticateUser, async (req: AuthRequest, res: any) => {
+  try {
+    if (!isPlatformRole(req.user?.platformRole)) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const { Plan } = await import('../models');
+    const plan = await Plan.findById(req.params.id);
+
+    if (!plan) {
+      return res.status(404).json({ message: 'Plan not found' });
+    }
+
+    res.json({
+      message: 'Plan fetched successfully',
+      data: plan,
+    });
+  } catch (error: any) {
+    console.error('Error fetching plan:', error);
+    res.status(500).json({ message: 'Failed to fetch plan', error: error.message });
+  }
+});
+
+/**
+ * PUT /api/admin/plans/:id
+ * Update plan details
+ */
+router.put('/plans/:id', authenticateUser, async (req: AuthRequest, res: any) => {
+  try {
+    if (!isPlatformRole(req.user?.platformRole)) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const { Plan } = await import('../models');
+    const plan = await Plan.findByIdAndUpdate(
+      req.params.id,
+      {
+        ...req.body,
+        updatedAt: new Date(),
+      },
+      { new: true }
+    );
+
+    if (!plan) {
+      return res.status(404).json({ message: 'Plan not found' });
+    }
+
+    res.json({
+      message: 'Plan updated successfully',
+      data: plan,
+    });
+  } catch (error: any) {
+    console.error('Error updating plan:', error);
+    res.status(500).json({ message: 'Failed to update plan', error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/admin/plans/:id
+ * Archive plan (soft delete)
+ */
+router.delete('/plans/:id', authenticateUser, async (req: AuthRequest, res: any) => {
+  try {
+    if (!isPlatformRole(req.user?.platformRole)) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const { Plan } = await import('../models');
+    const plan = await Plan.findByIdAndUpdate(
+      req.params.id,
+      { active: false, archivedAt: new Date() },
+      { new: true }
+    );
+
+    if (!plan) {
+      return res.status(404).json({ message: 'Plan not found' });
+    }
+
+    res.json({
+      message: 'Plan archived successfully',
+      data: plan,
+    });
+  } catch (error: any) {
+    console.error('Error deleting plan:', error);
+    res.status(500).json({ message: 'Failed to delete plan', error: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/tenants/:id/subscription
+ * Assign plan to tenant (create subscription)
+ */
+router.post('/tenants/:id/subscription', authenticateUser, async (req: AuthRequest, res: any) => {
+  try {
+    if (!isPlatformRole(req.user?.platformRole)) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const { tenantId } = req.params;
+    const { planId, billingCycle = 'monthly', autoRenew = true, startDate } = req.body;
+
+    if (!planId || !billingCycle) {
+      return res.status(400).json({ message: 'Missing planId or billingCycle' });
+    }
+
+    const { Plan, Subscription } = await import('../models');
+
+    // Check plan exists
+    const plan = await Plan.findById(planId);
+    if (!plan) {
+      return res.status(404).json({ message: 'Plan not found' });
+    }
+
+    // Check tenant exists
+    const { Tenant } = await import('../models');
+    const tenant = await Tenant.findById(tenantId);
+    if (!tenant) {
+      return res.status(404).json({ message: 'Tenant not found' });
+    }
+
+    // Check if subscription already exists
+    const existing = await Subscription.findOne({ tenantId });
+    if (existing) {
+      return res.status(409).json({ message: 'Tenant already has an active subscription' });
+    }
+
+    // Calculate renewal date based on billing cycle
+    const start = startDate ? new Date(startDate) : new Date();
+    const renewal = new Date(start);
+    if (billingCycle === 'monthly') renewal.setMonth(renewal.getMonth() + 1);
+    else if (billingCycle === 'quarterly') renewal.setMonth(renewal.getMonth() + 3);
+    else if (billingCycle === 'halfYearly') renewal.setMonth(renewal.getMonth() + 6);
+    else if (billingCycle === 'annual') renewal.setFullYear(renewal.getFullYear() + 1);
+
+    // Calculate trial end date
+    const trialEnd = plan.trial?.enabled
+      ? new Date(start.getTime() + plan.trial.daysCount * 24 * 60 * 60 * 1000)
+      : undefined;
+
+    const subscription = new Subscription({
+      tenantId,
+      planId,
+      billingCycle,
+      status: plan.trial?.enabled ? 'TRIAL' : 'ACTIVE',
+      startDate: start,
+      renewalDate: renewal,
+      isTrial: plan.trial?.enabled || false,
+      trialEndsAt: trialEnd,
+      autoRenew,
+      activatedAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await subscription.save();
+
+    // Update tenant with trial dates if applicable
+    if (plan.trial?.enabled) {
+      await Tenant.findByIdAndUpdate(tenantId, {
+        trialStartsAt: start,
+        trialEndsAt: trialEnd,
+      });
+    }
+
+    res.status(201).json({
+      message: 'Subscription created successfully',
+      data: subscription,
+    });
+  } catch (error: any) {
+    console.error('Error creating subscription:', error);
+    res.status(500).json({ message: 'Failed to create subscription', error: error.message });
+  }
+});
+
+/**
+ * GET /api/admin/tenants/:id/subscription
+ * Get tenant subscription details
+ */
+router.get('/tenants/:id/subscription', authenticateUser, async (req: AuthRequest, res: any) => {
+  try {
+    if (!isPlatformRole(req.user?.platformRole)) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const { Subscription } = await import('../models');
+    const subscription = await Subscription.findOne({ tenantId: req.params.id })
+      .populate('planId');
+
+    if (!subscription) {
+      return res.status(404).json({ message: 'No subscription found for tenant' });
+    }
+
+    res.json({
+      message: 'Subscription fetched successfully',
+      data: subscription,
+    });
+  } catch (error: any) {
+    console.error('Error fetching subscription:', error);
+    res.status(500).json({ message: 'Failed to fetch subscription', error: error.message });
+  }
+});
+
+/**
+ * PUT /api/admin/tenants/:id/subscription
+ * Update tenant subscription (plan, billing cycle, status)
+ */
+router.put('/tenants/:id/subscription', authenticateUser, async (req: AuthRequest, res: any) => {
+  try {
+    if (!isPlatformRole(req.user?.platformRole)) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    const { tenantId } = req.params;
+    const { planId, billingCycle, status, autoRenew } = req.body;
+
+    const { Subscription } = await import('../models');
+    const subscription = await Subscription.findOne({ tenantId });
+
+    if (!subscription) {
+      return res.status(404).json({ message: 'Subscription not found' });
+    }
+
+    // If changing plan, verify new plan exists
+    if (planId) {
+      const { Plan } = await import('../models');
+      const plan = await Plan.findById(planId);
+      if (!plan) {
+        return res.status(404).json({ message: 'Plan not found' });
+      }
+    }
+
+    // Calculate new renewal date if billing cycle changed
+    if (billingCycle && billingCycle !== subscription.billingCycle) {
+      const renewal = new Date(subscription.startDate);
+      if (billingCycle === 'monthly') renewal.setMonth(renewal.getMonth() + 1);
+      else if (billingCycle === 'quarterly') renewal.setMonth(renewal.getMonth() + 3);
+      else if (billingCycle === 'halfYearly') renewal.setMonth(renewal.getMonth() + 6);
+      else if (billingCycle === 'annual') renewal.setFullYear(renewal.getFullYear() + 1);
+
+      subscription.renewalDate = renewal;
+      subscription.billingCycle = billingCycle;
+    }
+
+    if (planId) subscription.planId = planId;
+    if (status) subscription.status = status;
+    if (autoRenew !== undefined) subscription.autoRenew = autoRenew;
+    subscription.updatedAt = new Date();
+
+    await subscription.save();
+
+    res.json({
+      message: 'Subscription updated successfully',
+      data: subscription,
+    });
+  } catch (error: any) {
+    console.error('Error updating subscription:', error);
+    res.status(500).json({ message: 'Failed to update subscription', error: error.message });
+  }
+});
+
+/**
+ * POST /api/admin/tenants/:id/auto-login-token
+ * Generate temporary auth token for SUPER ADMIN ONLY to access tenant CRM without password
+ * Only PLATFORM_ROOT can use this - other platform admins cannot
+ */
+router.post('/tenants/:id/auto-login-token', authenticateUser, async (req: AuthRequest, res: any) => {
+  try {
+    // ONLY PLATFORM_ROOT (Super Admin) can access this endpoint
+    if (req.user?.platformRole !== 'PLATFORM_ROOT') {
+      return res.status(403).json({
+        message: 'Only Super Admin can access tenant CRM directly. Other admins must use the standard login.'
+      });
+    }
+
+    const { Tenant, User } = await import('../models');
+
+    const tenant = await Tenant.findById(req.params.id);
+    if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
+
+    // Get tenant owner
+    const owner = await User.findOne({
+      tenantId: req.params.id,
+      role: 'admin'
+    });
+
+    if (!owner) return res.status(404).json({ message: 'Tenant owner not found' });
+
+    // Generate temporary session token (JWT-like)
+    const tempToken = Buffer.from(JSON.stringify({
+      userId: owner.userId,
+      tenantId: req.params.id,
+      role: owner.role,
+      timestamp: Date.now(),
+      temp: true
+    })).toString('base64');
+
+    res.json({
+      message: 'Auto-login token generated',
+      data: {
+        token: tempToken,
+        user: {
+          userId: owner.userId,
+          email: owner.password ? '***' : owner.email,
+          role: owner.role,
+          tenantId: req.params.id,
+          name: owner.name,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error('Error generating auto-login token:', error);
+    res.status(500).json({ message: 'Failed to generate token', error: error.message });
+  }
+});
+
 export default router;

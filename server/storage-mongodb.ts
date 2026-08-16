@@ -465,6 +465,11 @@ export class MongoDBStorage implements IStorage {
         userData.userId = userData.userId.toLowerCase();
       }
 
+      // Store email in lowercase for consistency
+      if (userData.email) {
+        userData.email = userData.email.toLowerCase();
+      }
+
       if (userData.password) {
         userData.password = await bcrypt.hash(userData.password, 12);
       }
@@ -481,11 +486,17 @@ export class MongoDBStorage implements IStorage {
       const user = new User(userData);
       const savedUser = await user.save();
 
-      console.log('User created successfully:', { 
-        id: savedUser._id, 
-        userId: savedUser.userId, 
-        tenantId: savedUser.tenantId 
+      console.log('User created successfully:', {
+        id: savedUser._id,
+        userId: savedUser.userId,
+        email: savedUser.email,
+        tenantId: savedUser.tenantId,
+        hasPassword: !!savedUser.password
       });
+
+      // Verify the user can be found
+      const verify = await User.findOne({ email: savedUser.email });
+      console.log('User findOne verification:', verify ? 'FOUND' : 'NOT_FOUND');
 
       return savedUser;
     } catch (error) {
