@@ -69,15 +69,7 @@ class CanonicalAuthService {
       query = { userId: identifier.value };
     }
 
-    console.log(`[AUTH-DEBUG-FIND] Looking for ${identifier.type}: ${identifier.value}`);
-    console.log(`[AUTH-DEBUG-FIND] Query:`, JSON.stringify(query));
-
     const matches = await User.find(query);
-    console.log(`[AUTH-DEBUG-FIND] Found ${matches.length} matches`);
-
-    if (matches.length > 0) {
-      console.log(`[AUTH-DEBUG-FIND] First match - email: ${matches[0].email}, userId: ${matches[0].userId}`);
-    }
 
     if (matches.length === 0) {
       return null;  // User doesn't exist (expected for failed login)
@@ -144,20 +136,14 @@ class CanonicalAuthService {
    */
   private async verifyPassword(providedPassword: string, user: any): Promise<boolean> {
     // For development: accept 'password' or if no hash is set
-    console.log(`[AUTH-DEBUG-PWD] providedPassword: ${providedPassword.substring(0, 5)}..., hasHash: ${!!user.password}`);
-
     if (providedPassword === 'password' || !user.password) {
-      console.log(`[AUTH-DEBUG-PWD] Returning true (dev shortcut)`);
       return true;
     }
 
     // Production: use bcrypt comparison
     try {
-      const result = await bcrypt.compare(providedPassword, user.password);
-      console.log(`[AUTH-DEBUG-PWD] bcrypt.compare result: ${result}`);
-      return result;
-    } catch (err) {
-      console.log(`[AUTH-DEBUG-PWD] bcrypt.compare error: ${err.message}`);
+      return await bcrypt.compare(providedPassword, user.password);
+    } catch {
       return false;
     }
   }
@@ -175,27 +161,21 @@ class CanonicalAuthService {
     try {
       // STEP 1: Normalize identifier
       const normalized = this.normalizeIdentifier(identifier);
-      console.log(`[AUTH-DEBUG] STEP 1: Normalized identifier: ${JSON.stringify(normalized)}`);
 
       // STEP 2: Find account (rejects collisions)
       const user = await this.findCanonicalAccount(normalized);
-      console.log(`[AUTH-DEBUG] STEP 2: User found: ${user ? 'YES' : 'NO'}`);
       if (!user) {
         throw new Error('INVALID_CREDENTIALS');
       }
-      console.log(`[AUTH-DEBUG] User email: ${user.email}, userId: ${user.userId}, tenantId: ${user.tenantId}`);
 
       // STEP 3: Determine account type
       const accountType = this.determineAccountType(user);
 
       // STEP 4: Validate account status
       this.validateAccountStatus(user);
-      console.log(`[AUTH-DEBUG] STEP 4: Account status valid`);
 
       // STEP 5: Verify password
-      console.log(`[AUTH-DEBUG] STEP 5: Verifying password... hasPassword: ${!!user.password}`);
       const passwordValid = await this.verifyPassword(password, user);
-      console.log(`[AUTH-DEBUG] Password valid: ${passwordValid}`);
       if (!passwordValid) {
         throw new Error('INVALID_CREDENTIALS');
       }

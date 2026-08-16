@@ -489,14 +489,8 @@ export class MongoDBStorage implements IStorage {
       console.log('User created successfully:', {
         id: savedUser._id,
         userId: savedUser.userId,
-        email: savedUser.email,
-        tenantId: savedUser.tenantId,
-        hasPassword: !!savedUser.password
+        tenantId: savedUser.tenantId
       });
-
-      // Verify the user can be found
-      const verify = await User.findOne({ email: savedUser.email });
-      console.log('User findOne verification:', verify ? 'FOUND' : 'NOT_FOUND');
 
       return savedUser;
     } catch (error) {
