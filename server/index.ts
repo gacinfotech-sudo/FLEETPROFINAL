@@ -154,14 +154,15 @@ app.use((req, res, next) => {
     let rootUser = await storage.getUser('fleet_root_admin_1d2af76b');
     if (!rootUser) {
       // Create root user with default password
-      const hashedPassword = await bcrypt.hash('Change@123', 12);
+      // Note: createUser will hash the password, so pass plain password here
       rootUser = await storage.createUser({
         userId: 'fleet_root_admin_1d2af76b',
         email: 'fleet_root_admin_1d2af76b@fleetpro.local',
-        passwordHash: hashedPassword,
+        password: 'Change@123',
         platformRole: 'PLATFORM_ROOT',
         name: 'Root Admin',
-        status: 'ACTIVE',
+        isActive: true,
+        role: 'root',
         createdAt: new Date(),
         updatedAt: new Date()
       });

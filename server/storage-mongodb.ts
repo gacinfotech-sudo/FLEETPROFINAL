@@ -233,7 +233,7 @@ export class MongoDBStorage implements IStorage {
       if (!user) return undefined;
 
       // Password remains case-sensitive
-      const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+      const isValidPassword = await bcrypt.compare(password, user.password);
       if (!isValidPassword) return undefined;
 
       // Map _id to id for backward compatibility with routes code
