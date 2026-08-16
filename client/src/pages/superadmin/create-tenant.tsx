@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { AlertCircle, CheckCircle } from 'lucide-react';
+import SuperAdminLayout from '@/components/superadmin-layout';
 
 interface FormData {
   businessName: string;
@@ -106,19 +107,21 @@ export default function CreateTenant() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <SuperAdminLayout>
+        <div className="flex items-center justify-center p-4 min-h-full">
         <div className="bg-white rounded-lg border border-green-200 p-8 text-center max-w-md">
           <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Tenant Created!</h2>
           <p className="text-gray-600 mb-6">{successMessage}</p>
           <p className="text-sm text-gray-500">Redirecting to tenant list...</p>
         </div>
-      </div>
+        </div>
+      </SuperAdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <SuperAdminLayout>
       <div className="max-w-2xl mx-auto p-8">
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Create New Tenant</h1>
@@ -252,6 +255,6 @@ export default function CreateTenant() {
           </form>
         </div>
       </div>
-    </div>
+    </SuperAdminLayout>
   );
 }

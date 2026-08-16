@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Users, TrendingUp, Plus } from 'lucide-react';
 import { useLocation } from 'wouter';
+import SuperAdminLayout from '@/components/superadmin-layout';
 
 interface TenantStats {
   total: number;
@@ -43,7 +44,7 @@ export default function SuperAdminDashboard() {
   }, [token]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <SuperAdminLayout>
       <div className="p-8">
         {/* Header */}
         <div className="mb-8">
@@ -105,6 +106,6 @@ export default function SuperAdminDashboard() {
           </button>
         </div>
       </div>
-    </div>
+    </SuperAdminLayout>
   );
 }

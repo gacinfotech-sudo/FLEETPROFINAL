@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, LogIn, ToggleLeft } from 'lucide-react';
 import { useLocation } from 'wouter';
+import SuperAdminLayout from '@/components/superadmin-layout';
 
 interface Tenant {
   _id: string;
@@ -71,7 +72,7 @@ export default function SuperAdminTenants() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <SuperAdminLayout>
       <div className="p-8">
         {/* Header */}
         <div className="mb-8 flex items-center justify-between">
@@ -170,6 +171,6 @@ export default function SuperAdminTenants() {
           )}
         </div>
       </div>
-    </div>
+    </SuperAdminLayout>
   );
 }
