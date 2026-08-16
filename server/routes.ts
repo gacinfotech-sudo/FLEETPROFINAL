@@ -83,11 +83,7 @@ import entitlementsRouter from "./routes/entitlements";
 import billingRouter from "./routes/billing";
 import platformRoutes from "./platform/routes";
 // WAVE 21 & 23: Enterprise Features & Integrations
-import enterpriseSSORouter from "./routes/enterprise-sso";
-import enterpriseWorkflowRouter from "./routes/enterprise-workflow";
-import enterpriseReportRouter from "./routes/enterprise-reports";
-import enterpriseWebhookRouter from "./routes/enterprise-webhooks";
-import enterpriseIntegrationRouter from "./routes/enterprise-integrations";
+// Removed: enterprise-sso, enterprise-workflow, enterprise-reports, enterprise-webhooks, enterprise-integrations
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import mongoose from "mongoose";
@@ -9639,13 +9635,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/support", supportRouter);
 
   // ========== WAVE 21: ENTERPRISE FEATURES ==========
-  app.use("/api/auth/sso", enterpriseSSORouter);
-  app.use("/api/workflows", enterpriseWorkflowRouter);
-  app.use("/api/reports", enterpriseReportRouter);
-  app.use("/api/webhooks", enterpriseWebhookRouter);
 
   // ========== WAVE 23: ADVANCED INTEGRATIONS ==========
-  app.use("/api/integrations", enterpriseIntegrationRouter);
 
   // ========== HEALTH & MONITORING (Phase 7) ==========
   app.get("/api/health/saas", (req, res) => {
