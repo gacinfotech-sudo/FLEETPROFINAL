@@ -52,23 +52,29 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
 
   const handleSessionExpiry = () => {
     const currentPath = window.location.pathname;
+    console.log("Session expiry triggered at path:", currentPath);
 
-    // Don't show session expiry message on login page
+    // Don't do anything on login page - just clear user
     if (currentPath === '/login' || currentPath === '/driver-login') {
-      console.log("Session check on login page - silently clearing");
+      console.log("On login page - silently clearing user");
       setUser(null);
+      localStorage.removeItem('fleetpro_token');
+      localStorage.removeItem('fleetpro_user');
       return;
     }
 
-    console.log("Session expired - redirecting to login");
+    // Only show toast and redirect if on a protected page
+    console.log("Session expired from protected page - redirecting");
     setUser(null);
+    localStorage.removeItem('fleetpro_token');
+    localStorage.removeItem('fleetpro_user');
+
     toast({
       variant: "destructive",
       title: "Session Expired",
       description: "Your session has expired. Please login again.",
     });
 
-    // Redirect to login after a brief delay to show the toast
     setTimeout(() => {
       setLocation("/login");
     }, 1500);

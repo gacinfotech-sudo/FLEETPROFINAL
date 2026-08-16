@@ -18,14 +18,13 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Get form values directly from the form
-    const formData = new FormData(e.currentTarget as HTMLFormElement);
-    const formUserId = formData.get("userId") as string;
-    const formPassword = formData.get("password") as string;
+    // Use state variables directly
+    const trimmedUserId = userId?.trim() || "";
+    const trimmedPassword = password?.trim() || "";
 
-    console.log("Form submission - userId:", formUserId, "password:", formPassword);
+    console.log("Form submission attempt:", { userId: trimmedUserId, hasPassword: !!trimmedPassword });
 
-    if (!formUserId || !formPassword) {
+    if (!trimmedUserId || !trimmedPassword) {
       toast({
         title: "Error",
         description: "Please fill in all fields",
@@ -36,20 +35,21 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      await login(formUserId, formPassword);
+      console.log("Calling login with:", trimmedUserId);
+      await login(trimmedUserId, trimmedPassword);
+      console.log("Login successful");
       toast({
         title: "Success",
         description: "Logged in successfully",
       });
     } catch (error: any) {
-      let errorMessage = "Invalid credentials";
-      
-      if (error.status === 403 && error.code === "ACCOUNT_INACTIVE") {
-        errorMessage = error.message;
-      } else if (error.message) {
+      console.error("Login error:", error);
+      let errorMessage = error?.message || "Invalid credentials";
+
+      if (error?.status === 403 && error?.code === "ACCOUNT_INACTIVE") {
         errorMessage = error.message;
       }
-      
+
       toast({
         title: "Login Failed",
         description: errorMessage,
