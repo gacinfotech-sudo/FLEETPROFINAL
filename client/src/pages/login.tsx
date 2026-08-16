@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Car, Shield, Users, BarChart3, Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
-  const [userId, setUserId] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("root@fleetpro.local");
+  const [password, setPassword] = useState("password");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -16,58 +16,50 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
 
-    const trimmedUserId = userId?.trim() || "";
-    const trimmedPassword = password?.trim() || "";
-
-    if (!trimmedUserId || !trimmedPassword) {
-      setError("Please fill in all fields");
+    if (!email || !password) {
+      setError("Email and password required");
       return;
     }
 
     setLoading(true);
-    try {
-      console.log("🔐 LOGIN: Attempting login with:", trimmedUserId);
+    console.log("🔐 LOGIN: Starting login with email:", email);
 
+    try {
       const response = await fetch("/api/platform/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmedUserId, password: trimmedPassword }),
+        body: JSON.stringify({ email, password }),
       });
 
-      const data = await response.json();
-      console.log("🔐 LOGIN: Response status:", response.status);
+      console.log("🔐 LOGIN: Got response, status:", response.status);
 
       if (!response.ok) {
-        console.error("🔐 LOGIN: Failed -", data);
-        setError(data.error || data.message || "Login failed");
+        const text = await response.text();
+        console.error("🔐 LOGIN: Error response:", text);
+        setError(`Login failed: ${response.status}`);
         setLoading(false);
         return;
       }
+
+      const data = await response.json();
+      console.log("🔐 LOGIN: Response data:", data);
 
       if (!data.token) {
-        console.error("🔐 LOGIN: No token in response");
-        setError("No token received from server");
+        setError("No token from server");
         setLoading(false);
         return;
       }
 
-      console.log("🔐 LOGIN: Success! Token received, storing...");
+      console.log("🔐 LOGIN: Token received, clearing storage and storing new token");
       localStorage.clear();
-      localStorage.setItem('fleetpro_token', data.token);
-      localStorage.setItem('fleetpro_user', JSON.stringify({
-        ...data.user,
-        token: data.token,
-        lastValidated: Date.now()
-      }));
+      localStorage.setItem("fleetpro_token", data.token);
+      localStorage.setItem("fleetpro_user", JSON.stringify(data.user));
 
-      console.log("🔐 LOGIN: Redirecting to dashboard...");
-      // Hard redirect - bypass React routing entirely
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 500);
-    } catch (error: any) {
-      console.error("🔐 LOGIN: Error -", error);
-      setError(error.message || "Login failed");
+      console.log("🔐 LOGIN: Stored! Redirecting to /dashboard");
+      window.location.href = "/dashboard";
+    } catch (err: any) {
+      console.error("🔐 LOGIN: Exception:", err);
+      setError(`Failed to fetch: ${err.message}`);
       setLoading(false);
     }
   };
