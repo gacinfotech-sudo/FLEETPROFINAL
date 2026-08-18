@@ -6090,12 +6090,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       payload.primaryMobile = normalizedMobile;
       if (!payload.source) payload.source = 'phone_call';
 
+      // DEDUPLICATION: Check if customer already exists by phone number
+      // If found, link to existing customer instead of creating duplicate
+      let linkedCustomerId: string | undefined;
+      try {
+        const { customer } = await findOrCreateCustomer(
+          req.tenantId!,
+          { name: payload.customerName, phone: normalizedMobile, email: payload.email },
+          { userId: req.userId!, role: req.user?.role || 'client' }
+        );
+        linkedCustomerId = customer._id.toString();
+      } catch (err: any) {
+        console.error('Customer dedup failed:', err?.message);
+        // Continue without linking if customer resolution fails
+      }
+
       const inquiryNumber = await nextInquiryNumber(req.tenantId!);
       const inquiry = await Inquiry.create({
         tenantId: (req.tenantObjectId || req.tenantId),
         inquiryNumber,
         status: 'new',
         ...payload,
+        ...(linkedCustomerId ? { linkedCustomerId } : {}),
         createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
       });
       res.status(201).json(inquiry);
