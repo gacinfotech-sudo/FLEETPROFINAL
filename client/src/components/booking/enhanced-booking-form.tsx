@@ -27,39 +27,27 @@ import { validateCompleteBooking } from "@/utils/bookingValidation";
 import "./booking-highlighting.css";
 
 const bookingSchema = z.object({
-  customerName: z.string().min(1, "Customer name is required"),
-  customerPhone: z.string().min(10, "Phone number must be at least 10 digits").max(15, "Phone number too long"),
+  // ULTRA FAST: ALL booking fields optional - zero friction form
+  // Users can create booking with ANY info, fill details later
+  customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
   customerEmail: z.string().email("Invalid email").optional().or(z.literal("")),
   bookingSource: z.enum(["direct_customer", "walk_in", "phone_call", "whatsapp", "website", "google_business_profile",
     "google_ads", "facebook", "instagram", "hotel", "corporate_client", "travel_agent", "vendor_partner",
     "referral", "online_travel_platform", "repeat_customer", "other"]).default("direct_customer"),
-  // Only meaningful (and shown) when bookingSource is an external/agent
-  // source — see EXTERNAL_SOURCE_TYPES below. Kept optional at the schema
-  // level since Zod's static shape can't see the sibling field; required-
-  // when-applicable is enforced at submit time instead (same pattern the
-  // rest of this multi-step form already uses for step validation).
   sourceName: z.string().optional(),
   sourceContact: z.string().optional(),
-  // Optional link to a real Vendor Master record — when set, sourceName/
-  // sourceContact above are auto-filled from it but stay editable/
-  // overridable, and remain the actual display fields either way.
   sourceVendorId: z.string().optional(),
   sourceReferenceNumber: z.string().optional(),
   sourceCommissionType: z.enum(["flat", "percentage"]).optional(),
   sourceCommissionAmount: z.number().min(0).optional(),
   sourceNotes: z.string().optional(),
-  // Optional as of the flexible-fulfilment initiative — a booking may be
-  // confirmed with the physical vehicle still unresolved (Vendor Vehicle
-  // or Outsource path). The step-2 Continue button and final submit both
-  // enforce the real business rule (own vehicle selected, OR a vendor
-  // vehicle selected, OR resourceMode acknowledges sourcing is pending)
-  // via resourceMode/resourceAssignmentPending, not this schema.
   vehicleId: z.string().optional(),
   driverId: z.string().optional(),
-  bookingType: z.enum(["self_drive", "with_driver"]),
-  tripType: z.enum(["one_way", "round_trip", "local", "airport"]),
-  pickupLocation: z.string().min(1, "Pickup location is required"),
-  dropoffLocation: z.string().min(1, "Drop-off location is required"),
+  bookingType: z.enum(["self_drive", "with_driver"]).optional(),
+  tripType: z.enum(["one_way", "round_trip", "local", "airport"]).optional(),
+  pickupLocation: z.string().optional(),
+  dropoffLocation: z.string().optional(),
   // Date-certainty axis (TASK-BOOKING-UI-04, field contract from
   // TASK-BOOKING-DOMAIN-02): pickupDate/pickupTime/returnDate/returnTime
   // are relaxed from unconditionally-required to structurally optional

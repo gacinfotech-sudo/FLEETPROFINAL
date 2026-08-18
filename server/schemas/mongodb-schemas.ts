@@ -167,17 +167,14 @@ export const mongoBookingSchema = z.object({
   // building the Availability Engine's own-draft self-exclusion check,
   // which depends on it to identify "the user creating this booking."
   createdBy: z.object({ userId: z.string(), role: z.string() }).optional(),
-  customerName: z.string().min(1, 'Customer name is required'),
-  customerPhone: z.string().min(1, 'Customer phone is required'),
+  // ULTRA FAST: ALL booking fields optional - maximum flexibility
+  // Users can create booking with ANY info, complete details later
+  customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
   customerEmail: z.string().email().optional(),
-  // Optional as of the flexible-fulfilment initiative — see
-  // docs/BOOKING_RESOURCE_DEAD_END_AUDIT.md. server/routes.ts's
-  // POST /api/bookings enforces the actual "own vehicle, vendor vehicle,
-  // or explicit assignment-pending" business rule; this schema only
-  // guards the field's type/shape when present.
   vehicleId: z.string().optional(),
   driverId: z.string().optional(),
-  pickupLocation: z.string().min(1, 'Pickup location is required'),
+  pickupLocation: z.string().optional(),
   dropoffLocation: z.string().optional(),
   // TASK-BOOKING-DOMAIN-02: relaxed from unconditionally-required to
   // structurally optional here — the actual conditional-requirement rule

@@ -4125,23 +4125,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // required" behavior unchanged.
       const bookingData: any = mongoBookingSchemaWithCertainty.parse(mappedData);
 
-      // Flexible fulfilment: vehicleId is no longer schema-required (a
-      // booking may be confirmed with the physical resource still
-      // unresolved — see docs/BOOKING_RESOURCE_DEAD_END_AUDIT.md), but
-      // SOME explicit resolution is still required so an old/unmodified
-      // client (which never sends resourceAssignmentPending) keeps
-      // getting today's exact "vehicleId required" behavior unchanged.
-      // Vendor-vehicle linkage is deliberately NOT accepted here — it
-      // goes through the existing, already-tested
-      // POST /api/bookings/:id/assign-vendor as an immediate follow-up
-      // call from the wizard, reusing its real overlap/duty checks
-      // rather than duplicating them on this path too.
-      if (!bookingData.vehicleId && !req.body.resourceAssignmentPending) {
-        return res.status(400).json({
-          message: "A vehicle is required, or set resourceAssignmentPending to confirm the booking with resource sourcing still pending.",
-          code: "VEHICLE_OR_ASSIGNMENT_PENDING_REQUIRED",
-        });
-      }
+      // ULTRA FAST: Make booking creation frictionless
+      // Vehicle is optional - can be assigned later via POST /api/bookings/:id/assign-vendor
+      // If no vehicle provided, auto-mark as pending resource assignment
+      // This allows instant booking creation with minimal info
       if (!bookingData.resourceFulfilmentStatus) {
         bookingData.resourceFulfilmentStatus = bookingData.vehicleId ? 'own_fleet_assigned' : 'not_started';
       }
