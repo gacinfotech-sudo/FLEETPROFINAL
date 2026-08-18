@@ -3000,9 +3000,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(vehicle);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid vehicle data", errors: error.errors });
+        const fieldErrors = error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }));
+        console.error('Vehicle validation errors:', fieldErrors);
+        return res.status(400).json({
+          message: "Invalid vehicle data",
+          details: fieldErrors.map(e => `${e.field}: ${e.message}`).join(", ")
+        });
       }
-      res.status(500).json({ message: "Failed to create vehicle" });
+      console.error('Vehicle creation error:', error);
+      res.status(500).json({ message: "Failed to create vehicle", error: error instanceof Error ? error.message : String(error) });
     }
   });
 
