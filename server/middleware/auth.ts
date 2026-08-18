@@ -56,10 +56,16 @@ export const authenticateUser = async (req: AuthRequest, res: Response, next: Ne
     req.user = user;
     req.userId = user.userId;
     // Handle both populated and non-populated tenantId
+    // CRITICAL: Convert to ObjectId to match MongoDB document format
     if (user.tenantId) {
-      req.tenantId = typeof user.tenantId === 'object'
-        ? (user.tenantId as any)._id.toString()
-        : (user.tenantId as any).toString();
+      const tenantId = typeof user.tenantId === 'object'
+        ? (user.tenantId as any)._id
+        : user.tenantId;
+      // Store as string for logs/responses, but also provide ObjectId version
+      req.tenantId = tenantId.toString?.() || tenantId.toString();
+      req.tenantObjectId = typeof tenantId === 'string'
+        ? new (require('mongoose')).Types.ObjectId(tenantId)
+        : tenantId;
     }
 
     // P0 FIX: this used to console.log the full user identity (userId,

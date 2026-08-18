@@ -2645,7 +2645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: req.body.password,
         name: req.body.name,
         role: 'manager', // Sub-users are always managers
-        tenantId: req.tenantId, // Use the tenant ID from the authenticated user
+        tenantId: (req.tenantObjectId || req.tenantId), // Use the tenant ID from the authenticated user
         isActive: true,
         permissions: permissions
       };
@@ -2800,7 +2800,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { startDate, endDate } = req.query;
       console.log('Revenue Report API Debug:', {
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         startDate,
         endDate,
         queryParams: req.query
@@ -2980,7 +2980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Map frontend field names to MongoDB schema
       const mappedData = {
         ...req.body,
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         // Handle different model field names
         vehicleModel: req.body.vehicleModel || req.body.model,
         // Handle different license plate field names  
@@ -3075,7 +3075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vehicle-types", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { search, minSeating, maxSeating } = req.query;
-      const query: Record<string, any> = { tenantId: req.tenantId, isActive: true };
+      const query: Record<string, any> = { tenantId: (req.tenantObjectId || req.tenantId), isActive: true };
 
       if (search) {
         const searchTerm = String(search).toLowerCase();
@@ -3109,8 +3109,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid seating capacity" });
       }
 
-      const types = await VehicleType.find({
-        tenantId: req.tenantId,
+      const types = await VehicleType.find({ tenantId: req.tenantObjectId || req.tenantId,
         isActive: true,
         seatingCapacity: { $gte: seating },
       }).sort({ seatingCapacity: 1, sortOrder: 1 });
@@ -3635,8 +3634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const todayEnd = new Date(todayStart);
       todayEnd.setDate(todayEnd.getDate() + 1);
 
-      const transactions = await PaymentTransaction.find({
-        tenantId: req.tenantId,
+      const transactions = await PaymentTransaction.find({ tenantId: req.tenantObjectId || req.tenantId,
         status: 'completed',
         paymentType: { $in: Array.from(RECEIPT_TYPES) },
         receivedAt: { $gte: todayStart, $lt: todayEnd },
@@ -3951,7 +3949,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/bookings/:id/whatsapp/messages", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const messages = await WhatsAppMessage.find({ tenantId: req.tenantId, bookingId: req.params.id })
+      const messages = await WhatsAppMessage.find({ tenantId: req.tenantObjectId || req.tenantId, bookingId: req.params.id })
         .sort({ createdAt: -1 });
       res.json(messages);
     } catch (error: any) {
@@ -3974,7 +3972,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin: Recalculate customer stats (totalBookings, completedBookings, etc.) from actual bookings
   app.post("/api/admin/fix-customer-stats", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const customers = await Customer.find({ tenantId: req.tenantId });
+      const customers = await Customer.find({ tenantId: req.tenantObjectId || req.tenantId });
 
       let fixed = 0;
       for (const customer of customers) {
@@ -4027,7 +4025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // real booking so it doesn't need its own permission key).
   app.get("/api/booking-drafts/mine", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const draft = await BookingDraft.findOne({ tenantId: req.tenantId, userId: req.userId });
+      const draft = await BookingDraft.findOne({ tenantId: req.tenantObjectId || req.tenantId, userId: req.userId });
       res.json(draft || null);
     } catch (error: any) {
       console.error('Get booking draft error:', error?.message || error);
@@ -4039,7 +4037,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { step, formData, leadId } = req.body || {};
       const draft = await BookingDraft.findOneAndUpdate(
-        { tenantId: req.tenantId, userId: req.userId },
+        { tenantId: (req.tenantObjectId || req.tenantId), userId: req.userId },
         {
           $set: {
             step: typeof step === 'number' ? step : 1,
@@ -4047,7 +4045,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             ...(leadId !== undefined ? { leadId } : {}),
             updatedAt: new Date(),
           },
-          $setOnInsert: { tenantId: req.tenantId, userId: req.userId, createdAt: new Date() },
+          $setOnInsert: { tenantId: (req.tenantObjectId || req.tenantId), userId: req.userId, createdAt: new Date() },
         },
         { upsert: true, new: true },
       );
@@ -4060,7 +4058,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/booking-drafts/mine", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      await BookingDraft.deleteOne({ tenantId: req.tenantId, userId: req.userId });
+      await BookingDraft.deleteOne({ tenantId: (req.tenantObjectId || req.tenantId), userId: req.userId });
       res.json({ success: true });
     } catch (error: any) {
       console.error('Delete booking draft error:', error?.message || error);
@@ -4083,7 +4081,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const mappedData = {
         ...req.body,
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         // Map amount to totalAmount - INCLUDE toll + parking charges
         totalAmount: totalWithCharges,
         // Ensure proper field names
@@ -4178,8 +4176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // callers that don't send a key (imports, migrations, older clients)
       // keep today's behavior unchanged.
       if (bookingData.idempotencyKey) {
-        const existingBooking = await Booking.findOne({
-          tenantId: req.tenantId,
+        const existingBooking = await Booking.findOne({ tenantId: req.tenantObjectId || req.tenantId,
           idempotencyKey: bookingData.idempotencyKey,
         });
         if (existingBooking) {
@@ -4194,7 +4191,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // from it here only when the caller left them blank, so a manually
       // typed override always wins.
       if (bookingData.sourceVendorId) {
-        const sourceVendor = await Vendor.findOne({ _id: bookingData.sourceVendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+        const sourceVendor = await Vendor.findOne({ _id: bookingData.sourceVendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
         if (!sourceVendor) {
           return res.status(400).json({ message: "Source vendor not found" });
         }
@@ -4306,8 +4303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // guard, this just turns that race into the same "return the
         // existing booking" response instead of a raw 500.
         if (error?.code === 11000 && bookingData.idempotencyKey) {
-          const existingBooking = await Booking.findOne({
-            tenantId: req.tenantId,
+          const existingBooking = await Booking.findOne({ tenantId: req.tenantObjectId || req.tenantId,
             idempotencyKey: bookingData.idempotencyKey,
           });
           if (existingBooking) return res.status(200).json(existingBooking);
@@ -4690,7 +4686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const booking = await storage.getBooking(req.params.id, scopeTenant(req));
       if (!booking) return res.status(404).json({ message: "Booking not found" });
-      const transactions = await PaymentTransaction.find({ tenantId: req.tenantId, bookingId: req.params.id })
+      const transactions = await PaymentTransaction.find({ tenantId: req.tenantObjectId || req.tenantId, bookingId: req.params.id })
         .sort({ receivedAt: -1 });
       res.json(transactions);
     } catch (error: any) {
@@ -4711,7 +4707,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.getBooking(req.params.id, scopeTenant(req));
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
-      const expenses = await Expense.find({ tenantId: req.tenantId, bookingId: req.params.id })
+      const expenses = await Expense.find({ tenantId: req.tenantObjectId || req.tenantId, bookingId: req.params.id })
         .populate('driverId', 'name')
         .sort({ date: -1 });
 
@@ -4861,7 +4857,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { createItinerary } = await import("./services/itineraryService");
 
-      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      const booking = await Booking.findOne({ tenantId: req.tenantObjectId || req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
       const itinerary = await createItinerary({
@@ -4908,7 +4904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id: bookingId } = req.params;
       const { getItinerary } = await import("./services/itineraryService");
 
-      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      const booking = await Booking.findOne({ tenantId: req.tenantObjectId || req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
       const itinerary = await getItinerary(req.tenantId!, booking._id);
@@ -4932,7 +4928,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { updateItinerary } = await import("./services/itineraryService");
 
-      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      const booking = await Booking.findOne({ tenantId: req.tenantObjectId || req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
       updates.updatedBy = { userId: req.userId!, userName: req.user?.name || 'Unknown' };
@@ -4958,7 +4954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { approveItinerary } = await import("./services/itineraryService");
 
-      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      const booking = await Booking.findOne({ tenantId: req.tenantObjectId || req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
       const itinerary = await approveItinerary(
@@ -4981,7 +4977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id: bookingId } = req.params;
       const { getItineraryVersions } = await import("./services/itineraryService");
 
-      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      const booking = await Booking.findOne({ tenantId: req.tenantObjectId || req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
       const versions = await getItineraryVersions(req.tenantId!, booking._id);
@@ -4999,7 +4995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id: bookingId } = req.params;
       const { getItinerary, formatItineraryForCustomer } = await import("./services/itineraryService");
 
-      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      const booking = await Booking.findOne({ tenantId: req.tenantObjectId || req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
       const itinerary = await getItinerary(req.tenantId!, booking._id);
@@ -5022,7 +5018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id: bookingId } = req.params;
       const { getItinerary, formatItineraryForDriver } = await import("./services/itineraryService");
 
-      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      const booking = await Booking.findOne({ tenantId: req.tenantObjectId || req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
       const itinerary = await getItinerary(req.tenantId!, booking._id);
@@ -5047,7 +5043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { archiveItinerary } = await import("./services/itineraryService");
 
-      const booking = await Booking.findOne({ tenantId: req.tenantId, _id: bookingId });
+      const booking = await Booking.findOne({ tenantId: req.tenantObjectId || req.tenantId, _id: bookingId });
       if (!booking) return res.status(404).json({ message: "Booking not found" });
 
       const itinerary = await archiveItinerary(req.tenantId!, booking._id, reason);
@@ -5064,7 +5060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/customers", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { search, customerStatus, customerType, tag, city, minBookings, minSpending, lastBookingBefore, loyaltyTier, segment } = req.query;
-      const query: any = { tenantId: req.tenantId, isDeleted: { $ne: true } };
+      const query: any = { tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } };
       if (segment && typeof segment === 'string') {
         Object.assign(query, await getSegmentFilter(req.tenantId!, segment));
       }
@@ -5147,7 +5143,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!customer.tags.includes(cleanTag)) {
         customer.tags.push(cleanTag);
         await customer.save();
-        await CustomerTagEvent.create({ tenantId: req.tenantId, customerId: customer._id, tag: cleanTag, action: 'added', actor });
+        await CustomerTagEvent.create({ tenantId: (req.tenantObjectId || req.tenantId), customerId: customer._id, tag: cleanTag, action: 'added', actor });
       }
       res.json(customer);
     } catch (error: any) {
@@ -5166,7 +5162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customer.tags = customer.tags.filter((t: string) => t !== tag);
         await customer.save();
         await CustomerTagEvent.create({
-          tenantId: req.tenantId, customerId: customer._id, tag, action: 'removed',
+          tenantId: (req.tenantObjectId || req.tenantId), customerId: customer._id, tag, action: 'removed',
           actor: { userId: req.userId!, role: req.user?.role || 'client' },
         });
       }
@@ -5180,7 +5176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Feedback — driver/vehicle/service ratings tied to a specific booking.
   app.get("/api/customers/:id/feedback", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const rows = await CustomerFeedback.find({ tenantId: req.tenantId, customerId: req.params.id })
+      const rows = await CustomerFeedback.find({ tenantId: req.tenantObjectId || req.tenantId, customerId: req.params.id })
         .populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation')
         .populate('driverId', 'name phone status')
         .populate('vehicleId', 'make vehicleModel licensePlate')
@@ -5205,7 +5201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
       const booking: any = bookingId
-        ? await Booking.findOne({ _id: bookingId, tenantId: req.tenantId, customerId: customer._id }).lean()
+        ? await Booking.findOne({ _id: bookingId, tenantId: (req.tenantObjectId || req.tenantId), customerId: customer._id }).lean()
         : null;
       if (bookingId && !booking) return res.status(400).json({ message: "bookingId does not belong to this customer." });
       if (type && !['feedback', 'appreciation'].includes(type)) return res.status(400).json({ message: "Invalid feedback type." });
@@ -5248,12 +5244,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Add a rating or feedback comment." });
       }
       const feedbackType = type || 'feedback';
-      if (bookingId && await CustomerFeedback.exists({ tenantId: req.tenantId, customerId: customer._id, bookingId, type: feedbackType })) {
+      if (bookingId && await CustomerFeedback.exists({ tenantId: (req.tenantObjectId || req.tenantId), customerId: customer._id, bookingId, type: feedbackType })) {
         return res.status(409).json({ message: "Feedback for this booking already exists. The original record was preserved." });
       }
 
       const feedback = await CustomerFeedback.create({
-        tenantId: req.tenantId, customerId: req.params.id, bookingId: bookingId || undefined,
+        tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id, bookingId: bookingId || undefined,
         driverId: booking?.driverId, vehicleId: booking?.vehicleId,
         type: feedbackType, ...ratingFields, vehicleIssueReported, breakdownOccurred,
         vehicleIssueDescription: vehicleIssueDescription?.trim(), wouldBookAgain, wouldRecommend,
@@ -5271,7 +5267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/customers/:id/drivers", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid customer ID" });
-      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
       res.json(await buildCustomerDriverHistory(req.tenantId!, req.params.id));
     } catch (error: any) {
@@ -5283,7 +5279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/customers/:id/vehicles", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid customer ID" });
-      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
       res.json(await buildCustomerVehicleHistory(req.tenantId!, req.params.id));
     } catch (error: any) {
@@ -5295,7 +5291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Complaints and service recovery.
   app.get("/api/customers/:id/complaints", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const rows = await CustomerComplaint.find({ tenantId: req.tenantId, customerId: req.params.id })
+      const rows = await CustomerComplaint.find({ tenantId: req.tenantObjectId || req.tenantId, customerId: req.params.id })
         .populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation')
         .populate('driverId', 'name phone status')
         .populate('vehicleId', 'make vehicleModel licensePlate')
@@ -5324,7 +5320,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
       const booking: any = bookingId
-        ? await Booking.findOne({ _id: bookingId, tenantId: req.tenantId, customerId: customer._id }).lean()
+        ? await Booking.findOne({ _id: bookingId, tenantId: (req.tenantObjectId || req.tenantId), customerId: customer._id }).lean()
         : null;
       if (bookingId && !booking) return res.status(400).json({ message: "bookingId does not belong to this customer." });
       const classifiedParty = responsibleParty || 'unclear';
@@ -5339,7 +5335,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const actor = { userId: req.userId!, role: req.user?.role || 'client' };
 
       const complaint = await CustomerComplaint.create({
-        tenantId: req.tenantId, customerId: req.params.id, bookingId: bookingId || undefined,
+        tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id, bookingId: bookingId || undefined,
         driverId: booking?.driverId, vehicleId: booking?.vehicleId,
         category, severity: severity || 'medium', description,
         responsibleParty: classifiedParty, responsibilityReason: responsibilityReason?.trim(), assignedTo,
@@ -5364,7 +5360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // compensation; compensation is opt-in via correctiveAction.
   app.put("/api/customers/:id/complaints/:complaintId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const complaint = await CustomerComplaint.findOne({ _id: req.params.complaintId, tenantId: req.tenantId, customerId: req.params.id });
+      const complaint = await CustomerComplaint.findOne({ _id: req.params.complaintId, tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id });
       if (!complaint) return res.status(404).json({ message: "Complaint not found" });
 
       const { status, assignedTo, resolutionDeadline, correctiveAction, compensationAmount, compensationPoints, resolution, satisfactionAfterResolution, responsibleParty, responsibilityReason } = req.body || {};
@@ -5439,7 +5435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
-      const history = await CustomerConsentEvent.find({ tenantId: req.tenantId, customerId: req.params.id }).sort({ createdAt: -1 });
+      const history = await CustomerConsentEvent.find({ tenantId: req.tenantObjectId || req.tenantId, customerId: req.params.id }).sort({ createdAt: -1 });
       res.json({
         consent: customer.consent, consentSource: customer.consentSource, consentDate: customer.consentDate,
         optOutDate: customer.optOutDate, doNotContactReason: customer.doNotContactReason,
@@ -5474,7 +5470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await customer.save();
 
       await CustomerConsentEvent.create({
-        tenantId: req.tenantId, customerId: customer._id, channel, action: 'opted_in', source: source || 'manual',
+        tenantId: (req.tenantObjectId || req.tenantId), customerId: customer._id, channel, action: 'opted_in', source: source || 'manual',
         actor: { userId: req.userId!, role: req.user?.role || 'client' },
       });
       res.json(customer);
@@ -5504,7 +5500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const ch of channelsToRevoke) {
         (customer.consent as any)[ch] = false;
         await CustomerConsentEvent.create({
-          tenantId: req.tenantId, customerId: customer._id, channel: ch, action: 'opted_out',
+          tenantId: (req.tenantObjectId || req.tenantId), customerId: customer._id, channel: ch, action: 'opted_out',
           source: 'manual', reason, actor,
         });
       }
@@ -5539,7 +5535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/customers/:id/follow-ups", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const rows = await CustomerFollowUp.find({ tenantId: req.tenantId, customerId: req.params.id }).sort({ dueDate: 1 });
+      const rows = await CustomerFollowUp.find({ tenantId: req.tenantObjectId || req.tenantId, customerId: req.params.id }).sort({ dueDate: 1 });
       res.json(rows);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch follow-up tasks" });
@@ -5552,11 +5548,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!taskType || !dueDate) return res.status(400).json({ message: "taskType and dueDate are required." });
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
-      if (bookingId && !await Booking.exists({ _id: bookingId, tenantId: req.tenantId, customerId: customer._id })) {
+      if (bookingId && !await Booking.exists({ _id: bookingId, tenantId: (req.tenantObjectId || req.tenantId), customerId: customer._id })) {
         return res.status(400).json({ message: "bookingId does not belong to this customer." });
       }
       const task = await CustomerFollowUp.create({
-        tenantId: req.tenantId, customerId: req.params.id, bookingId: bookingId || undefined,
+        tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id, bookingId: bookingId || undefined,
         taskType, assignedTo, dueDate: new Date(dueDate), priority: priority || 'medium', notes,
         createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
       });
@@ -5595,9 +5591,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/customers/:id/google-reviews", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid customer ID" });
-      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
-      const rows = await GoogleReviewTracking.find({ tenantId: req.tenantId, customerId: req.params.id })
+      const rows = await GoogleReviewTracking.find({ tenantId: req.tenantObjectId || req.tenantId, customerId: req.params.id })
         .populate('bookingId', 'bookingId pickupDate pickupLocation dropoffLocation status')
         .populate('requestMessageId', 'status provider providerMessageId sentAt')
         .populate('rewardTransactionId', 'transactionType points balanceAfter reason createdAt')
@@ -5619,8 +5615,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "A valid requestId is required" });
       }
       const [customer, booking, tenant] = await Promise.all([
-        Customer.findOne({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } }),
-        Booking.findOne({ _id: bookingId, tenantId: req.tenantId, customerId: req.params.id }),
+        Customer.findOne({ _id: req.params.id, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } }),
+        Booking.findOne({ _id: bookingId, tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id }),
         storage.getTenant(req.tenantId!),
       ]);
       if (!customer) return res.status(404).json({ message: "Customer not found" });
@@ -5634,7 +5630,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const pageUrl = safeGoogleReviewUrl(reviewPageUrl || (tenant as any)?.operationsSettings?.googleReviewUrl || '');
       if (!pageUrl) return res.status(400).json({ message: "No Google review page URL — pass one or configure it in Settings → Operations." });
 
-      let tracking = await GoogleReviewTracking.findOne({ tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id });
+      let tracking = await GoogleReviewTracking.findOne({ tenantId: req.tenantObjectId || req.tenantId, customerId: customer._id, bookingId: booking._id });
       if (tracking?.reviewReceived) return res.status(409).json({ message: "A received Google review is already confirmed for this booking" });
       const previousAttempt = tracking?.requestHistory?.find((attempt: any) => attempt.requestId === requestId);
       if (previousAttempt) {
@@ -5658,7 +5654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (!messageDoc) {
           messageDoc = await WhatsAppMessage.create({
-            tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id,
+            tenantId: (req.tenantObjectId || req.tenantId), customerId: customer._id, bookingId: booking._id,
             recipientType: 'customer', recipientPhone, messageType: 'customer_google_review_request',
             content: googleReviewRequestMessage(customer, booking, tenant, pageUrl),
             provider: whatsappProvider.kind, status: 'queued', attemptCount: 0, createdBy: actor, idempotencyKey,
@@ -5680,7 +5676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!tracking) {
-        tracking = new GoogleReviewTracking({ tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id });
+        tracking = new GoogleReviewTracking({ tenantId: (req.tenantObjectId || req.tenantId), customerId: customer._id, bookingId: booking._id });
       }
       tracking.reviewPageUrl = pageUrl;
       tracking.reviewRequested = true;
@@ -5693,13 +5689,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await tracking.save();
 
       const openReviewTask = await CustomerFollowUp.exists({
-        tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id,
+        tenantId: (req.tenantObjectId || req.tenantId), customerId: customer._id, bookingId: booking._id,
         taskType: 'Google review follow-up', status: { $nin: ['resolved', 'closed', 'do_not_contact'] },
       });
       if (!openReviewTask) {
         const dueDate = new Date(sentAt); dueDate.setDate(dueDate.getDate() + 3);
         await CustomerFollowUp.create({
-          tenantId: req.tenantId, customerId: customer._id, bookingId: booking._id,
+          tenantId: (req.tenantObjectId || req.tenantId), customerId: customer._id, bookingId: booking._id,
           taskType: 'Google review follow-up', dueDate, priority: 'low',
           notes: `Review requested through ${String(channel).replace(/_/g, ' ')}`,
           createdBy: actor,
@@ -5736,7 +5732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Review date is invalid or in the future" });
       }
 
-      const review = await GoogleReviewTracking.findOne({ _id: req.params.reviewId, tenantId: req.tenantId, customerId: req.params.id });
+      const review = await GoogleReviewTracking.findOne({ _id: req.params.reviewId, tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id });
       if (!review) return res.status(404).json({ message: "Google review tracking record not found" });
       const actor = { userId: req.userId!, role: req.user?.role || 'client' };
       if (review.reviewReceived) {
@@ -5773,7 +5769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await review.save();
       }
       await CustomerFollowUp.updateMany({
-        tenantId: req.tenantId, customerId: req.params.id, bookingId: review.bookingId,
+        tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id, bookingId: review.bookingId,
         taskType: 'Google review follow-up', status: { $nin: ['resolved', 'closed'] },
       }, {
         $set: { status: 'resolved', resolution: 'Google review receipt confirmed with evidence.', communicationResult: `Received ${rating}-star Google review.` },
@@ -5792,7 +5788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!mongoose.isValidObjectId(req.params.id) || !mongoose.isValidObjectId(req.params.reviewId)) {
         return res.status(400).json({ message: "Invalid customer or review ID" });
       }
-      const review = await GoogleReviewTracking.findOne({ _id: req.params.reviewId, tenantId: req.tenantId, customerId: req.params.id });
+      const review = await GoogleReviewTracking.findOne({ _id: req.params.reviewId, tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id });
       if (!review) return res.status(404).json({ message: "Google review tracking record not found" });
       const { reviewPageUrl, reviewLink, reviewReference, reviewRating, reviewDate, followUpRequired, responseStatus, notes } = req.body || {};
       if (reviewPageUrl !== undefined) {
@@ -5841,13 +5837,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (review.followUpRequired) {
         const openTask = await CustomerFollowUp.exists({
-          tenantId: req.tenantId, customerId: req.params.id, bookingId: review.bookingId,
+          tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id, bookingId: review.bookingId,
           taskType: 'Google review follow-up', status: { $nin: ['resolved', 'closed', 'do_not_contact'] },
         });
         if (!openTask) {
           const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + 3);
           await CustomerFollowUp.create({
-            tenantId: req.tenantId, customerId: req.params.id, bookingId: review.bookingId,
+            tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id, bookingId: review.bookingId,
             taskType: 'Google review follow-up', dueDate, priority: 'low', notes: 'Added from Google Review tracking.', createdBy: actor,
           });
         }
@@ -5870,8 +5866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const normalized = normalizeIndianPhone((phone as string) || '');
       if (!normalized) return res.json({ customer: null });
 
-      const customer = await Customer.findOne({
-        tenantId: req.tenantId, isDeleted: { $ne: true },
+      const customer = await Customer.findOne({ tenantId: req.tenantObjectId || req.tenantId, isDeleted: { $ne: true },
         $or: [{ primaryMobile: normalized }, { alternateMobile: normalized }, { whatsappNumber: normalized }, { phoneAliases: normalized }],
       });
       if (!customer) return res.json({ customer: null });
@@ -5895,7 +5890,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/customers/:id", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const customer = await Customer.findOne({ _id: req.params.id, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
       res.json(customer);
     } catch (error: any) {
@@ -5947,9 +5942,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // customer's needs change so older booking agreements remain auditable.
   app.get("/api/customers/:id/requirements", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
-      const rows = await CustomerRequirement.find({ tenantId: req.tenantId, customerId: req.params.id })
+      const rows = await CustomerRequirement.find({ tenantId: req.tenantObjectId || req.tenantId, customerId: req.params.id })
         .populate('bookingId', 'bookingId pickupDate')
         .sort({ createdAt: -1 });
       res.json(rows);
@@ -5961,7 +5956,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/customers/:id/requirements", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
 
       const allowed = [
@@ -5987,7 +5982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       if (payload.bookingId && !await Booking.exists({
-        _id: payload.bookingId, tenantId: req.tenantId, customerId: req.params.id,
+        _id: payload.bookingId, tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id,
       })) {
         return res.status(400).json({ message: "bookingId does not belong to this customer." });
       }
@@ -6001,7 +5996,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!hasRequirement) return res.status(400).json({ message: "Add at least one requirement." });
 
       const requirement = await CustomerRequirement.create({
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         customerId: req.params.id,
         ...payload,
         createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
@@ -6090,7 +6085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const inquiryNumber = await nextInquiryNumber(req.tenantId!);
       const inquiry = await Inquiry.create({
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         inquiryNumber,
         status: 'new',
         ...payload,
@@ -6169,7 +6164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (inquiry.status === 'converted_to_lead') {
         return res.status(400).json({ message: "This inquiry has already been converted to a lead.", code: 'ALREADY_CONVERTED' });
       }
-      const existingLead = await Lead.findOne({ tenantId: req.tenantId, inquiryId: inquiry._id });
+      const existingLead = await Lead.findOne({ tenantId: req.tenantObjectId || req.tenantId, inquiryId: inquiry._id });
       if (existingLead) {
         return res.status(400).json({ message: "A lead already exists for this inquiry.", code: 'ALREADY_CONVERTED', lead: existingLead });
       }
@@ -6182,7 +6177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const leadNumber = await nextLeadNumber(req.tenantId!);
       const runConvert = async (session?: mongoose.ClientSession) => {
         const [lead] = await Lead.create([{
-          tenantId: req.tenantId,
+          tenantId: (req.tenantObjectId || req.tenantId),
           leadNumber,
           inquiryId: inquiry._id,
           status: 'new',
@@ -6382,7 +6377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/leads/:leadId/quotations", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_QUOTATIONS), async (req: AuthRequest, res) => {
     try {
-      const rows = await Quotation.find({ tenantId: req.tenantId, leadId: req.params.leadId }).sort({ version: -1, createdAt: -1 });
+      const rows = await Quotation.find({ tenantId: req.tenantObjectId || req.tenantId, leadId: req.params.leadId }).sort({ version: -1, createdAt: -1 });
       res.json(rows);
     } catch (error: any) {
       console.error('List quotations error:', error?.message || error);
@@ -6401,7 +6396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const quotationNumber = await nextQuotationNumber(req.tenantId!);
       const quotation = await Quotation.create({
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         quotationNumber,
         leadId: lead._id,
         status: 'draft',
@@ -6656,7 +6651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const quotationNumber = await nextQuotationNumber(req.tenantId!);
       const revision = await Quotation.create({
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         quotationNumber,
         leadId: original.leadId,
         status: 'draft',
@@ -6730,7 +6725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/leads/:leadId/followups", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_FOLLOWUPS), async (req: AuthRequest, res) => {
     try {
-      const rows = await LeadFollowUp.find({ tenantId: req.tenantId, leadId: req.params.leadId }).sort({ scheduledAt: -1 });
+      const rows = await LeadFollowUp.find({ tenantId: req.tenantObjectId || req.tenantId, leadId: req.params.leadId }).sort({ scheduledAt: -1 });
       res.json(rows);
     } catch (error: any) {
       console.error('List lead follow-ups error:', error?.message || error);
@@ -6746,7 +6741,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!req.body?.scheduledAt) return res.status(400).json({ message: "scheduledAt is required." });
 
       const followUp = await LeadFollowUp.create({
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         leadId: lead._id,
         type: req.body.type.trim(),
         scheduledAt: req.body.scheduledAt,
@@ -6770,7 +6765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // here regardless of its scheduledAt, since it isn't waiting on anyone.
   app.get("/api/followups", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_FOLLOWUPS), async (req: AuthRequest, res) => {
     try {
-      const query: Record<string, any> = { tenantId: req.tenantId, outcome: 'pending' };
+      const query: Record<string, any> = { tenantId: (req.tenantObjectId || req.tenantId), outcome: 'pending' };
       const now = new Date();
       const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0);
       const todayEnd = new Date(todayStart); todayEnd.setDate(todayEnd.getDate() + 1);
@@ -6820,7 +6815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.nextFollowUpAt) {
         followUp.nextFollowUpAt = req.body.nextFollowUpAt;
         nextFollowUp = await LeadFollowUp.create({
-          tenantId: req.tenantId,
+          tenantId: (req.tenantObjectId || req.tenantId),
           leadId: followUp.leadId,
           type: req.body.nextFollowUpType || followUp.type,
           scheduledAt: req.body.nextFollowUpAt,
@@ -6933,8 +6928,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
       const bookingIds = await Booking.find({ customerId: customer._id, tenantId: req.tenantId }).distinct('_id');
-      const transactions = await PaymentTransaction.find({
-        tenantId: req.tenantId,
+      const transactions = await PaymentTransaction.find({ tenantId: req.tenantObjectId || req.tenantId,
         bookingId: { $in: bookingIds },
       })
         .populate('bookingId', 'bookingId totalAmount pickupDate')
@@ -7000,9 +6994,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/customers/:id/billing-profiles", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
-      const profiles = await CustomerBillingProfile.find({ tenantId: req.tenantId, customerId: req.params.id, isActive: true })
+      const profiles = await CustomerBillingProfile.find({ tenantId: req.tenantObjectId || req.tenantId, customerId: req.params.id, isActive: true })
         .sort({ isDefault: -1, createdAt: 1 });
       res.json(profiles);
     } catch (error: any) {
@@ -7017,18 +7011,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/customers/:id/billing-profiles", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
     try {
-      const customer = await Customer.exists({ _id: req.params.id, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const customer = await Customer.exists({ _id: req.params.id, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
       const payload: Record<string, any> = {};
       for (const field of billingProfileFields) if (req.body?.[field] !== undefined) payload[field] = req.body[field];
       if (!payload.label?.trim() || !payload.billingName?.trim()) return res.status(400).json({ message: "Profile label and billing name are required." });
       if (payload.gstNumber) payload.gstNumber = String(payload.gstNumber).trim().toUpperCase();
       if (payload.billingEmail) payload.billingEmail = String(payload.billingEmail).trim().toLowerCase();
-      const isFirst = await CustomerBillingProfile.countDocuments({ tenantId: req.tenantId, customerId: req.params.id, isActive: true }) === 0;
+      const isFirst = await CustomerBillingProfile.countDocuments({ tenantId: req.tenantObjectId || req.tenantId, customerId: req.params.id, isActive: true }) === 0;
       const isDefault = isFirst || req.body?.isDefault === true;
-      if (isDefault) await CustomerBillingProfile.updateMany({ tenantId: req.tenantId, customerId: req.params.id }, { $set: { isDefault: false } });
+      if (isDefault) await CustomerBillingProfile.updateMany({ tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id }, { $set: { isDefault: false } });
       const profile = await CustomerBillingProfile.create({
-        tenantId: req.tenantId, customerId: req.params.id, ...payload, isDefault,
+        tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id, ...payload, isDefault,
         createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
       });
       res.status(201).json(profile);
@@ -7041,7 +7035,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/customers/:id/billing-profiles/:profileId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
     try {
       const profile = await CustomerBillingProfile.findOne({
-        _id: req.params.profileId, tenantId: req.tenantId, customerId: req.params.id, isActive: true,
+        _id: req.params.profileId, tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id, isActive: true,
       });
       if (!profile) return res.status(404).json({ message: "Billing profile not found" });
       for (const field of billingProfileFields) if (req.body?.[field] !== undefined) (profile as any)[field] = req.body[field];
@@ -7049,7 +7043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (profile.gstNumber) profile.gstNumber = profile.gstNumber.trim().toUpperCase();
       if (profile.billingEmail) profile.billingEmail = profile.billingEmail.trim().toLowerCase();
       if (req.body?.isDefault === true && !profile.isDefault) {
-        await CustomerBillingProfile.updateMany({ tenantId: req.tenantId, customerId: req.params.id }, { $set: { isDefault: false } });
+        await CustomerBillingProfile.updateMany({ tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id }, { $set: { isDefault: false } });
         profile.isDefault = true;
       }
       profile.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
@@ -7064,9 +7058,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/customers/:id/billing-profiles/:profileId/set-default", authenticateUser, requireTenant, requirePermission(PERMISSIONS.GENERATE_INVOICE), async (req: AuthRequest, res) => {
     try {
-      const profile = await CustomerBillingProfile.findOne({ _id: req.params.profileId, tenantId: req.tenantId, customerId: req.params.id, isActive: true });
+      const profile = await CustomerBillingProfile.findOne({ _id: req.params.profileId, tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id, isActive: true });
       if (!profile) return res.status(404).json({ message: "Billing profile not found" });
-      await CustomerBillingProfile.updateMany({ tenantId: req.tenantId, customerId: req.params.id }, { $set: { isDefault: false } });
+      await CustomerBillingProfile.updateMany({ tenantId: (req.tenantObjectId || req.tenantId), customerId: req.params.id }, { $set: { isDefault: false } });
       profile.isDefault = true;
       profile.updatedBy = { userId: req.userId!, role: req.user?.role || 'client' };
       profile.updatedAt = new Date();
@@ -7079,7 +7073,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/customers/:id/invoices", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const invoices = await Invoice.find({ tenantId: req.tenantId, customerId: req.params.id })
+      const invoices = await Invoice.find({ tenantId: req.tenantObjectId || req.tenantId, customerId: req.params.id })
         .populate('bookingId', 'bookingId pickupDate').sort({ createdAt: -1 });
       res.json(await addCurrentInvoiceSettlements(invoices));
     } catch (error: any) {
@@ -7166,8 +7160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
       const phone = normalizeIndianPhone(customer.primaryMobile);
-      const messages = await WhatsAppMessage.find({
-        tenantId: req.tenantId,
+      const messages = await WhatsAppMessage.find({ tenantId: req.tenantObjectId || req.tenantId,
         recipientType: 'customer',
         $or: [
           { customerId: customer._id },
@@ -7244,7 +7237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (existing) return res.json({ message: "Message already processed", alreadySent: true, messageDoc: existing });
 
       const messageDoc = await WhatsAppMessage.create({
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         customerId: context.customer._id,
         bookingId: template.bookingId || undefined,
         recipientType: 'customer',
@@ -7307,7 +7300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (update.email) duplicateChecks.push({ email: update.email }, { emailAliases: update.email });
       if (update.gstNumber) duplicateChecks.push({ gstNumber: update.gstNumber }, { gstAliases: update.gstNumber });
       if (duplicateChecks.length && await Customer.exists({
-        _id: { $ne: req.params.id }, tenantId: req.tenantId, isDeleted: { $ne: true }, $or: duplicateChecks,
+        _id: { $ne: req.params.id }, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true }, $or: duplicateChecks,
       })) {
         return res.status(409).json({ message: "Another customer already uses this mobile, email, or GST number." });
       }
@@ -7333,7 +7326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.tenantId });
       if (!customer) return res.status(404).json({ message: "Customer not found" });
-      const transactions = await RewardTransaction.find({ tenantId: req.tenantId, customerId: req.params.id }).sort({ createdAt: -1 });
+      const transactions = await RewardTransaction.find({ tenantId: req.tenantObjectId || req.tenantId, customerId: req.params.id }).sort({ createdAt: -1 });
       const rule = await getRewardRule(req.tenantId!);
       res.json({ balance: customer.rewardPointsBalance, tier: customer.loyaltyTier, transactions, rule });
     } catch (error: any) {
@@ -7361,7 +7354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // of what the target filter matched.
   app.get("/api/campaigns", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const campaigns = await Campaign.find({ tenantId: req.tenantId }).sort({ createdAt: -1 });
+      const campaigns = await Campaign.find({ tenantId: req.tenantObjectId || req.tenantId }).sort({ createdAt: -1 });
       res.json(campaigns);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch campaigns" });
@@ -7388,7 +7381,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (targetType === 'segment') await getSegmentFilter(req.tenantId!, String(targetKey));
 
       const campaign = await Campaign.create({
-        tenantId: req.tenantId, name: name.trim(), description,
+        tenantId: (req.tenantObjectId || req.tenantId), name: name.trim(), description,
         offerType: offerType || 'announcement', offerValue,
         targetType, targetKey, channel: 'whatsapp', messageTemplate,
         validFrom: validFrom ? new Date(validFrom) : undefined,
@@ -7486,7 +7479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vendors", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
     try {
       const { status, search } = req.query as { status?: string; search?: string };
-      const query: any = { tenantId: req.tenantId, isDeleted: { $ne: true } };
+      const query: any = { tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } };
       if (status) query.status = status;
       if (search) {
         const normalized = normalizeIndianPhone(search) || '';
@@ -7507,7 +7500,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/vendors/:vendorId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
     try {
-      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!vendor) return res.status(404).json({ message: "Vendor not found" });
       res.json(vendor);
     } catch (error: any) {
@@ -7551,7 +7544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // can't blow away fields the caller didn't intend to touch.
   app.patch("/api/vendors/:vendorId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_EDIT), async (req: AuthRequest, res) => {
     try {
-      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!vendor) return res.status(404).json({ message: "Vendor not found" });
       const payload = req.body || {};
 
@@ -7591,7 +7584,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/vendors/:vendorId/block", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_BLOCK), async (req: AuthRequest, res) => {
     try {
       const { reason } = req.body || {};
-      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!vendor) return res.status(404).json({ message: "Vendor not found" });
       vendor.status = 'temporarily_blocked';
       vendor.suspensionReason = reason;
@@ -7605,7 +7598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/vendors/:vendorId/activate", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_BLOCK), async (req: AuthRequest, res) => {
     try {
-      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!vendor) return res.status(404).json({ message: "Vendor not found" });
       vendor.status = 'active';
       vendor.suspensionReason = undefined;
@@ -7622,9 +7615,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // is by normalized mobile WITHIN the vendor only (see vendorDriverService).
   app.get("/api/vendors/:vendorId/drivers", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
     try {
-      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!vendor) return res.status(404).json({ message: "Vendor not found" });
-      const drivers = await VendorDriver.find({ tenantId: req.tenantId, vendorId: vendor._id, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
+      const drivers = await VendorDriver.find({ tenantId: req.tenantObjectId || req.tenantId, vendorId: vendor._id, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
       res.json(drivers);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch vendor drivers" });
@@ -7665,7 +7658,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/vendors/:vendorId/drivers", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_DRIVER_CREATE), async (req: AuthRequest, res) => {
     try {
-      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!vendor) return res.status(404).json({ message: "Vendor not found" });
       const { name, primaryMobile } = req.body || {};
       if (!name || !name.trim()) return res.status(400).json({ message: "Driver name is required" });
@@ -7690,7 +7683,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/vendors/:vendorId/drivers/:driverId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_DRIVER_EDIT), async (req: AuthRequest, res) => {
     try {
-      const driver = await VendorDriver.findOne({ _id: req.params.driverId, tenantId: req.tenantId, vendorId: req.params.vendorId, isDeleted: { $ne: true } });
+      const driver = await VendorDriver.findOne({ _id: req.params.driverId, tenantId: (req.tenantObjectId || req.tenantId), vendorId: req.params.vendorId, isDeleted: { $ne: true } });
       if (!driver) return res.status(404).json({ message: "Vendor driver not found" });
       const payload = req.body || {};
 
@@ -7724,9 +7717,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // is by normalized registration number WITHIN the vendor only.
   app.get("/api/vendors/:vendorId/vehicles", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
     try {
-      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!vendor) return res.status(404).json({ message: "Vendor not found" });
-      const vehicles = await VendorVehicle.find({ tenantId: req.tenantId, vendorId: vendor._id, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
+      const vehicles = await VendorVehicle.find({ tenantId: req.tenantObjectId || req.tenantId, vendorId: vendor._id, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
       res.json(vehicles);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch vendor vehicles" });
@@ -7760,7 +7753,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/vendors/:vendorId/vehicles", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VEHICLE_CREATE), async (req: AuthRequest, res) => {
     try {
-      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!vendor) return res.status(404).json({ message: "Vendor not found" });
       const { registrationNumber, vehicleModel, category } = req.body || {};
       if (!registrationNumber) return res.status(400).json({ message: "Registration number is required" });
@@ -7788,7 +7781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/vendors/:vendorId/vehicles/:vehicleId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VEHICLE_EDIT), async (req: AuthRequest, res) => {
     try {
-      const vehicle = await VendorVehicle.findOne({ _id: req.params.vehicleId, tenantId: req.tenantId, vendorId: req.params.vendorId, isDeleted: { $ne: true } });
+      const vehicle = await VendorVehicle.findOne({ _id: req.params.vehicleId, tenantId: (req.tenantObjectId || req.tenantId), vendorId: req.params.vendorId, isDeleted: { $ne: true } });
       if (!vehicle) return res.status(404).json({ message: "Vendor vehicle not found" });
       const payload = req.body || {};
 
@@ -7827,9 +7820,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // assignment or that booking's own status changes.
   app.get("/api/vendors/:vendorId/duties", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
     try {
-      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+      const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!vendor) return res.status(404).json({ message: "Vendor not found" });
-      const duties = await VendorDuty.find({ tenantId: req.tenantId, fulfilmentVendorId: vendor._id })
+      const duties = await VendorDuty.find({ tenantId: req.tenantObjectId || req.tenantId, fulfilmentVendorId: vendor._id })
         .populate('bookingId', 'bookingId customerName pickupLocation dropoffLocation status totalAmount')
         .populate('vendorDriverId', 'name driverCode')
         .populate('vendorVehicleId', 'registrationNumber vehicleCode')
@@ -7896,7 +7889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const rule = await RewardRule.findOneAndUpdate(
         { tenantId: req.tenantId },
-        { $set: update, $setOnInsert: { tenantId: req.tenantId, createdBy: { userId: req.userId!, role: req.user?.role || 'client' } } },
+        { $set: update, $setOnInsert: { tenantId: (req.tenantObjectId || req.tenantId), createdBy: { userId: req.userId!, role: req.user?.role || 'client' } } },
         { new: true, upsert: true }
       );
       res.json(rule);
@@ -7937,7 +7930,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // (e.g. {points: 1.5} alone) must preserve the rule's own existing
       // name/awardTiming, not silently reset them to the generic default —
       // so the existing row (if any) is read first.
-      const existingRule = await RewardEventRule.findOne({ tenantId: req.tenantId, eventKey });
+      const existingRule = await RewardEventRule.findOne({ tenantId: req.tenantObjectId || req.tenantId, eventKey });
       const update: any = {
         updatedBy: { userId: req.userId!, role: req.user?.role || 'client' },
         name: name !== undefined ? name : (existingRule?.name ?? eventKey),
@@ -7951,11 +7944,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (enabled !== undefined) update.enabled = enabled;
 
       const rule = await RewardEventRule.findOneAndUpdate(
-        { tenantId: req.tenantId, eventKey },
+        { tenantId: (req.tenantObjectId || req.tenantId), eventKey },
         {
           $set: update,
           $setOnInsert: {
-            tenantId: req.tenantId, eventKey,
+            tenantId: (req.tenantObjectId || req.tenantId), eventKey,
             createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
           },
         },
@@ -8026,8 +8019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/customers/:id/referrals", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REFERRAL_VIEW), async (req: AuthRequest, res) => {
     try {
-      const rows = await Referral.find({
-        tenantId: req.tenantId,
+      const rows = await Referral.find({ tenantId: req.tenantObjectId || req.tenantId,
         $or: [{ referrerCustomerId: req.params.id }, { referredCustomerId: req.params.id }],
       }).sort({ createdAt: -1 })
         .populate('referrerCustomerId', 'name primaryMobile')
@@ -8074,7 +8066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Referral endpoints were previously nested under /api/customers/:id/referrals
   app.get("/api/referrals", authenticateUser, requireTenant, requirePermission(PERMISSIONS.REFERRAL_VIEW), async (req: AuthRequest, res) => {
     try {
-      const referrals = await Referral.find({ tenantId: req.tenantId })
+      const referrals = await Referral.find({ tenantId: req.tenantObjectId || req.tenantId })
         .sort({ createdAt: -1 })
         .limit(200)
         .populate('customerId', 'name primaryMobile')
@@ -8127,14 +8119,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await markReferralBookingCompleted(req.tenantId!, bookingRecordId, actor);
       }
       if (status === 'completed') {
-        const alreadyCreated = await CustomerFollowUp.exists({ tenantId: req.tenantId, bookingId: bookingRecordId });
+        const alreadyCreated = await CustomerFollowUp.exists({ tenantId: (req.tenantObjectId || req.tenantId), bookingId: bookingRecordId });
         if (!alreadyCreated) {
           const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
           const inAWeek = new Date(); inAWeek.setDate(inAWeek.getDate() + 7);
           await CustomerFollowUp.insertMany([
-            { tenantId: req.tenantId, customerId, bookingId: bookingRecordId, taskType: 'Confirm safe trip completion', dueDate: new Date(), priority: 'high', createdBy: actor },
-            { tenantId: req.tenantId, customerId, bookingId: bookingRecordId, taskType: 'Ask for driver feedback', dueDate: tomorrow, priority: 'medium', createdBy: actor },
-            { tenantId: req.tenantId, customerId, bookingId: bookingRecordId, taskType: 'Offer repeat booking benefit', dueDate: inAWeek, priority: 'low', createdBy: actor },
+            { tenantId: (req.tenantObjectId || req.tenantId), customerId, bookingId: bookingRecordId, taskType: 'Confirm safe trip completion', dueDate: new Date(), priority: 'high', createdBy: actor },
+            { tenantId: (req.tenantObjectId || req.tenantId), customerId, bookingId: bookingRecordId, taskType: 'Ask for driver feedback', dueDate: tomorrow, priority: 'medium', createdBy: actor },
+            { tenantId: (req.tenantObjectId || req.tenantId), customerId, bookingId: bookingRecordId, taskType: 'Offer repeat booking benefit', dueDate: inAWeek, priority: 'low', createdBy: actor },
           ]);
         }
       }
@@ -8409,7 +8401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let linkedVendor: any = null;
       if (fulfilmentVendorId) {
-        linkedVendor = await Vendor.findOne({ _id: fulfilmentVendorId, tenantId: req.tenantId, isDeleted: { $ne: true } });
+        linkedVendor = await Vendor.findOne({ _id: fulfilmentVendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
         if (!linkedVendor) return res.status(400).json({ message: "Vendor not found" });
         if (linkedVendor.status !== 'active') {
           return res.status(400).json({ message: `Vendor "${linkedVendor.companyName}" is ${linkedVendor.status.replace(/_/g, ' ')}, not active.` });
@@ -8418,7 +8410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!vendorContactPhone) vendorContactPhone = linkedVendor.primaryMobile;
 
         if (vendorDriverId) {
-          const driver = await VendorDriver.findOne({ _id: vendorDriverId, tenantId: req.tenantId, vendorId: linkedVendor._id, isDeleted: { $ne: true } });
+          const driver = await VendorDriver.findOne({ _id: vendorDriverId, tenantId: (req.tenantObjectId || req.tenantId), vendorId: linkedVendor._id, isDeleted: { $ne: true } });
           if (!driver) return res.status(400).json({ message: "Vendor driver not found under this vendor" });
           const availability = await checkVendorDriverAvailability(req.tenantId!, String(linkedVendor._id), vendorDriverId, window);
           if (!availability.available) {
@@ -8429,7 +8421,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         if (vendorVehicleId) {
-          const vehicle = await VendorVehicle.findOne({ _id: vendorVehicleId, tenantId: req.tenantId, vendorId: linkedVendor._id, isDeleted: { $ne: true } });
+          const vehicle = await VendorVehicle.findOne({ _id: vendorVehicleId, tenantId: (req.tenantObjectId || req.tenantId), vendorId: linkedVendor._id, isDeleted: { $ne: true } });
           if (!vehicle) return res.status(400).json({ message: "Vendor vehicle not found under this vendor" });
           const availability = await checkVendorVehicleAvailability(req.tenantId!, String(linkedVendor._id), vendorVehicleId, window);
           if (!availability.available) {
@@ -8530,7 +8522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/bookings/:bookingId/sourcing-requests", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_VIEW), async (req: AuthRequest, res) => {
     try {
-      const requests = await VendorSourcingRequest.find({ tenantId: req.tenantId, bookingId: req.params.bookingId }).sort({ createdAt: -1 });
+      const requests = await VendorSourcingRequest.find({ tenantId: req.tenantObjectId || req.tenantId, bookingId: req.params.bookingId }).sort({ createdAt: -1 });
       res.json(requests);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch sourcing requests" });
@@ -8552,7 +8544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/sourcing-requests/:requestId/responses", authenticateUser, requireTenant, requirePermission(PERMISSIONS.OUTSOURCING_VIEW), async (req: AuthRequest, res) => {
     try {
-      const responses = await VendorSourcingResponse.find({ tenantId: req.tenantId, sourcingRequestId: req.params.requestId }).sort({ createdAt: 1 });
+      const responses = await VendorSourcingResponse.find({ tenantId: req.tenantObjectId || req.tenantId, sourcingRequestId: req.params.requestId }).sort({ createdAt: 1 });
       const ranked = rankResponses(responses as any);
       res.json({
         responses,
@@ -8889,8 +8881,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getBookingsByTenant(req.tenantId!),
         storage.getExpensesByTenant(req.tenantId!),
         storage.getVehiclesByTenant(req.tenantId!),
-        CustomerFeedback.find({ tenantId: req.tenantId }).lean(),
-        CustomerComplaint.find({ tenantId: req.tenantId }).lean(),
+        CustomerFeedback.find({ tenantId: req.tenantObjectId || req.tenantId }).lean(),
+        CustomerComplaint.find({ tenantId: req.tenantObjectId || req.tenantId }).lean(),
       ]);
       const summary = buildVehiclePerformance(bookings, expenses, vehicles, monthStart, monthEnd, feedback, complaints);
       res.json({ month: `${year}-${String(month).padStart(2, '0')}`, vehicles: summary });
@@ -8940,7 +8932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       dayKey.setHours(0, 0, 0, 0);
 
       const record = await DriverAttendance.findOneAndUpdate(
-        { tenantId: req.tenantId, driverId: req.params.id, date: dayKey },
+        { tenantId: (req.tenantObjectId || req.tenantId), driverId: req.params.id, date: dayKey },
         {
           $set: {
             status, notes, source: 'manual',
@@ -8983,8 +8975,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [drivers, attendanceRecords, leaves, bookings] = await Promise.all([
         storage.getDriversByTenant(req.tenantId!),
-        DriverAttendance.find({ tenantId: req.tenantId, date: dayKey }),
-        DriverLeave.find({ tenantId: req.tenantId, status: 'approved', startDate: { $lt: dayEnd }, endDate: { $gt: dayKey } }),
+        DriverAttendance.find({ tenantId: req.tenantObjectId || req.tenantId, date: dayKey }),
+        DriverLeave.find({ tenantId: req.tenantObjectId || req.tenantId, status: 'approved', startDate: { $lt: dayEnd }, endDate: { $gt: dayKey } }),
         storage.getBookingsByTenant(req.tenantId!),
       ]);
 
@@ -9073,7 +9065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!driver) return res.status(404).json({ message: "Driver not found" });
 
       const leave = await DriverLeave.create({
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         driverId: req.params.id,
         startDate: start,
         endDate: end,
@@ -9581,8 +9573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       start.setHours(0, 0, 0, 0);
       const end = new Date();
       end.setHours(23, 59, 59, 999);
-      const bookings = await Booking.find({
-        tenantId: req.tenantId,
+      const bookings = await Booking.find({ tenantId: req.tenantObjectId || req.tenantId,
         pickupDate: { $gte: start, $lte: end }
       }).sort({ pickupTime: 1 });
       res.json(bookings);
@@ -9600,8 +9591,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const end = new Date();
       end.setDate(end.getDate() + 7);
       end.setHours(23, 59, 59, 999);
-      const bookings = await Booking.find({
-        tenantId: req.tenantId,
+      const bookings = await Booking.find({ tenantId: req.tenantObjectId || req.tenantId,
         pickupDate: { $gte: start, $lte: end }
       }).sort({ pickupDate: 1, pickupTime: 1 });
       res.json(bookings);
@@ -9615,7 +9605,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/operations/live", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { buildLiveOperations } = await import("./services/liveOperations");
-      const bookings = await Booking.find({ tenantId: req.tenantId }).lean();
+      const bookings = await Booking.find({ tenantId: req.tenantObjectId || req.tenantId }).lean();
       const liveOps = buildLiveOperations(bookings, new Date());
       res.json(liveOps);
     } catch (error: any) {
@@ -9667,9 +9657,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endDate = req.query.endDate ? new Date(req.query.endDate as string) : new Date();
 
       const [bookings, expenses, payments] = await Promise.all([
-        Booking.find({ tenantId: req.tenantId, createdAt: { $gte: startDate, $lte: endDate } }),
-        Expense.find({ tenantId: req.tenantId, createdAt: { $gte: startDate, $lte: endDate } }),
-        PaymentTransaction.find({ tenantId: req.tenantId, createdAt: { $gte: startDate, $lte: endDate } })
+        Booking.find({ tenantId: req.tenantObjectId || req.tenantId, createdAt: { $gte: startDate, $lte: endDate } }),
+        Expense.find({ tenantId: req.tenantObjectId || req.tenantId, createdAt: { $gte: startDate, $lte: endDate } }),
+        PaymentTransaction.find({ tenantId: req.tenantObjectId || req.tenantId, createdAt: { $gte: startDate, $lte: endDate } })
       ]);
 
       const totalRevenue = bookings.reduce((s: number, b: any) => s + (b.totalAmount || 0), 0);
@@ -9702,7 +9692,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // invented properties and reported every vehicle compliant).
       const { VehicleDocument } = await import("./vehicle/documents/models/vehicleDocument");
       const vehicles = await storage.getVehiclesByTenant(req.tenantId!);
-      const docs: any[] = await VehicleDocument.find({ tenantId: req.tenantId })
+      const docs: any[] = await VehicleDocument.find({ tenantId: req.tenantObjectId || req.tenantId })
         .select('vehicleId documentType expiryDate').lean();
       const now = new Date();
       const byVehicle = new Map<string, Map<string, Date | null>>();
@@ -9751,7 +9741,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Outstanding Analysis - Customers & vendors who owe money
   app.get("/api/finance/outstanding", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const invoices = await Invoice.find({ tenantId: req.tenantId, balanceDue: { $gt: 0 } });
+      const invoices = await Invoice.find({ tenantId: req.tenantObjectId || req.tenantId, balanceDue: { $gt: 0 } });
       const customerOutstanding = invoices.reduce((acc: any, inv: any) => {
         const customerId = inv.customerId?.toString?.() || inv.customerId;
         acc[customerId] = (acc[customerId] || 0) + (inv.balanceDue || 0);
@@ -9774,7 +9764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all vendors
   app.get("/api/vendors", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const vendors = await Vendor.find({ tenantId: req.tenantId }).sort({ createdAt: -1 });
+      const vendors = await Vendor.find({ tenantId: req.tenantObjectId || req.tenantId }).sort({ createdAt: -1 });
       res.json(vendors);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch vendors" });
@@ -11163,7 +11153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/notifications/triggers", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const triggers = db?.collection("eventTriggers")
-        .find({ tenantId: req.tenantId })
+        .find({ tenantId: req.tenantObjectId || req.tenantId })
         .sort({ createdAt: -1 })
         .toArray();
 
@@ -11180,7 +11170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const trigger = {
         id: `trigger-${Date.now()}`,
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         name,
         eventType,
         condition,
@@ -11224,7 +11214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await db?.collection("eventTriggers").deleteOne({
         id: triggerId,
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
       });
 
       res.json({ message: "Trigger deleted" });
@@ -11239,7 +11229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const trigger = await db?.collection("eventTriggers").findOne({
         id: triggerId,
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
       });
 
       if (!trigger) {
@@ -11262,7 +11252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { limit = 100 } = req.query;
 
       const events = await db?.collection("notificationEvents")
-        .find({ tenantId: req.tenantId })
+        .find({ tenantId: req.tenantObjectId || req.tenantId })
         .sort({ timestamp: -1 })
         .limit(parseInt(limit as string) || 100)
         .toArray();
@@ -11697,7 +11687,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await db?.collection("appliedOptimizations").insertOne({
         id: `applied-${Date.now()}`,
         optimizationId,
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         appliedAt: new Date(),
         expectedLifts: { openRate: 0.15, clickRate: 0.20, conversionRate: 0.18 }
       });
@@ -11729,7 +11719,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/notifications/segments", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { name, description, rules } = req.body;
-      const segment = { id: `seg-${Date.now()}`, name, description, rules, tenantId: req.tenantId, createdAt: new Date() };
+      const segment = { id: `seg-${Date.now()}`, name, description, rules, tenantId: (req.tenantObjectId || req.tenantId), createdAt: new Date() };
       await db?.collection("segments").insertOne(segment);
       res.json(segment);
     } catch (error: any) {
@@ -11828,7 +11818,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const profile = await storage.client
         ?.db("fleetpro")
         .collection("tenantWhatsAppProfiles")
-        .findOne({ tenantId: req.tenantId });
+        .findOne({ tenantId: req.tenantObjectId || req.tenantId });
       res.json({ profile: profile || {} });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -11839,7 +11829,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { companyName, customerLanguage, driverLanguage, dailySummaryTime, ...rest } = req.body;
       const updateData = {
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         companyName,
         customerLanguage: customerLanguage || 'en',
         driverLanguage: driverLanguage || 'hi',
@@ -11863,7 +11853,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const templates = await storage.client
         ?.db("fleetpro")
         .collection("whatsappTemplates")
-        .find({ tenantId: req.tenantId })
+        .find({ tenantId: req.tenantObjectId || req.tenantId })
         .toArray();
       res.json({ templates: templates || [] });
     } catch (error: any) {
@@ -11877,7 +11867,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const templates = await storage.client
         ?.db("fleetpro")
         .collection("whatsappTemplates")
-        .find({ tenantId: req.tenantId })
+        .find({ tenantId: req.tenantObjectId || req.tenantId })
         .sort({ category: 1, messageType: 1, updatedAt: -1 })
         .toArray();
       res.json({ templates: templates || [] });
@@ -11890,7 +11880,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { body, variables, changesSummary, ...rest } = req.body;
       const newTemplate = {
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         body,
         variables: variables || extractVariablesFromText(body),
         isCustom: true,
@@ -11962,7 +11952,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.client
         ?.db("fleetpro")
         .collection("whatsappTemplates")
-        .deleteOne({ _id: new mongoose.Types.ObjectId(req.params.templateId), tenantId: req.tenantId, isCustom: true });
+        .deleteOne({ _id: new mongoose.Types.ObjectId(req.params.templateId), tenantId: (req.tenantObjectId || req.tenantId), isCustom: true });
       res.json({ success: true, message: 'Template deleted' });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -12317,7 +12307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { versionNumber } = req.body;
       const WhatsAppApprovalWorkflow = (await import('./services/whatsapp-approval-workflow')).default;
       const result = await WhatsAppApprovalWorkflow.submitForApproval({
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         templateId,
         versionNumber,
         submittedBy: req.user?.email || 'unknown',
@@ -12473,7 +12463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tenant = await storage.client
         ?.db("fleetpro")
         .collection("tenantWhatsAppProfiles")
-        .findOne({ tenantId: req.tenantId });
+        .findOne({ tenantId: req.tenantObjectId || req.tenantId });
 
       if (!tenant?.isActive) {
         return res.status(400).json({ message: 'WhatsApp not configured for tenant' });
@@ -12504,7 +12494,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Import and trigger
       const BookingWhatsAppIntegration = (await import('./services/booking-whatsapp-integration')).default;
       await BookingWhatsAppIntegration.handleBookingConfirmed({
-        tenantId: req.tenantId,
+        tenantId: (req.tenantObjectId || req.tenantId),
         bookingId: booking._id.toString(),
         eventType: 'BOOKING_CONFIRMED',
         booking,
