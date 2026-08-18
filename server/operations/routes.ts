@@ -7,6 +7,7 @@ import { authenticateUser, requireTenant, type AuthRequest } from '../middleware
 import { requirePermission, PERMISSIONS } from '../middleware/permissions';
 import { Tenant, OperationsAlert, OperationsActivity, Booking } from '../models/index';
 import mongoose from 'mongoose';
+import { getAllTemplates, getTemplateByCategory } from '../templates/booking-templates';
 import { SelfDriveTrip, computeRefund } from '../booking/self-drive/models';
 import { buildLiveVehicles } from './liveVehicles';
 import { sweepTenant } from './reminderEngine';
@@ -377,6 +378,32 @@ export function registerOperationsRoutes(app: Express): void {
     } catch (error: any) {
       console.error('Manual sweep error:', error?.message || error);
       res.status(500).json({ message: 'Failed to run reminder sweep' });
+    }
+  });
+
+  // Pre-filled templates for bookings, customers, drivers, vehicles
+  app.get('/api/templates', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const templates = getAllTemplates();
+      res.json(templates);
+    } catch (error: any) {
+      console.error('Templates error:', error?.message || error);
+      res.status(500).json({ message: 'Failed to load templates' });
+    }
+  });
+
+  // Get specific template by category and type
+  app.get('/api/templates/:category/:type', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { category, type } = req.params;
+      const template = getTemplateByCategory(category, type);
+      if (!template) {
+        return res.status(404).json({ message: 'Template not found' });
+      }
+      res.json(template);
+    } catch (error: any) {
+      console.error('Template lookup error:', error?.message || error);
+      res.status(500).json({ message: 'Failed to load template' });
     }
   });
 }
