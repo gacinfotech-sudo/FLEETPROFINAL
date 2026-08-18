@@ -137,17 +137,59 @@ export default function ReminderSettingsDialog({ open, onOpenChange }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto" data-testid="reminder-settings-dialog">
+      <DialogContent className="sm:max-w-2xl max-h-[95vh] overflow-y-auto" data-testid="reminder-settings-dialog">
         <DialogHeader>
-          <DialogTitle>Booking End Reminders</DialogTitle>
+          <DialogTitle>Booking End Reminders & Staff Notifications</DialogTitle>
         </DialogHeader>
-        <div className="space-y-5">
-          <p className="text-xs text-gray-500">
-            Controlled escalation before each booking's scheduled end. The engine fires the most imminent enabled
-            stage — acknowledged alerts don't repeat, and critical overdue alerts stay visible until resolved.
-          </p>
-          <StageEditor title="Self Drive" mode="self_drive" stages={selfDriveStages} onChange={setSelfDriveStages} />
-          <StageEditor title="With Driver" mode="with_driver" stages={withDriverStages} onChange={setWithDriverStages} />
+        <div className="space-y-4">
+          {/* STAFF PHONE NUMBERS - PRIORITY SECTION */}
+          <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-3">
+            <h3 className="text-sm font-bold text-blue-900 mb-2">📱 STAFF WHATSAPP BROADCAST</h3>
+            <p className="text-xs text-blue-800 mb-3">Add up to 5 staff members who receive ALL booking notifications instantly</p>
+            <div className="space-y-1.5 bg-white rounded p-2">
+              {[0, 1, 2, 3, 4].map((idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-gray-600 w-14">Staff {idx + 1}:</span>
+                  <input
+                    type="text"
+                    value={staffPhones[idx] || ""}
+                    onChange={(e) => {
+                      const newPhones = [...staffPhones];
+                      newPhones[idx] = e.target.value;
+                      setStaffPhones(newPhones.filter((_, i) => i <= 4));
+                    }}
+                    placeholder="91 98765 43210"
+                    className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded"
+                  />
+                  {staffPhones[idx] && (
+                    <button
+                      onClick={() => {
+                        const newPhones = staffPhones.filter((_, i) => i !== idx);
+                        setStaffPhones(newPhones);
+                      }}
+                      className="text-red-600 text-xs font-bold hover:bg-red-100 rounded px-2 py-1"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-green-700 mt-2 bg-green-50 rounded px-2 py-1.5 font-medium">
+              ✓ {staffPhones.filter(p => p.trim().length > 0).length} staff will get WhatsApp for: Reminders • Returns • Payments • Overdue • Turnaround
+            </p>
+          </div>
+
+          {/* REMINDER STAGES */}
+          <div className="border-t pt-3">
+            <p className="text-xs text-gray-500 mb-3">
+              Controlled escalation before each booking's scheduled end. The engine fires the most imminent enabled
+              stage — acknowledged alerts don't repeat, and critical overdue alerts stay visible until resolved.
+            </p>
+            <StageEditor title="Self Drive" mode="self_drive" stages={selfDriveStages} onChange={setSelfDriveStages} />
+            <StageEditor title="With Driver" mode="with_driver" stages={withDriverStages} onChange={setWithDriverStages} />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="grace">Overdue grace (minutes)</Label>
@@ -169,43 +211,6 @@ export default function ReminderSettingsDialog({ open, onOpenChange }: {
               <Label htmlFor="review-url">Google review link (this company's page — used by review requests)</Label>
               <Input id="review-url" type="url" value={reviewUrl} onChange={(e) => setReviewUrl(e.target.value)} placeholder="https://g.page/r/.../review" data-testid="settings-review-url" />
             </div>
-          </div>
-
-          <div className="border-t pt-4">
-            <h4 className="text-sm font-semibold text-gray-900 mb-3">📱 Staff WhatsApp Numbers (Broadcast All Events)</h4>
-            <p className="text-xs text-gray-500 mb-3">Add up to 5 staff members who receive ALL booking notifications (reminders, payment due, returns, overdue, turnaround conflicts)</p>
-            <div className="space-y-2">
-              {[0, 1, 2, 3, 4].map((idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-gray-600 w-12">Staff {idx + 1}:</span>
-                  <Input
-                    value={staffPhones[idx] || ""}
-                    onChange={(e) => {
-                      const newPhones = [...staffPhones];
-                      newPhones[idx] = e.target.value;
-                      setStaffPhones(newPhones.filter((_, i) => i <= 4)); // keep max 5
-                    }}
-                    placeholder="91 98765 43210"
-                    className="text-sm"
-                  />
-                  {staffPhones[idx] && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        const newPhones = staffPhones.filter((_, i) => i !== idx);
-                        setStaffPhones(newPhones);
-                      }}
-                    >
-                      ✕
-                    </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-green-700 mt-2 bg-green-50 rounded px-2 py-1.5">
-              ✓ All {staffPhones.filter(p => p.trim().length > 0).length} staff will receive instant WhatsApp notifications for every booking event
-            </p>
           </div>
 
           <details className="rounded-md border border-gray-200 p-3">
