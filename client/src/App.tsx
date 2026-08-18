@@ -21,6 +21,7 @@ import DriverPortalPage from "./pages/driver-portal";
 import DriverPayrollDashboard from "./pages/driver-payroll-dashboard";
 import VendorSettlementPortal from "./pages/vendor-settlement-portal";
 import VendorInvoices from "./pages/vendor-invoices";
+import TemplatesLibrary from "./pages/templates-library";
 import OperationsCenter from "./pages/operations-center";
 import LiveBookings from "./pages/live-bookings";
 import UpcomingBookings from "./pages/upcoming-bookings";
@@ -415,6 +416,13 @@ function AuthenticatedApp() {
       <Route path="/vendor-invoices">
         <ProtectedRoute allowedRoles={["client", "manager", "admin"]}>
           <VendorInvoices />
+        </ProtectedRoute>
+      </Route>
+
+      {/* Templates Library */}
+      <Route path="/templates">
+        <ProtectedRoute allowedRoles={["client", "manager", "admin"]}>
+          <TemplatesLibrary />
         </ProtectedRoute>
       </Route>
 

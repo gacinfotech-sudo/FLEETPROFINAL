@@ -46,6 +46,9 @@ export const TENANT_MODULES = [
   { id: 'vendor-settlement', label: 'Settlement Portal', iconKey: 'revenue', parentGroup: 'vendors' },
   { id: 'vendor-invoices', label: 'Vendor Invoices', iconKey: 'alert', parentGroup: 'vendors' },
 
+  // Tools & Templates
+  { id: 'templates', label: 'Templates Library', iconKey: 'activity', parentGroup: 'tools' },
+
   // Finance
   { id: 'revenue', label: 'Revenue Report', iconKey: 'revenue', parentGroup: 'finance' },
   { id: 'expenses', label: 'Manage Expenses', iconKey: 'expenses', parentGroup: 'finance' },
@@ -109,6 +112,12 @@ export function getNavigationStructure(role?: string, permissions?: string[]): N
       label: 'Vendors',
       iconKey: 'contact',
       children: ['vendors', 'vendor-settlement', 'vendor-invoices']
+    },
+    {
+      id: 'tools',
+      label: 'Tools',
+      iconKey: 'activity',
+      children: ['templates']
     },
     {
       id: 'finance',
