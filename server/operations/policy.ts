@@ -22,6 +22,7 @@ export interface OperationsPolicy {
   selfDriveStages: ReminderStage[];
   withDriverStages: ReminderStage[];
   whatsappInternalPhone?: string;
+  staffPhones?: string[]; // Array of staff phone numbers for internal notifications
 }
 
 export const DEFAULT_TIMEZONE = 'Asia/Kolkata';
@@ -68,6 +69,15 @@ export function resolvePolicy(tenant: any): OperationsPolicy {
       }))
       .sort((a, b) => b.minutesBefore - a.minutesBefore);
   };
+  const cleanPhones = (phones: any): string[] => {
+    if (!Array.isArray(phones)) return [];
+    return phones
+      .filter((p: any) => typeof p === 'string' && p.trim().length > 0)
+      .map((p: any) => p.trim())
+      .filter((p: string, i: number, arr: string[]) => arr.indexOf(p) === i) // dedupe
+      .slice(0, 5); // max 5 staff numbers
+  };
+
   return {
     timezone: typeof tenant?.timezone === 'string' && tenant.timezone ? tenant.timezone : DEFAULT_TIMEZONE,
     graceMinutes: Number.isFinite(s.graceMinutes) ? Math.max(0, Math.min(24 * 60, s.graceMinutes)) : 15,
@@ -77,6 +87,7 @@ export function resolvePolicy(tenant: any): OperationsPolicy {
     selfDriveStages: normalizeStages(s.selfDriveStages, DEFAULT_SELF_DRIVE_STAGES),
     withDriverStages: normalizeStages(s.withDriverStages, DEFAULT_WITH_DRIVER_STAGES),
     whatsappInternalPhone: s.whatsappInternalPhone || tenant?.phone || undefined,
+    staffPhones: cleanPhones(s.staffPhones),
     overdueRealertMinutes: Number.isFinite(s.overdueRealertMinutes) ? Math.max(5, Math.min(24 * 60, s.overdueRealertMinutes)) : 30,
     googleReviewUrl: typeof s.googleReviewUrl === 'string' && s.googleReviewUrl ? s.googleReviewUrl : undefined,
     reviewTemplate: typeof s.reviewTemplate === 'string' && s.reviewTemplate ? s.reviewTemplate : undefined,

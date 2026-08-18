@@ -194,6 +194,14 @@ export function registerOperationsRoutes(app: Express): void {
         if (operationsSettings.notifyOwner !== undefined) s.notifyOwner = !!operationsSettings.notifyOwner;
         if (operationsSettings.notifyAssignedUser !== undefined) s.notifyAssignedUser = !!operationsSettings.notifyAssignedUser;
         if (typeof operationsSettings.whatsappInternalPhone === 'string') s.whatsappInternalPhone = operationsSettings.whatsappInternalPhone.trim();
+        if (Array.isArray(operationsSettings.staffPhones)) {
+          const cleanedPhones = operationsSettings.staffPhones
+            .filter((p: any) => typeof p === 'string' && p.trim().length > 0)
+            .map((p: any) => p.trim())
+            .filter((p: string, i: number, arr: string[]) => arr.indexOf(p) === i) // dedupe
+            .slice(0, 5); // max 5 staff numbers
+          s.staffPhones = cleanedPhones;
+        }
         if (operationsSettings.overdueRealertMinutes !== undefined) s.overdueRealertMinutes = num(operationsSettings.overdueRealertMinutes, 5, 1440);
         if (typeof operationsSettings.googleReviewUrl === 'string') {
           const url = operationsSettings.googleReviewUrl.trim();
