@@ -549,7 +549,8 @@ export class MongoDBStorage implements IStorage {
     try {
       const db = mongoose.connection.getClient().db('fleetpro');
       const collection = db.collection('users');
-      return await collection.find({ tenantId }).toArray() as unknown as IUser[];
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      return await collection.find({ tenantId: objectId }).toArray() as unknown as IUser[];
     } catch (error) {
       console.error('Error getting users by tenant:', error);
       throw error;
@@ -608,7 +609,8 @@ export class MongoDBStorage implements IStorage {
     try {
       const db = mongoose.connection.getClient().db('fleetpro');
       const collection = db.collection('vehicles');
-      return await collection.find({ tenantId }).sort({ createdAt: -1 }).toArray() as unknown as IVehicle[];
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      return await collection.find({ tenantId: objectId }).sort({ createdAt: -1 }).toArray() as unknown as IVehicle[];
     } catch (error) {
       console.error('Error getting vehicles by tenant:', error);
       throw error;
@@ -720,7 +722,8 @@ export class MongoDBStorage implements IStorage {
     try {
       const db = mongoose.connection.getClient().db('fleetpro');
       const collection = db.collection('drivers');
-      return await collection.find({ tenantId }).sort({ createdAt: -1 }).toArray() as unknown as IDriver[];
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      return await collection.find({ tenantId: objectId }).sort({ createdAt: -1 }).toArray() as unknown as IDriver[];
     } catch (error) {
       console.error('Error getting drivers by tenant:', error);
       throw error;
@@ -988,7 +991,8 @@ export class MongoDBStorage implements IStorage {
     try {
       const db = mongoose.connection.getClient().db('fleetpro');
       const collection = db.collection('bookings');
-      return await collection.find({ tenantId }).sort({ createdAt: -1 }).toArray() as unknown as IBooking[];
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      return await collection.find({ tenantId: objectId }).sort({ createdAt: -1 }).toArray() as unknown as IBooking[];
     } catch (error) {
       console.error('Error getting bookings by tenant:', error);
       throw error;
