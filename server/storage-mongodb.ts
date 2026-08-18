@@ -718,8 +718,11 @@ export class MongoDBStorage implements IStorage {
   // Driver methods
   async createDriver(driverData: any): Promise<IDriver> {
     try {
-      // Keep tenantId as STRING to match getDriversByTenant query
-      // (which queries with string tenantId, not ObjectId)
+      // Convert tenantId to ObjectId to match schema definition
+      // Schema expects: tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true }
+      if (driverData.tenantId && typeof driverData.tenantId === 'string') {
+        driverData.tenantId = new mongoose.Types.ObjectId(driverData.tenantId);
+      }
       const driver = new Driver(driverData);
       return await driver.save();
     } catch (error) {
@@ -732,8 +735,15 @@ export class MongoDBStorage implements IStorage {
     try {
       const db = mongoose.connection.getClient().db('fleetpro');
       const collection = db.collection('drivers');
-      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
-      return await collection.find({ tenantId: objectId }).sort({ createdAt: -1 }).toArray() as unknown as IDriver[];
+      // Convert string tenantId to ObjectId - schema always expects ObjectId
+      const objectId = new mongoose.Types.ObjectId(tenantId);
+      // Query with fallback to also check string tenantId (for backwards compatibility)
+      return await collection.find({
+        $or: [
+          { tenantId: objectId },
+          { tenantId: tenantId } // Fallback for any drivers stored with string tenantId
+        ]
+      }).sort({ createdAt: -1 }).toArray() as unknown as IDriver[];
     } catch (error) {
       console.error('Error getting drivers by tenant:', error);
       throw error;
@@ -1732,11 +1742,17 @@ export class MongoDBStorage implements IStorage {
 
   async checkDriverLimit(tenantId: string): Promise<{ current: number; limit: number; canAdd: boolean; }> {
     try {
-      const objectId = tenantId;
-      const driverCount = await Driver.countDocuments({ tenantId: objectId });
+      const objectId = new mongoose.Types.ObjectId(tenantId);
+      // Query with fallback to also check string tenantId (for backwards compatibility)
+      const driverCount = await Driver.countDocuments({
+        $or: [
+          { tenantId: objectId },
+          { tenantId: tenantId }
+        ]
+      });
       const limits = await this.getTenantLimits(tenantId);
       const limit = limits?.drivers || 3;
-      
+
       return {
         current: driverCount,
         limit: limit,
