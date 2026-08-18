@@ -46,6 +46,21 @@ export default function SuperAdminTenants() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [selectedTenant, setSelectedTenant] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Filter tenants based on search query
+  const filteredTenants = tenants.filter(tenant => {
+    const query = searchQuery.toLowerCase();
+    return (
+      tenant.name?.toLowerCase().includes(query) ||
+      tenant.businessName?.toLowerCase().includes(query) ||
+      tenant.ownerName?.toLowerCase().includes(query) ||
+      tenant.ownerEmail?.toLowerCase().includes(query) ||
+      tenant._id?.includes(query) ||
+      tenant.status?.toLowerCase().includes(query) ||
+      tenant.billing?.subscriptionPlan?.toLowerCase().includes(query)
+    );
+  });
 
   useEffect(() => {
     const userStr = localStorage.getItem('fleetpro_user');
@@ -243,6 +258,34 @@ export default function SuperAdminTenants() {
           </div>
         )}
 
+        {/* SEARCH BAR */}
+        <div className="mb-6">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="🔍 Search by name, email, ID, status, or plan..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full px-4 py-3 pl-12 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-gray-900"
+            />
+            <div className="absolute left-4 top-3.5 text-gray-400">🔍</div>
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-4 top-3.5 text-gray-500 hover:text-gray-700 font-bold text-lg"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          {tenants.length > 0 && (
+            <p className="text-sm text-gray-600 mt-2">
+              Showing {filteredTenants.length} of {tenants.length} tenants
+              {searchQuery && ` (filtered by: "${searchQuery}")`}
+            </p>
+          )}
+        </div>
+
         {tenants.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-gray-500 mb-4">No tenants yet</p>
@@ -253,10 +296,20 @@ export default function SuperAdminTenants() {
               Create first tenant
             </button>
           </div>
+        ) : filteredTenants.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-gray-500 mb-4">No tenants found matching "{searchQuery}"</p>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="text-blue-600 hover:underline font-medium"
+            >
+              Clear search
+            </button>
+          </div>
         ) : viewMode === 'cards' ? (
           // CARD VIEW - READ-ONLY, NO MODIFICATIONS ALLOWED
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {tenants.map((tenant) => (
+            {filteredTenants.map((tenant) => (
               <div
                 key={tenant._id}
                 onClick={() => canManageTenants(currentUser) && setLocation(`/superadmin/tenants/${tenant._id}`)}
@@ -360,7 +413,7 @@ export default function SuperAdminTenants() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {tenants.map((tenant) => (
+                {filteredTenants.map((tenant) => (
                   <tr key={tenant._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{tenant.businessName}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{tenant.ownerName}</td>
