@@ -4450,7 +4450,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(booking);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid booking data", errors: error.errors });
+        console.error('Booking validation errors:', error.issues.map(i => ({ path: i.path.join('.'), code: i.code, message: i.message })));
+        return res.status(400).json({
+          message: "Please check the highlighted fields.",
+          fields: zodErrorToFieldErrors(error),
+        });
       }
       // P0 FIX: surface double-booking conflicts as 409 with structured
       // conflict details so the client can show exactly which booking is
@@ -4681,7 +4685,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(booking);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid booking data", errors: error.errors });
+        console.error('Booking validation errors:', (error as any).issues?.map((i: any) => ({ path: i.path.join('.'), code: i.code, message: i.message })));
+        return res.status(400).json({
+          message: "Please check the highlighted fields.",
+          fields: zodErrorToFieldErrors(error),
+        });
       }
       console.error('Booking update error:', error);
       res.status(500).json({ message: "Failed to update booking" });
