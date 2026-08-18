@@ -1886,6 +1886,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // POST change login ID for tenant owner
+  app.post("/api/admin/tenants/:tenantId/change-login-id", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { tenantId } = req.params;
+      const { newLoginID } = req.body;
+
+      if (!mongoose.isValidObjectId(tenantId)) {
+        return res.status(400).json({ message: "Invalid tenant ID" });
+      }
+
+      if (!newLoginID || typeof newLoginID !== 'string') {
+        return res.status(400).json({ message: "New login ID is required" });
+      }
+
+      const newEmail = newLoginID.trim().toLowerCase();
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(newEmail)) {
+        return res.status(400).json({ message: "Invalid email format" });
+      }
+
+      const Tenant = mongoose.model('Tenant');
+      const User = mongoose.model('User');
+
+      // Check if new login ID already exists
+      const existingUser = await User.findOne({ email: newEmail });
+      if (existingUser) {
+        return res.status(400).json({ message: "This login ID is already in use by another account" });
+      }
+
+      const tenant = await Tenant.findById(tenantId);
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      // Update tenant owner email
+      const updated = await Tenant.findByIdAndUpdate(
+        tenantId,
+        {
+          ownerEmail: newEmail,
+          updatedAt: new Date()
+        },
+        { new: true }
+      );
+
+      // Also update user record if it exists
+      await User.findOneAndUpdate(
+        { email: tenant.ownerEmail },
+        { email: newEmail },
+        { upsert: true }
+      );
+
+      // Audit: Login ID changed
+      console.log(`[AUDIT] Login ID changed for tenant: ${tenantId} from ${tenant.ownerEmail} to ${newEmail} by ${req.userId}`);
+
+      res.json(updated.toObject());
+    } catch (error: any) {
+      console.error('Change login ID error:', error?.message);
+      res.status(500).json({ message: "Failed to change login ID" });
+    }
+  });
+
   // NEW: Auto-login token for Root Admin to access tenant dashboard
   app.post("/api/admin/tenants/:tenantId/auto-login-token", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
     try {

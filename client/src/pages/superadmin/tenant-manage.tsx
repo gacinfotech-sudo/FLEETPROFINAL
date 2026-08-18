@@ -39,6 +39,8 @@ export default function TenantManage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [tempPassword, setTempPassword] = useState('');
+  const [showLoginIDChange, setShowLoginIDChange] = useState(false);
+  const [newLoginID, setNewLoginID] = useState('');
 
   // Fetch tenant data
   useEffect(() => {
@@ -111,6 +113,37 @@ export default function TenantManage() {
       }
     } catch (error) {
       setMessage({ type: 'error', text: 'Error resetting password' });
+      console.error(error);
+    }
+  }
+
+  async function changeLoginID() {
+    if (!tenant || !newLoginID.trim()) {
+      setMessage({ type: 'error', text: 'Please enter a new login ID' });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/tenants/${tenant._id}/change-login-id`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newLoginID: newLoginID.trim() }),
+      });
+
+      if (response.ok) {
+        const updated = await response.json();
+        setTenant(updated);
+        setEditedData(updated);
+        setShowLoginIDChange(false);
+        setNewLoginID('');
+        setMessage({ type: 'success', text: 'Login ID changed successfully!' });
+      } else {
+        const error = await response.json();
+        setMessage({ type: 'error', text: error.message || 'Failed to change login ID' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Error changing login ID' });
       console.error(error);
     }
   }
@@ -236,6 +269,41 @@ export default function TenantManage() {
           </div>
         )}
 
+        {/* Login ID Change Modal */}
+        {showLoginIDChange && (
+          <div className="mb-6 bg-purple-50 border-2 border-purple-300 rounded-lg p-6">
+            <h3 className="text-lg font-bold text-purple-900 mb-4">🔑 Change Login ID</h3>
+            <p className="text-sm text-purple-800 mb-4">Current Login ID: <strong>{tenant?.ownerEmail}</strong></p>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">New Login ID / Email</label>
+              <input
+                type="email"
+                placeholder="Enter new login ID/email"
+                value={newLoginID}
+                onChange={e => setNewLoginID(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={changeLoginID}
+                className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+              >
+                Change Login ID
+              </button>
+              <button
+                onClick={() => {
+                  setShowLoginIDChange(false);
+                  setNewLoginID('');
+                }}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="mb-6 border-b border-gray-300 flex gap-4">
           {['profile', 'owner', 'plan', 'limits', 'subscription', 'status'].map(tab => (
@@ -335,39 +403,76 @@ export default function TenantManage() {
 
           {activeTab === 'owner' && (
             <div className="space-y-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Owner Information</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  placeholder="Owner Name"
-                  value={editedData.ownerName || ''}
-                  onChange={e => updateField('ownerName', e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded"
-                />
-                <input
-                  type="email"
-                  placeholder="Owner Email"
-                  value={editedData.ownerEmail || ''}
-                  onChange={e => updateField('ownerEmail', e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded"
-                />
-                <input
-                  type="text"
-                  placeholder="Owner Mobile"
-                  value={editedData.ownerMobile || ''}
-                  onChange={e => updateField('ownerMobile', e.target.value)}
-                  className="col-span-2 px-3 py-2 border border-gray-300 rounded"
-                />
-                <button
-                  onClick={() => {
-                    setShowPasswordReset(true);
-                    resetPassword();
-                  }}
-                  className="col-span-2 px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 flex items-center justify-center gap-2"
-                >
-                  <Key className="w-4 h-4" /> Reset Password
-                </button>
+              <h2 className="text-xl font-bold text-gray-900 mb-6">Owner Information & Access Control</h2>
+
+              {/* Login ID Section */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                <h3 className="text-sm font-bold text-gray-900 mb-3">Login Credentials</h3>
+                <div className="space-y-2 mb-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Login ID / Email</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={tenant?.ownerEmail || ''}
+                        readOnly
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded bg-white text-gray-900"
+                      />
+                      <button
+                        onClick={() => setShowLoginIDChange(true)}
+                        className="px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 flex items-center gap-1 text-sm"
+                      >
+                        🔑 Change
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
+
+              {/* Owner Details Section */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Owner Name</label>
+                  <input
+                    type="text"
+                    placeholder="Owner Name"
+                    value={editedData.ownerName || ''}
+                    onChange={e => updateField('ownerName', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Primary Email</label>
+                  <input
+                    type="email"
+                    placeholder="Owner Email"
+                    value={editedData.ownerEmail || ''}
+                    onChange={e => updateField('ownerEmail', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number</label>
+                  <input
+                    type="text"
+                    placeholder="Owner Mobile"
+                    value={editedData.ownerMobile || ''}
+                    onChange={e => updateField('ownerMobile', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded"
+                  />
+                </div>
+              </div>
+
+              {/* Password Reset Button */}
+              <button
+                onClick={() => {
+                  setShowPasswordReset(true);
+                  resetPassword();
+                }}
+                className="w-full px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 flex items-center justify-center gap-2 font-medium"
+              >
+                <Key className="w-4 h-4" /> Reset Password (Generate Temporary)
+              </button>
             </div>
           )}
 
