@@ -9842,6 +9842,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== VENDOR INVOICES ==========
+  app.get("/api/vendor-invoices", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
+    try {
+      const tenantObjectId = req.tenantObjectId || (mongoose.Types.ObjectId.isValid(req.tenantId) ? new mongoose.Types.ObjectId(req.tenantId) : req.tenantId);
+
+      const bookings = await Booking.find({
+        $or: [
+          { tenantId: tenantObjectId },
+          { tenantId: req.tenantId }
+        ],
+        fulfilmentType: 'vendor',
+        vendorName: { $exists: true, $ne: '' },
+      })
+        .select('bookingId vendorName vendorContactPhone vendorAgreedRate vendorAdvancePaid pickupDate pickupLocation dropoffLocation status')
+        .sort({ pickupDate: -1 });
+
+      const byVendor = new Map<string, {
+        vendorName: string;
+        vendorContactPhone?: string;
+        totalAgreed: number;
+        totalPaid: number;
+        outstanding: number;
+        bookingCount: number;
+        bookings: any[];
+      }>();
+
+      for (const b of bookings as any[]) {
+        const key = b.vendorName;
+        if (!byVendor.has(key)) {
+          byVendor.set(key, {
+            vendorName: key,
+            vendorContactPhone: b.vendorContactPhone,
+            totalAgreed: 0,
+            totalPaid: 0,
+            outstanding: 0,
+            bookingCount: 0,
+            bookings: []
+          });
+        }
+        const entry = byVendor.get(key)!;
+        const agreed = b.vendorAgreedRate || 0;
+        const paid = b.vendorAdvancePaid || 0;
+        entry.totalAgreed += agreed;
+        entry.totalPaid += paid;
+        entry.outstanding += Math.max(0, agreed - paid);
+        entry.bookingCount += 1;
+        entry.bookings.push({
+          bookingId: b.bookingId,
+          pickupDate: b.pickupDate,
+          pickupLocation: b.pickupLocation,
+          dropoffLocation: b.dropoffLocation,
+          status: b.status,
+          vendorAgreedRate: agreed,
+          vendorAdvancePaid: paid,
+          outstanding: Math.max(0, agreed - paid),
+        });
+      }
+
+      const vendors = Array.from(byVendor.values())
+        .map(v => ({
+          ...v,
+          invoiceNo: `VI-${Date.now()}-${v.vendorName.replace(/\s+/g, '').substring(0, 3).toUpperCase()}`,
+          invoiceDate: new Date().toISOString().split('T')[0],
+          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        }))
+        .sort((a, b) => b.outstanding - a.outstanding);
+
+      res.json({
+        vendors,
+        totalOutstanding: vendors.reduce((sum, v) => sum + v.outstanding, 0),
+        totalBookings: vendors.reduce((sum, v) => sum + v.bookingCount, 0),
+        generatedAt: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error('Vendor invoices error:', error?.message || error);
+      res.status(500).json({ message: "Failed to generate vendor invoices" });
+    }
+  });
+
+  app.get("/api/vendor-invoices/:vendorName", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
+    try {
+      const vendorName = decodeURIComponent(req.params.vendorName);
+      const tenantObjectId = req.tenantObjectId || (mongoose.Types.ObjectId.isValid(req.tenantId) ? new mongoose.Types.ObjectId(req.tenantId) : req.tenantId);
+
+      const bookings = await Booking.find({
+        $or: [
+          { tenantId: tenantObjectId },
+          { tenantId: req.tenantId }
+        ],
+        fulfilmentType: 'vendor',
+        vendorName: vendorName,
+      })
+        .populate('customerId', 'name phone')
+        .sort({ pickupDate: -1 });
+
+      if (!bookings.length) {
+        return res.status(404).json({ message: "No invoices found for this vendor" });
+      }
+
+      const totalAgreed = bookings.reduce((sum, b: any) => sum + (b.vendorAgreedRate || 0), 0);
+      const totalPaid = bookings.reduce((sum, b: any) => sum + (b.vendorAdvancePaid || 0), 0);
+      const outstanding = Math.max(0, totalAgreed - totalPaid);
+
+      const invoiceData = {
+        invoiceNo: `VI-${Date.now()}-${vendorName.replace(/\s+/g, '').substring(0, 3).toUpperCase()}`,
+        invoiceDate: new Date().toISOString().split('T')[0],
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        vendorName,
+        vendorContactPhone: (bookings[0] as any).vendorContactPhone,
+        bookings: bookings.map((b: any) => ({
+          bookingId: b.bookingId,
+          customerName: b.customerId?.name || 'N/A',
+          pickupDate: b.pickupDate,
+          route: `${b.pickupLocation} → ${b.dropoffLocation}`,
+          status: b.status,
+          amount: b.vendorAgreedRate || 0,
+          paid: b.vendorAdvancePaid || 0,
+          outstanding: Math.max(0, (b.vendorAgreedRate || 0) - (b.vendorAdvancePaid || 0)),
+        })),
+        summary: {
+          totalBookings: bookings.length,
+          totalAgreed,
+          totalPaid,
+          outstanding,
+          status: outstanding === 0 ? 'Paid' : 'Outstanding'
+        }
+      };
+
+      res.json(invoiceData);
+    } catch (error: any) {
+      console.error('Vendor invoice detail error:', error?.message || error);
+      res.status(500).json({ message: "Failed to fetch vendor invoice" });
+    }
+  });
+
   // ========== PLATFORM CONTROL PLANE (FRESH SaaS ARCHITECTURE) ==========
   // STEPS 16-25: Subscription management + Billing + Support + Invoicing
   app.use("/api/platform", platformRoutes);
