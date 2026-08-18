@@ -175,18 +175,19 @@ export function registerOperationsRoutes(app: Express): void {
         return res.status(403).json({ message: 'Only the account owner can change reminder settings' });
       }
       const tenantId = mongoose.Types.ObjectId.isValid(req.tenantId!) ? new mongoose.Types.ObjectId(req.tenantId!) : req.tenantId!;
-      const tenant: any = await Tenant.findById(tenantId);
-      if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
 
       const { timezone, operationsSettings } = req.body || {};
+      const updateObj: any = {};
+
       if (timezone !== undefined) {
         if (timezone !== null && timezone !== '') {
           try { new Intl.DateTimeFormat('en-IN', { timeZone: timezone }); } catch {
             return res.status(400).json({ message: `Invalid timezone: ${timezone}` });
           }
         }
-        tenant.timezone = timezone || undefined;
+        updateObj.timezone = timezone || undefined;
       }
+
       if (operationsSettings !== undefined && operationsSettings !== null && typeof operationsSettings === 'object') {
         const s: any = {};
         const num = (v: any, lo: number, hi: number) => Number.isFinite(Number(v)) ? Math.max(lo, Math.min(hi, Number(v))) : undefined;
@@ -234,10 +235,18 @@ export function registerOperationsRoutes(app: Express): void {
         const wd = cleanStages(operationsSettings.withDriverStages);
         if (sd) s.selfDriveStages = sd;
         if (wd) s.withDriverStages = wd;
-        tenant.operationsSettings = { ...(tenant.operationsSettings?.toObject?.() || tenant.operationsSettings || {}), ...s };
+
+        const tenant: any = await Tenant.findById(tenantId);
+        if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
+
+        updateObj.operationsSettings = { ...(tenant.operationsSettings?.toObject?.() || tenant.operationsSettings || {}), ...s };
       }
-      await tenant.save();
-      res.json({ policy: resolvePolicy(tenant.toObject()), timezone: tenant.timezone || null });
+
+      // Use findByIdAndUpdate to avoid full schema validation
+      const updated = await Tenant.findByIdAndUpdate(tenantId, updateObj, { new: true }).lean();
+      if (!updated) return res.status(404).json({ message: 'Tenant not found' });
+
+      res.json({ policy: resolvePolicy(updated), timezone: updated.timezone || null });
     } catch (error: any) {
       console.error('Update operations settings error:', error?.message || error);
       res.status(500).json({ message: 'Failed to update operations settings' });
