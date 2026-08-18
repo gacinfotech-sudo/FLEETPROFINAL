@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit2, LogIn, Eye, DollarSign, Calendar, CheckCircle, AlertCircle, RefreshCw, FileText, CreditCard, Copy, Key } from 'lucide-react';
 import { useLocation } from 'wouter';
 import SuperAdminLayout from '@/components/superadmin-layout';
+import SearchSortBar from '@/components/shared/search-sort-bar';
 
 interface TenantBilling {
   subscriptionPlan: 'starter' | 'professional' | 'enterprise';
@@ -47,20 +48,36 @@ export default function SuperAdminTenants() {
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [selectedTenant, setSelectedTenant] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('recent');
 
   // Filter tenants based on search query
-  const filteredTenants = tenants.filter(tenant => {
-    const query = searchQuery.toLowerCase();
-    return (
-      tenant.name?.toLowerCase().includes(query) ||
-      tenant.businessName?.toLowerCase().includes(query) ||
-      tenant.ownerName?.toLowerCase().includes(query) ||
-      tenant.ownerEmail?.toLowerCase().includes(query) ||
-      tenant._id?.includes(query) ||
-      tenant.status?.toLowerCase().includes(query) ||
-      tenant.billing?.subscriptionPlan?.toLowerCase().includes(query)
-    );
-  });
+  const filteredTenants = tenants
+    .filter(tenant => {
+      const query = searchQuery.toLowerCase();
+      return (
+        tenant.name?.toLowerCase().includes(query) ||
+        tenant.businessName?.toLowerCase().includes(query) ||
+        tenant.ownerName?.toLowerCase().includes(query) ||
+        tenant.ownerEmail?.toLowerCase().includes(query) ||
+        tenant._id?.includes(query) ||
+        tenant.status?.toLowerCase().includes(query) ||
+        tenant.billing?.subscriptionPlan?.toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'recent':
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        case 'oldest':
+          return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+        case 'name-asc':
+          return (a.businessName || a.name || '').localeCompare(b.businessName || b.name || '');
+        case 'name-desc':
+          return (b.businessName || b.name || '').localeCompare(a.businessName || a.name || '');
+        default:
+          return 0;
+      }
+    });
 
   useEffect(() => {
     const userStr = localStorage.getItem('fleetpro_user');
@@ -258,33 +275,22 @@ export default function SuperAdminTenants() {
           </div>
         )}
 
-        {/* SEARCH BAR */}
-        <div className="mb-6">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="🔍 Search by name, email, ID, status, or plan..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-3 pl-12 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-gray-900"
-            />
-            <div className="absolute left-4 top-3.5 text-gray-400">🔍</div>
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-4 top-3.5 text-gray-500 hover:text-gray-700 font-bold text-lg"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-          {tenants.length > 0 && (
-            <p className="text-sm text-gray-600 mt-2">
-              Showing {filteredTenants.length} of {tenants.length} tenants
-              {searchQuery && ` (filtered by: "${searchQuery}")`}
-            </p>
-          )}
-        </div>
+        {/* SEARCH & SORT BAR */}
+        <SearchSortBar
+          searchPlaceholder="🔍 Search by name, email, ID, status, or plan..."
+          searchValue={searchQuery}
+          onSearchChange={setSearchQuery}
+          sortValue={sortBy}
+          onSortChange={setSortBy}
+          resultCount={filteredTenants.length}
+          totalCount={tenants.length}
+          sortOptions={[
+            { value: 'recent', label: 'Most Recent' },
+            { value: 'oldest', label: 'Oldest First' },
+            { value: 'name-asc', label: 'Name A-Z' },
+            { value: 'name-desc', label: 'Name Z-A' },
+          ]}
+        />
 
         {tenants.length === 0 ? (
           <div className="text-center py-12">
