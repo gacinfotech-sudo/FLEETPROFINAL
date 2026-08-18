@@ -27,14 +27,19 @@ export interface OperationsPolicy {
 export const DEFAULT_TIMEZONE = 'Asia/Kolkata';
 
 // Default escalation ladder (spec §11-12): 3h/2h/90m CRM, 60m CRM +
-// internal WhatsApp, 30m CRM. End-time and overdue alerts always fire —
-// they are not stages a tenant can disable, only the grace is tunable.
+// internal WhatsApp, 30m CRM, plus short-notice reminders at 10/7/5/2 min.
+// End-time and overdue alerts always fire — they are not stages a tenant
+// can disable, only the grace is tunable.
 export const DEFAULT_SELF_DRIVE_STAGES: ReminderStage[] = [
   { minutesBefore: 180, enabled: true },
   { minutesBefore: 120, enabled: true },
   { minutesBefore: 90, enabled: true },
   { minutesBefore: 60, enabled: true, whatsappInternal: true },
   { minutesBefore: 30, enabled: true },
+  { minutesBefore: 10, enabled: true },
+  { minutesBefore: 7, enabled: true },
+  { minutesBefore: 5, enabled: true },
+  { minutesBefore: 2, enabled: true },
 ];
 
 export const DEFAULT_WITH_DRIVER_STAGES: ReminderStage[] = [
@@ -42,6 +47,10 @@ export const DEFAULT_WITH_DRIVER_STAGES: ReminderStage[] = [
   { minutesBefore: 120, enabled: true },
   { minutesBefore: 60, enabled: true, whatsappInternal: true },
   { minutesBefore: 30, enabled: true },
+  { minutesBefore: 10, enabled: true },
+  { minutesBefore: 7, enabled: true },
+  { minutesBefore: 5, enabled: true },
+  { minutesBefore: 2, enabled: true },
 ];
 
 export function resolvePolicy(tenant: any): OperationsPolicy {
