@@ -211,7 +211,7 @@ export default function QuickInquiryForm({ onSuccess, onCancel, initialMobile }:
               id="inq-name"
               value={form.customerName}
               onChange={(e) => set("customerName")(e.target.value)}
-              placeholder="Somya Kandil"
+              placeholder="Enter customer name"
             />
           </div>
           <div>
@@ -221,7 +221,7 @@ export default function QuickInquiryForm({ onSuccess, onCancel, initialMobile }:
               value={form.primaryMobile}
               onChange={(e) => handleMobileChange(e.target.value)}
               onBlur={handleMobileBlur}
-              placeholder="8305770046 or +918305770046"
+              placeholder="10-digit Indian mobile number"
               className={mobileError ? "border-red-500" : ""}
             />
             {mobileError && (
@@ -243,8 +243,8 @@ export default function QuickInquiryForm({ onSuccess, onCancel, initialMobile }:
                 <Badge variant="secondary">{lookupResult.customer.customerType || "individual"}</Badge>
               </div>
               <div className="text-sm text-gray-700 space-y-1">
-                <div>{lookupResult.customer.name} — {lookupResult.customer.primaryMobile}</div>
-                <div>Total bookings: {lookupResult.customer.totalBookings ?? 0} · Pending due: ₹{lookupResult.pendingDue ?? 0}</div>
+                <div>Customer found · {lookupResult.customer.totalBookings ?? 0} booking(s)</div>
+                <div>Pending due: ₹{lookupResult.pendingDue ?? 0}</div>
               </div>
               <div className="flex gap-2">
                 <Button type="button" size="sm" onClick={applyExistingCustomer}>Use This Customer</Button>
