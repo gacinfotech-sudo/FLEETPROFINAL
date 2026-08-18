@@ -626,7 +626,10 @@ export class MongoDBStorage implements IStorage {
     try {
       if (!mongoose.Types.ObjectId.isValid(id)) return undefined;
       const query: any = { _id: id };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
       return await Vehicle.findOne(query) || undefined;
     } catch (error) {
       console.error('Error getting vehicle:', error);
@@ -643,7 +646,10 @@ export class MongoDBStorage implements IStorage {
       if (tenantId) delete data.tenantId;
 
       const query: any = { _id: id };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
 
       const result = await collection.findOneAndUpdate(query, { $set: data }, { returnDocument: 'after' });
       return result.value as unknown as IVehicle | undefined;
@@ -659,7 +665,10 @@ export class MongoDBStorage implements IStorage {
       const collection = db.collection('vehicles');
 
       const query: any = { _id: id };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
       await collection.deleteOne(query);
     } catch (error) {
       console.error('Error deleting vehicle:', error);
@@ -735,7 +744,10 @@ export class MongoDBStorage implements IStorage {
     try {
       if (!mongoose.Types.ObjectId.isValid(id)) return undefined;
       const query: any = { _id: id };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
       return await Driver.findOne(query) || undefined;
     } catch (error) {
       console.error('Error getting driver:', error);
@@ -755,7 +767,10 @@ export class MongoDBStorage implements IStorage {
       if (tenantId) delete data.tenantId;
 
       const query: any = { _id: id };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
 
       const result = await collection.findOneAndUpdate(query, { $set: data }, { returnDocument: 'after' });
       return result.value as unknown as IDriver | undefined;
@@ -771,7 +786,10 @@ export class MongoDBStorage implements IStorage {
       const collection = db.collection('drivers');
 
       const query: any = { _id: id };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
       await collection.deleteOne(query);
     } catch (error) {
       console.error('Error deleting driver:', error);
@@ -1004,7 +1022,10 @@ export class MongoDBStorage implements IStorage {
     try {
       if (!mongoose.Types.ObjectId.isValid(id)) return undefined;
       const query: any = { _id: id };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
       return await Booking.findOne(query)
         .populate('vehicleId')
         .populate('driverId')
@@ -1025,7 +1046,10 @@ export class MongoDBStorage implements IStorage {
       if (tenantId) delete data.tenantId;
 
       const query: any = { _id: id };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
 
       const result = await collection.findOneAndUpdate(query, { $set: data }, { returnDocument: 'after' });
       return result.value as unknown as IBooking | undefined;
@@ -1041,7 +1065,10 @@ export class MongoDBStorage implements IStorage {
       const collection = db.collection('bookings');
 
       const query: any = { _id: id };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
       await collection.deleteOne(query);
     } catch (error) {
       console.error('Error deleting booking:', error);
@@ -1412,7 +1439,10 @@ export class MongoDBStorage implements IStorage {
   async deactivateSubUser(userId: string, deactivatedBy: string, tenantId?: string): Promise<void> {
     try {
       const query: any = { userId: userId.toLowerCase(), role: 'manager' };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
       const result = await User.findOneAndUpdate(
         query,
         {
@@ -1436,7 +1466,10 @@ export class MongoDBStorage implements IStorage {
   async updateSubUserPermissions(userId: string, permissions: string[], tenantId?: string): Promise<IUser> {
     try {
       const query: any = { userId: userId.toLowerCase(), role: 'manager' };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
       const result = await User.findOneAndUpdate(
         query,
         { permissions },
@@ -1455,7 +1488,10 @@ export class MongoDBStorage implements IStorage {
   async reactivateSubUser(userId: string, reactivatedBy: string, tenantId?: string): Promise<void> {
     try {
       const query: any = { userId: userId.toLowerCase(), role: 'manager' };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
       const result = await User.findOneAndUpdate(
         query,
         {
@@ -1727,7 +1763,10 @@ export class MongoDBStorage implements IStorage {
     try {
       if (!mongoose.Types.ObjectId.isValid(id)) return undefined;
       const query: any = { _id: id };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
       const expense = await Expense.findOne(query)
         .populate('vehicleId', 'make vehicleModel licensePlate');
       return expense || undefined;
@@ -1746,7 +1785,10 @@ export class MongoDBStorage implements IStorage {
       if (tenantId) delete data.tenantId;
 
       const query: any = { _id: id };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
       const expense = await Expense.findOneAndUpdate(query, data, { new: true })
         .populate('vehicleId', 'make vehicleModel licensePlate');
       return expense || undefined;
@@ -1760,7 +1802,10 @@ export class MongoDBStorage implements IStorage {
     try {
       if (!mongoose.Types.ObjectId.isValid(id)) return;
       const query: any = { _id: id };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
       await Expense.findOneAndDelete(query);
     } catch (error) {
       console.error('Error deleting expense:', error);
@@ -1852,7 +1897,10 @@ export class MongoDBStorage implements IStorage {
     try {
       if (!mongoose.Types.ObjectId.isValid(id)) return null;
       const query: any = { _id: id };
-      if (tenantId) query.tenantId = tenantId;
+      if (tenantId) {
+      const objectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      query.tenantId = objectId;
+    }
       return await CallSession.findOne(query);
     } catch (error) {
       console.error('Error getting call session by id:', error);
