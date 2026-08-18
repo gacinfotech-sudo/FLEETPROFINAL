@@ -29,6 +29,7 @@ interface SettingsResponse {
     selfDriveStages: Stage[];
     withDriverStages: Stage[];
     whatsappInternalPhone?: string;
+    staffPhones?: string[];
   };
 }
 
@@ -88,6 +89,7 @@ export default function ReminderSettingsDialog({ open, onOpenChange }: {
   const [graceMinutes, setGraceMinutes] = useState("15");
   const [turnaround, setTurnaround] = useState("60");
   const [waPhone, setWaPhone] = useState("");
+  const [staffPhones, setStaffPhones] = useState<string[]>([]);
   const [realertMinutes, setRealertMinutes] = useState("30");
   const [reviewUrl, setReviewUrl] = useState("");
   const [sdTemplates, setSdTemplates] = useState<Record<string, string>>({});
@@ -100,6 +102,7 @@ export default function ReminderSettingsDialog({ open, onOpenChange }: {
       setGraceMinutes(String(data.policy.graceMinutes));
       setTurnaround(String(data.policy.turnaroundBufferMinutes));
       setWaPhone(data.policy.whatsappInternalPhone || "");
+      setStaffPhones(data.policy.staffPhones || []);
       setRealertMinutes(String((data.policy as any).overdueRealertMinutes ?? 30));
       setReviewUrl((data.policy as any).googleReviewUrl || "");
       setSdTemplates(((data as any).raw?.sdTemplates as Record<string, string>) || {});
@@ -114,6 +117,7 @@ export default function ReminderSettingsDialog({ open, onOpenChange }: {
           graceMinutes: Number(graceMinutes),
           turnaroundBufferMinutes: Number(turnaround),
           whatsappInternalPhone: waPhone,
+          staffPhones: staffPhones.filter(p => p.trim().length > 0),
           overdueRealertMinutes: Number(realertMinutes),
           googleReviewUrl: reviewUrl.trim(),
           sdTemplates,
@@ -154,7 +158,7 @@ export default function ReminderSettingsDialog({ open, onOpenChange }: {
               <Input id="turnaround" type="number" min="0" value={turnaround} onChange={(e) => setTurnaround(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="wa-phone">Internal WhatsApp number (staff reminders)</Label>
+              <Label htmlFor="wa-phone">Internal WhatsApp number (single staff member)</Label>
               <Input id="wa-phone" value={waPhone} onChange={(e) => setWaPhone(e.target.value)} placeholder="98xxxxxxxx" />
             </div>
             <div className="space-y-1.5">
@@ -165,6 +169,43 @@ export default function ReminderSettingsDialog({ open, onOpenChange }: {
               <Label htmlFor="review-url">Google review link (this company's page — used by review requests)</Label>
               <Input id="review-url" type="url" value={reviewUrl} onChange={(e) => setReviewUrl(e.target.value)} placeholder="https://g.page/r/.../review" data-testid="settings-review-url" />
             </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <h4 className="text-sm font-semibold text-gray-900 mb-3">📱 Staff WhatsApp Numbers (Broadcast All Events)</h4>
+            <p className="text-xs text-gray-500 mb-3">Add up to 5 staff members who receive ALL booking notifications (reminders, payment due, returns, overdue, turnaround conflicts)</p>
+            <div className="space-y-2">
+              {[0, 1, 2, 3, 4].map((idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-gray-600 w-12">Staff {idx + 1}:</span>
+                  <Input
+                    value={staffPhones[idx] || ""}
+                    onChange={(e) => {
+                      const newPhones = [...staffPhones];
+                      newPhones[idx] = e.target.value;
+                      setStaffPhones(newPhones.filter((_, i) => i <= 4)); // keep max 5
+                    }}
+                    placeholder="91 98765 43210"
+                    className="text-sm"
+                  />
+                  {staffPhones[idx] && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        const newPhones = staffPhones.filter((_, i) => i !== idx);
+                        setStaffPhones(newPhones);
+                      }}
+                    >
+                      ✕
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-green-700 mt-2 bg-green-50 rounded px-2 py-1.5">
+              ✓ All {staffPhones.filter(p => p.trim().length > 0).length} staff will receive instant WhatsApp notifications for every booking event
+            </p>
           </div>
 
           <details className="rounded-md border border-gray-200 p-3">
