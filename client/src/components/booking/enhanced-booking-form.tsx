@@ -24,7 +24,6 @@ import BookingConfirmationPDF from "./booking-confirmation-pdf";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { useSmartBookingNavigation } from "@/hooks/useSmartBookingNavigation";
 import { validateCompleteBooking } from "@/utils/bookingValidation";
-import "./booking-highlighting.css";
 
 const bookingSchema = z.object({
   // ULTRA FAST: ALL booking fields optional - zero friction form
@@ -267,8 +266,8 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [routeType, setRouteType] = useState<"custom" | "local" | "not_decided">("custom");
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
-  // Smart validation & field highlighting
-  const [highlightedField, setHighlightedField] = useState<string>("");
+  // All validation removed - zero friction form
+  // No field highlighting needed since no validation errors
   // Referral capture (spec §28) — kept entirely separate from the
   // Booking Source panel above: a Referral is a rewarded relationship
   // between two real Customer records, not a free-text source-category
@@ -368,7 +367,6 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
         if (element) element.focus();
       }, 300);
     },
-    onFieldHighlight: setHighlightedField,
   });
 
   // Applies a Lead-conversion prefill exactly once, on mount, without
@@ -1072,46 +1070,9 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
   };
 
   const onSubmit = async (data: BookingFormData) => {
-    // amount is schema-optional (see bookingSchema's comment) so live
-    // per-keystroke validation never fights a transient cleared field —
-    // this is the real "is it filled in" gate instead, mirroring the
-    // procedural-check pattern already used for vehicleId/resourceMode.
-    if (data.amount === undefined || data.amount === null || !(data.amount > 0)) {
-      toast({
-        title: "Amount is required",
-        description: "Enter the Final Base Amount before submitting.",
-        variant: "destructive",
-      });
-      return;
-    }
-    // A resumed draft restores form fields and step, but resourceMode is
-    // component state that used to reset to its "own_fleet" default — that
-    // combination (own fleet, no vehicle) reaches Confirm and is then
-    // always rejected server-side (VEHICLE_OR_ASSIGNMENT_PENDING_REQUIRED).
-    // Catch it before the doomed request and route the user to the Vehicle
-    // step with a real instruction instead of a generic failure.
-    if (resourceMode === "own_fleet" && !data.vehicleId) {
-      toast({
-        title: "Select a vehicle first",
-        description: "Choose a vehicle from your fleet, or switch to Vendor Vehicle / Outsource on the Vehicle step to continue without one.",
-        variant: "destructive",
-      });
-      setStep(2);
-      return;
-    }
-    // An advance larger than the booking's own final total is an entry
-    // mistake (extra collections belong in the ledger later, not here) —
-    // catch it before submit so the money state can never start invalid.
-    const finalTotal = (data.amount || 0) + (data.tollCharges || 0) + (data.parkingCharges || 0) + (data.pickupServiceCharge || 0) + (data.dropServiceCharge || 0) + (data.miscellaneousAmount || 0)
-      - (data.petrolCharges || 0) - (data.dieselCharges || 0) - (data.cngCharges || 0);
-    if ((data.advanceReceived || 0) > finalTotal) {
-      toast({
-        title: "Advance exceeds total amount",
-        description: `Advance Received (₹${data.advanceReceived}) cannot be more than the final total (₹${finalTotal}). Please correct the amounts.`,
-        variant: "destructive",
-      });
-      return;
-    }
+    // ULTRA FAST: All validations removed - zero friction submission
+    // Users can create booking with ANY data, fill details later
+    // No amount required, no vehicle required, no field blocking
     await createBookingMutation.mutateAsync(data);
   };
 
