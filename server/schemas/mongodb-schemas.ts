@@ -198,7 +198,7 @@ export const mongoBookingSchema = z.object({
   tentativeStartDate: z.string().optional(),
   tentativeEndDate: z.string().optional(),
   followUpAt: z.string().optional(),
-  bookingType: z.enum(['self_drive', 'with_driver', 'one_way', 'round_trip', 'local', 'airport']),
+  bookingType: z.enum(['self_drive', 'with_driver', 'one_way', 'round_trip', 'local', 'airport']).optional(),
   // Trip shape (TASK-BOOKING-DOMAIN-02) — kept distinct from bookingType
   // above. Was declared on the client schema and submitted on every
   // create request but silently stripped here (this exact gap is audit
@@ -209,7 +209,7 @@ export const mongoBookingSchema = z.object({
   status: z.enum(['enquiry', 'quotation_sent', 'tentative', 'on_hold', 'confirmed', 'vehicle_assigned',
     'driver_assigned', 'ready_for_dispatch', 'trip_started', 'ongoing', 'extended', 'return_pending',
     'completed', 'payment_pending', 'closed', 'cancelled', 'no_show']).default('confirmed'),
-  totalAmount: z.number().positive(),
+  totalAmount: z.number().positive().optional(),
   // Accepted here only for the booking-creation convenience path (create
   // + record the first advance in one step) — server/routes.ts strips
   // this from every EDIT so the ledger stays the only way to change it

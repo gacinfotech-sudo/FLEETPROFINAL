@@ -4107,6 +4107,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Default values for optional fields
         tollCharges: tollCharges,
         parkingCharges: parkingCharges,
+        // If no pickupDate provided, set travelDateStatus to 'not_decided' to skip date requirements
+        travelDateStatus: req.body.pickupDate ? (req.body.travelDateStatus || 'confirmed') : 'not_decided',
         // Add audit logging for who created the booking
         createdBy: {
           userId: req.userId!,

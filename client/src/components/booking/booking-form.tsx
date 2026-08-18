@@ -19,20 +19,20 @@ import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhan
 import BookingAssistant from "./booking-assistant";
 
 const bookingSchema = z.object({
-  customerName: z.string().min(1, "Customer name is required"),
-  customerPhone: z.string().min(10, "Valid phone number is required"),
+  customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
   customerEmail: z.string().email("Invalid email").optional().or(z.literal("")),
-  vehicleId: z.number().min(1, "Please select a vehicle"),
+  vehicleId: z.number().optional(),
   driverId: z.number().optional(),
-  bookingType: z.enum(["self_drive", "with_driver"]),
-  tripType: z.enum(["one_way", "round_trip", "local", "airport"]),
-  pickupLocation: z.string().min(1, "Pickup location is required"),
-  dropoffLocation: z.string().min(1, "Drop-off location is required"),
-  pickupDate: z.string().min(1, "Pickup date is required"),
-  pickupTime: z.string().min(1, "Pickup time is required"),
-  returnDate: z.string().min(1, "Return date is required"),
-  returnTime: z.string().min(1, "Return time is required"),
-  amount: z.number().min(1, "Amount is required"),
+  bookingType: z.enum(["self_drive", "with_driver"]).optional(),
+  tripType: z.enum(["one_way", "round_trip", "local", "airport"]).optional(),
+  pickupLocation: z.string().optional(),
+  dropoffLocation: z.string().optional(),
+  pickupDate: z.string().optional(),
+  pickupTime: z.string().optional(),
+  returnDate: z.string().optional(),
+  returnTime: z.string().optional(),
+  amount: z.number().optional(),
   notes: z.string().optional(),
 });
 
@@ -124,12 +124,7 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
   };
 
   const handleDateSelection = () => {
-    const pickup = form.getValues("pickupDate");
-    const returnDate = form.getValues("returnDate");
-    
-    if (pickup && returnDate) {
-      setStep(2);
-    }
+    setStep(2);
   };
 
   const handleVehicleSelection = (vehicleId: number) => {
@@ -274,7 +269,6 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                   <Button
                     size="sm"
                     onClick={handleDateSelection}
-                    disabled={!watchedValues.pickupDate || !watchedValues.returnDate || !watchedValues.pickupLocation || !watchedValues.dropoffLocation}
                     className="text-xs md:text-sm"
                   >
                     Next <ArrowRight className="w-4 h-4 ml-1" />
