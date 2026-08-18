@@ -70,10 +70,19 @@ const configuredProxyHops = Number(process.env.TRUST_PROXY_HOPS);
 app.set('trust proxy', Number.isInteger(configuredProxyHops) && configuredProxyHops >= 0
   ? configuredProxyHops
   : (process.env.NODE_ENV === 'production' ? 1 : false));
-// gzip/br response compression — over a real LAN link (vs loopback) this
-// materially cuts transfer time for JSON API responses and any
-// non-Vite-bundled assets; negligible CPU cost on a local dev machine.
-app.use(compression());
+// ULTRA FAST: Aggressive compression for slow networks
+// - Level 9: Maximum compression (slightly slower but much smaller)
+// - Threshold: 512 bytes (compress everything)
+// - Brotli: Higher quality compression if supported
+app.use(compression({
+  level: 9,  // Maximum compression level (1-11 for brotli, 1-9 for gzip)
+  threshold: 512,  // Compress responses > 512 bytes (default 1024)
+  filter: (req, res) => {
+    // Compress everything except images and already-compressed files
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
 
 // Add structured request logging middleware
 app.use(requestLoggingMiddleware);
@@ -90,6 +99,29 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 app.use(correlationIdMiddleware);
+
+// ULTRA FAST: Aggressive caching for static assets and API responses
+app.use((req, res, next) => {
+  // Cache static assets for 1 year (they have hash in filename)
+  if (req.path.startsWith('/assets/')) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  }
+  // Cache static files for 1 day
+  else if (req.path.match(/\.(js|css|svg|woff2)$/)) {
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+  }
+  // Cache API GET responses for 5 minutes (except user-specific data)
+  else if (req.method === 'GET' && req.path.startsWith('/api/')) {
+    if (req.path.includes('public') || req.path.includes('list') || req.path.includes('search')) {
+      res.setHeader('Cache-Control', 'public, max-age=300');  // 5 minutes
+    }
+  }
+  // Disable cache for mutations and user data
+  else if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

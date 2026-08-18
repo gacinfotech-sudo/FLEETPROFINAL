@@ -34,6 +34,35 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // ULTRA FAST OPTIMIZATIONS FOR SLOW NETWORKS
+    minify: "esbuild",
+    target: 'es2020',
+    // Aggressive code splitting for faster initial load
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Split large libraries
+          'react-vendor': ['react', 'react-dom'],
+          'query': ['@tanstack/react-query'],
+          'form': ['react-hook-form', '@hookform/resolvers', 'zod'],
+          'ui': ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-popover'],
+          'charts': ['recharts'],
+          'pdf': ['html2pdf.js', 'jspdf'],
+        },
+        // Optimize chunk sizes
+        chunkFileNames: 'assets/[name]-[hash:8].js',
+        entryFileNames: 'assets/[name]-[hash:8].js',
+        assetFileNames: 'assets/[name]-[hash:8][extname]'
+      }
+    },
+    // Smaller CSS files
+    cssCodeSplit: true,
+    // Source maps only in dev
+    sourcemap: process.env.NODE_ENV === 'development',
+    // Increase chunk size warning limit (we're optimizing hard)
+    chunkSizeWarningLimit: 600,
+    // Rollup optimizations
+    commonjsOptions: { transformMixedEsModules: true }
   },
   server: {
     fs: {
