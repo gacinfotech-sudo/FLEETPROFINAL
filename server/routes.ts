@@ -4217,9 +4217,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         if (bookingData.driverId) {
-          const driverConflicts = await checkDriverAvailability(req.tenantId!, bookingData.driverId, dayStart, dayEnd, undefined);
-          if (driverConflicts && driverConflicts.conflicts && driverConflicts.conflicts.length > 0) {
-            conflicts.driver = driverConflicts.conflicts;
+          const driverAvail = await checkDriverAvailability(req.tenantId!, bookingData.driverId, dayStart, dayEnd, undefined);
+          if (!driverAvail.available) {
+            const allConflicts = [...(driverAvail.bookingConflicts || []), ...(driverAvail.leaveConflicts || [])];
+            if (allConflicts.length > 0) {
+              conflicts.driver = allConflicts;
+            }
           }
         }
 
