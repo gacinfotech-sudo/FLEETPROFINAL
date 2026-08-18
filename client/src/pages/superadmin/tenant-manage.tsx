@@ -72,6 +72,8 @@ export default function TenantManage() {
     if (!tenant) return;
     try {
       setSaving(true);
+      console.log('Saving tenant data:', editedData);
+
       const response = await fetch(`/api/admin/tenants/${tenant._id}`, {
         method: 'PUT',
         credentials: 'include',
@@ -79,17 +81,22 @@ export default function TenantManage() {
         body: JSON.stringify(editedData),
       });
 
+      console.log('Save response status:', response.status);
+
       if (response.ok) {
         const updated = await response.json();
+        console.log('Updated tenant data:', updated);
         setTenant(updated);
-        setMessage({ type: 'success', text: 'Tenant updated successfully' });
+        setEditedData(updated);
+        setMessage({ type: 'success', text: 'Tenant updated successfully ✅' });
       } else {
         const error = await response.json();
-        setMessage({ type: 'error', text: error.message || 'Failed to save' });
+        console.error('Save error:', error);
+        setMessage({ type: 'error', text: `Failed: ${error.message || 'Unknown error'}` });
       }
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Error saving tenant' });
-      console.error(error);
+    } catch (error: any) {
+      console.error('Save exception:', error?.message);
+      setMessage({ type: 'error', text: `Error: ${error?.message || 'Network error'}` });
     } finally {
       setSaving(false);
     }
@@ -405,27 +412,35 @@ export default function TenantManage() {
             <div className="space-y-4">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Owner Information & Access Control</h2>
 
-              {/* Login ID Section */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-                <h3 className="text-sm font-bold text-gray-900 mb-3">Login Credentials</h3>
-                <div className="space-y-2 mb-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Login ID / Email</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={tenant?.ownerEmail || ''}
-                        readOnly
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded bg-white text-gray-900"
-                      />
-                      <button
-                        onClick={() => setShowLoginIDChange(true)}
-                        className="px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 flex items-center gap-1 text-sm"
-                      >
-                        🔑 Change
-                      </button>
-                    </div>
-                  </div>
+              {/* Simple Login ID Display */}
+              <div className="bg-blue-50 border-2 border-blue-500 rounded-lg p-4 mb-6">
+                <div className="mb-3">
+                  <label className="block text-sm font-bold text-gray-800">🔑 Login ID (Username)</label>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={tenant?.ownerEmail || 'Not Set'}
+                    className="flex-1 px-4 py-3 bg-white border-2 border-blue-400 rounded font-mono text-base font-bold text-gray-900"
+                  />
+                  {tenant?.ownerEmail && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(tenant.ownerEmail);
+                        setMessage({ type: 'success', text: 'Login ID copied to clipboard!' });
+                      }}
+                      className="px-4 py-3 bg-blue-600 text-white rounded font-bold hover:bg-blue-700"
+                    >
+                      Copy
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowLoginIDChange(true)}
+                    className="px-4 py-3 bg-purple-600 text-white rounded font-bold hover:bg-purple-700"
+                  >
+                    Change
+                  </button>
                 </div>
               </div>
 
@@ -463,16 +478,65 @@ export default function TenantManage() {
                 </div>
               </div>
 
-              {/* Password Reset Button */}
-              <button
-                onClick={() => {
-                  setShowPasswordReset(true);
-                  resetPassword();
-                }}
-                className="w-full px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 flex items-center justify-center gap-2 font-medium"
-              >
-                <Key className="w-4 h-4" /> Reset Password (Generate Temporary)
-              </button>
+              {/* Password Reset Section - Simple */}
+              <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-4">
+                <h3 className="text-sm font-bold text-orange-900 mb-3">
+                  🔐 Reset Tenant Password
+                </h3>
+                <p className="text-xs text-orange-800 mb-4">Send a temporary password to tenant owner. They'll set a new one on first login.</p>
+                <button
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`/api/admin/tenants/${tenant._id}/reset-password`, {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                      });
+                      if (response.ok) {
+                        const data = await response.json();
+                        setTempPassword(data.tempPassword);
+                      } else {
+                        setMessage({ type: 'error', text: 'Failed to generate password' });
+                      }
+                    } catch (err) {
+                      setMessage({ type: 'error', text: 'Error: ' + err });
+                    }
+                  }}
+                  className="w-full px-4 py-3 bg-orange-600 text-white rounded hover:bg-orange-700 font-bold flex items-center justify-center gap-2"
+                >
+                  <Key className="w-4 h-4" /> Generate Password
+                </button>
+              </div>
+
+              {/* Show Password When Generated */}
+              {tempPassword && (
+                <div className="bg-red-100 border-2 border-red-500 rounded-lg p-4 mt-4">
+                  <p className="text-sm font-bold text-red-900 mb-3">⚠️ TEMPORARY PASSWORD - Copy NOW!</p>
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      readOnly
+                      value={tempPassword}
+                      className="flex-1 px-4 py-3 bg-white border-2 border-red-400 rounded font-mono font-bold text-red-900"
+                    />
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(tempPassword);
+                        setMessage({ type: 'success', text: 'Password copied to clipboard!' });
+                      }}
+                      className="px-4 py-3 bg-red-600 text-white rounded font-bold hover:bg-red-700"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setTempPassword('')}
+                    className="w-full px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                  >
+                    Hide Password
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

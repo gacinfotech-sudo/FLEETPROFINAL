@@ -9,6 +9,22 @@ import { RECEIPT_TYPES } from "../services/paymentLedger";
 import { buildLiveOperations } from "../services/liveOperations";
 import { buildPaymentDues } from "../services/paymentDues";
 
+// Simple in-memory cache: tenantId -> { data, timestamp }
+const dashboardCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 10000; // 10 seconds
+
+function getCachedData(tenantId: string) {
+  const cached = dashboardCache.get(tenantId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedData(tenantId: string, data: any) {
+  dashboardCache.set(tenantId, { data, timestamp: Date.now() });
+}
+
 // Booking.status → the four operational groups the Dashboard's Booking
 // Activity chart shows. Grouping mirrors the canonical enum in
 // server/models/index.ts — every enum value maps to exactly one group so
@@ -57,8 +73,18 @@ export function registerDashboardOverviewRoute(app: Express) {
   app.get("/api/dashboard/overview", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const tenantId = req.tenantId!;
-      const tenantObjectId = new mongoose.Types.ObjectId(tenantId);
       const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;
+
+      // Check cache
+      const cacheKey = `${tenantId}:${days}`;
+      const cached = getCachedData(cacheKey);
+      if (cached) {
+        res.set('X-Cache', 'HIT');
+        return res.json(cached);
+      }
+      res.set('X-Cache', 'MISS');
+
+      const tenantObjectId = new mongoose.Types.ObjectId(tenantId);
 
       const periodStart = new Date();
       periodStart.setHours(0, 0, 0, 0);
@@ -99,8 +125,8 @@ export function registerDashboardOverviewRoute(app: Express) {
         Booking.find({
           tenantId,
           status: "completed",
-          createdAt: { $gte: periodStart, $lte: now },
-        }).select("totalAmount createdAt").lean(),
+          updatedAt: { $gte: periodStart, $lte: now },
+        }).select("totalAmount updatedAt createdAt").lean(),
         PaymentTransaction.find({
           tenantId,
           status: "completed",
@@ -112,9 +138,11 @@ export function registerDashboardOverviewRoute(app: Express) {
           .limit(4)
           .select("name primaryMobile totalBookings lastBookingDate status")
           .lean(),
-        // Full booking list is what the existing live-ops/payment-dues
-        // services take as input (same as /api/operations/* endpoints).
-        storage.getBookingsByTenant(tenantId),
+        // Optimized: Only fetch active/pending bookings needed for attention items
+        Booking.find({
+          tenantId,
+          status: { $in: ACTIVE_STATUSES.concat(['payment_pending']) },
+        }).select("bookingId status pickupDate dropDate totalAmount paymentStatus createdAt updatedAt").lean(),
         GpsConnection.find({ tenantId }).select("status enabled").lean(),
         GpsDevice.aggregate([
           { $match: { tenantId: tenantObjectId, status: { $ne: "removed" } } },
@@ -144,7 +172,7 @@ export function registerDashboardOverviewRoute(app: Express) {
         trendByDay.set(key, { date: key, revenue: 0, collections: 0 });
       }
       for (const b of completedInPeriod) {
-        const key = localDayKey(new Date(b.createdAt as any));
+        const key = localDayKey(new Date((b as any).updatedAt as any));
         const bucket = trendByDay.get(key);
         if (bucket) bucket.revenue += (b as any).totalAmount || 0;
       }
@@ -178,7 +206,7 @@ export function registerDashboardOverviewRoute(app: Express) {
       const gpsConfigured = gpsConnections.some((c: any) => c.enabled || c.status === "connected");
       const gpsDeviceCounts = countByStatus(gpsDeviceRows as any);
 
-      res.json({
+      const responseData = {
         periodDays: days,
         kpis: {
           revenue: {
@@ -218,7 +246,11 @@ export function registerDashboardOverviewRoute(app: Express) {
           offline: (gpsDeviceCounts["offline"] || 0) + (gpsDeviceCounts["faulty"] || 0),
           idle: (gpsDeviceCounts["assigned"] || 0) + (gpsDeviceCounts["unassigned"] || 0) + (gpsDeviceCounts["inactive"] || 0),
         },
-      });
+      };
+
+      // Cache for 10 seconds
+      setCachedData(cacheKey, responseData);
+      res.json(responseData);
     } catch (error) {
       console.error("Dashboard overview error:", error);
       res.status(500).json({ message: "Failed to load dashboard overview" });

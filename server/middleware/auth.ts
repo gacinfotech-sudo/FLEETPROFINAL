@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { storage } from "../storage-mongodb";
 import { isPlatformRole } from "../root/types";
+import mongoose from "mongoose";
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -64,7 +65,7 @@ export const authenticateUser = async (req: AuthRequest, res: Response, next: Ne
       // Store as string for logs/responses, but also provide ObjectId version
       req.tenantId = tenantId.toString?.() || tenantId.toString();
       req.tenantObjectId = typeof tenantId === 'string'
-        ? new (require('mongoose')).Types.ObjectId(tenantId)
+        ? new mongoose.Types.ObjectId(tenantId)
         : tenantId;
     }
 

@@ -44,7 +44,7 @@ export const mongoUserSchema = z.object({
 
 // MongoDB Vehicle Schema
 export const mongoVehicleSchema = z.object({
-  tenantId: z.string(),
+  tenantId: z.union([z.string(), z.any()]).transform(val => typeof val === 'object' && val?._id ? val._id.toString() : String(val)),
   // ULTRA FAST: ALL vehicle fields optional - no blocking validation
   // Users can add vehicle with minimum info, fill details later
   make: z.string().optional().or(z.undefined()),
@@ -81,7 +81,7 @@ export const mongoVehicleSchema = z.object({
 
 // MongoDB Driver Schema
 export const mongoDriverSchema = z.object({
-  tenantId: z.string(),
+  tenantId: z.union([z.string(), z.any()]).transform(val => typeof val === 'object' && val?._id ? val._id.toString() : String(val)),
   // ULTRA FAST: ALL fields optional - no blocking validation
   // Users can add driver with minimum info, fill details later
   name: optionalString(z.string().min(1, 'Name is required')),

@@ -558,19 +558,36 @@ const TenantSchema = new Schema<ITenant>({
   email: { type: String },
   phone: { type: String },
   address: { type: String },
+  city: { type: String },
+  state: { type: String },
+  pin: { type: String },
+  gstin: { type: String },
+  pan: { type: String },
   isActive: { type: Boolean, default: true },
   maxManagers: { type: Number, default: 5 }, // Kept for backward compatibility
-  subscriptionPlan: { 
-    type: String, 
-    enum: ['starter', 'pro', 'custom'], 
-    default: 'starter' 
+  subscriptionPlan: {
+    type: String,
+    enum: ['starter', 'pro', 'professional', 'enterprise', 'custom'],
+    default: 'starter'
   },
+  // Resource limits (top-level for easy access)
+  vehicleLimit: { type: Number, default: 10 },
+  userLimit: { type: Number, default: 5 },
+  driverLimit: { type: Number, default: 20 },
+  branchLimit: { type: Number, default: 1 },
+  // Legacy nested limits (for backward compatibility)
   limits: {
     vehicles: { type: Number, default: 6 }, // Starter plan default
     drivers: { type: Number, default: 3 },  // Starter plan default
     managers: { type: Number, default: 1 }  // Starter plan default
   },
+  // Owner/contact information
+  ownerName: { type: String },
+  ownerEmail: { type: String },
+  ownerMobile: { type: String },
+  status: { type: String, enum: ['active', 'inactive', 'suspended'], default: 'active' },
   createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
   // TASK-ROOT-DASHBOARD-02 (Root Control Plane) — additive/optional, no
   // migration required. See ITenant's doc comment above.
   tenantCode: { type: String, unique: true, sparse: true },

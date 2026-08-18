@@ -69,7 +69,7 @@ class CanonicalAuthService {
       query = { userId: identifier.value };
     }
 
-    const matches = await User.find(query);
+    const matches = await User.find(query).select('+password');
 
     if (matches.length === 0) {
       return null;  // User doesn't exist (expected for failed login)
@@ -159,23 +159,31 @@ class CanonicalAuthService {
     password: string
   ): Promise<AuthenticatedIdentity> {
     try {
+      console.log('[CANONICAL AUTH] Starting auth for:', identifier);
+
       // STEP 1: Normalize identifier
       const normalized = this.normalizeIdentifier(identifier);
+      console.log('[CANONICAL AUTH] Normalized to:', normalized);
 
       // STEP 2: Find account (rejects collisions)
       const user = await this.findCanonicalAccount(normalized);
       if (!user) {
+        console.log('[CANONICAL AUTH] User not found');
         throw new Error('INVALID_CREDENTIALS');
       }
+      console.log('[CANONICAL AUTH] User found:', { userId: user.userId, email: user.email });
 
       // STEP 3: Determine account type
       const accountType = this.determineAccountType(user);
+      console.log('[CANONICAL AUTH] Account type:', accountType);
 
       // STEP 4: Validate account status
       this.validateAccountStatus(user);
+      console.log('[CANONICAL AUTH] Account status valid');
 
       // STEP 5: Verify password
       const passwordValid = await this.verifyPassword(password, user);
+      console.log('[CANONICAL AUTH] Password valid:', passwordValid);
       if (!passwordValid) {
         throw new Error('INVALID_CREDENTIALS');
       }

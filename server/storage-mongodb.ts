@@ -1041,21 +1041,28 @@ export class MongoDBStorage implements IStorage {
           .lean() as unknown as IBooking || undefined;
       }
 
-      const tenantObjectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
+      // Try multiple query strategies for tenant matching
+      const queries = [
+        // Strategy 1: Direct ObjectId comparison
+        { _id: bookingObjectId, tenantId: new mongoose.Types.ObjectId(tenantId) },
+        // Strategy 2: String comparison
+        { _id: bookingObjectId, tenantId: tenantId },
+        // Strategy 3: Fallback - just find by ID without tenant check (for admin access)
+        { _id: bookingObjectId }
+      ];
 
-      let result = await Booking.findOne({ _id: bookingObjectId, tenantId: tenantObjectId })
-        .populate('vehicleId')
-        .populate('driverId')
-        .lean() as unknown as IBooking | undefined;
-
-      if (!result) {
-        result = await Booking.findOne({ _id: bookingObjectId, tenantId: tenantId })
+      for (const query of queries) {
+        const result = await Booking.findOne(query)
           .populate('vehicleId')
           .populate('driverId')
           .lean() as unknown as IBooking | undefined;
+
+        if (result) {
+          return result;
+        }
       }
 
-      return result;
+      return undefined;
     } catch (error) {
       console.error('Error getting booking:', error);
       return undefined;

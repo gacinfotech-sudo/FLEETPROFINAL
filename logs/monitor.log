@@ -4390,3 +4390,399 @@ Tue Aug 18 19:45:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
 Tue Aug 18 19:45:00 IST 2026: Database backups:      125
 Tue Aug 18 19:45:00 IST 2026: Disk usage: 38%
 Tue Aug 18 19:45:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 19:50:01 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 19:50:01 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 19:50:01 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 19:50:01 IST 2026: Database backups:      125
+Tue Aug 18 19:50:01 IST 2026: Disk usage: 38%
+Tue Aug 18 19:50:01 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 19:55:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 19:55:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 19:55:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 19:55:00 IST 2026: Database backups:      125
+Tue Aug 18 19:55:00 IST 2026: Disk usage: 38%
+Tue Aug 18 19:55:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 20:00:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 20:00:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 20:00:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 20:00:00 IST 2026: Database backups:      125
+Tue Aug 18 20:00:00 IST 2026: Disk usage: 38%
+Tue Aug 18 20:00:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 20:05:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 20:05:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 20:05:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 20:05:00 IST 2026: Database backups:      125
+Tue Aug 18 20:05:00 IST 2026: Disk usage: 38%
+Tue Aug 18 20:05:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 20:10:01 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 20:10:01 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 20:10:01 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 20:10:01 IST 2026: Database backups:      125
+Tue Aug 18 20:10:01 IST 2026: Disk usage: 38%
+Tue Aug 18 20:10:01 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 20:15:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 20:15:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 20:15:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 20:15:00 IST 2026: Database backups:      125
+Tue Aug 18 20:15:00 IST 2026: Disk usage: 38%
+Tue Aug 18 20:15:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 20:20:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 20:20:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 20:20:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 20:20:00 IST 2026: Database backups:      125
+Tue Aug 18 20:20:00 IST 2026: Disk usage: 38%
+Tue Aug 18 20:20:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 20:25:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 20:25:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 20:25:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 20:25:00 IST 2026: Database backups:      125
+Tue Aug 18 20:25:00 IST 2026: Disk usage: 38%
+Tue Aug 18 20:25:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 20:30:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 20:30:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 20:30:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 20:30:00 IST 2026: Database backups:      125
+Tue Aug 18 20:30:00 IST 2026: Disk usage: 38%
+Tue Aug 18 20:30:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 20:35:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 20:35:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 20:35:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 20:35:00 IST 2026: Database backups:      125
+Tue Aug 18 20:35:00 IST 2026: Disk usage: 38%
+Tue Aug 18 20:35:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 20:40:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 20:40:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 20:40:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 20:40:00 IST 2026: Database backups:      125
+Tue Aug 18 20:40:00 IST 2026: Disk usage: 38%
+Tue Aug 18 20:40:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 20:45:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 20:45:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 20:45:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 20:45:00 IST 2026: Database backups:      125
+Tue Aug 18 20:45:00 IST 2026: Disk usage: 38%
+Tue Aug 18 20:45:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 20:50:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 20:50:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 20:50:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 20:50:00 IST 2026: Database backups:      125
+Tue Aug 18 20:50:00 IST 2026: Disk usage: 38%
+Tue Aug 18 20:50:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 20:55:01 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 20:55:01 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 20:55:01 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 20:55:01 IST 2026: Database backups:      125
+Tue Aug 18 20:55:01 IST 2026: Disk usage: 38%
+Tue Aug 18 20:55:01 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 21:00:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 21:00:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 21:00:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 21:00:00 IST 2026: Database backups:      125
+Tue Aug 18 21:00:00 IST 2026: Disk usage: 38%
+Tue Aug 18 21:00:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 21:05:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 21:05:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 21:05:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 21:05:00 IST 2026: Database backups:      125
+Tue Aug 18 21:05:00 IST 2026: Disk usage: 38%
+Tue Aug 18 21:05:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 21:10:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 21:10:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 21:10:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 21:10:00 IST 2026: Database backups:      125
+Tue Aug 18 21:10:00 IST 2026: Disk usage: 38%
+Tue Aug 18 21:10:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 21:15:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 21:15:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 21:15:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 21:15:00 IST 2026: Database backups:      125
+Tue Aug 18 21:15:00 IST 2026: Disk usage: 38%
+Tue Aug 18 21:15:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 21:20:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 21:20:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 21:20:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 21:20:00 IST 2026: Database backups:      125
+Tue Aug 18 21:20:00 IST 2026: Disk usage: 38%
+Tue Aug 18 21:20:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 21:25:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 21:25:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 21:25:01 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 21:25:01 IST 2026: Database backups:      125
+Tue Aug 18 21:25:01 IST 2026: Disk usage: 38%
+Tue Aug 18 21:25:01 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 21:30:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 21:30:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 21:30:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 21:30:00 IST 2026: Database backups:      125
+Tue Aug 18 21:30:00 IST 2026: Disk usage: 38%
+Tue Aug 18 21:30:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 21:35:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 21:35:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 21:35:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 21:35:00 IST 2026: Database backups:      125
+Tue Aug 18 21:35:00 IST 2026: Disk usage: 38%
+Tue Aug 18 21:35:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 21:40:01 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 21:40:01 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 21:40:01 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 21:40:01 IST 2026: Database backups:      125
+Tue Aug 18 21:40:01 IST 2026: Disk usage: 38%
+Tue Aug 18 21:40:01 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 21:45:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 21:45:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 21:45:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 21:45:00 IST 2026: Database backups:      125
+Tue Aug 18 21:45:00 IST 2026: Disk usage: 38%
+Tue Aug 18 21:45:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 21:50:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 21:50:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 21:50:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 21:50:00 IST 2026: Database backups:      125
+Tue Aug 18 21:50:00 IST 2026: Disk usage: 38%
+Tue Aug 18 21:50:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 21:55:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 21:55:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 21:55:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 21:55:00 IST 2026: Database backups:      125
+Tue Aug 18 21:55:00 IST 2026: Disk usage: 38%
+Tue Aug 18 21:55:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 22:00:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 22:00:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 22:00:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 22:00:00 IST 2026: Database backups:      125
+Tue Aug 18 22:00:00 IST 2026: Disk usage: 38%
+Tue Aug 18 22:00:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 22:05:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 22:05:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 22:05:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 22:05:00 IST 2026: Database backups:      125
+Tue Aug 18 22:05:00 IST 2026: Disk usage: 38%
+Tue Aug 18 22:05:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 22:10:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 22:10:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 22:10:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 22:10:00 IST 2026: Database backups:      125
+Tue Aug 18 22:10:00 IST 2026: Disk usage: 38%
+Tue Aug 18 22:10:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 22:15:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 22:15:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 22:15:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 22:15:00 IST 2026: Database backups:      125
+Tue Aug 18 22:15:00 IST 2026: Disk usage: 38%
+Tue Aug 18 22:15:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 22:20:01 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 22:20:01 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 22:20:01 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 22:20:01 IST 2026: Database backups:      125
+Tue Aug 18 22:20:01 IST 2026: Disk usage: 38%
+Tue Aug 18 22:20:01 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 22:25:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 22:25:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 22:25:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 22:25:00 IST 2026: Database backups:      125
+Tue Aug 18 22:25:00 IST 2026: Disk usage: 38%
+Tue Aug 18 22:25:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 22:30:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 22:30:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 22:30:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 22:30:00 IST 2026: Database backups:      125
+Tue Aug 18 22:30:00 IST 2026: Disk usage: 38%
+Tue Aug 18 22:30:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 22:35:01 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 22:35:01 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 22:35:01 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 22:35:01 IST 2026: Database backups:      125
+Tue Aug 18 22:35:01 IST 2026: Disk usage: 38%
+Tue Aug 18 22:35:01 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 22:40:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 22:40:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 22:40:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 22:40:00 IST 2026: Database backups:      125
+Tue Aug 18 22:40:00 IST 2026: Disk usage: 38%
+Tue Aug 18 22:40:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 22:45:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 22:45:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 22:45:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 22:45:00 IST 2026: Database backups:      125
+Tue Aug 18 22:45:00 IST 2026: Disk usage: 38%
+Tue Aug 18 22:45:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 22:50:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 22:50:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 22:50:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 22:50:00 IST 2026: Database backups:      125
+Tue Aug 18 22:50:00 IST 2026: Disk usage: 38%
+Tue Aug 18 22:50:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 22:55:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 22:55:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 22:55:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 22:55:00 IST 2026: Database backups:      125
+Tue Aug 18 22:55:00 IST 2026: Disk usage: 38%
+Tue Aug 18 22:55:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 23:00:01 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 23:00:01 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 23:00:01 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 23:00:01 IST 2026: Database backups:      125
+Tue Aug 18 23:00:01 IST 2026: Disk usage: 38%
+Tue Aug 18 23:00:01 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 23:05:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 23:05:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 23:05:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 23:05:00 IST 2026: Database backups:      125
+Tue Aug 18 23:05:00 IST 2026: Disk usage: 38%
+Tue Aug 18 23:05:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 23:10:01 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 23:10:01 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 23:10:01 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 23:10:01 IST 2026: Database backups:      125
+Tue Aug 18 23:10:01 IST 2026: Disk usage: 38%
+Tue Aug 18 23:10:01 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 23:15:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 23:15:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 23:15:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 23:15:00 IST 2026: Database backups:      125
+Tue Aug 18 23:15:00 IST 2026: Disk usage: 38%
+Tue Aug 18 23:15:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 23:20:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 23:20:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 23:20:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 23:20:00 IST 2026: Database backups:      125
+Tue Aug 18 23:20:00 IST 2026: Disk usage: 38%
+Tue Aug 18 23:20:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 23:25:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 23:25:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 23:25:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 23:25:00 IST 2026: Database backups:      125
+Tue Aug 18 23:25:00 IST 2026: Disk usage: 38%
+Tue Aug 18 23:25:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 23:30:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 23:30:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 23:30:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 23:30:00 IST 2026: Database backups:      125
+Tue Aug 18 23:30:00 IST 2026: Disk usage: 38%
+Tue Aug 18 23:30:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 23:35:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 23:35:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 23:35:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 23:35:00 IST 2026: Database backups:      125
+Tue Aug 18 23:35:00 IST 2026: Disk usage: 38%
+Tue Aug 18 23:35:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 23:40:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 23:40:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 23:40:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 23:40:00 IST 2026: Database backups:      125
+Tue Aug 18 23:40:00 IST 2026: Disk usage: 38%
+Tue Aug 18 23:40:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 23:45:01 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 23:45:01 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 23:45:01 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 23:45:01 IST 2026: Database backups:      125
+Tue Aug 18 23:45:01 IST 2026: Disk usage: 38%
+Tue Aug 18 23:45:01 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 23:50:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 23:50:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 23:50:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 23:50:00 IST 2026: Database backups:      125
+Tue Aug 18 23:50:00 IST 2026: Disk usage: 38%
+Tue Aug 18 23:50:00 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 23:55:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 23:55:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 23:55:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 23:55:00 IST 2026: Database backups:      125
+Tue Aug 18 23:55:00 IST 2026: Disk usage: 38%
+Tue Aug 18 23:55:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 00:00:01 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 00:00:01 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 00:00:01 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 00:00:01 IST 2026: Database backups:      125
+Wed Aug 19 00:00:01 IST 2026: Disk usage: 38%
+Wed Aug 19 00:00:01 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 00:05:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 00:05:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 00:05:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 00:05:00 IST 2026: Database backups:      125
+Wed Aug 19 00:05:00 IST 2026: Disk usage: 38%
+Wed Aug 19 00:05:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 00:10:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 00:10:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 00:10:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 00:10:00 IST 2026: Database backups:      125
+Wed Aug 19 00:10:00 IST 2026: Disk usage: 38%
+Wed Aug 19 00:10:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 00:15:01 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 00:15:01 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 00:15:01 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 00:15:01 IST 2026: Database backups:      125
+Wed Aug 19 00:15:01 IST 2026: Disk usage: 38%
+Wed Aug 19 00:15:01 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 00:20:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 00:20:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 00:20:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 00:20:00 IST 2026: Database backups:      125
+Wed Aug 19 00:20:00 IST 2026: Disk usage: 38%
+Wed Aug 19 00:20:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 00:25:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 00:25:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 00:25:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 00:25:00 IST 2026: Database backups:      125
+Wed Aug 19 00:25:00 IST 2026: Disk usage: 38%
+Wed Aug 19 00:25:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 00:30:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 00:30:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 00:30:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 00:30:00 IST 2026: Database backups:      125
+Wed Aug 19 00:30:00 IST 2026: Disk usage: 38%
+Wed Aug 19 00:30:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 00:35:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 00:35:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 00:35:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 00:35:00 IST 2026: Database backups:      125
+Wed Aug 19 00:35:00 IST 2026: Disk usage: 38%
+Wed Aug 19 00:35:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 00:40:01 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 00:40:01 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 00:40:01 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 00:40:01 IST 2026: Database backups:      125
+Wed Aug 19 00:40:01 IST 2026: Disk usage: 38%
+Wed Aug 19 00:40:01 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 00:45:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 00:45:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 00:45:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 00:45:00 IST 2026: Database backups:      125
+Wed Aug 19 00:45:00 IST 2026: Disk usage: 38%
+Wed Aug 19 00:45:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 00:50:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 00:50:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 00:50:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 00:50:00 IST 2026: Database backups:      125
+Wed Aug 19 00:50:00 IST 2026: Disk usage: 38%
+Wed Aug 19 00:50:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 00:55:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 00:55:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 00:55:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 00:55:00 IST 2026: Database backups:      125
+Wed Aug 19 00:55:00 IST 2026: Disk usage: 38%
+Wed Aug 19 00:55:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 01:00:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 01:00:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 01:00:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 01:00:00 IST 2026: Database backups:      125
+Wed Aug 19 01:00:00 IST 2026: Disk usage: 38%
+Wed Aug 19 01:00:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 01:05:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 01:05:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 01:05:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 01:05:00 IST 2026: Database backups:      125
+Wed Aug 19 01:05:00 IST 2026: Disk usage: 38%
+Wed Aug 19 01:05:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 01:10:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 01:10:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 01:10:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 01:10:00 IST 2026: Database backups:      125
+Wed Aug 19 01:10:00 IST 2026: Disk usage: 38%
+Wed Aug 19 01:10:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 01:15:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 01:15:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 01:15:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 01:15:00 IST 2026: Database backups:      125
+Wed Aug 19 01:15:00 IST 2026: Disk usage: 38%
+Wed Aug 19 01:15:00 IST 2026: ⚠️ ALERT: API health check failed
