@@ -198,7 +198,7 @@ export default function SuperAdminTenants() {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-1">💼 Tenant Management</h1>
-            <p className="text-sm text-gray-600">Manage customers, billing, subscriptions & payments</p>
+            <p className="text-sm text-gray-600">View-only tenant information (All data locked for security)</p>
           </div>
           <div className="flex gap-2">
             <div className="flex gap-1 bg-gray-200 p-1 rounded-lg">
@@ -215,13 +215,17 @@ export default function SuperAdminTenants() {
                 Table
               </button>
             </div>
-            <button
-              onClick={() => setLocation('/superadmin/tenants/create')}
-              className="inline-flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-blue-700"
-            >
-              <Plus className="w-4 h-4" />
-              New Tenant
-            </button>
+          </div>
+        </div>
+
+        {/* SECURITY LOCK BANNER */}
+        <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="text-3xl">🔒</div>
+            <div>
+              <p className="font-bold text-red-900">TENANT DATA LOCKED FOR SECURITY</p>
+              <p className="text-sm text-red-800">This page is read-only. All credentials and sensitive data are hidden. No changes allowed.</p>
+            </div>
           </div>
         </div>
 
@@ -236,12 +240,12 @@ export default function SuperAdminTenants() {
             </button>
           </div>
         ) : viewMode === 'cards' ? (
-          // CARD VIEW - Better for billing management
+          // CARD VIEW - READ-ONLY, NO MODIFICATIONS ALLOWED
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {tenants.map((tenant) => (
               <div
                 key={tenant._id}
-                className={`bg-gradient-to-br ${getPlanColor(tenant.billing?.subscriptionPlan || 'starter')} rounded-lg border border-gray-200 shadow-md hover:shadow-lg transition-all p-4`}
+                className={`bg-gradient-to-br ${getPlanColor(tenant.billing?.subscriptionPlan || 'starter')} rounded-lg border-2 border-gray-300 shadow-md p-4 cursor-not-allowed opacity-95`}
               >
                 {/* Tenant Header */}
                 <div className="flex items-start justify-between mb-3">
@@ -298,99 +302,23 @@ export default function SuperAdminTenants() {
                   </div>
                 </div>
 
-                {/* Auto-Renewal Toggle */}
-                <div className="bg-white/60 rounded p-2 mb-3 flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <RefreshCw className="w-3 h-3 text-blue-600" />
-                    <span className="text-xs font-semibold text-gray-900">Auto-Renew</span>
+                {/* AUTO-RENEWAL STATUS (READ-ONLY) */}
+                <div className="bg-white/60 rounded p-2 mb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1">
+                      <RefreshCw className="w-3 h-3 text-gray-600" />
+                      <span className="text-xs font-semibold text-gray-900">Auto-Renew</span>
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${tenant.billing?.autoRenewal ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                      {tenant.billing?.autoRenewal ? '✓ ON' : '✗ OFF'}
+                    </span>
                   </div>
-                  <button
-                    onClick={() => toggleAutoRenewal(tenant._id, tenant.billing?.autoRenewal ?? false)}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full ${
-                      tenant.billing?.autoRenewal ? 'bg-green-600' : 'bg-gray-300'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition ${
-                        tenant.billing?.autoRenewal ? 'translate-x-5' : 'translate-x-0.5'
-                      }`}
-                    />
-                  </button>
                 </div>
 
-                {/* Login Credentials Section */}
-                <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded border-2 border-orange-300 p-2 mb-2">
-                  <div className="flex items-center gap-1 mb-2">
-                    <Key className="w-3 h-3 text-orange-600" />
-                    <span className="text-xs font-bold text-orange-900">CREDENTIALS</span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="bg-white rounded p-1.5 flex items-center justify-between">
-                      <div className="min-w-0">
-                        <p className="text-xs text-gray-600">Login ID</p>
-                        <p className="text-xs font-mono font-bold text-gray-900 truncate">{(tenant as any).credentials?.loginId || tenant.ownerEmail}</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText((tenant as any).credentials?.loginId || tenant.ownerEmail || '');
-                          alert('Copied!');
-                        }}
-                        className="p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
-                        title="Copy Login ID"
-                      >
-                        <Copy className="w-3 h-3 text-blue-600" />
-                      </button>
-                    </div>
-                    <div className="bg-white rounded p-1.5 flex items-center justify-between">
-                      <div className="min-w-0">
-                        <p className="text-xs text-gray-600">Password</p>
-                        <p className="text-xs font-mono font-bold text-gray-900">••••••••••</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText((tenant as any).credentials?.password || 'password123!');
-                          alert('Password copied!');
-                        }}
-                        className="p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
-                        title="Copy Password"
-                      >
-                        <Copy className="w-3 h-3 text-green-600" />
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-orange-700 mt-2 bg-orange-100 rounded px-1.5 py-0.5">
-                    ⚠️ Share securely. Must change on login.
-                  </p>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="grid grid-cols-3 gap-1">
-                  <button
-                    onClick={() => setLocation(`/superadmin/tenants/${tenant._id}/billing`)}
-                    className="flex items-center justify-center gap-0.5 bg-white hover:bg-gray-50 text-gray-700 px-2 py-1.5 rounded text-xs font-semibold transition-colors"
-                    title="Billing"
-                  >
-                    <DollarSign className="w-3 h-3" />
-                    Bill
-                  </button>
-                  <button
-                    onClick={() => setLocation(`/superadmin/tenants/${tenant._id}/advanced`)}
-                    className="flex items-center justify-center gap-0.5 bg-white hover:bg-gray-50 text-gray-700 px-2 py-1.5 rounded text-xs font-semibold transition-colors"
-                    title="Settings"
-                  >
-                    ⚙️
-                    Setup
-                  </button>
-                  {currentUser?.platformRole === 'PLATFORM_ROOT' && (
-                    <button
-                      onClick={() => openTenant(tenant._id)}
-                      className="flex items-center justify-center gap-0.5 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1.5 rounded text-xs font-semibold transition-colors"
-                      title="Access"
-                    >
-                      <LogIn className="w-3 h-3" />
-                      Open
-                    </button>
-                  )}
+                {/* READ-ONLY NOTICE */}
+                <div className="bg-blue-50 border border-blue-200 rounded p-2 mb-2 text-center">
+                  <p className="text-xs font-bold text-blue-900">🔐 DATA LOCKED</p>
+                  <p className="text-xs text-blue-700 mt-0.5">No changes allowed. View-only mode.</p>
                 </div>
               </div>
             ))}
@@ -429,14 +357,11 @@ export default function SuperAdminTenants() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm">
-                      <button
-                        onClick={() => toggleAutoRenewal(tenant._id, tenant.billing?.autoRenewal ?? false)}
-                        className={`px-3 py-1 rounded text-xs font-semibold ${
-                          tenant.billing?.autoRenewal ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
+                      <span className={`px-3 py-1 rounded text-xs font-semibold inline-block ${
+                        tenant.billing?.autoRenewal ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
                         {tenant.billing?.autoRenewal ? '✓ On' : '✗ Off'}
-                      </button>
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {new Date(tenant.billing?.nextBillingDate || '').toLocaleDateString()}
@@ -448,32 +373,8 @@ export default function SuperAdminTenants() {
                         {tenant.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setLocation(`/superadmin/tenants/${tenant._id}/360`)}
-                          className="p-2 hover:bg-purple-100 rounded text-purple-600 transition-colors"
-                          title="View 360"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => setLocation(`/superadmin/tenants/${tenant._id}/billing`)}
-                          className="p-2 hover:bg-green-100 rounded text-green-600 transition-colors"
-                          title="Billing"
-                        >
-                          <DollarSign className="w-4 h-4" />
-                        </button>
-                        {currentUser?.platformRole === 'PLATFORM_ROOT' && (
-                          <button
-                            onClick={() => openTenant(tenant._id)}
-                            className="p-2 hover:bg-blue-100 rounded text-blue-600 transition-colors"
-                            title="Access"
-                          >
-                            <LogIn className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                    <td className="px-6 py-4 text-center">
+                      <span className="text-xs text-gray-500 font-semibold">🔒 LOCKED</span>
                     </td>
                   </tr>
                 ))}
