@@ -197,8 +197,12 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
   });
 
   const saveBasics = async (andThen: "close" | "continue") => {
-    const valid = await form.trigger();
+    // ULTRA FAST: Only validate required fields, skip optional identity docs
+    // Identity docs step is optional - don't validate everything, just the essentials
+    const requiredFields: (keyof typeof form.getValues)[] = ['name', 'phone', 'status'];
+    const valid = await form.trigger(requiredFields);
     if (!valid) return;
+
     const data = form.getValues();
     try {
       const result = savedDriver
