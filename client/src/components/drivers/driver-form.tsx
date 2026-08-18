@@ -31,6 +31,7 @@ import DriverLifecyclePanel from "./driver-lifecycle-panel";
 const driverSchema = z.object({
   name: z.string().min(1, "Name is required"),
   phone: z.string().min(10, "Valid phone number is required"),
+  email: z.string().email("Invalid email").optional(),
   licenseNumber: z.string().optional(),
   experience: z.number().min(0, "Experience must be a positive number").optional(),
   rating: z.number().min(1).max(5).default(5),
@@ -71,6 +72,7 @@ const WIZARD_STEPS: { key: WizardStepKey; label: string; icon: any; requiresDriv
 const STEP_FOR_FIELD: Partial<Record<keyof DriverFormData, WizardStepKey>> = {
   name: "basic",
   phone: "basic",
+  email: "basic",
   licenseNumber: "basic",
   experience: "basic",
   rating: "basic",
@@ -112,6 +114,7 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
     defaultValues: {
       name: driver?.name || "",
       phone: driver?.phone || "",
+      email: driver?.email || "",
       licenseNumber: driver?.licenseNumber || "",
       experience: driver?.experience || undefined,
       rating: driver?.rating || 5,
@@ -302,6 +305,13 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
                 <FormItem>
                   <FormLabel>Phone Number</FormLabel>
                   <FormControl><Input placeholder="Enter phone number" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="email" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email (Optional)</FormLabel>
+                  <FormControl><Input type="email" placeholder="Enter email address" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />

@@ -510,21 +510,19 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
   return (
     <Form {...form}>
       <FormSubmitStatus
-        status={bookingMutation.isPending ? "loading" : bookingMutation.isSuccess ? "success" : bookingMutation.isError ? "error" : "idle"}
+        status={createBookingMutation.isPending ? "loading" : createBookingMutation.isSuccess ? "success" : createBookingMutation.isError ? "error" : "idle"}
         successMessage="Booking created successfully!"
-        errorMessage={(bookingMutation.error as any)?.message || "Failed to create booking"}
+        errorMessage={(createBookingMutation.error as any)?.message || "Failed to create booking"}
       />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Booking Assistant - Intelligent Guide */}
         <BookingAssistant
           tripType={watchedValues.tripType}
-          passengerCount={watchedValues.passengerCount}
           vehicleSelected={!!watchedValues.vehicleId}
           dateSelected={!!watchedValues.pickupDate && !!watchedValues.returnDate}
           routeSet={!!watchedValues.pickupLocation && !!watchedValues.dropoffLocation}
           priceCalculated={!!watchedValues.amount}
-          paymentMethod={watchedValues.paymentMethod}
         />
         {/* Progress Steps */}
         <div className="mb-6 sm:mb-8">
