@@ -6,6 +6,7 @@ import type { Express } from 'express';
 import { authenticateUser, requireTenant, type AuthRequest } from '../middleware/auth';
 import { requirePermission, PERMISSIONS } from '../middleware/permissions';
 import { Tenant, OperationsAlert, OperationsActivity, Booking } from '../models/index';
+import mongoose from 'mongoose';
 import { SelfDriveTrip, computeRefund } from '../booking/self-drive/models';
 import { buildLiveVehicles } from './liveVehicles';
 import { sweepTenant } from './reminderEngine';
@@ -150,7 +151,8 @@ export function registerOperationsRoutes(app: Express): void {
   // effective stages, defaults included.
   app.get('/api/tenant/operations-settings', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const tenant: any = await Tenant.findById(req.tenantId).lean();
+      const tenantId = mongoose.Types.ObjectId.isValid(req.tenantId!) ? new mongoose.Types.ObjectId(req.tenantId!) : req.tenantId!;
+      const tenant: any = await Tenant.findById(tenantId).lean();
       if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
       res.json({
         policy: resolvePolicy(tenant),
@@ -171,7 +173,8 @@ export function registerOperationsRoutes(app: Express): void {
       if (req.user?.role !== 'client' && req.user?.role !== 'admin') {
         return res.status(403).json({ message: 'Only the account owner can change reminder settings' });
       }
-      const tenant: any = await Tenant.findById(req.tenantId);
+      const tenantId = mongoose.Types.ObjectId.isValid(req.tenantId!) ? new mongoose.Types.ObjectId(req.tenantId!) : req.tenantId!;
+      const tenant: any = await Tenant.findById(tenantId);
       if (!tenant) return res.status(404).json({ message: 'Tenant not found' });
 
       const { timezone, operationsSettings } = req.body || {};
