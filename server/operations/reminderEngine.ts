@@ -119,6 +119,25 @@ async function createAlertIfNew(seed: AlertSeed): Promise<any | null> {
 
 // ---------- WhatsApp dispatch (honest status, tenant's own provider) ----------
 
+// Send to all configured staff members (max 5)
+async function sendStaffBroadcast(opts: {
+  tenantId: string;
+  alert: any;
+  card: LiveVehicleCard;
+  staffPhones: string[];
+  text: string;
+}): Promise<void> {
+  const { tenantId, alert, card, staffPhones, text } = opts;
+  if (!staffPhones || staffPhones.length === 0) return;
+
+  for (const staffPhone of staffPhones) {
+    await sendReminderWhatsApp({
+      tenantId, alert, card, target: 'internal',
+      phone: staffPhone, text,
+    });
+  }
+}
+
 async function sendReminderWhatsApp(opts: {
   tenantId: string;
   alert: any;
@@ -387,6 +406,7 @@ async function sweepCard(tenantId: string, card: LiveVehicleCard, policy: Operat
       // moves the booking forward. Never auto-frees the vehicle (spec §21).
       const lateBy = humanizeMinutes(-remaining);
       const nextRisk = card.nextBooking?.atRisk ? ` NEXT BOOKING AT RISK: ${card.nextBooking.bookingCode} starts ${card.nextBooking.startAtLocal}.` : '';
+      const overdueMsgText = `🚨 OVERDUE: ${vehicleLabel(card)} with ${card.customerName} is ${lateBy} past scheduled ${card.serviceMode === 'self_drive' ? 'return' : 'trip end'} (${card.endAtLocal}).${nextRisk}`;
       const alert = await createAlertIfNew({
         tenantId, bookingId: card.id,
         dedupeKey: `${tenantId}:${card.id}:overdue:${endAtIso}`,
@@ -395,9 +415,17 @@ async function sweepCard(tenantId: string, card: LiveVehicleCard, policy: Operat
         body: `${vehicleLabel(card)} with ${card.customerName} is ${lateBy} past its scheduled ${card.serviceMode === 'self_drive' ? 'return' : 'trip end'} (${card.endAtLocal}).${nextRisk}`,
         endAtSnapshot: endAt,
       });
-      if (alert) { created++; await alert.save(); }
+      if (alert) {
+        created++;
+        // Notify all staff immediately for overdue
+        if (policy.staffPhones && policy.staffPhones.length > 0) {
+          await sendStaffBroadcast({ tenantId, alert, card, staffPhones: policy.staffPhones, text: overdueMsgText });
+        }
+        await alert.save();
+      }
     } else {
       // RETURN / TRIP END DUE — end time reached, inside grace.
+      const returnMsgText = `📍 RETURN DUE: ${vehicleLabel(card)} with ${card.customerName} was due back at ${card.endAtLocal}${card.returnLocation ? ` (${card.returnLocation})` : ''}. Please coordinate return or extension.`;
       const alert = await createAlertIfNew({
         tenantId, bookingId: card.id,
         dedupeKey: `${tenantId}:${card.id}:end:${endAtIso}`,
@@ -406,7 +434,14 @@ async function sweepCard(tenantId: string, card: LiveVehicleCard, policy: Operat
         body: `${vehicleLabel(card)} with ${card.customerName} was due back at ${card.endAtLocal}${card.returnLocation ? ` (${card.returnLocation})` : ''}. Confirm return/completion or extend.`,
         endAtSnapshot: endAt,
       });
-      if (alert) { created++; await alert.save(); }
+      if (alert) {
+        created++;
+        // Notify all staff for return due
+        if (policy.staffPhones && policy.staffPhones.length > 0) {
+          await sendStaffBroadcast({ tenantId, alert, card, staffPhones: policy.staffPhones, text: returnMsgText });
+        }
+        await alert.save();
+      }
     }
   } else {
     // Pre-end escalation ladder: fire ONLY the most imminent enabled stage
@@ -426,6 +461,10 @@ async function sweepCard(tenantId: string, card: LiveVehicleCard, policy: Operat
       });
       if (alert) {
         created++;
+        // Send to all staff members
+        if (policy.staffPhones && policy.staffPhones.length > 0) {
+          await sendStaffBroadcast({ tenantId, alert, card, staffPhones: policy.staffPhones, text: internalReminderText(card, remaining) });
+        }
         if (stage.whatsappInternal) {
           await sendReminderWhatsApp({ tenantId, alert, card, target: 'internal', phone: policy.whatsappInternalPhone, text: internalReminderText(card, remaining) });
         }
@@ -443,6 +482,7 @@ async function sweepCard(tenantId: string, card: LiveVehicleCard, policy: Operat
   // PAYMENT DUE near trip end (spec §36) — rental balance only; the
   // security deposit is never part of this number.
   if (card.balance > 0 && remaining <= 60) {
+    const paymentMsgText = `💰 PAYMENT DUE: ₹${card.balance.toLocaleString('en-IN')} from ${card.customerName} | ${card.serviceMode === 'self_drive' ? 'Booking' : 'Trip'} ${remaining > 0 ? `ends in ${humanizeMinutes(remaining)}` : 'has ended'}. Collect before release.`;
     const alert = await createAlertIfNew({
       tenantId, bookingId: card.id,
       dedupeKey: `${tenantId}:${card.id}:payment_due:${endAtIso}`,
@@ -451,12 +491,20 @@ async function sweepCard(tenantId: string, card: LiveVehicleCard, policy: Operat
       body: `${card.serviceMode === 'self_drive' ? 'Booking' : 'Trip'} ${remaining > 0 ? `ends in ${humanizeMinutes(remaining)}` : 'has ended'}. Balance: ₹${card.balance.toLocaleString('en-IN')} from ${card.customerName}.`,
       endAtSnapshot: endAt,
     });
-    if (alert) { created++; await alert.save(); }
+    if (alert) {
+      created++;
+      // Notify all staff for payment due
+      if (policy.staffPhones && policy.staffPhones.length > 0) {
+        await sendStaffBroadcast({ tenantId, alert, card, staffPhones: policy.staffPhones, text: paymentMsgText });
+      }
+      await alert.save();
+    }
   }
 
   // TURNAROUND CONFLICT / next booking at risk (spec §38-40).
   if (card.nextBooking && (card.nextBooking.turnaroundConflict || card.nextBooking.atRisk)) {
     const nb = card.nextBooking;
+    const turnaroundMsgText = `⚠️ ${nb.atRisk ? '🚨 CRITICAL' : '⚠️ CONFLICT'}: ${vehicleLabel(card)} | Current return/end: ${card.endAtLocal} | Next booking ${nb.bookingCode} (${nb.customerName}) starts ${nb.startAtLocal}${nb.gapMinutes !== null ? ` | Gap: ${humanizeMinutes(nb.gapMinutes)}` : ''}.`;
     const alert = await createAlertIfNew({
       tenantId, bookingId: card.id,
       dedupeKey: `${tenantId}:${card.id}:turnaround:${nb.bookingId}:${endAtIso}`,
@@ -466,7 +514,14 @@ async function sweepCard(tenantId: string, card: LiveVehicleCard, policy: Operat
       body: `Current ${card.serviceMode === 'self_drive' ? 'return' : 'trip end'}: ${card.endAtLocal}. Next booking ${nb.bookingCode} (${nb.customerName}) starts ${nb.startAtLocal}${nb.gapMinutes !== null ? ` — gap ${humanizeMinutes(nb.gapMinutes)}, required buffer ${humanizeMinutes(nb.requiredBufferMinutes)}` : ''}.`,
       endAtSnapshot: endAt,
     });
-    if (alert) { created++; await alert.save(); }
+    if (alert) {
+      created++;
+      // Notify all staff for turnaround conflicts
+      if (policy.staffPhones && policy.staffPhones.length > 0) {
+        await sendStaffBroadcast({ tenantId, alert, card, staffPhones: policy.staffPhones, text: turnaroundMsgText });
+      }
+      await alert.save();
+    }
   }
 
   return created;
