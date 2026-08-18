@@ -45,7 +45,9 @@ export const mongoUserSchema = z.object({
 // MongoDB Vehicle Schema
 export const mongoVehicleSchema = z.object({
   tenantId: z.string(),
-  make: z.string().min(1, 'Car name is required'),
+  // ULTRA FAST: ALL vehicle fields optional - no blocking validation
+  // Users can add vehicle with minimum info, fill details later
+  make: z.string().optional().or(z.undefined()),
   vehicleModel: z.string().optional().or(z.undefined()),
   year: z.number().int().min(1900).max(new Date().getFullYear() + 1).optional().or(z.undefined()),
   licensePlate: z.string().optional().or(z.undefined()),

@@ -25,11 +25,13 @@ import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhan
 // Required-field validation (this schema) is skipped entirely for "Save
 // Draft" — see `draftSchema` below.
 const vehicleSchema = z.object({
-  make: z.string().min(1, "Vehicle name is required"),
-  model: z.string().min(1, "Model is required"),
-  vehicleCategory: z.string().min(1, "Vehicle category is required"),
+  // ULTRA FAST: ALL vehicle fields optional - zero friction form
+  // Users can create vehicle with ANY info, complete details later
+  make: z.string().optional(),
+  model: z.string().optional(),
+  vehicleCategory: z.string().optional(),
   year: z.number().min(1900, "Valid year is required").optional(),
-  registrationNumber: z.string().min(1, "Registration number is required"),
+  registrationNumber: z.string().optional(),
   vehicleType: z.enum(["hatchback", "sedan", "suv", "economy", "standard", "premium", "luxury", "coupe", "convertible"]).optional(),
   ratePerDay: z.number().min(0).optional(),
   ratePerKm: z.number().min(0).optional(),

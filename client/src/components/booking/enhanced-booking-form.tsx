@@ -766,9 +766,10 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
       const finalAmount = (data.amount || 0) + (data.tollCharges || 0) + (data.parkingCharges || 0) + (data.pickupServiceCharge || 0) + (data.dropServiceCharge || 0) + (data.miscellaneousAmount || 0) - totalFuelCost;
       
       // Send data with the calculated final amount
+      // Only send amount if it's greater than 0 (to avoid .positive() validation error)
       const bookingData = {
         ...data,
-        amount: finalAmount,
+        amount: finalAmount > 0 ? finalAmount : undefined,
         // Security deposit is held money, never revenue (Rule A/B): the
         // amount is snapshotted on the booking for the live cards; the
         // actual receipt is recorded through the self-drive deposit
