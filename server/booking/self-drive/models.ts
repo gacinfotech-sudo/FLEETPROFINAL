@@ -346,7 +346,8 @@ export function computeRefund(refund: { depositAmount: number; deductions: Refun
   const totalDeduction = activeDeductionTotal(refund);
   const refundable = Math.max(0, depositAmount - totalDeduction);
   const extraOwed = Math.max(0, totalDeduction - depositAmount);
-  const refunded = refundedTotal(refund);
+  // Cap refunded to never exceed refundable amount (prevents overpayment)
+  const refunded = Math.min(refundable, refundedTotal(refund));
   const balance = Math.max(0, refundable - refunded);
   return { depositAmount, totalDeduction, refundable, extraOwed, refunded, balance };
 }
