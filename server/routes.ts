@@ -2835,8 +2835,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // visibility, the same category of oversight data.
   app.get("/api/vendors/settlement", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
     try {
+      const tenantObjectId = mongoose.Types.ObjectId.isValid(req.tenantId) ? new mongoose.Types.ObjectId(req.tenantId) : req.tenantId;
       const bookings = await Booking.find({
-        tenantId: req.tenantId,
+        $or: [
+          { tenantId: tenantObjectId },
+          { tenantId: req.tenantId }
+        ],
         fulfilmentType: 'vendor',
         vendorName: { $exists: true, $ne: '' },
       })
@@ -2882,8 +2886,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Previously only at /api/vendors/settlement (namespace inconsistency)
   app.get("/api/vendor-settlement", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
     try {
+      const tenantObjectId = mongoose.Types.ObjectId.isValid(req.tenantId) ? new mongoose.Types.ObjectId(req.tenantId) : req.tenantId;
       const bookings = await Booking.find({
-        tenantId: req.tenantId,
+        $or: [
+          { tenantId: tenantObjectId },
+          { tenantId: req.tenantId }
+        ],
         fulfilmentType: 'vendor',
         vendorName: { $exists: true, $ne: '' },
       })
