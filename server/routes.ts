@@ -4088,7 +4088,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const mappedData = {
         ...req.body,
-        tenantId: (req.tenantObjectId || req.tenantId),
+        tenantId: String(req.tenantObjectId || req.tenantId),
         // Map amount to totalAmount - INCLUDE toll + parking charges
         totalAmount: totalWithCharges,
         // Ensure proper field names
