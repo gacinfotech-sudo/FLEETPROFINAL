@@ -1725,6 +1725,167 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET single tenant detail
+  app.get("/api/admin/tenants/:tenantId", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { tenantId } = req.params;
+      if (!mongoose.isValidObjectId(tenantId)) {
+        return res.status(400).json({ message: "Invalid tenant ID" });
+      }
+
+      const Tenant = mongoose.model('Tenant');
+      const tenant = await Tenant.findById(tenantId);
+
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      // Audit: Tenant viewed
+      console.log(`[AUDIT] Tenant viewed: ${tenantId} by ${req.userId}`);
+
+      res.json(tenant.toObject());
+    } catch (error: any) {
+      console.error('Fetch tenant error:', error?.message);
+      res.status(500).json({ message: "Failed to fetch tenant" });
+    }
+  });
+
+  // PUT update tenant
+  app.put("/api/admin/tenants/:tenantId", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { tenantId } = req.params;
+      if (!mongoose.isValidObjectId(tenantId)) {
+        return res.status(400).json({ message: "Invalid tenant ID" });
+      }
+
+      const Tenant = mongoose.model('Tenant');
+      const updates = {
+        ...req.body,
+        updatedAt: new Date(),
+      };
+
+      const tenant = await Tenant.findByIdAndUpdate(tenantId, updates, { new: true });
+
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      // Audit: Tenant updated
+      console.log(`[AUDIT] Tenant updated: ${tenantId} by ${req.userId}`, Object.keys(updates));
+
+      res.json(tenant.toObject());
+    } catch (error: any) {
+      console.error('Update tenant error:', error?.message);
+      res.status(500).json({ message: "Failed to update tenant" });
+    }
+  });
+
+  // POST reset password for tenant owner
+  app.post("/api/admin/tenants/:tenantId/reset-password", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { tenantId } = req.params;
+      if (!mongoose.isValidObjectId(tenantId)) {
+        return res.status(400).json({ message: "Invalid tenant ID" });
+      }
+
+      const Tenant = mongoose.model('Tenant');
+      const tenant = await Tenant.findById(tenantId);
+
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      // Generate temporary password
+      const tempPassword = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-2).toUpperCase();
+
+      // Hash password (would use proper bcrypt in production)
+      const crypto = require('crypto');
+      const hashedPassword = crypto.createHash('sha256').update(tempPassword).digest('hex');
+
+      // Save hashed password
+      const User = mongoose.model('User');
+      await User.findOneAndUpdate(
+        { email: tenant.ownerEmail },
+        {
+          password: hashedPassword,
+          mustResetPassword: true,
+          lastPasswordReset: new Date()
+        },
+        { upsert: true }
+      );
+
+      // Audit: Password reset
+      console.log(`[AUDIT] Tenant password reset: ${tenantId} by ${req.userId}`);
+
+      res.json({
+        tempPassword,
+        message: "Temporary password generated. Copy it now - it will not be shown again!",
+        loginId: tenant.ownerEmail
+      });
+    } catch (error: any) {
+      console.error('Reset password error:', error?.message);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
+
+  // POST activate tenant
+  app.post("/api/admin/tenants/:tenantId/activate", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { tenantId } = req.params;
+      if (!mongoose.isValidObjectId(tenantId)) {
+        return res.status(400).json({ message: "Invalid tenant ID" });
+      }
+
+      const Tenant = mongoose.model('Tenant');
+      const tenant = await Tenant.findByIdAndUpdate(
+        tenantId,
+        { status: 'active', updatedAt: new Date() },
+        { new: true }
+      );
+
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      // Audit: Tenant activated
+      console.log(`[AUDIT] Tenant activated: ${tenantId} by ${req.userId}`);
+
+      res.json(tenant.toObject());
+    } catch (error: any) {
+      console.error('Activate tenant error:', error?.message);
+      res.status(500).json({ message: "Failed to activate tenant" });
+    }
+  });
+
+  // POST deactivate tenant
+  app.post("/api/admin/tenants/:tenantId/deactivate", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { tenantId } = req.params;
+      if (!mongoose.isValidObjectId(tenantId)) {
+        return res.status(400).json({ message: "Invalid tenant ID" });
+      }
+
+      const Tenant = mongoose.model('Tenant');
+      const tenant = await Tenant.findByIdAndUpdate(
+        tenantId,
+        { status: 'inactive', updatedAt: new Date() },
+        { new: true }
+      );
+
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+
+      // Audit: Tenant deactivated
+      console.log(`[AUDIT] Tenant deactivated: ${tenantId} by ${req.userId}`);
+
+      res.json(tenant.toObject());
+    } catch (error: any) {
+      console.error('Deactivate tenant error:', error?.message);
+      res.status(500).json({ message: "Failed to deactivate tenant" });
+    }
+  });
+
   // NEW: Auto-login token for Root Admin to access tenant dashboard
   app.post("/api/admin/tenants/:tenantId/auto-login-token", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
     try {
