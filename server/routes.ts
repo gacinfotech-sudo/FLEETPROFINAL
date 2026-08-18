@@ -3168,35 +3168,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const driverData = mongoDriverSchema.parse({ ...req.body, tenantId: req.tenantId });
       const driver = await storage.createDriver(driverData);
 
-      // ========== PHASE 1: AUTO-ENROLL ==========
-      // Automatically create salary master and enroll in payroll
-      try {
-        const { autoCreateSalaryMaster, autoEnrollInPayroll } = await import('../services/driverAutoEnrollmentService');
-        const salaryMaster = await autoCreateSalaryMaster(driver, req.tenantId!);
-        await autoEnrollInPayroll(driver, req.tenantId!, salaryMaster);
+      // INSTANT RESPONSE: Return driver immediately
+      res.json({
+        ...driver,
+        autoEnrollment: {
+          status: 'pending',
+          message: 'Setting up salary master in background...'
+        }
+      });
 
-        // Return driver with auto-enrollment info
-        res.json({
-          ...driver,
-          autoEnrollment: {
-            salaryMasterId: salaryMaster._id?.toString(),
-            status: 'active',
-            autoCreated: true,
-            message: 'Salary master automatically created and driver enrolled in payroll'
-          }
-        });
-      } catch (autoEnrollError) {
-        // Log error but still return driver - auto-enrollment is non-blocking
-        console.error('[AUTO-ENROLL] Error during auto-enrollment:', autoEnrollError);
-        res.json({
-          ...driver,
-          autoEnrollment: {
-            status: 'partial',
-            error: 'Auto-enrollment encountered an issue, but driver was created',
-            message: 'Please manually configure salary master'
-          }
-        });
-      }
+      // ========== AUTO-ENROLL (BACKGROUND) ==========
+      // Do NOT await - let response go back to user immediately
+      // Process auto-enrollment in background
+      (async () => {
+        try {
+          const { autoCreateSalaryMaster, autoEnrollInPayroll } = await import('../services/driverAutoEnrollmentService');
+          const salaryMaster = await autoCreateSalaryMaster(driver, req.tenantId!);
+          await autoEnrollInPayroll(driver, req.tenantId!, salaryMaster);
+          console.log(`[AUTO-ENROLL] Success for driver ${driver._id}: salary master ${salaryMaster._id}`);
+        } catch (autoEnrollError) {
+          console.error('[AUTO-ENROLL] Background error for driver', driver._id, autoEnrollError);
+        }
+      })();
     } catch (error) {
       if (error instanceof z.ZodError) {
         // TASK-DRIVER-ADD-400-FIX: previously returned the raw Zod
