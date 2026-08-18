@@ -46,88 +46,128 @@ export default function AdvancedConsoleLive() {
       setError('');
 
       // Fetch tenant stats
-      const tenantsRes = await fetch('https://localhost:5050/api/admin/tenants', {
+      const tenantsRes = await fetch('/api/admin/tenants', {
         credentials: 'include'
       });
       if (tenantsRes.ok) {
         const tenants = await tenantsRes.json();
         setTenantStats({
-          total: tenants.length,
-          active: tenants.filter((t: any) => t.isActive).length
+          total: Array.isArray(tenants) ? tenants.length : 0,
+          active: Array.isArray(tenants) ? tenants.filter((t: any) => t.isActive).length : 0
         });
+      } else {
+        console.warn('Failed to fetch tenants:', tenantsRes.status);
+        setTenantStats({ total: 0, active: 0 });
       }
 
       // Fetch analytics
-      const growthRes = await fetch('https://localhost:5050/api/admin/console/analytics/tenant-growth', {
+      const growthRes = await fetch('/api/admin/console/analytics/tenant-growth', {
         credentials: 'include'
       });
       if (growthRes.ok) {
-        setTenantGrowth(await growthRes.json());
+        const data = await growthRes.json();
+        setTenantGrowth(Array.isArray(data) ? data : []);
+      } else {
+        console.warn('Failed to fetch tenant growth:', growthRes.status);
+        setTenantGrowth([]);
       }
 
-      const revenueRes = await fetch('https://localhost:5050/api/admin/console/analytics/revenue', {
+      const revenueRes = await fetch('/api/admin/console/analytics/revenue', {
         credentials: 'include'
       });
       if (revenueRes.ok) {
-        setRevenueStats(await revenueRes.json());
+        const data = await revenueRes.json();
+        setRevenueStats(data || {});
+      } else {
+        console.warn('Failed to fetch revenue stats:', revenueRes.status);
+        setRevenueStats({});
       }
 
       // Fetch reports
-      const reportRevRes = await fetch('https://localhost:5050/api/admin/console/reports/revenue', {
+      const reportRevRes = await fetch('/api/admin/console/reports/revenue', {
         credentials: 'include'
       });
       if (reportRevRes.ok) {
-        setRevenueReport(await reportRevRes.json());
+        const data = await reportRevRes.json();
+        setRevenueReport(data || {});
+      } else {
+        console.warn('Failed to fetch revenue report:', reportRevRes.status);
+        setRevenueReport({});
       }
 
-      const healthRes = await fetch('https://localhost:5050/api/admin/console/reports/tenant-health', {
+      const healthRes = await fetch('/api/admin/console/reports/tenant-health', {
         credentials: 'include'
       });
       if (healthRes.ok) {
-        setTenantHealth(await healthRes.json());
+        const data = await healthRes.json();
+        setTenantHealth(data || {});
+      } else {
+        console.warn('Failed to fetch tenant health:', healthRes.status);
+        setTenantHealth({});
       }
 
-      const subsRes = await fetch('https://localhost:5050/api/admin/console/reports/subscriptions', {
+      const subsRes = await fetch('/api/admin/console/reports/subscriptions', {
         credentials: 'include'
       });
       if (subsRes.ok) {
-        setSubscriptions(await subsRes.json());
+        const data = await subsRes.json();
+        setSubscriptions(data || {});
+      } else {
+        console.warn('Failed to fetch subscriptions:', subsRes.status);
+        setSubscriptions({});
       }
 
       // Fetch automation rules
-      const rulesRes = await fetch('https://localhost:5050/api/admin/console/automation/rules', {
+      const rulesRes = await fetch('/api/admin/console/automation/rules', {
         credentials: 'include'
       });
       if (rulesRes.ok) {
-        setAutomationRules(await rulesRes.json());
+        const data = await rulesRes.json();
+        setAutomationRules(Array.isArray(data) ? data : []);
+      } else {
+        console.warn('Failed to fetch automation rules:', rulesRes.status);
+        setAutomationRules([]);
       }
 
       // Fetch integrations
-      const intRes = await fetch('https://localhost:5050/api/admin/console/integrations', {
+      const intRes = await fetch('/api/admin/console/integrations', {
         credentials: 'include'
       });
       if (intRes.ok) {
-        setIntegrations(await intRes.json());
+        const data = await intRes.json();
+        setIntegrations(Array.isArray(data) ? data : []);
+      } else {
+        console.warn('Failed to fetch integrations:', intRes.status);
+        setIntegrations([]);
       }
 
       // Fetch compliance
-      const compRes = await fetch('https://localhost:5050/api/admin/console/compliance', {
+      const compRes = await fetch('/api/admin/console/compliance', {
         credentials: 'include'
       });
       if (compRes.ok) {
-        setCompliance(await compRes.json());
+        const data = await compRes.json();
+        setCompliance(data || {});
+      } else {
+        console.warn('Failed to fetch compliance:', compRes.status);
+        setCompliance({});
       }
 
       // Fetch performance
-      const perfRes = await fetch('https://localhost:5050/api/admin/console/performance', {
+      const perfRes = await fetch('/api/admin/console/performance', {
         credentials: 'include'
       });
       if (perfRes.ok) {
-        setPerformance(await perfRes.json());
+        const data = await perfRes.json();
+        setPerformance(data || {});
+      } else {
+        console.warn('Failed to fetch performance:', perfRes.status);
+        setPerformance({});
       }
 
       setLoading(false);
     } catch (err: any) {
+      console.error('Fetch error:', err);
       setError(err.message || 'Failed to load data');
       setLoading(false);
     }
@@ -137,7 +177,7 @@ export default function AdvancedConsoleLive() {
     if (!newRuleName || !newRuleTrigger) return;
 
     try {
-      const res = await fetch('https://localhost:5050/api/admin/console/automation/rules', {
+      const res = await fetch('/api/admin/console/automation/rules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -160,7 +200,7 @@ export default function AdvancedConsoleLive() {
 
   async function exportData(format: string) {
     try {
-      await fetch('https://localhost:5050/api/admin/console/export', {
+      await fetch('/api/admin/console/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

@@ -62,7 +62,7 @@ export default function CreateTenant() {
     setErrors({});
 
     try {
-      const response = await fetch('https://localhost:5050/api/admin/tenants', {
+      const response = await fetch('/api/admin/tenants', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

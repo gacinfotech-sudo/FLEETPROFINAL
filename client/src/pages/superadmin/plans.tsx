@@ -40,7 +40,7 @@ export default function PlansPage() {
 
   async function fetchPlans() {
     try {
-      const response = await fetch('https://localhost:5050/api/admin/plans?limit=50', {
+      const response = await fetch('/api/admin/plans?limit=50', {
         credentials: 'include',
       });
       if (response.ok) {
@@ -57,7 +57,7 @@ export default function PlansPage() {
   async function handleCreatePlan(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const response = await fetch('https://localhost:5050/api/admin/plans', {
+      const response = await fetch('/api/admin/plans', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -89,7 +89,7 @@ export default function PlansPage() {
   async function deletePlan(planId: string) {
     if (!confirm('Delete this plan?')) return;
     try {
-      await fetch(`https://localhost:5050/api/admin/plans/${planId}`, {
+      await fetch(`/api/admin/plans/${planId}`, {
         method: 'DELETE',
         credentials: 'include',
       });

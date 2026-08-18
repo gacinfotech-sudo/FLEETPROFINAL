@@ -60,9 +60,18 @@ import Tenant360 from "./pages/superadmin/tenant-360";
 import TenantBilling from "./pages/superadmin/tenant-billing";
 import TenantAdvanced from "./pages/superadmin/tenant-advanced";
 import AdvancedConsole from "./pages/superadmin/advanced-console-live";
-import PlansPage from "./pages/superadmin/plans";
+import RevenueIntelligence from "./pages/superadmin/revenue-intelligence";
+import UserManagement from "./pages/superadmin/user-management";
+import SettingsConfig from "./pages/superadmin/settings-config";
+import AuditLogs from "./pages/superadmin/audit-logs";
+import PlansEnhanced from "./pages/superadmin/plans-enhanced";
 import SubscriptionsPage from "./pages/superadmin/subscriptions";
 import BillingPage from "./pages/superadmin/billing";
+import AdvancedAnalytics from "./pages/superadmin/advanced-analytics";
+import CustomerSuccessDashboard from "./pages/superadmin/customer-success";
+import ComplianceSecurityDashboard from "./pages/superadmin/compliance-security";
+import TenantPortalDashboard from "./pages/tenant-portal/dashboard";
+import SupportTicketingDashboard from "./pages/superadmin/support-ticketing";
 
 function AuthenticatedApp() {
   const { user, loading } = useAuth();
@@ -208,7 +217,7 @@ function AuthenticatedApp() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : user?.platformRole ? (
-          <PlansPage />
+          <PlansEnhanced />
         ) : (
           <LoginPage />
         )}
@@ -233,6 +242,123 @@ function AuthenticatedApp() {
           </div>
         ) : user?.platformRole ? (
           <BillingPage />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      {/* Revenue Intelligence Dashboard */}
+      <Route path="/superadmin/revenue">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <RevenueIntelligence />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      {/* User Management */}
+      <Route path="/superadmin/users">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <UserManagement />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      {/* Settings & Configuration */}
+      <Route path="/superadmin/settings">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <SettingsConfig />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      {/* Audit Logs */}
+      <Route path="/superadmin/audit">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <AuditLogs />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      {/* Advanced Analytics Engine */}
+      <Route path="/superadmin/analytics">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <AdvancedAnalytics />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      {/* Customer Success Dashboard */}
+      <Route path="/superadmin/cs">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <CustomerSuccessDashboard />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      {/* Compliance & Security Dashboard */}
+      <Route path="/superadmin/compliance">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <ComplianceSecurityDashboard />
+        ) : (
+          <LoginPage />
+        )}
+      </Route>
+
+      {/* Tenant Portal Dashboard */}
+      <Route path="/tenant/portal">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : !user ? (
+          <LoginPage />
+        ) : (
+          <TenantPortalDashboard />
+        )}
+      </Route>
+
+      {/* Support Ticketing System */}
+      <Route path="/superadmin/support">
+        {loading ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          </div>
+        ) : user?.platformRole ? (
+          <SupportTicketingDashboard />
         ) : (
           <LoginPage />
         )}

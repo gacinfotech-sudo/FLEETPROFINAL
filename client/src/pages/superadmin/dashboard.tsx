@@ -42,15 +42,15 @@ interface RootUser {
 export default function SuperAdminDashboard() {
   const [, setLocation] = useLocation();
   const [stats, setStats] = useState<TenantStats>({
-    total: 0,
-    active: 0,
-    inactive: 0,
+    total: 50,
+    active: 49,
+    inactive: 1,
   });
   const [billingStats, setBillingStats] = useState<BillingStats>({
-    totalRevenue: 0,
-    mrr: 0,
-    activeSubscriptions: 0,
-    pendingPayments: 0,
+    totalRevenue: 1567500, // Sample: ₹15,67,500
+    mrr: 345000, // Sample: ₹3,45,000/month
+    activeSubscriptions: 49,
+    pendingPayments: 28500, // Sample: ₹28,500
   });
   const [systemHealth, setSystemHealth] = useState<SystemHealth>({
     apiStatus: 'healthy',
@@ -58,7 +58,14 @@ export default function SuperAdminDashboard() {
     cacheStatus: 'healthy',
     lastChecked: new Date().toISOString(),
   });
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([
+    { id: '1', action: 'Tenant Created', user: 'admin@fleetpro.local', timestamp: new Date(Date.now() - 5 * 60000).toISOString(), details: 'New tenant: Acme Corp' },
+    { id: '2', action: 'Subscription Upgraded', user: 'system', timestamp: new Date(Date.now() - 15 * 60000).toISOString(), details: 'TechStart Inc: Professional → Enterprise' },
+    { id: '3', action: 'Payment Received', user: 'system', timestamp: new Date(Date.now() - 45 * 60000).toISOString(), details: 'Invoice INV-2026-008 paid: ₹2,999' },
+    { id: '4', action: 'User Added', user: 'admin@fleetpro.local', timestamp: new Date(Date.now() - 2 * 3600000).toISOString(), details: 'Sarah Johnson added to Acme Corp' },
+    { id: '5', action: 'Plan Modified', user: 'admin@fleetpro.local', timestamp: new Date(Date.now() - 4 * 3600000).toISOString(), details: 'Professional plan: Added Advanced Analytics' },
+    { id: '6', action: 'API Key Generated', user: 'system', timestamp: new Date(Date.now() - 6 * 3600000).toISOString(), details: 'Production key created for Digital Pro' },
+  ]);
   const [rootUsers, setRootUsers] = useState<RootUser[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -139,16 +146,17 @@ export default function SuperAdminDashboard() {
 
   return (
     <SuperAdminLayout>
-      <div className="p-8 max-w-7xl mx-auto">
+      <div className="w-full h-full overflow-y-auto">
+        <div className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 w-full min-h-full">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">🚀 Platform Root Dashboard</h1>
-          <p className="text-gray-600">Complete platform management and analytics</p>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">🚀 Platform Root Dashboard</h1>
+          <p className="text-sm sm:text-base text-gray-600">Complete platform management and analytics</p>
         </div>
 
         {/* SECTION F: QuickStats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg border border-blue-200 p-4 sm:p-6">
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-blue-700">Total Tenants</p>
@@ -174,7 +182,7 @@ export default function SuperAdminDashboard() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-purple-700">Monthly Revenue</p>
-                <p className="text-3xl font-bold text-purple-900 mt-2">₹{(billingStats.mrr / 100000).toFixed(1)}L</p>
+                <p className="text-3xl font-bold text-purple-900 mt-2">₹{(billingStats.mrr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
                 <p className="text-xs text-purple-600 mt-1">MRR</p>
               </div>
               <DollarSign className="w-8 h-8 text-purple-600" />
@@ -185,7 +193,7 @@ export default function SuperAdminDashboard() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm font-medium text-orange-700">Total Revenue</p>
-                <p className="text-3xl font-bold text-orange-900 mt-2">₹{(billingStats.totalRevenue / 1000000).toFixed(1)}M</p>
+                <p className="text-3xl font-bold text-orange-900 mt-2">₹{(billingStats.totalRevenue || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
                 <p className="text-xs text-orange-600 mt-1">All-time</p>
               </div>
               <TrendingUp className="w-8 h-8 text-orange-600" />
@@ -194,8 +202,8 @@ export default function SuperAdminDashboard() {
         </div>
 
         {/* SECTION B: System Health Monitor */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 shadow-sm">
             <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
               <Activity className="w-5 h-5 text-blue-600" />
               System Health
@@ -227,15 +235,15 @@ export default function SuperAdminDashboard() {
           </div>
 
           {/* SECTION D: Billing Dashboard */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 shadow-sm">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-green-600" />
               Billing Overview
             </h3>
             <div className="space-y-3">
               <div className="p-3 bg-gradient-to-r from-green-50 to-green-100 rounded">
                 <p className="text-xs text-green-700 font-medium">Monthly Recurring Revenue</p>
-                <p className="text-2xl font-bold text-green-900 mt-1">₹{(billingStats.mrr / 100000).toFixed(1)}L</p>
+                <p className="text-2xl font-bold text-green-900 mt-1">₹{(billingStats.mrr || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
               </div>
               <div className="p-3 bg-gradient-to-r from-blue-50 to-blue-100 rounded">
                 <p className="text-xs text-blue-700 font-medium">Active Subscriptions</p>
@@ -243,14 +251,14 @@ export default function SuperAdminDashboard() {
               </div>
               <div className="p-3 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded">
                 <p className="text-xs text-yellow-700 font-medium">Pending Payments</p>
-                <p className="text-2xl font-bold text-yellow-900 mt-1">₹{(billingStats.pendingPayments / 100000).toFixed(1)}L</p>
+                <p className="text-2xl font-bold text-yellow-900 mt-1">₹{(billingStats.pendingPayments || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
               </div>
             </div>
           </div>
 
           {/* SECTION E: User Management (Quick View) */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 shadow-sm">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
               <Shield className="w-5 h-5 text-purple-600" />
               Root Admin Users
             </h3>
@@ -270,23 +278,23 @@ export default function SuperAdminDashboard() {
         </div>
 
         {/* SECTION A: Tenant Analytics */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm mb-8">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 shadow-sm mb-6 sm:mb-8">
+          <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-blue-600" />
             Tenant Analytics
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div className="p-3 sm:p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg">
               <p className="text-xs text-blue-700 font-semibold uppercase">Active Growth Rate</p>
               <p className="text-2xl font-bold text-blue-900 mt-2">
                 {stats.total > 0 ? ((stats.active / stats.total) * 100).toFixed(1) : 0}%
               </p>
               <p className="text-xs text-blue-600 mt-2">{stats.active} of {stats.total} tenants active</p>
             </div>
-            <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg">
+            <div className="p-3 sm:p-4 bg-gradient-to-br from-green-50 to-green-100 rounded-lg">
               <p className="text-xs text-green-700 font-semibold uppercase">Avg Revenue per Tenant</p>
               <p className="text-2xl font-bold text-green-900 mt-2">
-                ₹{stats.total > 0 ? (billingStats.totalRevenue / stats.total / 100000).toFixed(1) : 0}L
+                ₹{stats.total > 0 ? ((billingStats.totalRevenue || billingStats.mrr * 12) / stats.total).toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '0'}
               </p>
               <p className="text-xs text-green-600 mt-2">ARPU (Annual)</p>
             </div>
@@ -301,23 +309,22 @@ export default function SuperAdminDashboard() {
         </div>
 
         {/* SECTION C: Recent Activity Log */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 shadow-sm">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
               <Clock className="w-5 h-5 text-orange-600" />
               Recent Activity
             </h3>
             <div className="space-y-3">
               {activityLogs.length > 0 ? (
                 activityLogs.slice(0, 6).map((log) => (
-                  <div key={log.id} className="p-3 bg-gray-50 rounded border-l-4 border-orange-400">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{log.action}</p>
-                        <p className="text-xs text-gray-600 mt-1">{log.user}</p>
-                      </div>
+                  <div key={log.id} className="p-3 bg-gray-50 rounded border-l-4 border-orange-400 hover:bg-gray-100 transition-colors">
+                    <div className="flex items-start justify-between mb-1">
+                      <p className="text-sm font-semibold text-gray-900">{log.action}</p>
                       <span className="text-xs text-gray-500">{new Date(log.timestamp).toLocaleTimeString()}</span>
                     </div>
+                    <p className="text-xs text-gray-600">{log.details}</p>
+                    <p className="text-xs text-gray-500 mt-1">By: {log.user}</p>
                   </div>
                 ))
               ) : (
@@ -329,8 +336,8 @@ export default function SuperAdminDashboard() {
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+          <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 shadow-sm">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
               <Plus className="w-5 h-5 text-green-600" />
               Quick Actions
             </h3>
@@ -368,6 +375,7 @@ export default function SuperAdminDashboard() {
               </button>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </SuperAdminLayout>

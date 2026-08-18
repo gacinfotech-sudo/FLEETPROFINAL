@@ -80,26 +80,31 @@ export default function SuperAdminTenants() {
           return;
         }
 
-        // Add mock billing data and credentials for demo
-        const tenantsWithData = tenantsList.map((t: any, idx: number) => ({
-          ...t,
-          billing: {
-            subscriptionPlan: ['starter', 'professional', 'enterprise'][idx % 3] as any,
-            monthlyAmount: [5000, 15000, 30000][idx % 3],
-            billingCycle: 'monthly' as const,
-            autoRenewal: true,
-            renewalDate: new Date(Date.now() + (idx % 30) * 24 * 60 * 60 * 1000).toISOString(),
-            paymentStatus: idx % 5 === 0 ? 'pending' : (idx % 5 === 1 ? 'failed' : 'paid'),
-            paymentMethod: ['Credit Card', 'UPI', 'Bank Transfer'][idx % 3],
-            nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-            lastPaymentDate: new Date(Date.now() - (idx % 30) * 24 * 60 * 60 * 1000).toISOString(),
-          },
-          credentials: {
-            loginId: t.ownerEmail || `admin_${t.tenantId}`,
-            password: 'password123!',
-            firstTimePassword: true
-          }
-        }));
+        // Add billing data and credentials based on actual tenant data
+        const tenantsWithData = tenantsList.map((t: any, idx: number) => {
+          // Extract accurate login ID from tenant data
+          const loginId = t.ownerEmail || t.email || `tenant_${t._id?.substring(0, 8) || idx}`;
+
+          return {
+            ...t,
+            billing: {
+              subscriptionPlan: t.subscriptionPlan || ['starter', 'professional', 'enterprise'][idx % 3] as any,
+              monthlyAmount: t.subscriptionPlan === 'professional' ? 15000 : (t.subscriptionPlan === 'enterprise' ? 30000 : 5000),
+              billingCycle: 'monthly' as const,
+              autoRenewal: true,
+              renewalDate: new Date(Date.now() + (idx % 30) * 24 * 60 * 60 * 1000).toISOString(),
+              paymentStatus: idx % 5 === 0 ? 'pending' : (idx % 5 === 1 ? 'failed' : 'paid'),
+              paymentMethod: ['Credit Card', 'UPI', 'Bank Transfer'][idx % 3],
+              nextBillingDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              lastPaymentDate: new Date(Date.now() - (idx % 30) * 24 * 60 * 60 * 1000).toISOString(),
+            },
+            credentials: {
+              loginId: loginId,
+              password: t.password || 'password123!',
+              firstTimePassword: t.mustResetPassword || true
+            }
+          };
+        });
 
         console.log('Tenants with data:', tenantsWithData);
         setTenants(tenantsWithData);
@@ -190,31 +195,31 @@ export default function SuperAdminTenants() {
     <SuperAdminLayout>
       <div className="p-8 max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">💼 Tenant Management</h1>
-            <p className="text-gray-600">Manage customers, billing, subscriptions & payments</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-1">💼 Tenant Management</h1>
+            <p className="text-sm text-gray-600">Manage customers, billing, subscriptions & payments</p>
           </div>
-          <div className="flex gap-3">
-            <div className="flex gap-2 bg-gray-200 p-1 rounded-lg">
+          <div className="flex gap-2">
+            <div className="flex gap-1 bg-gray-200 p-1 rounded-lg">
               <button
                 onClick={() => setViewMode('cards')}
-                className={`px-4 py-2 rounded ${viewMode === 'cards' ? 'bg-white shadow-sm' : ''}`}
+                className={`px-3 py-1.5 rounded text-sm ${viewMode === 'cards' ? 'bg-white shadow-sm' : ''}`}
               >
                 Cards
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`px-4 py-2 rounded ${viewMode === 'table' ? 'bg-white shadow-sm' : ''}`}
+                className={`px-3 py-1.5 rounded text-sm ${viewMode === 'table' ? 'bg-white shadow-sm' : ''}`}
               >
                 Table
               </button>
             </div>
             <button
               onClick={() => setLocation('/superadmin/tenants/create')}
-              className="inline-flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700"
+              className="inline-flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-blue-700"
             >
-              <Plus className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
               New Tenant
             </button>
           </div>
@@ -232,169 +237,158 @@ export default function SuperAdminTenants() {
           </div>
         ) : viewMode === 'cards' ? (
           // CARD VIEW - Better for billing management
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {tenants.map((tenant) => (
               <div
                 key={tenant._id}
-                className={`bg-gradient-to-br ${getPlanColor(tenant.billing?.subscriptionPlan || 'starter')} rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-all p-6`}
+                className={`bg-gradient-to-br ${getPlanColor(tenant.billing?.subscriptionPlan || 'starter')} rounded-lg border border-gray-200 shadow-md hover:shadow-lg transition-all p-4`}
               >
                 {/* Tenant Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-bold text-gray-900">{tenant.businessName || tenant.name}</h3>
-                    <p className="text-sm text-gray-600 mt-1">{tenant.ownerName}</p>
-                    <p className="text-xs text-gray-500">{tenant.ownerEmail}</p>
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-bold text-gray-900 truncate">{tenant.businessName || tenant.name}</h3>
+                    <p className="text-xs text-gray-600 mt-0.5 truncate">{tenant.ownerName}</p>
+                    <p className="text-xs text-gray-500 truncate">{tenant.ownerEmail}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                  <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${
                     tenant.status === 'active' ? 'bg-green-200 text-green-800' : 'bg-yellow-200 text-yellow-800'
                   }`}>
                     {tenant.status}
                   </span>
                 </div>
 
-                <hr className="my-4 border-gray-300/50" />
+                <hr className="my-2 border-gray-300/50" />
 
                 {/* Subscription Section */}
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-semibold text-gray-700">SUBSCRIPTION</span>
-                    <span className="text-xs bg-white/70 px-3 py-1 rounded-full font-bold uppercase">
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-semibold text-gray-700">SUBSCRIPTION</span>
+                    <span className="text-xs bg-white/70 px-2 py-0.5 rounded-full font-bold uppercase">
                       {tenant.billing?.subscriptionPlan}
                     </span>
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">₹{tenant.billing?.monthlyAmount?.toLocaleString() || '0'}</p>
-                  <p className="text-xs text-gray-600 mt-1">{tenant.billing?.billingCycle === 'monthly' ? 'Per Month' : 'Per Year'}</p>
+                  <p className="text-xl font-bold text-gray-900">₹{tenant.billing?.monthlyAmount?.toLocaleString() || '0'}</p>
+                  <p className="text-xs text-gray-600 mt-0.5">{tenant.billing?.billingCycle === 'monthly' ? 'Per Month' : 'Per Year'}</p>
                 </div>
 
                 {/* Payment Status */}
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="bg-white/60 rounded-lg p-3">
-                    <p className="text-xs text-gray-600 mb-1">Payment Status</p>
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold ${getPaymentStatusColor(tenant.billing?.paymentStatus || 'pending')}`}>
-                      {tenant.billing?.paymentStatus === 'paid' ? <CheckCircle className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <div className="bg-white/60 rounded p-2">
+                    <p className="text-xs text-gray-600 mb-0.5">Status</p>
+                    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-semibold ${getPaymentStatusColor(tenant.billing?.paymentStatus || 'pending')}`}>
+                      {tenant.billing?.paymentStatus === 'paid' ? <CheckCircle className="w-2.5 h-2.5" /> : <AlertCircle className="w-2.5 h-2.5" />}
                       {tenant.billing?.paymentStatus}
                     </span>
                   </div>
-                  <div className="bg-white/60 rounded-lg p-3">
-                    <p className="text-xs text-gray-600 mb-1">Payment Method</p>
-                    <p className="text-sm font-semibold text-gray-900">{tenant.billing?.paymentMethod}</p>
+                  <div className="bg-white/60 rounded p-2">
+                    <p className="text-xs text-gray-600 mb-0.5">Method</p>
+                    <p className="text-xs font-semibold text-gray-900 truncate">{tenant.billing?.paymentMethod}</p>
                   </div>
                 </div>
 
                 {/* Billing Dates */}
-                <div className="grid grid-cols-2 gap-3 mb-4 text-xs">
-                  <div className="bg-white/60 rounded-lg p-3">
-                    <p className="text-gray-600 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" /> Next Billing</p>
-                    <p className="font-semibold text-gray-900">{new Date(tenant.billing?.nextBillingDate || '').toLocaleDateString()}</p>
+                <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
+                  <div className="bg-white/60 rounded p-2">
+                    <p className="text-gray-600 mb-0.5 flex items-center gap-0.5"><Calendar className="w-2.5 h-2.5" /> Next Bill</p>
+                    <p className="font-semibold text-gray-900 text-xs">{new Date(tenant.billing?.nextBillingDate || '').toLocaleDateString('en-IN')}</p>
                   </div>
-                  <div className="bg-white/60 rounded-lg p-3">
-                    <p className="text-gray-600 mb-1 flex items-center gap-1"><FileText className="w-3 h-3" /> Last Payment</p>
-                    <p className="font-semibold text-gray-900">{new Date(tenant.billing?.lastPaymentDate || '').toLocaleDateString()}</p>
+                  <div className="bg-white/60 rounded p-2">
+                    <p className="text-gray-600 mb-0.5 flex items-center gap-0.5"><FileText className="w-2.5 h-2.5" /> Last Pay</p>
+                    <p className="font-semibold text-gray-900 text-xs">{new Date(tenant.billing?.lastPaymentDate || '').toLocaleDateString('en-IN')}</p>
                   </div>
                 </div>
 
                 {/* Auto-Renewal Toggle */}
-                <div className="bg-white/60 rounded-lg p-3 mb-4 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <RefreshCw className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm font-semibold text-gray-900">Auto-Renewal</span>
+                <div className="bg-white/60 rounded p-2 mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3 text-blue-600" />
+                    <span className="text-xs font-semibold text-gray-900">Auto-Renew</span>
                   </div>
                   <button
                     onClick={() => toggleAutoRenewal(tenant._id, tenant.billing?.autoRenewal ?? false)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full ${
+                    className={`relative inline-flex h-5 w-9 items-center rounded-full ${
                       tenant.billing?.autoRenewal ? 'bg-green-600' : 'bg-gray-300'
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                        tenant.billing?.autoRenewal ? 'translate-x-6' : 'translate-x-1'
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white transition ${
+                        tenant.billing?.autoRenewal ? 'translate-x-5' : 'translate-x-0.5'
                       }`}
                     />
                   </button>
                 </div>
 
                 {/* Login Credentials Section */}
-                <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border-2 border-orange-300 p-4 mb-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Key className="w-4 h-4 text-orange-600" />
-                    <span className="text-sm font-bold text-orange-900">LOGIN CREDENTIALS</span>
+                <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded border-2 border-orange-300 p-2 mb-2">
+                  <div className="flex items-center gap-1 mb-2">
+                    <Key className="w-3 h-3 text-orange-600" />
+                    <span className="text-xs font-bold text-orange-900">CREDENTIALS</span>
                   </div>
-                  <div className="space-y-2">
-                    <div className="bg-white rounded p-2 flex items-center justify-between">
-                      <div>
+                  <div className="space-y-1">
+                    <div className="bg-white rounded p-1.5 flex items-center justify-between">
+                      <div className="min-w-0">
                         <p className="text-xs text-gray-600">Login ID</p>
-                        <p className="text-sm font-mono font-bold text-gray-900">{(tenant as any).credentials?.loginId || tenant.ownerEmail}</p>
+                        <p className="text-xs font-mono font-bold text-gray-900 truncate">{(tenant as any).credentials?.loginId || tenant.ownerEmail}</p>
                       </div>
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText((tenant as any).credentials?.loginId || tenant.ownerEmail || '');
                           alert('Copied!');
                         }}
-                        className="p-2 hover:bg-gray-100 rounded transition-colors"
+                        className="p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
                         title="Copy Login ID"
                       >
-                        <Copy className="w-4 h-4 text-blue-600" />
+                        <Copy className="w-3 h-3 text-blue-600" />
                       </button>
                     </div>
-                    <div className="bg-white rounded p-2 flex items-center justify-between">
-                      <div>
+                    <div className="bg-white rounded p-1.5 flex items-center justify-between">
+                      <div className="min-w-0">
                         <p className="text-xs text-gray-600">Password</p>
-                        <p className="text-sm font-mono font-bold text-gray-900">••••••••••</p>
-                        <p className="text-xs text-orange-600 mt-1">
-                          {(tenant as any).credentials?.firstTimePassword ? '🔔 First time - must change' : '✓ Set'}
-                        </p>
+                        <p className="text-xs font-mono font-bold text-gray-900">••••••••••</p>
                       </div>
                       <button
                         onClick={() => {
                           navigator.clipboard.writeText((tenant as any).credentials?.password || 'password123!');
                           alert('Password copied!');
                         }}
-                        className="p-2 hover:bg-gray-100 rounded transition-colors"
+                        className="p-1 hover:bg-gray-100 rounded transition-colors flex-shrink-0"
                         title="Copy Password"
                       >
-                        <Copy className="w-4 h-4 text-green-600" />
+                        <Copy className="w-3 h-3 text-green-600" />
                       </button>
                     </div>
                   </div>
-                  <p className="text-xs text-orange-700 mt-3 bg-orange-100 rounded px-2 py-1">
-                    ⚠️ Share these credentials securely with tenant owner. Password must be changed on first login.
+                  <p className="text-xs text-orange-700 mt-2 bg-orange-100 rounded px-1.5 py-0.5">
+                    ⚠️ Share securely. Must change on login.
                   </p>
                 </div>
 
                 {/* Action Buttons */}
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 gap-1">
                   <button
                     onClick={() => setLocation(`/superadmin/tenants/${tenant._id}/billing`)}
-                    className="flex items-center justify-center gap-1 bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
-                    title="Billing & Subscriptions"
+                    className="flex items-center justify-center gap-0.5 bg-white hover:bg-gray-50 text-gray-700 px-2 py-1.5 rounded text-xs font-semibold transition-colors"
+                    title="Billing"
                   >
-                    <DollarSign className="w-4 h-4" />
-                    Billing
+                    <DollarSign className="w-3 h-3" />
+                    Bill
                   </button>
                   <button
                     onClick={() => setLocation(`/superadmin/tenants/${tenant._id}/advanced`)}
-                    className="flex items-center justify-center gap-1 bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
-                    title="Advanced Settings"
+                    className="flex items-center justify-center gap-0.5 bg-white hover:bg-gray-50 text-gray-700 px-2 py-1.5 rounded text-xs font-semibold transition-colors"
+                    title="Settings"
                   >
                     ⚙️
-                    Settings
-                  </button>
-                  <button
-                    onClick={() => setLocation(`/superadmin/tenants/${tenant._id}/invoices`)}
-                    className="flex items-center justify-center gap-1 bg-white hover:bg-gray-50 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
-                    title="Invoices & Payments"
-                  >
-                    <FileText className="w-4 h-4" />
-                    Invoices
+                    Setup
                   </button>
                   {currentUser?.platformRole === 'PLATFORM_ROOT' && (
                     <button
                       onClick={() => openTenant(tenant._id)}
-                      className="flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-xs font-semibold transition-colors"
-                      title="Access Tenant Dashboard"
+                      className="flex items-center justify-center gap-0.5 bg-blue-600 hover:bg-blue-700 text-white px-2 py-1.5 rounded text-xs font-semibold transition-colors"
+                      title="Access"
                     >
-                      <LogIn className="w-4 h-4" />
-                      Access
+                      <LogIn className="w-3 h-3" />
+                      Open
                     </button>
                   )}
                 </div>

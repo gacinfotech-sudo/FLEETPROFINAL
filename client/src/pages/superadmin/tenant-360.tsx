@@ -50,14 +50,14 @@ export default function Tenant360() {
   async function fetchTenantData() {
     try {
       // Get tenant details
-      const tenantRes = await fetch(`https://localhost:5050/api/admin/tenants/${id}`, {
+      const tenantRes = await fetch(`/api/admin/tenants/${id}`, {
         credentials: 'include',
       });
       const tenantData = await tenantRes.json();
       setTenant(tenantData);
 
       // Get tenant users
-      const usersRes = await fetch(`https://localhost:5050/api/admin/tenants/${id}/users`, {
+      const usersRes = await fetch(`/api/admin/tenants/${id}/users`, {
         credentials: 'include',
       });
       const usersData = await usersRes.json();
@@ -81,7 +81,7 @@ export default function Tenant360() {
     if (!newUserForm.name || !newUserForm.email) return;
 
     try {
-      const response = await fetch(`https://localhost:5050/api/admin/tenants/${id}/users`, {
+      const response = await fetch(`/api/admin/tenants/${id}/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -109,7 +109,7 @@ export default function Tenant360() {
     if (!confirm('Delete this user?')) return;
 
     try {
-      await fetch(`https://localhost:5050/api/admin/tenants/${id}/users/${userId}`, {
+      await fetch(`/api/admin/tenants/${id}/users/${userId}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -121,7 +121,7 @@ export default function Tenant360() {
 
   async function resetPassword(userId: string) {
     try {
-      const response = await fetch(`https://localhost:5050/api/admin/tenants/${id}/users/${userId}/reset-password`, {
+      const response = await fetch(`/api/admin/tenants/${id}/users/${userId}/reset-password`, {
         method: 'POST',
         credentials: 'include',
       });

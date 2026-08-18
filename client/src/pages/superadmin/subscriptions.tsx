@@ -47,10 +47,10 @@ export default function SubscriptionsPage() {
   async function fetchData() {
     try {
       const [tenantsRes, plansRes] = await Promise.all([
-        fetch('https://localhost:5050/api/admin/tenants', {
+        fetch('/api/admin/tenants', {
           credentials: 'include',
         }),
-        fetch('https://localhost:5050/api/admin/plans', {
+        fetch('/api/admin/plans', {
           credentials: 'include',
         }),
       ]);
@@ -64,7 +64,7 @@ export default function SubscriptionsPage() {
         const subsMap = new Map<string, Subscription>();
         for (const tenant of tenantList) {
           try {
-            const subRes = await fetch(`https://localhost:5050/api/admin/tenants/${tenant._id}/subscription`, {
+            const subRes = await fetch(`/api/admin/tenants/${tenant._id}/subscription`, {
               credentials: 'include',
             });
             if (subRes.ok) {
@@ -91,7 +91,7 @@ export default function SubscriptionsPage() {
 
   async function updateSubscription(tenantId: string) {
     try {
-      const response = await fetch(`https://localhost:5050/api/admin/tenants/${tenantId}/subscription`, {
+      const response = await fetch(`/api/admin/tenants/${tenantId}/subscription`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

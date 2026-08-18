@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { useLocation } from 'wouter';
-import { LogOut, LayoutDashboard, Building2, Menu, DollarSign, CreditCard, Package, Settings } from 'lucide-react';
+import { LogOut, LayoutDashboard, Building2, Menu, DollarSign, CreditCard, Package, Settings, Users, Sliders, Shield, BarChart3, Heart, Lock, MessageSquare } from 'lucide-react';
 import { useState } from 'react';
 
 interface SuperAdminLayoutProps {
@@ -15,7 +15,7 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
     try {
       const token = localStorage.getItem('fleetpro_token');
       if (token) {
-        await fetch('https://localhost:5050/api/auth/logout', {
+        await fetch('/api/auth/logout', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -87,6 +87,54 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
             open={sidebarOpen}
           />
           <NavItem
+            icon={<DollarSign size={20} />}
+            label="💰 Revenue Intelligence"
+            onClick={() => setLocation('/superadmin/revenue')}
+            open={sidebarOpen}
+          />
+          <NavItem
+            icon={<Users size={20} />}
+            label="👥 User Management"
+            onClick={() => setLocation('/superadmin/users')}
+            open={sidebarOpen}
+          />
+          <NavItem
+            icon={<Sliders size={20} />}
+            label="⚙️ Settings"
+            onClick={() => setLocation('/superadmin/settings')}
+            open={sidebarOpen}
+          />
+          <NavItem
+            icon={<Shield size={20} />}
+            label="🔍 Audit Logs"
+            onClick={() => setLocation('/superadmin/audit')}
+            open={sidebarOpen}
+          />
+          <NavItem
+            icon={<BarChart3 size={20} />}
+            label="📊 Advanced Analytics"
+            onClick={() => setLocation('/superadmin/analytics')}
+            open={sidebarOpen}
+          />
+          <NavItem
+            icon={<Heart size={20} />}
+            label="❤️ Customer Success"
+            onClick={() => setLocation('/superadmin/cs')}
+            open={sidebarOpen}
+          />
+          <NavItem
+            icon={<Lock size={20} />}
+            label="🔒 Compliance & Security"
+            onClick={() => setLocation('/superadmin/compliance')}
+            open={sidebarOpen}
+          />
+          <NavItem
+            icon={<MessageSquare size={20} />}
+            label="💬 Support Ticketing"
+            onClick={() => setLocation('/superadmin/support')}
+            open={sidebarOpen}
+          />
+          <NavItem
             icon={<Settings size={20} />}
             label="Advanced Console"
             onClick={() => setLocation('/superadmin/console')}
@@ -107,20 +155,20 @@ export default function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Top Bar */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between flex-shrink-0">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 hover:bg-gray-100 rounded-lg"
+            className="p-2 hover:bg-gray-100 rounded-lg flex-shrink-0"
           >
             <Menu size={24} />
           </button>
-          <div className="text-sm text-gray-600">Root Admin</div>
+          <div className="text-xs sm:text-sm text-gray-600 truncate ml-2">Root Admin</div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto min-w-0">
           {children}
         </div>
       </div>
