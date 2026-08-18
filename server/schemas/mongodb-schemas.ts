@@ -200,7 +200,7 @@ export const mongoBookingSchema = z.object({
   tentativeStartDate: z.string().optional(),
   tentativeEndDate: z.string().optional(),
   followUpAt: z.string().optional(),
-  bookingType: z.enum(['self_drive', 'with_driver', 'one_way', 'round_trip', 'local', 'airport']).optional(),
+  bookingType: z.enum(['self_drive', 'with_driver']).optional(),
   // Trip shape (TASK-BOOKING-DOMAIN-02) — kept distinct from bookingType
   // above. Was declared on the client schema and submitted on every
   // create request but silently stripped here (this exact gap is audit
