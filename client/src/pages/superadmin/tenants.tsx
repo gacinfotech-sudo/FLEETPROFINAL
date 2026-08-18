@@ -201,6 +201,12 @@ export default function SuperAdminTenants() {
             <p className="text-sm text-gray-600">View-only tenant information (All data locked for security)</p>
           </div>
           <div className="flex gap-2">
+            <button
+              onClick={() => setLocation('/superadmin/tenants/create')}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Create Tenant
+            </button>
             <div className="flex gap-1 bg-gray-200 p-1 rounded-lg">
               <button
                 onClick={() => setViewMode('cards')}

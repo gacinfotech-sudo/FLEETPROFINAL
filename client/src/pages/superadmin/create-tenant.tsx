@@ -32,23 +32,9 @@ export default function CreateTenant() {
   const [successMessage, setSuccessMessage] = useState('');
 
   function validateForm(): boolean {
-    const newErrors: FormErrors = {};
-
-    if (!formData.businessName.trim()) {
-      newErrors.businessName = 'Company Name is required';
-    }
-    if (!formData.ownerName.trim()) {
-      newErrors.ownerName = 'Owner Name is required';
-    }
-    if (!formData.ownerMobile.trim()) {
-      newErrors.ownerMobile = 'Mobile is required';
-    }
-    if (!formData.ownerEmail.trim()) {
-      newErrors.ownerEmail = 'Email is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    // ULTRA FAST: All fields optional - users can fill in later
+    // No validation blocking, allow creating tenant with minimal data
+    return true;
   }
 
   async function handleSubmit(e: React.FormEvent) {
