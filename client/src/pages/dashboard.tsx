@@ -12,6 +12,7 @@ import Driver360 from "../components/drivers/driver-360";
 import RevenueReport from "../components/reports/revenue-report";
 import DriverSalaryPayroll from "./driver-salary-payroll";
 import VendorSettlementPage from "./vendor-settlement";
+import VendorInvoices from "./vendor-invoices";
 import BookingHistoryPDF from "../components/reports/booking-history-pdf";
 import EnhancedInvoiceGenerator from "../components/invoice/enhanced-invoice-generator";
 import UserManagement from "../components/user-management";
@@ -1092,18 +1093,7 @@ export default function Dashboard() {
         return <VendorsPage />;
 
       case "vendor-invoices":
-        return (
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center py-12 bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border-2 border-dashed border-orange-200 max-w-md mx-auto">
-              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FileText className="w-8 h-8 text-orange-600" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-800">Vendor Invoices</h3>
-              <p className="text-gray-600 mt-2">Coming Soon</p>
-              <p className="text-sm text-gray-500 mt-4">This feature is coming in a future update</p>
-            </div>
-          </div>
-        );
+        return <VendorInvoices />;
 
       case "history":
         // Defensive: ensure bookings is a valid array with required fields
