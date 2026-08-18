@@ -4222,3 +4222,9 @@ Tue Aug 18 17:25:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
 Tue Aug 18 17:25:00 IST 2026: Database backups:      125
 Tue Aug 18 17:25:00 IST 2026: Disk usage: 37%
 Tue Aug 18 17:25:01 IST 2026: ⚠️ ALERT: API health check failed
+Tue Aug 18 17:30:00 IST 2026: ⚠️ ALERT: Backend process not running
+Tue Aug 18 17:30:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Tue Aug 18 17:30:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Tue Aug 18 17:30:00 IST 2026: Database backups:      125
+Tue Aug 18 17:30:00 IST 2026: Disk usage: 37%
+Tue Aug 18 17:30:00 IST 2026: ⚠️ ALERT: API health check failed

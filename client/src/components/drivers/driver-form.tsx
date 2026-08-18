@@ -29,8 +29,10 @@ import DriverLifecyclePanel from "./driver-lifecycle-panel";
 // nothing: every field the form captured before still exists below with
 // identical validation.
 const driverSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  phone: z.string().min(10, "Valid phone number is required"),
+  // ULTRA FAST: ALL fields optional - no blocking validation ever
+  // Users can add driver with ANY info, complete profile later
+  name: z.string().optional(),
+  phone: z.string().optional(),
   email: z.string().email("Invalid email").optional(),
   licenseNumber: z.string().optional(),
   experience: z.number().min(0, "Experience must be a positive number").optional(),
@@ -197,12 +199,9 @@ export default function DriverForm({ driver, onSuccess }: DriverFormProps) {
   });
 
   const saveBasics = async (andThen: "close" | "continue") => {
-    // ULTRA FAST: Only validate required fields, skip optional identity docs
-    // Identity docs step is optional - don't validate everything, just the essentials
-    const requiredFields: (keyof typeof form.getValues)[] = ['name', 'phone', 'status'];
-    const valid = await form.trigger(requiredFields);
-    if (!valid) return;
-
+    // ULTRA FAST: NO VALIDATION - save whatever the user provided
+    // All fields are optional, so save immediately
+    // This ensures instant response with zero validation blocking
     const data = form.getValues();
     try {
       const result = savedDriver

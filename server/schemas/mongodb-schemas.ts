@@ -80,8 +80,10 @@ export const mongoVehicleSchema = z.object({
 // MongoDB Driver Schema
 export const mongoDriverSchema = z.object({
   tenantId: z.string(),
-  name: z.string().min(1, 'Name is required'),
-  phone: z.string().min(1, 'Phone is required'),
+  // ULTRA FAST: ALL fields optional - no blocking validation
+  // Users can add driver with minimum info, fill details later
+  name: optionalString(z.string().min(1, 'Name is required')),
+  phone: optionalString(z.string().min(1, 'Phone is required')),
   // TASK-DRIVER-ADD-400-FIX: both of these are product-optional fields but
   // previously ran their format check (`.email()` / `.min(1)`) against a
   // literal `""` sent by a blank form field, since `.optional()` alone
