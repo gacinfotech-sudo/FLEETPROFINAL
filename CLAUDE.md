@@ -7,24 +7,56 @@
 
 ## 🔐 SHARED FILES LOCK (Final Integrator Only)
 
-### Protected Files
-These files can ONLY be modified by the Final Integrator:
+### Protected Files (TIER 1 - IMMUTABLE STRUCTURE)
+These files are **LOCKED FOREVER** - NO MODIFICATIONS ALLOWED:
 
 ```
-LOCKED FILES (Read-only for all agents except Final Integrator):
-├─ client/src/modules/manifest.ts (Navigation registry - 42+ items)
-├─ client/src/components/layout/sidebar.tsx (Sidebar rendering)
-├─ client/src/App.tsx (Main app component)
-├─ client/src/routes.ts (Route definitions)
-├─ server/index.ts (Server entry point)
-├─ server/connectDB.ts (Database connection)
-├─ server/models/index.ts (Database schema)
-├─ package.json (Dependencies)
-├─ package-lock.json (Dependency lock)
-├─ tsconfig.json (TypeScript config)
-├─ vite.config.ts (Vite build config)
-├─ playwright.config.ts (Test configuration)
-└─ All migration files (server/migrations/*)
+IMMUTABLE CORE STRUCTURE (Backup: BACKUP-ROOT-ADMIN-TENANT-STRUCTURE-20260818-FINAL):
+├─ ROOT ADMIN DOMAIN (Locked 2026-08-18)
+│  ├─ server/domains/root-admin/ (ALL files - NO changes/deletes)
+│  ├─ server/admin/ (ALL files - NO changes/deletes)
+│  ├─ server/roles/ (ALL files - NO changes/deletes)
+│  ├─ server/permissions/ (ALL files - NO changes/deletes)
+│  └─ server/audit/ (ALL files - NO changes/deletes)
+├─ TENANT DOMAIN (Locked 2026-08-18)
+│  ├─ server/domains/tenant/ (ALL files - NO changes/deletes)
+│  ├─ server/models/Tenant.ts (Tenant schema - IMMUTABLE)
+│  ├─ server/models/TenantConfig.ts (Config - IMMUTABLE)
+│  ├─ server/models/TenantLimit.ts (Limits - IMMUTABLE)
+│  └─ server/models/TenantPlan.ts (Plans - IMMUTABLE)
+├─ AUTHENTICATION & SECURITY
+│  ├─ server/middleware/auth.ts (NO modifications)
+│  ├─ server/middleware/tenant.ts (NO modifications)
+│  ├─ server/middleware/rbac.ts (NO modifications)
+│  └─ server/security/ (ALL files - NO changes/deletes)
+├─ NAVIGATION & ROUTING
+│  ├─ client/src/modules/manifest.ts (Navigation registry - 42+ items)
+│  ├─ client/src/components/layout/sidebar.tsx (Sidebar rendering)
+│  ├─ client/src/App.tsx (Main app component)
+│  ├─ client/src/routes.ts (Route definitions)
+│  └─ client/src/admin/ (Admin UI - locked structure)
+├─ INFRASTRUCTURE
+│  ├─ server/index.ts (Server entry point)
+│  ├─ server/connectDB.ts (Database connection)
+│  ├─ server/models/index.ts (Database schema index)
+│  ├─ package.json (Dependencies)
+│  ├─ package-lock.json (Dependency lock)
+│  ├─ tsconfig.json (TypeScript config)
+│  ├─ vite.config.ts (Vite build config)
+│  ├─ playwright.config.ts (Test configuration)
+│  └─ All migration files (server/migrations/*)
+```
+
+### Protected Files (TIER 2 - FEATURE ADDITIONS ONLY)
+These files CAN be modified ONLY to ADD new features (via worktrees):
+
+```
+FEATURE-ADDITIVE FILES (Can add new routes/models, NO modifications to existing):
+├─ server/routes.ts (Can add new endpoints, NO changes to existing)
+├─ server/schemas/ (Can add new schemas, NO changes to existing)
+├─ client/src/components/ (Can add new components, NO changes to existing structure)
+├─ server/services/ (Can add new services, NO changes to existing)
+└─ client/src/features/ (Can add new features, NO changes to existing)
 ```
 
 ### Why These Files?
@@ -36,11 +68,78 @@ LOCKED FILES (Read-only for all agents except Final Integrator):
 - **Config files**: Build reproducibility
 
 ### Modification Policy
-1. **Read-only for all agents** (enforceable via git hooks)
-2. **Only Final Integrator modifies** these files
-3. **Changes require approval** from stakeholders
-4. **Rollback ready** for every change
-5. **No parallel writers** allowed
+
+**TIER 1 (IMMUTABLE - Root Admin & Tenant):**
+1. ✅ **Zero modifications** to ROOT ADMIN & TENANT structure
+2. ✅ **Add-only mode**: New features via NEW endpoints/services
+3. ✅ **Backup exists**: BACKUP-ROOT-ADMIN-TENANT-STRUCTURE-20260818-FINAL
+4. ✅ **Git hooks enforce**: Blocks any modification attempts
+5. ✅ **No exceptions** - Even Final Integrator cannot modify
+
+**TIER 2 (Controlled - Feature-Additive):**
+1. ✅ Can add new routes to routes.ts (NO modifying existing)
+2. ✅ Can add new schemas (NO modifying existing)
+3. ✅ Can add new components (NO modifying existing)
+4. ✅ Changes require Final Integrator approval
+5. ✅ Must use feature worktrees for isolation
+
+**All Other Files:**
+1. ✅ Can modify freely via worktrees
+2. ✅ Requires review + merge
+3. ✅ No parallel writers
+4. ✅ Rollback ready
+
+---
+
+## 🔒 ROOT ADMIN & TENANT STRUCTURE - LOCKED FOREVER (2026-08-18)
+
+### WHAT IS LOCKED
+✅ **ROOT ADMIN domain** - Completely immutable
+  - No deletions allowed
+  - No modifications allowed
+  - No structure changes allowed
+  - Backup: BACKUP-ROOT-ADMIN-TENANT-STRUCTURE-20260818-FINAL
+
+✅ **TENANT domain** - Completely immutable
+  - No deletions allowed
+  - No modifications allowed
+  - No schema changes allowed
+  - Backup: BACKUP-ROOT-ADMIN-TENANT-STRUCTURE-20260818-FINAL
+
+✅ **Authentication & Security** - Completely immutable
+  - No changes to auth middleware
+  - No changes to tenant isolation
+  - No changes to RBAC
+  - Critical for system stability
+
+### WHAT IS ALLOWED
+✅ **Add-only features** (via worktrees):
+  - NEW root admin capabilities (via new routes)
+  - NEW tenant features (via new services)
+  - NEW authentication methods (separate endpoints)
+  - NEW permissions (additive, not modifying existing)
+
+❌ **NEVER ALLOWED:**
+  - Modify existing root admin code
+  - Modify existing tenant code
+  - Modify tenant schema
+  - Modify authentication logic
+  - Delete any locked files
+  - Change any locked structure
+
+### WHY THIS LOCK?
+- **Stability**: ROOT ADMIN controls everything
+- **Security**: Tenant isolation is critical
+- **Data integrity**: Tenant limits & configs are immutable
+- **Audit**: Complete change history needed
+- **Compliance**: Cannot alter core structures
+
+### ENFORCEMENT
+```bash
+# If someone tries to modify locked files:
+git hook pre-commit → BLOCKS commit
+Error: "ROOT_ADMIN locked. Create feature worktree instead."
+```
 
 ---
 
@@ -129,48 +228,62 @@ Before modifying ANY protected file:
 
 ## 🔄 CHANGE REQUEST PROCESS
 
-### To Add a New Feature
+### To Add a NEW ROOT ADMIN Feature (Add-Only)
 
 1. **Create Isolated Worktree**
    ```bash
-   git worktree add feature/my-feature
+   git worktree add feature/root-admin-new-capability
    ```
 
-2. **Develop in Isolation**
-   - Make all changes in your worktree
-   - Do NOT modify protected files
-   - Test thoroughly
-   - Create commits with clear messages
+2. **Develop NEW Endpoint**
+   - Create NEW route in server/routes.ts (do NOT modify existing)
+   - Create NEW service file (do NOT modify existing services)
+   - Create NEW schema (do NOT modify existing schemas)
+   - Test thoroughly with existing admin code
+   - Zero changes to existing ROOT ADMIN code
 
 3. **Request Integration**
-   - Create pull request
-   - Get code review
-   - Final Integrator cherry-picks or merges
-   - Verify no conflicts with manifest.ts
+   - Create pull request with: "NEW ROOT ADMIN FEATURE: [description]"
+   - Code review checks: "No modifications to existing admin code?"
+   - Final Integrator verifies structure intact
+   - Verify no deletions or changes to locked files
 
 4. **Final Integrator Approval**
-   - Reviews for navigation conflicts
-   - Verifies 42+ items still present
+   - Confirms no structural changes
+   - Confirms all new endpoints are additive
    - Runs build validation
    - Merges to main
+   - Updates MEMORY.md with new capability
 
-### To Fix a Bug
+### To Add a NEW TENANT Feature (Add-Only)
 
-Same process:
+Same process as ROOT ADMIN:
+- NEW services only (no modifying existing)
+- NEW routes only (no modifying existing)
+- NEW middleware only (no modifying existing)
+- Zero changes to tenant schema
+- Zero changes to tenant isolation logic
+
+### To Fix a Bug (Bug Fixes Only)
+
+Bug fixes are allowed ONLY in non-locked areas:
 1. Isolate in worktree
-2. Fix + test
-3. Request review
+2. Fix bug (NO structural changes)
+3. Request review (must not touch ROOT ADMIN/TENANT)
 4. Final Integrator validates + merges
 
-### To Modify Protected Files
+### To Modify ROOT ADMIN or TENANT (BLOCKED)
 
-**REQUIRES EXPLICIT APPROVAL:**
-1. Create pull request with detailed justification
-2. Get stakeholder sign-off
-3. Final Integrator executes change
-4. Create pre-change backup tag
-5. Run full test suite
-6. Deploy + monitor
+**NOT ALLOWED UNDER ANY CIRCUMSTANCES:**
+```
+❌ Modification of existing root admin code
+❌ Modification of existing tenant code
+❌ Modification of tenant schema
+❌ Modification of authentication logic
+❌ Any structural changes
+
+RESULT: Git pre-commit hook BLOCKS commit
+```
 
 ---
 
@@ -229,23 +342,55 @@ PORT=5050 npm run dev
 ## 📊 LOCK STATUS
 
 **Current State:**
-- ✅ Production deployed (commit 1a1d569)
+- ✅ Production deployed (commit 932d90d)
 - ✅ All 42+ features live on :5050
 - ✅ Database verified healthy (87 collections)
-- ✅ Backup tagged (production-live-20260809-212440)
+- ✅ ROOT ADMIN structure LOCKED (2026-08-18)
+- ✅ TENANT structure LOCKED (2026-08-18)
+- ✅ Backup tagged (BACKUP-ROOT-ADMIN-TENANT-STRUCTURE-20260818-FINAL)
 - ✅ Single-integrator lock active
 - ✅ Parallel writers blocked
+- ✅ Add-only mode for new features
+
+**TIER 1 LOCKS (Immutable):**
+- 🔒 ROOT ADMIN domain (all files)
+- 🔒 TENANT domain (all files)
+- 🔒 Authentication & Security
+- 🔒 Database schemas (immutable)
+- 🔒 Core infrastructure
+
+**TIER 2 LOCKS (Feature-Additive):**
+- 🔒 routes.ts (add new, no modify existing)
+- 🔒 schemas/ (add new, no modify existing)
+- 🔒 components/ (add new, no modify structure)
 
 **Lock Enforced By:**
 - Git hooks (pre-commit validation)
-- CLAUDE.md policy (this file)
-- Code review requirements
-- Final Integrator approval gate
+- CLAUDE.md policy (this file - Updated 2026-08-18)
 - Backup + rollback procedures
+- Final Integrator approval gate
+- Immutable backup tag
+
+**Backup Details:**
+```
+Tag: BACKUP-ROOT-ADMIN-TENANT-STRUCTURE-20260818-FINAL
+Date: 2026-08-18
+Content: Complete ROOT ADMIN & TENANT structure
+Restore: git checkout BACKUP-ROOT-ADMIN-TENANT-STRUCTURE-20260818-FINAL
+```
 
 ---
 
 ## 📝 HISTORY
+
+**2026-08-18 12:30 IST** — ROOT ADMIN & TENANT STRUCTURE LOCKED FOREVER
+- ROOT ADMIN domain: IMMUTABLE (no modifications allowed)
+- TENANT domain: IMMUTABLE (no modifications allowed)
+- Backup tag created: BACKUP-ROOT-ADMIN-TENANT-STRUCTURE-20260818-FINAL
+- All existing files preserved (zero deletions)
+- Add-only mode enabled for new features
+- TIER 1 & TIER 2 locking system implemented
+- All future work via feature worktrees
 
 **2026-08-09 18:10 IST** — PHASE 7 LOCKS ACTIVATED
 - Production deployed to :5050 (commit 1a1d569)
