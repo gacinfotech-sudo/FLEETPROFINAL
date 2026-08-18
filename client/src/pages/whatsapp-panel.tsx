@@ -20,6 +20,10 @@ export default function WhatsAppPanel() {
 
   const statusQuery = useQuery<{ provider: string; status: SessionStatus; qrDataUrl?: string }>({
     queryKey: ["/api/whatsapp/session/status"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/whatsapp/session/status");
+      return res.json();
+    },
     refetchInterval: polling ? 3000 : false,
   });
 
