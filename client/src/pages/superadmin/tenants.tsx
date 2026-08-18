@@ -31,6 +31,12 @@ interface Tenant {
 interface User {
   userId?: string;
   platformRole?: string;
+  role?: string;
+}
+
+// Authorization helper
+function canManageTenants(user: User | null): boolean {
+  return user?.platformRole === 'PLATFORM_ROOT' || user?.role === 'admin';
 }
 
 export default function SuperAdminTenants() {
@@ -224,16 +230,18 @@ export default function SuperAdminTenants() {
           </div>
         </div>
 
-        {/* SECURITY LOCK BANNER */}
-        <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="text-3xl">🔒</div>
-            <div>
-              <p className="font-bold text-red-900">TENANT DATA LOCKED FOR SECURITY</p>
-              <p className="text-sm text-red-800">This page is read-only. All credentials and sensitive data are hidden. No changes allowed.</p>
+        {/* SECURITY LOCK BANNER - Only show for non-root users */}
+        {!canManageTenants(currentUser) && (
+          <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">🔒</div>
+              <div>
+                <p className="font-bold text-red-900">TENANT DATA LOCKED FOR SECURITY</p>
+                <p className="text-sm text-red-800">This page is read-only. All credentials and sensitive data are hidden. No changes allowed.</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {tenants.length === 0 ? (
           <div className="text-center py-12">
@@ -251,7 +259,12 @@ export default function SuperAdminTenants() {
             {tenants.map((tenant) => (
               <div
                 key={tenant._id}
-                className={`bg-gradient-to-br ${getPlanColor(tenant.billing?.subscriptionPlan || 'starter')} rounded-lg border-2 border-gray-300 shadow-md p-4 cursor-not-allowed opacity-95`}
+                onClick={() => canManageTenants(currentUser) && setLocation(`/superadmin/tenants/${tenant._id}`)}
+                className={`bg-gradient-to-br ${getPlanColor(tenant.billing?.subscriptionPlan || 'starter')} rounded-lg border-2 border-gray-300 shadow-md p-4 ${
+                  canManageTenants(currentUser)
+                    ? 'cursor-pointer hover:shadow-lg hover:border-gray-400 transition-all'
+                    : 'cursor-not-allowed opacity-95'
+                }`}
               >
                 {/* Tenant Header */}
                 <div className="flex items-start justify-between mb-3">
