@@ -1,0 +1,324 @@
+# Docker Compose Configuration for Production Deployment
+# Complete stack with app, database, cache, and reverse proxy
+# Version: 3.8 - Compatible with Docker Compose v1.29+
+
+version: '3.8'
+
+services:
+  # =========================================================================
+  # MongoDB - Primary Data Store
+  # =========================================================================
+  mongodb:
+    image: mongo:7.0-alpine
+    container_name: fleetpro-mongodb
+    restart: unless-stopped
+
+    # Environment configuration
+    environment:
+      MONGO_INITDB_DATABASE: fleetpro
+      # Security - Change these in production!
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_ROOT_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD:-CHANGE_ME_IN_PRODUCTION}
+      TZ: UTC
+
+    # Port exposure (only on internal network in production)
+    ports:
+      - "127.0.0.1:27017:27017"  # Localhost only
+
+    # Volume management for data persistence
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+      - ./database/init-mongodb.js:/docker-entrypoint-initdb.d/01-init.js
+      - ./database/seed-production.js:/docker-entrypoint-initdb.d/02-seed.js
+
+    # Network configuration
+    networks:
+      - fleetpro-network
+
+    # Health check
+    healthcheck:
+      test: |
+        mongosh --eval "db.adminCommand('ping')"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+    # Read-only filesystem for security
+    read_only: false  # MongoDB needs write access to data volumes
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=mongodb"
+
+  # =========================================================================
+  # Redis - Caching & Session Store
+  # =========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: fleetpro-redis
+    restart: unless-stopped
+
+    # Port exposure (only on internal network)
+    ports:
+      - "127.0.0.1:6379:6379"
+
+    # Redis configuration
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD:-CHANGE_ME_IN_PRODUCTION}
+      --bind 0.0.0.0
+
+    # Volume for persistence
+    volumes:
+      - redis_data:/data
+
+    # Network
+    networks:
+      - fleetpro-network
+
+    # Health check
+    healthcheck:
+      test: |
+        redis-cli
+        -a ${REDIS_PASSWORD:-CHANGE_ME_IN_PRODUCTION}
+        ping
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+    # Security
+    security_opt:
+      - no-new-privileges:true
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=redis"
+
+  # =========================================================================
+  # Node.js Application
+  # =========================================================================
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+
+    container_name: fleetpro-app
+    restart: unless-stopped
+
+    # Environment variables from .env.production
+    env_file:
+      - .env.production
+
+    # Additional environment overrides
+    environment:
+      NODE_ENV: production
+      PORT: 5050
+      MONGODB_URI: mongodb://${MONGODB_ROOT_USER:-admin}:${MONGODB_ROOT_PASSWORD:-CHANGE_ME}@mongodb:27017/fleetpro?authSource=admin
+      REDIS_URL: redis://:${REDIS_PASSWORD:-CHANGE_ME}@redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      TZ: UTC
+
+    # Port exposure (through nginx only)
+    ports:
+      - "127.0.0.1:5050:5050"
+
+    # Volume mounts
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+
+    # Network configuration
+    networks:
+      - fleetpro-network
+
+    # Dependencies
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5050/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1.5G
+
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+        labels: "service=app"
+
+  # =========================================================================
+  # Nginx - Reverse Proxy & Load Balancer
+  # =========================================================================
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: fleetpro-nginx
+    restart: unless-stopped
+
+    # Port exposure (public facing)
+    ports:
+      - "80:80"
+      - "443:443"
+
+    # Configuration and SSL certificates
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx-conf.d:/etc/nginx/conf.d:ro
+      - ./ssl/certs:/etc/nginx/ssl/certs:ro
+      - ./ssl/keys:/etc/nginx/ssl/private:ro
+      - ./public:/usr/share/nginx/static:ro
+      - nginx_cache:/var/cache/nginx
+      - nginx_logs:/var/log/nginx
+
+    # Network
+    networks:
+      - fleetpro-network
+
+    # Dependencies
+    depends_on:
+      - app
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+    # Security
+    security_opt:
+      - no-new-privileges:true
+
+    # Read-only filesystem
+    read_only: true
+    tmpfs:
+      - /var/run
+      - /var/cache/nginx
+      - /var/log/nginx
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+        labels: "service=nginx"
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
+volumes:
+  # MongoDB persistent storage
+  mongodb_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${MONGODB_DATA_PATH:-/var/lib/fleetpro/mongodb}
+
+  mongodb_config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${MONGODB_CONFIG_PATH:-/var/lib/fleetpro/mongodb-config}
+
+  # Redis persistent storage
+  redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${REDIS_DATA_PATH:-/var/lib/fleetpro/redis}
+
+  # Nginx cache and logs
+  nginx_cache:
+  nginx_logs:
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+networks:
+  fleetpro-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br_fleetpro
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

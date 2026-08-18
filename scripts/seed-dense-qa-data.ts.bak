@@ -1,0 +1,497 @@
+/**
+ * FleetPro DENSE QA TEST DATA SEEDER
+ *
+ * Creates 5-day realistic test portfolio for RAM and SHYAM tenants.
+ * Suitable for comprehensive physical testing of all modules.
+ *
+ * Data Window: 10-14 Aug 2026
+ * Target: ~50-60 bookings, 20+ customers, 20+ expenses, etc. per tenant
+ *
+ * Execution: npx tsx scripts/seed-dense-qa-data.ts
+ */
+
+import { MongoClient, ObjectId } from 'mongodb';
+import mongoose from 'mongoose';
+
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/fleetpro';
+
+// Test data constants
+const TEST_WINDOW_START = new Date('2026-08-10T00:00:00Z');
+const TEST_WINDOW_END = new Date('2026-08-14T23:59:59Z');
+
+const INDORE_COORDS = { lat: 22.7196, lng: 75.8577 };
+const UJJAIN_COORDS = { lat: 23.1815, lng: 75.7733 };
+const OMKARESHWAR_COORDS = { lat: 22.2669, lng: 75.3247 };
+const MAHESHWAR_COORDS = { lat: 22.1488, lng: 75.6164 };
+const MANDU_COORDS = { lat: 22.3317, lng: 75.4049 };
+const BHOPAL_COORDS = { lat: 23.1815, lng: 77.4149 };
+
+const REALISTIC_ROUTES = [
+  { name: 'Indore → Ujjain', start: INDORE_COORDS, end: UJJAIN_COORDS, km: 55, category: 'Outstation' },
+  { name: 'Indore → Omkareshwar', start: INDORE_COORDS, end: OMKARESHWAR_COORDS, km: 85, category: 'Outstation' },
+  { name: 'Indore → Omkareshwar → Maheshwar', start: INDORE_COORDS, end: MAHESHWAR_COORDS, km: 120, category: 'Multi-Day' },
+  { name: 'Indore → Mandu', start: INDORE_COORDS, end: MANDU_COORDS, km: 90, category: 'Outstation' },
+  { name: 'Indore → Bhopal', start: INDORE_COORDS, end: BHOPAL_COORDS, km: 190, category: 'Outstation' },
+  { name: 'Indore Local', start: INDORE_COORDS, end: INDORE_COORDS, km: 25, category: 'Local' },
+  { name: 'Airport → Vijay Nagar', start: INDORE_COORDS, end: INDORE_COORDS, km: 15, category: 'Airport' },
+  { name: 'Railway Pickup', start: INDORE_COORDS, end: INDORE_COORDS, km: 20, category: 'Railway' },
+  { name: 'Hotel Guest Transfer', start: INDORE_COORDS, end: INDORE_COORDS, km: 30, category: 'Corporate' },
+];
+
+const CUSTOMER_PATTERNS = [
+  'New Customer',
+  'Repeat Customer',
+  'Price Objection',
+  'No Response',
+  'Follow-up Due',
+  'Follow-up Completed',
+  'Quotation Sent',
+  'Converted Lead',
+  'Lost Lead',
+  'Complaint',
+  'Positive Feedback',
+  'Outstanding',
+  'Fully Paid',
+  'Corporate',
+];
+
+const EXPENSE_TYPES = [
+  { type: 'Fuel', baseAmount: 800, variance: 300 },
+  { type: 'CNG', baseAmount: 400, variance: 150 },
+  { type: 'Toll', baseAmount: 200, variance: 100 },
+  { type: 'Parking', baseAmount: 100, variance: 50 },
+  { type: 'Driver Allowance', baseAmount: 200, variance: 100 },
+  { type: 'Night Halt', baseAmount: 300, variance: 150 },
+  { type: 'Cleaning', baseAmount: 100, variance: 50 },
+  { type: 'Maintenance', baseAmount: 500, variance: 300 },
+];
+
+const BOOKING_STATUSES = [
+  'completed',
+  'cancelled',
+  'rescheduled',
+  'live',
+  'upcoming',
+  'payment_pending',
+  'extended'
+];
+
+interface SeederContext {
+  client: MongoClient;
+  db: any;
+  tenantId: string;
+  tenantName: string;
+  drivers: any[];
+  vehicles: any[];
+  customers: any[];
+}
+
+async function seedTenant(tenantId: string, tenantName: string) {
+  const client = new MongoClient(MONGODB_URI);
+
+  try {
+    await client.connect();
+    const db = client.db();
+
+    const context: SeederContext = {
+      client,
+      db,
+      tenantId,
+      tenantName,
+      drivers: [],
+      vehicles: [],
+      customers: []
+    };
+
+    console.log(`\n${'='.repeat(70)}`);
+    console.log(`SEEDING: ${tenantName.toUpperCase()}`);
+    console.log(`${'='.repeat(70)}`);
+
+    // Check if already seeded
+    const existingTag = await db.collection('bookings').findOne({
+      tenantId: new (require('mongoose')).Types.ObjectId(tenantId),
+      'metadata.seedBatch': { $regex: 'DENSE_QA_20260810' }
+    });
+
+    if (existingTag) {
+      console.log('✓ Already seeded. Skipping to avoid duplicates.');
+      return;
+    }
+
+    // Seed in order
+    await seedDrivers(context);
+    await seedVehicles(context);
+    await seedCustomers(context);
+    await seedBookings(context);
+    await seedPayments(context);
+    await seedExpenses(context);
+    await seedInvoices(context);
+
+    console.log(`\n✅ SEEDING COMPLETE: ${tenantName}`);
+
+  } finally {
+    await client.close();
+  }
+}
+
+async function seedDrivers(ctx: SeederContext) {
+  console.log('\n[Drivers]');
+
+  const driverCount = 20;
+  const statuses = ['available', 'on_duty', 'inactive'];
+
+  for (let i = 1; i <= driverCount; i++) {
+    const driver = {
+      tenantId: new ObjectId(ctx.tenantId),
+      name: `Driver ${i}`,
+      phone: `98${String(i).padStart(8, '0')}`,
+      email: `driver${i}@${ctx.tenantName}.local`,
+      licenseNumber: `DL-${ctx.tenantName.toUpperCase()}-${String(i).padStart(4, '0')}`,
+      experience: Math.floor(Math.random() * 10) + 1,
+      rating: (Math.random() * 2 + 3).toFixed(1),
+      status: statuses[Math.floor(Math.random() * statuses.length)],
+      lifecycleStage: 'active',
+      languages: ['Hindi', 'English'],
+      createdAt: new Date(),
+      dateOfJoining: new Date(TEST_WINDOW_START.getTime() - Math.random() * 365 * 24 * 60 * 60 * 1000)
+    };
+
+    await ctx.db.collection('drivers').insertOne(driver);
+    ctx.drivers.push(driver);
+  }
+
+  console.log(`  ✓ Created ${driverCount} drivers`);
+}
+
+async function seedVehicles(ctx: SeederContext) {
+  console.log('\n[Vehicles]');
+
+  const vehicles = [
+    'Crysta', 'Ertiga', 'Rumion', 'Dzire', 'Glanza', 'Ciaz', 'Baleno', 'Tempo Traveller',
+    'Innova', 'Fortuner', 'Legender', 'Fortuner Legender', 'XUV700', 'Thar', 'Creta'
+  ];
+
+  const statuses = ['available', 'on_trip', 'maintenance', 'RESERVED', 'ASSIGNED'];
+  const fuelTypes = ['Petrol', 'Diesel', 'CNG'];
+
+  for (let i = 1; i <= 20; i++) {
+    const vehicle = {
+      tenantId: new ObjectId(ctx.tenantId),
+      make: vehicles[i % vehicles.length],
+      vehicleModel: vehicles[(i + 1) % vehicles.length],
+      year: 2024 - (i % 5),
+      licensePlate: `MP${String(i).padStart(2, '0')}-${ctx.tenantName.toUpperCase()}-${String(i).padStart(4, '0')}`,
+      normalizedLicensePlate: `MP${String(i).padStart(2, '0')}${ctx.tenantName.toUpperCase()}${String(i).padStart(4, '0')}`,
+      capacity: (i % 3 === 0) ? 8 : 4,
+      type: ['economy', 'standard', 'premium'][i % 3],
+      status: statuses[Math.floor(Math.random() * statuses.length)],
+      features: ['AC', 'PowerSteering', 'GPS', 'WiFi'],
+      pricePerDay: 1500 + (i % 10) * 500,
+      pricePerHour: 300 + (i % 5) * 100,
+      pricePerKm: 25 + (i % 5) * 5,
+      color: ['White', 'Black', 'Silver', 'Blue'][i % 4],
+      fuelType: fuelTypes[i % 3],
+      transmission: i % 2 === 0 ? 'Automatic' : 'Manual',
+      createdAt: new Date(),
+      currentOdometer: 50000 + Math.random() * 50000,
+      ownershipType: 'owned',
+      status: statuses[Math.floor(Math.random() * statuses.length)]
+    };
+
+    await ctx.db.collection('vehicles').insertOne(vehicle);
+    ctx.vehicles.push(vehicle);
+  }
+
+  console.log(`  ✓ Created 20 vehicles`);
+}
+
+async function seedCustomers(ctx: SeederContext) {
+  console.log('\n[Customers]');
+
+  const customerCount = 25;
+  const sources = ['phone', 'whatsapp', 'google', 'agent', 'direct', 'corporate', 'hotel'];
+
+  for (let i = 1; i <= customerCount; i++) {
+    const customer = {
+      tenantId: new ObjectId(ctx.tenantId),
+      name: `Customer ${i}`,
+      phone: `99${String(i).padStart(8, '0')}`,
+      whatsapp: `99${String(i).padStart(8, '0')}`,
+      email: `customer${i}@example.com`,
+      address: `Location ${i}, ${ctx.tenantName}`,
+      city: ctx.tenantName === 'ram' ? 'Indore' : 'Indore',
+      source: sources[Math.floor(Math.random() * sources.length)],
+      category: CUSTOMER_PATTERNS[Math.floor(Math.random() * CUSTOMER_PATTERNS.length)],
+      totalBookings: Math.floor(Math.random() * 10),
+      totalSpent: Math.floor(Math.random() * 100000),
+      lastBooking: new Date(TEST_WINDOW_START.getTime() + Math.random() * (TEST_WINDOW_END.getTime() - TEST_WINDOW_START.getTime())),
+      isActive: true,
+      createdAt: new Date()
+    };
+
+    await ctx.db.collection('customers').insertOne(customer);
+    ctx.customers.push(customer);
+  }
+
+  console.log(`  ✓ Created ${customerCount} customers`);
+}
+
+async function seedBookings(ctx: SeederContext) {
+  console.log('\n[Bookings]');
+
+  const bookingPerDay = 11;
+  const bookingCount = bookingPerDay * 5; // 5 days
+  const createdBookings = [];
+
+  for (let day = 0; day < 5; day++) {
+    const dayStart = new Date(TEST_WINDOW_START.getTime() + day * 24 * 60 * 60 * 1000);
+
+    for (let b = 0; b < bookingPerDay; b++) {
+      const route = REALISTIC_ROUTES[Math.floor(Math.random() * REALISTIC_ROUTES.length)];
+      const customer = ctx.customers[Math.floor(Math.random() * ctx.customers.length)];
+      const driver = ctx.drivers[Math.floor(Math.random() * ctx.drivers.length)];
+      const vehicle = ctx.vehicles[Math.floor(Math.random() * ctx.vehicles.length)];
+
+      const bookingDate = new Date(dayStart.getTime() + Math.random() * 24 * 60 * 60 * 1000);
+      const pickupTime = new Date(bookingDate.getTime() + (6 + Math.random() * 12) * 60 * 60 * 1000);
+      const totalKm = route.km * (0.9 + Math.random() * 0.2);
+      const farePerKm = 25;
+      const totalFare = Math.round(totalKm * farePerKm);
+
+      // Determine booking status based on date
+      let status;
+      const now = new Date('2026-08-10T12:00:00Z');
+      if (bookingDate < now) {
+        status = BOOKING_STATUSES[Math.floor(Math.random() * (BOOKING_STATUSES.length - 2))]; // completed, cancelled, or rescheduled
+      } else if ((bookingDate.getTime() - now.getTime()) < 2 * 60 * 60 * 1000) {
+        status = 'live';
+      } else {
+        status = 'upcoming';
+      }
+
+      const booking = {
+        tenantId: new ObjectId(ctx.tenantId),
+        bookingId: `BK-${ctx.tenantName.toUpperCase()}-${String(createdBookings.length + 1).padStart(5, '0')}`,
+        bookingCode: `${ctx.tenantName.substring(0, 2).toUpperCase()}${String(createdBookings.length + 1).padStart(6, '0')}`,
+        customerId: customer._id,
+        driverId: driver._id,
+        vehicleId: vehicle._id,
+        status: status,
+        pickupLocation: route.start,
+        pickupLocationName: route.name.split('→')[0].trim(),
+        dropoffLocation: route.end,
+        dropoffLocationName: route.name.split('→')[1]?.trim() || route.name,
+        pickupTime: pickupTime,
+        estimatedEndTime: new Date(pickupTime.getTime() + (totalKm / 60 * 60 * 1000)),
+        actualEndTime: status === 'completed' ? new Date(pickupTime.getTime() + (totalKm / 60 * 60 * 1000) + Math.random() * 60 * 60 * 1000) : null,
+        totalAmount: totalFare,
+        paymentStatus: ['fully_paid', 'partially_paid', 'pending'][Math.floor(Math.random() * 3)],
+        advanceAmount: Math.round(totalFare * (0.3 + Math.random() * 0.3)),
+        totalKm: totalKm,
+        startOdometer: 50000 + Math.random() * 50000,
+        endOdometer: null,
+        tollCharges: Math.random() > 0.7 ? Math.round(50 + Math.random() * 100) : 0,
+        parkingCharges: Math.random() > 0.7 ? Math.round(50 + Math.random() * 100) : 0,
+        petrolCharges: 0,
+        miscellaneousAmount: 0,
+        createdAt: bookingDate,
+        updatedAt: bookingDate,
+        metadata: {
+          seedBatch: 'DENSE_QA_20260810_V1',
+          routeName: route.name,
+          category: route.category
+        }
+      };
+
+      await ctx.db.collection('bookings').insertOne(booking);
+      createdBookings.push(booking);
+    }
+  }
+
+  console.log(`  ✓ Created ${bookingCount} bookings`);
+  console.log(`    - Completed: ~${Math.floor(bookingCount * 0.4)}`);
+  console.log(`    - Upcoming: ~${Math.floor(bookingCount * 0.4)}`);
+  console.log(`    - Live: ~${Math.floor(bookingCount * 0.1)}`);
+  console.log(`    - Cancelled: ~${Math.floor(bookingCount * 0.05)}`);
+}
+
+async function seedPayments(ctx: SeederContext) {
+  console.log('\n[Payments]');
+
+  const bookings = await ctx.db.collection('bookings').find({
+    tenantId: new (require('mongoose')).Types.ObjectId(ctx.tenantId),
+    'metadata.seedBatch': 'DENSE_QA_20260810_V1'
+  }).toArray();
+
+  let paymentCount = 0;
+
+  for (const booking of bookings) {
+    const paymentModes = ['cash', 'upi', 'card', 'wallet'];
+    const mode = paymentModes[Math.floor(Math.random() * paymentModes.length)];
+
+    // Create advance payment
+    if (booking.advanceAmount > 0) {
+      const advancePayment = {
+        tenantId: booking.tenantId,
+        bookingId: booking._id,
+        customerId: booking.customerId,
+        amount: booking.advanceAmount,
+        transactionId: `TXN-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        mode: mode,
+        status: 'completed',
+        type: 'advance',
+        createdAt: booking.createdAt,
+        createdBy: 'system'
+      };
+
+      await ctx.db.collection('PaymentTransaction').insertOne(advancePayment);
+      paymentCount++;
+
+      // Create balance payment if not pending
+      if (booking.paymentStatus !== 'pending') {
+        const balancePayment = {
+          tenantId: booking.tenantId,
+          bookingId: booking._id,
+          customerId: booking.customerId,
+          amount: booking.totalAmount - booking.advanceAmount,
+          transactionId: `TXN-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+          mode: mode,
+          status: booking.paymentStatus === 'fully_paid' ? 'completed' : 'partial',
+          type: 'balance',
+          createdAt: new Date(booking.createdAt.getTime() + Math.random() * 24 * 60 * 60 * 1000),
+          createdBy: 'system'
+        };
+
+        await ctx.db.collection('PaymentTransaction').insertOne(balancePayment);
+        paymentCount++;
+      }
+    }
+  }
+
+  console.log(`  ✓ Created ${paymentCount} payment transactions`);
+}
+
+async function seedExpenses(ctx: SeederContext) {
+  console.log('\n[Expenses]');
+
+  const bookings = await ctx.db.collection('bookings').find({
+    tenantId: new (require('mongoose')).Types.ObjectId(ctx.tenantId),
+    'metadata.seedBatch': 'DENSE_QA_20260810_V1'
+  }).toArray();
+
+  let expenseCount = 0;
+
+  for (const booking of bookings) {
+    const expenseCount_this = Math.floor(Math.random() * 4) + 1; // 1-3 expenses per booking
+
+    for (let e = 0; e < expenseCount_this; e++) {
+      const expType = EXPENSE_TYPES[Math.floor(Math.random() * EXPENSE_TYPES.length)];
+      const amount = expType.baseAmount + (Math.random() - 0.5) * expType.variance * 2;
+
+      const expense = {
+        tenantId: booking.tenantId,
+        bookingId: booking._id,
+        driverId: booking.driverId,
+        vehicleId: booking.vehicleId,
+        expenseType: expType.type,
+        amount: Math.round(amount),
+        description: `${expType.type} for booking ${booking.bookingId}`,
+        date: booking.createdAt,
+        status: 'approved',
+        createdAt: booking.createdAt
+      };
+
+      await ctx.db.collection('Expense').insertOne(expense);
+      expenseCount++;
+    }
+  }
+
+  console.log(`  ✓ Created ${expenseCount} expenses`);
+}
+
+async function seedInvoices(ctx: SeederContext) {
+  console.log('\n[Invoices]');
+
+  const bookings = await ctx.db.collection('bookings').find({
+    tenantId: new (require('mongoose')).Types.ObjectId(ctx.tenantId),
+    status: 'completed',
+    'metadata.seedBatch': 'DENSE_QA_20260810_V1'
+  }).limit(20).toArray();
+
+  let invoiceCount = 0;
+
+  for (const booking of bookings) {
+    const invoice = {
+      tenantId: booking.tenantId,
+      bookingId: booking._id,
+      customerId: booking.customerId,
+      invoiceNumber: `INV-${ctx.tenantName.toUpperCase()}-${String(invoiceCount + 1).padStart(5, '0')}`,
+      totalAmount: booking.totalAmount,
+      taxableAmount: Math.round(booking.totalAmount / 1.18),
+      taxAmount: Math.round(booking.totalAmount - (booking.totalAmount / 1.18)),
+      status: booking.paymentStatus === 'fully_paid' ? 'paid' : 'draft',
+      issueDate: booking.actualEndTime || booking.createdAt,
+      dueDate: new Date((booking.actualEndTime || booking.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000),
+      items: [
+        {
+          description: `Taxi/Transport - ${booking.metadata?.routeName || 'Local'}`,
+          quantity: 1,
+          unitPrice: booking.totalAmount,
+          amount: booking.totalAmount
+        }
+      ],
+      createdAt: booking.actualEndTime || booking.createdAt
+    };
+
+    await ctx.db.collection('Invoice').insertOne(invoice);
+    invoiceCount++;
+  }
+
+  console.log(`  ✓ Created ${invoiceCount} invoices`);
+}
+
+// MAIN
+async function main() {
+  console.log(`\n${'='.repeat(70)}`);
+  console.log('FLEETPRO DENSE QA DATA SEEDER');
+  console.log('Window: 10-14 Aug 2026');
+  console.log('='.repeat(70));
+
+  const client = new MongoClient(MONGODB_URI);
+
+  try {
+    await client.connect();
+    const db = client.db();
+
+    // Find RAM and SHYAM tenants
+    const ramTenant = await db.collection('tenants').findOne({ name: 'ram' });
+    const shyamTenant = await db.collection('tenants').findOne({ name: { $regex: '^Shyam', $options: 'i' } });
+
+    if (!ramTenant) {
+      console.log('❌ RAM tenant not found');
+      return;
+    }
+
+    console.log('✓ Found RAM tenant');
+    await seedTenant(ramTenant._id.toString(), 'ram');
+
+    if (shyamTenant) {
+      console.log('✓ Found SHYAM tenant');
+      await seedTenant(shyamTenant._id.toString(), 'shyam');
+    } else {
+      console.log('⚠️  SHYAM tenant not found - create manually if needed');
+    }
+
+    console.log(`\n${'='.repeat(70)}`);
+    console.log('✅ SEEDING COMPLETE');
+    console.log('='.repeat(70));
+
+  } finally {
+    await client.close();
+  }
+}
+
+main().catch(error => {
+  console.error('❌ Seeding failed:', error);
+  process.exit(1);
+});

@@ -1,0 +1,50 @@
+# Pipeline Action Matrix
+
+Actions verified end-to-end (UI → API → DB → connected modules) this session, either newly built/repaired or spot-checked as part of this audit. This is **not** an exhaustive click-through of every button in the application — that would require a dedicated, much larger pass. It covers every action this audit's research and repair work actually touched or verified, honestly scoped rather than overclaimed.
+
+| Page | Label | API | Permission | Expected result | Actual result | Status | Severity |
+|---|---|---|---|---|---|---|---|
+| Revenue Report | (page load) | `GET /api/reports/revenue` | `view_revenue` | Manager without permission blocked; owner sees data | **Was**: any authenticated user got data regardless. **Now**: 403 for unauthorized manager, 200 for owner. | FIXED | P0 |
+| Driver Performance | (page load) | `GET /api/reports/driver-performance` | `view_revenue` | Same as above | Same fix applied | FIXED | P0 |
+| Vehicle Performance | (page load) | `GET /api/reports/vehicle-performance` | `view_revenue` | Same as above | Same fix applied | FIXED | P0 |
+| Add Booking wizard | "Confirm Booking" | `POST /api/bookings` | `create_booking` | One click → one booking, even under double-submit/retry | **Was**: two clicks/retries → two bookings. **Now**: same `idempotencyKey` → same booking returned. | FIXED | P0 |
+| Customer 360° / Booking detail | "Record Payment" | `POST /api/bookings/:id/payments` | `edit_booking` | One submit → one ledger entry | **Was**: retry could double-record. **Now**: idempotency-keyed per dialog session. | FIXED | P0 |
+| Invoice Document dialog | "Finalize & Lock" | `POST /api/invoices/:invoiceId/finalize` | `generate_invoice` | Disabled+tooltip if unauthorized, else works | **Was**: always enabled, 403 after click for unauthorized users. **Now**: disabled with explanation. | FIXED | P2 |
+| Manage Users | Deactivate/Reactivate sub-user | `DELETE`/`PATCH /api/users/sub-users/:userId` | admin/client inline check | Tenant-scoped | Hardened with `requireTenant` (narrow edge case) | FIXED | P2 |
+| Customer Database | Global Customer Search (Sidebar) | `GET /api/customers?search=` | — | Find existing customer, open 360° | Verified working (prior phase, regression-tested again this phase) | WORKING | — |
+| Customer 360° | "New Booking" / "Use as template" | reuses `EnhancedBookingForm.initialValues` | — | Correct prefill scope (identity only / route+notes only) | Verified working | WORKING | — |
+| Customers list | Unknown-number search | `GET /api/customers`, `QuickInquiryForm` | — | "Create Quick Inquiry" CTA with number prefilled | Verified working | WORKING | — |
+| Inquiries / Leads list | Pagination | `GET /api/inquiries` / `/api/leads` (`limit`/`skip`) | — | Correct page-of-50 + total count | Verified working | WORKING | — |
+| Inquiry → Lead | "Convert to Lead" | `POST /api/inquiries/:id/convert-to-lead` | `inquiry.convert_to_lead` | One Inquiry → one Lead, no data re-entry | Verified via code audit: two-layer idempotency guard, transaction-wrapped, requirement fields read live (not duplicated) | WORKING | — |
+| Lead → Quotation | "Send via WhatsApp" | `POST /api/quotations/:id/send-whatsapp` | `quotation.send` | Real provider send, failure surfaced, no false "sent" status | Verified via code audit: real Baileys provider, failure returns HTTP 400 and does not flip status | WORKING | — |
+| Lead → Customer | "Convert to Customer" | `POST /api/leads/:id/convert-to-customer` | `lead.convert_to_customer` | Reuses shared dedup logic, one-time only | Verified via code audit: shared `findOrCreateCustomer`, `linkedCustomerId` idempotency guard | WORKING | — |
+| Booking → Driver Duty | Driver-assignment WhatsApp | `sendBookingMessage` (`driver_duty` type) | — | Driver notified with itinerary | Verified working (sends), but no acceptance step and no driver portal exists to view it in-app — WhatsApp-message-only | PARTIALLY_WORKING | documented, not fixed (#6) |
+| Trip Start/Complete | `POST /api/bookings/:id/start` / `/complete` | — | `edit_booking` (via general booking permission) | Idempotent, correct status transition | Verified via code audit: no-op on repeat status | WORKING | — |
+| Google Review request | "Send Review Request" | `POST /api/customers/:id/google-reviews/request` | — | No duplicate charge/points; UI should prevent duplicate requests per booking | Idempotent for exact retry; UI does not disable after first request (button only disables once *received*) | PARTIALLY_WORKING | documented, not fixed (#11) |
+
+## Not audited at the action level this phase
+
+Vendor settlement UI (no such feature exists — confirmed absent, not "broken"), driver-facing UI (does not exist — no driver role/portal), telephony/calling UI (no provider integration exists), WhatsApp Settings/connection panel deep-dive, Campaigns, After-Sales, Salary pages. These were not implicated by any of the 5 research passes' findings and were left untouched per the "smallest safe patch" principle — auditing them exhaustively would be a separate, dedicated pass.
+
+## Addendum — Booking-First UI / Rewards & Referral initiative (Phases 0–7)
+
+New and changed actions from the later "Booking-First Interface, Connected Pipelines and Configurable Rewards/Referral Engine" initiative. Table format matches above; this section is additive, not a revision of the rows above it.
+
+| Page | Label | API | Permission | Expected result | Actual result | Status | Severity |
+|---|---|---|---|---|---|---|---|
+| Sidebar | Bookings group (Bookings/Live/Upcoming/Payment Dues/History) | — (client-side grouping only) | unchanged per item | 5 scattered nav items collapse under one "Bookings" parent; each still routes/permission-gates exactly as before | Verified: `navigation.spec.ts` green for every grouped item, no route/permission change | NEW (additive) | — |
+| Inquiry detail dialog | Pipeline stepper + contextual action bar | reuses existing inquiry mutations | unchanged | Visual "where am I / what's next" layer over already-working transitions | Verified via `pipeline-*` + manual click-through | NEW (additive) | — |
+| Lead detail dialog | Pipeline stepper + contextual action bar, incl. "Mark Lost" | reuses existing lead mutations | unchanged | Same as above; "Mark Lost" now reachable from detail dialog, not only table row | Verified | NEW (additive) | — |
+| Booking dialog (Dashboard) | Pipeline stepper (read-only) | — | — | Shows booking's macro-stage | Verified | NEW (additive) | — |
+| Add Booking wizard | Backward date/time edit after vehicle/driver selection | client-side revalidation, no new API | — | Stale vehicle/driver selection is cleared with a "Review required" notice, not silently carried forward | Verified: `booking-wizard-review-required.spec.ts` | FIXED (real gap) | P2 |
+| Add Booking wizard | "Was this Booking referred by someone?" capture | `GET /api/referrals/resolve-referrer`, referral payload on `POST /api/bookings` | `referral.create` | Referral linked and `referral.registered` credited exactly once; self-referral and duplicate blocked | Verified: `referral-rewards-engine.spec.ts` (9 API + 3 UI cases) | NEW | — |
+| Customer 360° | Referral Program panel (code, share, stats, history) | `GET /api/customers/:id/referrals`, `POST /api/customers/:id/referral-code` | `REFERRAL_VIEW` | Real code, real stats; pending (no-Customer-yet) referred contact never shown under the referrer's own name | Verified — a real misattribution bug was found and fixed here | NEW | — |
+| Customer 360° | Reward manual adjustment | `POST /api/customers/:id/reward-transactions` | `REWARD_ADJUST` | Fractional points (e.g. 0.5) accepted, not just integers | **Was**: `Number.isInteger` rejected fractional input. **Now**: rounds to 2dp, accepts fractional. | FIXED | P2 |
+| Profile → Settings | Rewards & Referral Settings panel (booking-reward rule + 4 event rules) | `GET/PUT /api/reward-event-rules[/:eventKey]`, existing `RewardRule` routes | `REWARD_RULE_MANAGE` | Owner can configure points/enabled/caps per event; persists and reloads | Verified: `referral-rewards-engine.spec.ts` UI case; found+fixed a `$set`/`$setOnInsert` path conflict on `points` | NEW | — |
+| Sidebar → Rewards & Referrals (new page) | 12 metric cards + Top Referrers, cards drill into filtered tables | `GET /api/rewards-referral-dashboard`, `GET /api/reward-transactions`, `GET /api/referrals` | `REFERRAL_VIEW` | Real aggregated numbers; clicking a card loads a real filtered table below it | Verified: `referral-rewards-engine.spec.ts` UI + API cases | NEW | — |
+| Booking completion / cancellation | `applyCustomerStatusEffects` choke point | existing route, extended | — | Referral rewards (`booking_completed` credit, reversal on pre-trip cancellation) piggyback on the same single choke point as the pre-existing booking-reward credit/reversal — no second code path to drift out of sync | Verified: completion and pre-trip-cancellation both tested; post-trip cancellation is correctly impossible per `bookingStateMachine.ts` | NEW | — |
+| All new referral/reward-event/dashboard endpoints | tenant isolation | all of the above | — | Another tenant's referrals, reward transactions, and dashboard totals never visible to `qaclient` | Verified via dedicated `referral-rewards-engine.spec.ts` cross-tenant test (fresh `ObjectId` tenant, planted 999,999-point transaction) | NEW (verified) | — |
+
+### Known, explicit scope deferral
+
+**Tiered redemption was not built.** `RewardRule.redemptionValuePerPoint` remains a single linear rate; the mega-spec's "linear AND tiered redemption" requirement is only half-delivered. This was called out in the Phase 5a commit message at the time and is repeated here rather than glossed over: building real tiers (rate bands, UI to configure them, redemption-time band selection, and tests proving band boundaries) is a non-trivial addition in its own right and was deferred rather than rushed. No tiered-redemption UI, field, or config exists anywhere in this branch — nothing was half-built and left inconsistent.

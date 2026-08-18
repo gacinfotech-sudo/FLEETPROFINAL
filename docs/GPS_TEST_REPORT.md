@@ -1,0 +1,47 @@
+# FleetPro GPS Test Report
+
+## Pre-change baseline
+
+- `npm run check`: passed.
+- `npm run build`: passed with pre-existing Browserslist age, mixed import and large chunk warnings.
+- Playwright on an isolated copy of the current source snapshot: 48 passed, 4 failed.
+- Three failures were caused by the copied tenant using disconnected Baileys instead of the test WhatsApp provider, returning HTTP 502.
+- One failure could not find the test's expected `₹1500/day` selectable vehicle in the copied snapshot.
+- Failure screenshots, traces and contexts are preserved under `baseline-test-failures` in the GPS baseline backup.
+- A previous clean Customer 360 baseline run at checkpoint `f77939b` passed 52/52; the current-source snapshot result is retained separately and is not represented as a GPS regression.
+
+## Phase 1 verification
+
+- `npm run check`: passed.
+- Targeted provider registry suite: 3 passed.
+- Cross-tenant resolution is rejected as not found.
+- An undocumented provider is blocked with `GPS_PROVIDER_CONFIGURATION_REQUIRED`.
+- A registered adapter receives an immutable, server-only connection object.
+- `npm run build`: passed with the same pre-existing warnings recorded above.
+- `git diff --check`: passed.
+- The worktree contains only GPS foundation, tests and audit documentation.
+- No network/provider test is claimed until official documentation and credentials exist.
+
+## Phase 2 verification
+
+- `npm run check`: passed.
+- GPS connection and registry suites: 5 passed.
+- AES-256-GCM ciphertext contains no plaintext credential and is bound to both tenant and connection through authenticated additional data.
+- Connection API returns only masked credential fields; direct isolated-database inspection verified encrypted storage.
+- Manual submission of `status: connected` is rejected.
+- Credential rotation is encrypted and audited without storing either old or new plaintext in the audit response.
+- Undocumented provider testing returns HTTP 409 with `configuration_required`.
+- A connection belonging to another tenant returns HTTP 404.
+- `npm run build`: passed with only the pre-existing build warnings.
+- `git diff --check`: passed.
+
+## Phase 3 verification
+
+- GPS registry, connection security and Device Master suites: 7 passed on an isolated database.
+- Provider-normalized device sync is idempotent and rejects duplicate/invalid records.
+- API responses exclude tenant ID and raw provider metadata.
+- Provider device ID is immutable through PATCH.
+- Tenant-scoped unique indexes reject duplicate active provider IDs and IMEIs.
+- Cross-tenant device lookup returns HTTP 404.
+- Undocumented-provider sync returns `configuration_required` without creating a device.
+- `npm run check`, `npm run build` and `git diff --check`: passed.

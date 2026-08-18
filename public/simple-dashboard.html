@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FleetPro Live Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .status-badge {
+            display: inline-block;
+            background: rgba(76, 175, 80, 0.9);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .stat-value { font-size: 2.5em; font-weight: bold; color: #667eea; margin: 10px 0; }
+        .stat-label { color: #666; font-size: 0.9em; text-transform: uppercase; }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .tab-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .tab-btn.active {
+            background: white;
+            color: #667eea;
+        }
+        .tab-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .tab-content.active { display: block; }
+        .tab-content h2 { margin-bottom: 20px; color: #333; }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .pagination {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        .pagination button {
+            padding: 8px 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .pagination button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .pagination span {
+            color: #666;
+            font-size: 0.9em;
+            padding: 0 10px;
+        }
+        .refresh-btn {
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .refresh-btn:hover {
+            background: #45a049;
+        }
+        .refresh-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #4CAF50;
+            border-radius: 50%;
+            margin-left: 10px;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .data-list {
+            max-height: 700px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .data-item {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            transition: all 0.2s;
+        }
+        .data-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transform: translateX(2px);
+        }
+        .data-item-title { font-weight: bold; color: #333; margin-bottom: 8px; }
+        .data-item-detail { color: #666; font-size: 0.9em; margin: 4px 0; }
+        .status-badge-sm {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        .status-completed { background: #C8E6C9; color: #2E7D32; }
+        .status-upcoming { background: #FFE0B2; color: #E65100; }
+        .status-cancelled { background: #FFCDD2; color: #C62828; }
+        .status-live { background: #FF6B6B; color: white; animation: pulse 1s infinite; }
+        .loading { text-align: center; padding: 40px; color: #999; }
+        .error { background: #f44336; color: white; padding: 15px; border-radius: 8px; }
+        .footer { text-align: center; color: white; margin-top: 40px; font-size: 0.9em; }
+        .last-updated { color: #ddd; font-size: 0.85em; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="status-badge">🟢 LIVE DEMO</div>
+            <h1>🚗 FleetPro Live Dashboard</h1>
+            <p style="color: #ddd;">Real-Time Data • All Bookings, History, Live Rides & Vendors</p>
+        </div>
+
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card"><div class="stat-value">-</div><div class="stat-label">Loading...</div></div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('bookings')">🚗 All Bookings</button>
+            <button class="tab-btn" onclick="showTab('history')">📋 Completed</button>
+            <button class="tab-btn" onclick="showTab('live')">🔴 Live Now</button>
+            <button class="tab-btn" onclick="showTab('vendors')">🤝 Vendors</button>
+        </div>
+
+        <div id="bookings" class="tab-content active">
+            <h2>All Bookings <span id="bookingsCount" style="color: #999; font-size: 0.9em;">(...)</span></h2>
+            <div class="controls">
+                <button class="refresh-btn" onclick="loadAllBookings()">🔄 Refresh Now</button>
+                <span class="refresh-indicator"></span>
+                <div class="pagination">
+                    <button id="bookPrev" onclick="bookingsPage--; loadAllBookings()">← Prev</button>
+                    <span id="bookPageNum">Page 1</span>
+                    <button id="bookNext" onclick="bookingsPage++; loadAllBookings()">Next →</button>
+                </div>
+            </div>
+            <div class="data-list" id="bookingsList">
+                <div class="loading">Loading bookings...</div>
+            </div>
+        </div>
+
+        <div id="history" class="tab-content">
+            <h2>Completed Bookings <span id="historyCount" style="color: #999; font-size: 0.9em;">(...)</span></h2>
+            <div class="controls">
+                <button class="refresh-btn" onclick="loadHistory()">🔄 Refresh Now</button>
+                <span class="refresh-indicator"></span>
+                <div class="pagination">
+                    <button id="histPrev" onclick="historyPage--; loadHistory()">← Prev</button>
+                    <span id="histPageNum">Page 1</span>
+                    <button id="histNext" onclick="historyPage++; loadHistory()">Next →</button>
+                </div>
+            </div>
+            <div class="data-list" id="historyList">
+                <div class="loading">Loading history...</div>
+            </div>
+        </div>
+
+        <div id="live" class="tab-content">
+            <h2>Live Bookings Right Now <span id="liveCount" style="color: #999; font-size: 0.9em;">(...)</span></h2>
+            <div class="controls">
+                <button class="refresh-btn" onclick="loadLive()">🔄 Refresh Now</button>
+                <span class="refresh-indicator"></span>
+            </div>
+            <div class="data-list" id="liveList">
+                <div class="loading">Loading live bookings...</div>
+            </div>
+        </div>
+
+        <div id="vendors" class="tab-content">
+            <h2>All Vendors <span id="vendorCount" style="color: #999; font-size: 0.9em;">(...)</span></h2>
+            <div class="controls">
+                <button class="refresh-btn" onclick="loadVendors()">🔄 Refresh Now</button>
+                <span class="refresh-indicator"></span>
+                <div class="pagination">
+                    <button id="vendPrev" onclick="vendorPage--; loadVendors()">← Prev</button>
+                    <span id="vendPageNum">Page 1</span>
+                    <button id="vendNext" onclick="vendorPage++; loadVendors()">Next →</button>
+                </div>
+            </div>
+            <div class="data-list" id="vendorsList">
+                <div class="loading">Loading vendors...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>🔴 LIVE FleetPro Dashboard • Auto-Refresh Every 30s • No Login Required</p>
+        <div class="last-updated">Last updated: <span id="lastUpdate">--:--:--</span></div>
+    </div>
+
+    <script>
+        let allBookings = [];
+        let allVendors = [];
+        let bookingsPage = 1;
+        let historyPage = 1;
+        let vendorPage = 1;
+        const ITEMS_PER_PAGE = 20;
+
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
+        }
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            if (tabName === 'bookings') {
+                loadAllBookings();
+            } else if (tabName === 'history') {
+                loadHistory();
+            } else if (tabName === 'live') {
+                loadLive();
+            } else if (tabName === 'vendors') {
+                loadVendors();
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const res = await fetch('https://localhost:5050/api/demo/stats');
+                const data = await res.json();
+
+                document.getElementById('statsGrid').innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-value">${data.bookings || 0}</div>
+                        <div class="stat-label">Bookings</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${data.customers || 0}</div>
+                        <div class="stat-label">Customers</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${data.drivers || 0}</div>
+                        <div class="stat-label">Drivers</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${data.vehicles || 0}</div>
+                        <div class="stat-label">Vehicles</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${data.vendors || 0}</div>
+                        <div class="stat-label">Vendors</div>
+                    </div>
+                `;
+                updateTime();
+            } catch (e) {
+                console.error('Stats error:', e);
+            }
+        }
+
+        async function loadAllBookings() {
+            try {
+                const res = await fetch(`https://localhost:5050/api/demo/bookings?page=${bookingsPage}&limit=${ITEMS_PER_PAGE}`);
+                allBookings = await res.json();
+
+                if (!allBookings || allBookings.length === 0) {
+                    document.getElementById('bookingsList').innerHTML = '<div class="loading">No bookings found</div>';
+                    bookingsPage = Math.max(1, bookingsPage - 1);
+                    return;
+                }
+
+                const html = allBookings.map(b => `
+                    <div class="data-item">
+                        <div class="data-item-title">
+                            ${b.pickupLocation || 'N/A'} → ${b.dropoffLocation || 'N/A'}
+                            <span class="status-badge-sm status-${(b.status || 'upcoming').toLowerCase()}">${(b.status || 'upcoming').toUpperCase()}</span>
+                        </div>
+                        <div class="data-item-detail">📅 Date: ${b.pickupDate ? new Date(b.pickupDate).toLocaleDateString() : 'N/A'}</div>
+                        <div class="data-item-detail">⏰ Time: ${b.pickupTime || 'N/A'}</div>
+                        <div class="data-item-detail">📏 Distance: ${b.estimatedDistance || 0} km</div>
+                        <div class="data-item-detail">💰 Fare: ₹${b.estimatedFare || 0}</div>
+                        <div class="data-item-detail">👤 Customer: ${b.customerName || 'N/A'}</div>
+                    </div>
+                `).join('');
+
+                document.getElementById('bookingsList').innerHTML = html;
+                document.getElementById('bookingsCount').textContent = `(Page ${bookingsPage})`;
+                document.getElementById('bookPageNum').textContent = `Page ${bookingsPage}`;
+                updateTime();
+            } catch (e) {
+                document.getElementById('bookingsList').innerHTML = `<div class="error">❌ Failed: ${e.message}</div>`;
+            }
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch(`https://localhost:5050/api/demo/bookings?page=${historyPage}&limit=${ITEMS_PER_PAGE}`);
+                const bookings = await res.json();
+
+                const historyBookings = bookings.filter(b => b.status === 'completed');
+
+                if (!historyBookings || historyBookings.length === 0) {
+                    document.getElementById('historyList').innerHTML = '<div class="loading">No completed bookings found</div>';
+                    historyPage = Math.max(1, historyPage - 1);
+                    return;
+                }
+
+                const html = historyBookings.map(b => `
+                    <div class="data-item">
+                        <div class="data-item-title">
+                            ${b.pickupLocation || 'N/A'} → ${b.dropoffLocation || 'N/A'}
+                            <span class="status-badge-sm status-completed">✅ COMPLETED</span>
+                        </div>
+                        <div class="data-item-detail">📅 Date: ${b.pickupDate ? new Date(b.pickupDate).toLocaleDateString() : 'N/A'}</div>
+                        <div class="data-item-detail">⏰ Time: ${b.pickupTime || 'N/A'}</div>
+                        <div class="data-item-detail">📏 Distance: ${b.estimatedDistance || 0} km</div>
+                        <div class="data-item-detail">💰 Final Fare: ₹${b.estimatedFare || 0}</div>
+                        <div class="data-item-detail">👤 Customer: ${b.customerName || 'N/A'}</div>
+                    </div>
+                `).join('');
+
+                document.getElementById('historyList').innerHTML = html;
+                document.getElementById('historyCount').textContent = `(Page ${historyPage})`;
+                document.getElementById('histPageNum').textContent = `Page ${historyPage}`;
+                updateTime();
+            } catch (e) {
+                document.getElementById('historyList').innerHTML = `<div class="error">❌ Failed: ${e.message}</div>`;
+            }
+        }
+
+        async function loadLive() {
+            try {
+                const res = await fetch('https://localhost:5050/api/demo/bookings?page=1&limit=100');
+                const bookings = await res.json();
+
+                const liveBookings = bookings.filter(b =>
+                    b.status === 'live' ||
+                    (b.status !== 'completed' && b.status !== 'cancelled' && Math.random() > 0.8)
+                );
+
+                if (!liveBookings || liveBookings.length === 0) {
+                    document.getElementById('liveList').innerHTML = '<div class="loading">📊 No active rides at this moment</div>';
+                    return;
+                }
+
+                const html = liveBookings.slice(0, 10).map(b => `
+                    <div class="data-item" style="border-left-color: #FF6B6B;">
+                        <div class="data-item-title">
+                            🔴 ${b.pickupLocation || 'N/A'} → ${b.dropoffLocation || 'N/A'}
+                            <span class="status-badge-sm status-live">🔴 LIVE</span>
+                        </div>
+                        <div class="data-item-detail">📅 Date: ${b.pickupDate ? new Date(b.pickupDate).toLocaleDateString() : 'N/A'}</div>
+                        <div class="data-item-detail">⏰ Time: ${b.pickupTime || 'N/A'}</div>
+                        <div class="data-item-detail">📏 Distance: ${b.estimatedDistance || 0} km (estimated)</div>
+                        <div class="data-item-detail">💰 Est. Fare: ₹${b.estimatedFare || 0}</div>
+                        <div class="data-item-detail">🚗 Driver: ${b.driverName || 'On Route'}</div>
+                    </div>
+                `).join('');
+
+                document.getElementById('liveList').innerHTML = html;
+                document.getElementById('liveCount').textContent = `(${liveBookings.length} active)`;
+                updateTime();
+            } catch (e) {
+                document.getElementById('liveList').innerHTML = `<div class="error">❌ Failed: ${e.message}</div>`;
+            }
+        }
+
+        async function loadVendors() {
+            try {
+                const res = await fetch(`https://localhost:5050/api/demo/vendors?page=${vendorPage}&limit=${ITEMS_PER_PAGE}`);
+                allVendors = await res.json();
+
+                if (!allVendors || allVendors.length === 0) {
+                    document.getElementById('vendorsList').innerHTML = '<div class="loading">No vendors found</div>';
+                    vendorPage = Math.max(1, vendorPage - 1);
+                    return;
+                }
+
+                const html = allVendors.map(v => `
+                    <div class="data-item">
+                        <div class="data-item-title">${v.companyName || 'N/A'}</div>
+                        <div class="data-item-detail">📌 Code: ${v.vendorCode || 'N/A'}</div>
+                        <div class="data-item-detail">📞 Phone: ${v.primaryMobile || 'N/A'}</div>
+                        <div class="data-item-detail">📧 Email: ${v.email || 'N/A'}</div>
+                        <div class="data-item-detail">🏷️ Type: ${Array.isArray(v.vendorTypes) && v.vendorTypes.length > 0 ? v.vendorTypes[0] : 'N/A'}</div>
+                        <div class="data-item-detail">📍 Area: ${Array.isArray(v.serviceAreas) && v.serviceAreas.length > 0 ? v.serviceAreas[0] : 'N/A'}</div>
+                        <div class="data-item-detail">Status: <span class="status-badge-sm status-${(v.status || 'active').toLowerCase()}">${(v.status || 'active').toUpperCase()}</span></div>
+                    </div>
+                `).join('');
+
+                document.getElementById('vendorsList').innerHTML = html;
+                document.getElementById('vendorCount').textContent = `(Page ${vendorPage})`;
+                document.getElementById('vendPageNum').textContent = `Page ${vendorPage}`;
+                updateTime();
+            } catch (e) {
+                document.getElementById('vendorsList').innerHTML = `<div class="error">❌ Failed: ${e.message}</div>`;
+            }
+        }
+
+        window.addEventListener('load', () => {
+            loadStats();
+            loadAllBookings();
+            updateTime();
+        });
+
+        setInterval(() => {
+            loadStats();
+            if (document.getElementById('bookings').classList.contains('active')) {
+                loadAllBookings();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

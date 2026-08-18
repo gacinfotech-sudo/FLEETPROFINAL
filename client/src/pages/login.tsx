@@ -1,0 +1,329 @@
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Car, Shield, Users, BarChart3, Eye, EyeOff, ArrowLeft } from "lucide-react";
+
+export default function LoginPage() {
+  const [isTenantMode, setIsTenantMode] = useState(false);
+  const [tenantId, setTenantId] = useState("");
+  const [email, setEmail] = useState("root@fleetpro.local");
+  const [userId, setUserId] = useState("root@fleetpro.local");
+  const [password, setPassword] = useState("password");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    // Check query params for tenant mode
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get('mode');
+    const tid = params.get('tenantId');
+
+    if (mode === 'tenant' && tid) {
+      setIsTenantMode(true);
+      setTenantId(tid);
+      setEmail('');
+      setUserId('');
+    }
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+
+    if (!email || !password) {
+      setError("Email and password required");
+      return;
+    }
+
+    setLoading(true);
+
+    if (isTenantMode) {
+      console.log("🔐 TENANT LOGIN: Starting login for tenant:", tenantId);
+    } else {
+      console.log("🔐 PLATFORM LOGIN: Starting login with email:", email);
+    }
+
+    try {
+      // P0 FIX: UNIFIED LOGIN - Backend determines account type
+      // Support both email and userId
+      // The form field is "User ID" which updates userId state
+      const endpoint = "/api/auth/login";
+
+      // Determine if input is email or userId based on '@' character
+      const isEmail = userId.includes('@');
+      const body = {
+        email: isEmail ? userId : undefined,
+        userId: !isEmail ? userId : undefined,
+        password
+      };
+
+      console.log("🔐 P0 LOGIN: Sending to backend for canonical auth...");
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("🔴 LOGIN FAILED:", { status: response.status, body: text });
+        setError("Invalid credentials");
+        setLoading(false);
+        return;
+      }
+
+      const data = await response.json();
+
+      console.log("🔐 P0 LOGIN RESPONSE:", {
+        accountType: data.accountType,
+        redirectUrl: data.redirectUrl
+      });
+
+      if (!data.user || !data.accountType) {
+        setError("Invalid server response");
+        setLoading(false);
+        return;
+      }
+
+      // CLEAR ALL old session state
+      localStorage.clear();
+      sessionStorage.clear();
+
+      // Store CANONICAL identity from backend (SESSION-BASED AUTH)
+      // Backend sets httpOnly cookie, we just store user data for app state
+      localStorage.setItem("fleetpro_user", JSON.stringify(data.user));
+      localStorage.setItem("accountType", data.accountType);
+      localStorage.setItem("tenantId", data.user.tenantId || "");
+
+      console.log(`✅ P0 LOGIN SUCCESS: accountType=${data.accountType}`);
+
+      // REDIRECT based on BACKEND-determined accountType
+      // NEVER trust frontend logic for this decision
+      const redirectUrl = data.redirectUrl || (
+        data.accountType === 'PLATFORM'
+          ? "/superadmin/dashboard"
+          : "/dashboard"
+      );
+
+      console.log(`🚀 Redirecting to: ${redirectUrl}`);
+      window.location.href = redirectUrl;
+    } catch (err: any) {
+      console.error("❌ P0 LOGIN FAILED:", err);
+      setError(`Login failed: ${err.message}`);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <div className="flex min-h-screen">
+        {/* Left Column - Features Section */}
+        <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-12 flex-col justify-center">
+          <div className="max-w-lg mx-auto text-white">
+            {/* Logo and Branding */}
+            <div className="mb-12">
+              <div className="flex items-center space-x-4 mb-6">
+                <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
+                  <Car className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold">FleetPro</h1>
+                  <p className="text-blue-100 text-lg">Professional Fleet Management</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Heading */}
+            <div className="mb-12">
+              <h2 className="text-4xl lg:text-5xl font-bold leading-tight mb-6">
+                Complete Fleet Management Solution
+              </h2>
+              <p className="text-xl text-blue-100 leading-relaxed">
+                Streamline your taxi and car rental operations with our comprehensive 
+                platform designed for modern fleet businesses.
+              </p>
+            </div>
+
+            {/* Feature List */}
+            <div className="space-y-8">
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 bg-blue-500/30 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0 mt-1">
+                  <Car className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">Vehicle Fleet Management</h3>
+                  <p className="text-blue-100 leading-relaxed">
+                    Track vehicle status, maintenance schedules, and availability in real-time 
+                    with comprehensive fleet oversight.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 bg-green-500/30 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0 mt-1">
+                  <Users className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">Driver Management</h3>
+                  <p className="text-blue-100 leading-relaxed">
+                    Manage driver profiles, licenses, and assign drivers to bookings 
+                    efficiently with automated workflows.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 bg-purple-500/30 backdrop-blur-sm rounded-xl flex items-center justify-center flex-shrink-0 mt-1">
+                  <BarChart3 className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold mb-2">Revenue Analytics</h3>
+                  <p className="text-blue-100 leading-relaxed">
+                    Detailed revenue reports, booking analytics, and professional PDF 
+                    export capabilities for business insights.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Login Form */}
+        <div className="w-full lg:w-1/2 flex items-center justify-center p-4 lg:p-12">
+          <Card className="w-full max-w-md bg-white/95 backdrop-blur-sm shadow-2xl border-0 rounded-3xl overflow-hidden">
+            <CardHeader className="text-center pb-4 lg:pb-8 px-4 lg:px-8 pt-6 lg:pt-10">
+              <div className="lg:hidden mb-6">
+                <div className="flex items-center justify-center space-x-3 mb-4">
+                  <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center">
+                    <Car className="w-7 h-7 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-slate-800">FleetPro</h1>
+                    <p className="text-slate-500 text-sm">Professional Fleet Management</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div>
+                {isTenantMode && (
+                  <button
+                    onClick={() => window.location.href = '/login'}
+                    className="mb-4 flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium"
+                  >
+                    <ArrowLeft size={16} />
+                    Back to Root
+                  </button>
+                )}
+                <CardTitle className="text-2xl lg:text-3xl font-bold text-slate-800 mb-2 lg:mb-4">
+                  {isTenantMode ? 'Tenant Login' : 'Welcome Back'}
+                </CardTitle>
+                <CardDescription className="text-base lg:text-lg text-slate-600 leading-relaxed">
+                  {isTenantMode
+                    ? 'Sign in to access your fleet management dashboard'
+                    : 'Sign in to access your fleet management dashboard'
+                  }
+                </CardDescription>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="space-y-4 lg:space-y-8 px-4 lg:px-8 pb-6 lg:pb-10">
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+              <form onSubmit={handleSubmit} className="space-y-4 lg:space-y-8" noValidate autoComplete="off">
+                <div className="space-y-2 lg:space-y-3">
+                  <Label htmlFor="userId" className="text-sm lg:text-base font-semibold text-slate-700">
+                    User ID
+                  </Label>
+                  <Input
+                    id="userId"
+                    name="userId"
+                    type="text"
+                    placeholder="Enter your User ID"
+                    value={userId}
+                    onChange={(e) => setUserId(e.target.value)}
+                    className="h-12 lg:h-14 px-3 lg:px-4 text-sm lg:text-base border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl transition-all duration-200 bg-slate-50 focus:bg-white"
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck="false"
+                  />
+                </div>
+                
+                <div className="space-y-2 lg:space-y-3">
+                  <Label htmlFor="password" className="text-sm lg:text-base font-semibold text-slate-700">
+                    Password
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="h-12 lg:h-14 px-3 lg:px-4 pr-12 lg:pr-14 text-sm lg:text-base border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl transition-all duration-200 bg-slate-50 focus:bg-white"
+                      autoComplete="current-password"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck="false"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 lg:right-4 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={18} className="lg:w-[22px] lg:h-[22px]" /> : <Eye size={18} className="lg:w-[22px] lg:h-[22px]" />}
+                    </button>
+                  </div>
+                </div>
+                
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-12 lg:h-14 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold text-base lg:text-lg rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl mt-6 lg:mt-8 hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  {loading ? (
+                    <div className="flex items-center space-x-2 lg:space-x-3">
+                      <div className="w-4 h-4 lg:w-5 lg:h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Signing In...</span>
+                    </div>
+                  ) : (
+                    "Sign In to Dashboard"
+                  )}
+                </Button>
+                
+                <div className="text-center pt-2 lg:pt-4">
+                  <p className="text-xs lg:text-sm text-slate-500">
+                    Forgot Password? Please contact your administrator to reset.
+                  </p>
+                </div>
+              </form>
+              
+              <div className="pt-3 lg:pt-6 border-t border-slate-200">
+                <div className="bg-blue-50 p-3 lg:p-5 rounded-xl">
+                  <div className="flex items-start space-x-3 lg:space-x-4">
+                    <Shield className="text-blue-600 mt-0.5 lg:mt-1" size={16} />
+                    <div className="space-y-0.5 lg:space-y-1">
+                      <p className="text-sm lg:text-base font-semibold text-blue-800">Security Notice</p>
+                      <p className="text-xs lg:text-sm text-blue-600 leading-relaxed">
+                        Single session enforcement - Previous sessions will be automatically logged out for enhanced security
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}

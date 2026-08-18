@@ -1,0 +1,143 @@
+/* Notification Bell Styles */
+
+.notification-bell-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.notification-bell {
+  background: none;
+  border: none;
+  color: #1f2937;
+  cursor: pointer;
+  padding: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+@media (prefers-color-scheme: dark) {
+  .notification-bell {
+    color: #f3f4f6;
+  }
+}
+
+.notification-bell:hover {
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+}
+
+.notification-bell:active {
+  transform: scale(0.95);
+}
+
+.notification-bell.animating {
+  animation: bellPulse 0.6s ease-out;
+}
+
+@keyframes bellPulse {
+  0% {
+    transform: scale(1) rotate(0deg);
+  }
+  15% {
+    transform: scale(1.1) rotate(-10deg);
+  }
+  30% {
+    transform: scale(1.1) rotate(10deg);
+  }
+  45% {
+    transform: scale(1.1) rotate(-8deg);
+  }
+  60% {
+    transform: scale(1.05) rotate(5deg);
+  }
+  75% {
+    transform: scale(1.05) rotate(0deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* Badge */
+.notification-badge {
+  position: absolute;
+  top: 4px;
+  right: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border-radius: 50%;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+  animation: badgePulse 0.5s ease-out;
+}
+
+@keyframes badgePulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.badge-count {
+  display: block;
+  line-height: 1;
+}
+
+/* Focus State */
+.notification-bell:focus {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .notification-bell {
+    transition: none;
+  }
+
+  .notification-bell.animating {
+    animation: none;
+  }
+
+  .notification-badge {
+    animation: none;
+  }
+
+  .notification-bell:active {
+    transform: none;
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+  .notification-bell {
+    padding: 10px;
+  }
+
+  .notification-badge {
+    min-width: 20px;
+    height: 20px;
+    font-size: 10px;
+    top: 2px;
+    right: 0px;
+  }
+}

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- PRIMARY COLORS - LIGHT MODE -->
+    <color name="primary_light">#1976D2</color>
+    <color name="primary_dark_light">#1565C0</color>
+    <color name="secondary_light">#FFC107</color>
+    <color name="secondary_dark_light">#FFA000</color>
+
+    <!-- PRIMARY COLORS - DARK MODE (OLED Optimized) -->
+    <color name="primary_dark">#64B5F6</color>
+    <color name="primary_dark_variant">#42A5F5</color>
+    <color name="secondary_dark">#FFD54F</color>
+    <color name="secondary_dark_variant">#FFCA28</color>
+
+    <!-- BACKGROUND COLORS -->
+    <color name="background_light">#FFFFFF</color>
+    <color name="background_dark">#121212</color> <!-- OLED True Black -->
+    <color name="surface_light">#F5F5F5</color>
+    <color name="surface_dark">#1E1E1E</color>
+
+    <!-- TEXT COLORS - LIGHT MODE -->
+    <color name="text_primary_light">#212121</color>
+    <color name="text_secondary_light">#757575</color>
+    <color name="text_input_hint_light">#999999</color>
+    <color name="text_input_stroke_light">#BDBDBD</color>
+
+    <!-- TEXT COLORS - DARK MODE -->
+    <color name="text_primary_dark">#FFFFFF</color>
+    <color name="text_secondary_dark">#BDBDBD</color>
+    <color name="text_input_hint_dark">#666666</color>
+    <color name="text_input_stroke_dark">#404040</color>
+
+    <!-- STATUS & NAVIGATION BARS -->
+    <color name="status_bar_light">#FFFFFF</color>
+    <color name="status_bar_dark">#000000</color>
+    <color name="nav_bar_light">#FFFFFF</color>
+    <color name="nav_bar_dark">#000000</color>
+
+    <!-- ACCESSIBILITY: HIGH CONTRAST -->
+    <color name="primary_high_contrast">#0D47A1</color> <!-- Darker blue for contrast -->
+    <color name="primary_high_contrast_dark">#82B1FF</color> <!-- Brighter blue for dark -->
+    <color name="text_high_contrast_light">#000000</color> <!-- Pure black -->
+    <color name="text_high_contrast_dark">#FFFFFF</color> <!-- Pure white -->
+    <color name="text_high_contrast_secondary">#333333</color>
+    <color name="text_high_contrast_secondary_dark">#CCCCCC</color>
+
+    <!-- SEMANTIC COLORS -->
+    <color name="success">#4CAF50</color>
+    <color name="success_light">#C8E6C9</color>
+    <color name="success_dark">#81C784</color>
+
+    <color name="error">#F44336</color>
+    <color name="error_light">#FFCDD2</color>
+    <color name="error_dark">#EF5350</color>
+
+    <color name="warning">#FF9800</color>
+    <color name="warning_light">#FFE0B2</color>
+    <color name="warning_dark">#FFB74D</color>
+
+    <color name="info">#2196F3</color>
+    <color name="info_light">#BBDEFB</color>
+    <color name="info_dark">#64B5F6</color>
+
+    <!-- FOCUS & INTERACTION -->
+    <color name="focus_ring">#1976D2</color>
+    <color name="focus_ring_dark">#64B5F6</color>
+    <color name="disabled">#BDBDBD</color>
+    <color name="disabled_text">#9E9E9E</color>
+</resources>

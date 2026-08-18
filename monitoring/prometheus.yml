@@ -1,0 +1,91 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'fleetpro-prod'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Alert rules
+rule_files:
+  - 'alerts.yml'
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # FleetPro Application Metrics
+  - job_name: 'fleetpro-app'
+    scrape_interval: 15s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ['localhost:5050']
+        labels:
+          service: 'fleetpro-api'
+          environment: 'production'
+    metrics_path: '/observability/metrics'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # FleetPro Development Metrics
+  - job_name: 'fleetpro-dev'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    static_configs:
+      - targets: ['localhost:5051']
+        labels:
+          service: 'fleetpro-dev'
+          environment: 'development'
+    metrics_path: '/observability/metrics'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # Node Exporter (System Metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['localhost:9100']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # Docker Metrics
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['localhost:8080']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # MongoDB Metrics (if using mongo-exporter)
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: ['localhost:9216']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+  # Redis Metrics (if using redis-exporter)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['localhost:9121']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+remote_write:
+  # Optional: Send metrics to remote storage
+  # - url: "http://remote-storage:9009/api/v1/push"
+
+remote_read:
+  # Optional: Read metrics from remote storage
+  # - url: "http://remote-storage:9009/api/v1/read"
