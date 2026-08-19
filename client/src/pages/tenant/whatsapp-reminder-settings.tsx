@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Card, Input, Checkbox, Select, Spin, Alert, Divider } from 'antd';
-import { SaveOutlined, ReloadOutlined, CheckOutlined } from '@ant-design/icons';
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Save, RotateCcw, Check } from 'lucide-react';
 
 interface ReminderSettings {
   enabled: boolean;
@@ -23,6 +27,7 @@ export default function WhatsAppReminderSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [messageType, setMessageType] = useState<'success' | 'error' | null>(null);
 
   useEffect(() => {
     fetchSettings();
@@ -40,7 +45,8 @@ export default function WhatsAppReminderSettings() {
         setSettings(data.settings);
       }
     } catch (err: any) {
-      setMessage(`Error: ${err.message}`);
+      setMessage(`Error loading settings: ${err.message}`);
+      setMessageType('error');
     } finally {
       setLoading(false);
     }
@@ -58,10 +64,15 @@ export default function WhatsAppReminderSettings() {
       const data = await res.json();
       if (data.success) {
         setMessage('✅ Settings saved successfully!');
+        setMessageType('success');
         setTimeout(() => setMessage(''), 3000);
+      } else {
+        setMessage(`Error: ${data.message}`);
+        setMessageType('error');
       }
     } catch (err: any) {
       setMessage(`Error: ${err.message}`);
+      setMessageType('error');
     } finally {
       setSaving(false);
     }
@@ -79,50 +90,68 @@ export default function WhatsAppReminderSettings() {
       if (data.success && data.settings) {
         setSettings(data.settings);
         setMessage('✅ Settings reset to defaults!');
+        setMessageType('success');
         setTimeout(() => setMessage(''), 3000);
       }
     } catch (err: any) {
       setMessage(`Error: ${err.message}`);
+      setMessageType('error');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <Spin size="large" style={{ display: 'flex', justifyContent: 'center', marginTop: '50px' }} />;
-  if (!settings) return <Alert message="Failed to load settings" type="error" />;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (!settings) {
+    return (
+      <Alert className="m-4 border-red-200 bg-red-50">
+        <AlertDescription className="text-red-800">
+          Failed to load settings
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '20px' }}>
-      <h1>📱 WhatsApp Reminder Settings</h1>
+    <div className="max-w-4xl mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-6">📱 WhatsApp Reminder Settings</h1>
 
       {message && (
-        <Alert
-          message={message}
-          type={message.includes('✅') ? 'success' : 'error'}
-          style={{ marginBottom: '20px' }}
-          closable
-          onClose={() => setMessage('')}
-        />
+        <Alert className={`mb-6 ${messageType === 'success' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+          <AlertDescription className={messageType === 'success' ? 'text-green-800' : 'text-red-800'}>
+            {message}
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* Enable/Disable */}
-      <Card style={{ marginBottom: '20px' }}>
-        <h2>Enable/Disable</h2>
-        <Checkbox
-          checked={settings.enabled}
-          onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
-        >
-          <strong>{settings.enabled ? '✅ Reminders Enabled' : '❌ Reminders Disabled'}</strong>
-        </Checkbox>
-        <p style={{ marginTop: '10px', color: '#666' }}>
+      <Card className="p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Enable/Disable</h2>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <Checkbox
+            checked={settings.enabled}
+            onCheckedChange={(checked) => setSettings({ ...settings, enabled: checked as boolean })}
+          />
+          <span className="text-lg font-medium">
+            {settings.enabled ? '✅ Reminders Enabled' : '❌ Reminders Disabled'}
+          </span>
+        </label>
+        <p className="mt-3 text-sm text-gray-600">
           When enabled, WhatsApp reminders will be automatically scheduled for all confirmed bookings.
         </p>
       </Card>
 
       {/* Reminder Intervals */}
-      <Card style={{ marginBottom: '20px' }}>
-        <h2>Reminder Intervals (minutes before pickup)</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '15px' }}>
+      <Card className="p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Reminder Intervals (minutes before pickup)</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
           {[5, 10, 20, 30, 60, 120, 300].map((interval) => (
             <Button
               key={interval}
@@ -132,93 +161,95 @@ export default function WhatsAppReminderSettings() {
                   : [...settings.reminderIntervals, interval];
                 setSettings({ ...settings, reminderIntervals: newIntervals.sort((a, b) => a - b) });
               }}
-              type={settings.reminderIntervals.includes(interval) ? 'primary' : 'default'}
-              style={{ width: '100%' }}
+              variant={settings.reminderIntervals.includes(interval) ? 'default' : 'outline'}
+              className="w-full"
             >
               {interval < 60 ? `${interval}m` : interval === 60 ? '1h' : interval === 120 ? '2h' : '5h'}
-              {settings.reminderIntervals.includes(interval) && <CheckOutlined style={{ marginLeft: '5px' }} />}
+              {settings.reminderIntervals.includes(interval) && <Check className="w-4 h-4 ml-1" />}
             </Button>
           ))}
         </div>
-        <p style={{ color: '#666' }}>
+        <p className="text-sm text-gray-600">
           <strong>Selected intervals:</strong> {settings.reminderIntervals.map(i => i < 60 ? `${i}m` : i === 60 ? '1h' : i === 120 ? '2h' : '5h').join(', ')}
         </p>
       </Card>
 
       {/* Recipients */}
-      <Card style={{ marginBottom: '20px' }}>
-        <h2>Notification Recipients</h2>
-        <div style={{ display: 'grid', gap: '15px' }}>
-          <Checkbox
-            checked={settings.recipients.driver}
-            onChange={(e) =>
-              setSettings({
-                ...settings,
-                recipients: { ...settings.recipients, driver: e.target.checked },
-              })
-            }
-          >
-            <strong>👨‍💼 Send to Drivers</strong>
-            <p style={{ margin: '5px 0', color: '#666', fontSize: '12px' }}>
-              Drivers get pickup notifications with location and booking details
-            </p>
-          </Checkbox>
+      <Card className="p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Notification Recipients</h2>
+        <div className="space-y-4">
+          <label className="flex items-start gap-3 cursor-pointer p-3 border rounded hover:bg-gray-50">
+            <Checkbox
+              checked={settings.recipients.driver}
+              onCheckedChange={(checked) =>
+                setSettings({
+                  ...settings,
+                  recipients: { ...settings.recipients, driver: checked as boolean },
+                })
+              }
+            />
+            <div>
+              <strong>👨‍💼 Send to Drivers</strong>
+              <p className="text-sm text-gray-600">Drivers get pickup notifications with location and booking details</p>
+            </div>
+          </label>
 
-          <Checkbox
-            checked={settings.recipients.customer}
-            onChange={(e) =>
-              setSettings({
-                ...settings,
-                recipients: { ...settings.recipients, customer: e.target.checked },
-              })
-            }
-          >
-            <strong>👤 Send to Customers</strong>
-            <p style={{ margin: '5px 0', color: '#666', fontSize: '12px' }}>
-              Customers get confirmation and arrival reminders for their bookings
-            </p>
-          </Checkbox>
+          <label className="flex items-start gap-3 cursor-pointer p-3 border rounded hover:bg-gray-50">
+            <Checkbox
+              checked={settings.recipients.customer}
+              onCheckedChange={(checked) =>
+                setSettings({
+                  ...settings,
+                  recipients: { ...settings.recipients, customer: checked as boolean },
+                })
+              }
+            />
+            <div>
+              <strong>👤 Send to Customers</strong>
+              <p className="text-sm text-gray-600">Customers get confirmation and arrival reminders for their bookings</p>
+            </div>
+          </label>
 
-          <Checkbox
-            checked={settings.recipients.officeStaff}
-            onChange={(e) =>
-              setSettings({
-                ...settings,
-                recipients: { ...settings.recipients, officeStaff: e.target.checked },
-              })
-            }
-          >
-            <strong>👥 Send to Office Staff</strong>
-            <p style={{ margin: '5px 0', color: '#666', fontSize: '12px' }}>
-              Managers and admins get booking updates for monitoring and coordination
-            </p>
-          </Checkbox>
+          <label className="flex items-start gap-3 cursor-pointer p-3 border rounded hover:bg-gray-50">
+            <Checkbox
+              checked={settings.recipients.officeStaff}
+              onCheckedChange={(checked) =>
+                setSettings({
+                  ...settings,
+                  recipients: { ...settings.recipients, officeStaff: checked as boolean },
+                })
+              }
+            />
+            <div>
+              <strong>👥 Send to Office Staff</strong>
+              <p className="text-sm text-gray-600">Managers and admins get booking updates for monitoring and coordination</p>
+            </div>
+          </label>
         </div>
       </Card>
 
       {/* Timezone */}
-      <Card style={{ marginBottom: '20px' }}>
-        <h2>Timezone</h2>
-        <Select
+      <Card className="p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Timezone</h2>
+        <select
           value={settings.timezone}
-          onChange={(value) => setSettings({ ...settings, timezone: value })}
-          style={{ width: '200px' }}
-          options={[
-            { label: 'Asia/Kolkata (IST)', value: 'Asia/Kolkata' },
-            { label: 'UTC', value: 'UTC' },
-            { label: 'Asia/Dubai (GST)', value: 'Asia/Dubai' },
-            { label: 'America/New_York (EST)', value: 'America/New_York' },
-          ]}
-        />
+          onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
+          className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+          <option value="UTC">UTC</option>
+          <option value="Asia/Dubai">Asia/Dubai (GST)</option>
+          <option value="America/New_York">America/New_York (EST)</option>
+        </select>
       </Card>
 
       {/* Message Templates */}
-      <Card style={{ marginBottom: '20px' }}>
-        <h2>Message Templates</h2>
+      <Card className="p-6 mb-6">
+        <h2 className="text-xl font-semibold mb-4">Message Templates</h2>
 
-        <div style={{ marginBottom: '20px' }}>
-          <h3>📍 Driver Message Template</h3>
-          <Input.TextArea
+        <div className="mb-6">
+          <h3 className="font-semibold mb-2">📍 Driver Message Template</h3>
+          <textarea
             value={settings.messageTemplates.driver}
             onChange={(e) =>
               setSettings({
@@ -227,19 +258,18 @@ export default function WhatsAppReminderSettings() {
               })
             }
             rows={4}
-            placeholder="Driver message template"
-            style={{ fontFamily: 'monospace', fontSize: '12px' }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <p style={{ marginTop: '5px', color: '#999', fontSize: '12px' }}>
-            Available placeholders: {'{MINUTES}'}, {'{BOOKING_ID}'}, {'{PICKUP_LOCATION}'}, {'{DROP_LOCATION}'}, {'{AMOUNT}'}
+          <p className="mt-2 text-xs text-gray-500">
+            Available: {'{MINUTES}'}, {'{BOOKING_ID}'}, {'{PICKUP_LOCATION}'}, {'{DROP_LOCATION}'}, {'{AMOUNT}'}
           </p>
         </div>
 
-        <Divider />
+        <hr className="my-6" />
 
-        <div style={{ marginBottom: '20px' }}>
-          <h3>👤 Customer Message Template</h3>
-          <Input.TextArea
+        <div className="mb-6">
+          <h3 className="font-semibold mb-2">👤 Customer Message Template</h3>
+          <textarea
             value={settings.messageTemplates.customer}
             onChange={(e) =>
               setSettings({
@@ -248,19 +278,18 @@ export default function WhatsAppReminderSettings() {
               })
             }
             rows={4}
-            placeholder="Customer message template"
-            style={{ fontFamily: 'monospace', fontSize: '12px' }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <p style={{ marginTop: '5px', color: '#999', fontSize: '12px' }}>
-            Available placeholders: {'{MINUTES}'}, {'{BOOKING_ID}'}, {'{PICKUP_LOCATION}'}
+          <p className="mt-2 text-xs text-gray-500">
+            Available: {'{MINUTES}'}, {'{BOOKING_ID}'}, {'{PICKUP_LOCATION}'}
           </p>
         </div>
 
-        <Divider />
+        <hr className="my-6" />
 
         <div>
-          <h3>👥 Office Staff Message Template</h3>
-          <Input.TextArea
+          <h3 className="font-semibold mb-2">👥 Office Staff Message Template</h3>
+          <textarea
             value={settings.messageTemplates.officeStaff}
             onChange={(e) =>
               setSettings({
@@ -269,50 +298,55 @@ export default function WhatsAppReminderSettings() {
               })
             }
             rows={4}
-            placeholder="Office staff message template"
-            style={{ fontFamily: 'monospace', fontSize: '12px' }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <p style={{ marginTop: '5px', color: '#999', fontSize: '12px' }}>
-            Available placeholders: {'{MINUTES}'}, {'{BOOKING_ID}'}, {'{CUSTOMER_NAME}'}, {'{CUSTOMER_PHONE}'}, {'{PICKUP_LOCATION}'}
+          <p className="mt-2 text-xs text-gray-500">
+            Available: {'{MINUTES}'}, {'{BOOKING_ID}'}, {'{CUSTOMER_NAME}'}, {'{CUSTOMER_PHONE}'}, {'{PICKUP_LOCATION}'}
           </p>
         </div>
       </Card>
 
       {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+      <div className="flex gap-3 justify-end mb-6">
         <Button
-          icon={<ReloadOutlined />}
+          variant="destructive"
           onClick={resetSettings}
-          danger
-          loading={saving}
+          disabled={saving}
         >
+          <RotateCcw className="w-4 h-4 mr-2" />
           Reset to Defaults
         </Button>
         <Button
-          type="primary"
-          icon={<SaveOutlined />}
           onClick={saveSettings}
-          loading={saving}
-          size="large"
+          disabled={saving}
+          className="bg-blue-600 hover:bg-blue-700"
         >
-          Save Settings
+          {saving ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              Save Settings
+            </>
+          )}
         </Button>
       </div>
 
       {/* Info Box */}
-      <Alert
-        message="ℹ️ How it works"
-        description={
-          <ul style={{ margin: '10px 0', paddingLeft: '20px' }}>
+      <Alert className="border-blue-200 bg-blue-50">
+        <AlertDescription className="text-blue-900">
+          <strong>ℹ️ How it works:</strong>
+          <ul className="mt-2 ml-4 space-y-1 list-disc text-sm">
             <li>When a booking is confirmed, reminders are automatically scheduled</li>
             <li>Each reminder interval (5min, 10min, etc.) will send a separate message</li>
             <li>Messages are sent only to enabled recipients</li>
             <li>Timezone is used to calculate pickup times accurately</li>
           </ul>
-        }
-        type="info"
-        style={{ marginTop: '20px' }}
-      />
+        </AlertDescription>
+      </Alert>
     </div>
   );
 }

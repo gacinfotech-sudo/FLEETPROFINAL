@@ -72,6 +72,57 @@ export async function updateSettings(
     const db = mongoose.connection.db;
     if (!db) throw new Error('Database not connected');
 
+    // Validate updates
+    const validatedUpdates: any = {};
+
+    if (updates.enabled !== undefined) {
+      validatedUpdates.enabled = Boolean(updates.enabled);
+    }
+
+    if (updates.reminderIntervals !== undefined) {
+      if (!Array.isArray(updates.reminderIntervals)) {
+        throw new Error('reminderIntervals must be an array');
+      }
+      // Validate all intervals are positive numbers between 1 and 1440 (1 day)
+      validatedUpdates.reminderIntervals = updates.reminderIntervals
+        .filter(i => typeof i === 'number' && i > 0 && i <= 1440)
+        .sort((a, b) => a - b);
+
+      if (validatedUpdates.reminderIntervals.length === 0) {
+        throw new Error('At least one valid reminder interval is required (1-1440 minutes)');
+      }
+    }
+
+    if (updates.recipients !== undefined) {
+      if (typeof updates.recipients !== 'object') {
+        throw new Error('recipients must be an object');
+      }
+      validatedUpdates.recipients = {
+        driver: Boolean(updates.recipients.driver),
+        customer: Boolean(updates.recipients.customer),
+        officeStaff: Boolean(updates.recipients.officeStaff),
+      };
+    }
+
+    if (updates.timezone !== undefined) {
+      const validTimezones = ['Asia/Kolkata', 'UTC', 'Asia/Dubai', 'America/New_York'];
+      if (!validTimezones.includes(updates.timezone)) {
+        throw new Error(`Invalid timezone. Valid options: ${validTimezones.join(', ')}`);
+      }
+      validatedUpdates.timezone = updates.timezone;
+    }
+
+    if (updates.messageTemplates !== undefined) {
+      if (typeof updates.messageTemplates !== 'object') {
+        throw new Error('messageTemplates must be an object');
+      }
+      validatedUpdates.messageTemplates = {
+        driver: updates.messageTemplates.driver?.substring(0, 1000) || DEFAULT_SETTINGS.messageTemplates.driver,
+        customer: updates.messageTemplates.customer?.substring(0, 1000) || DEFAULT_SETTINGS.messageTemplates.customer,
+        officeStaff: updates.messageTemplates.officeStaff?.substring(0, 1000) || DEFAULT_SETTINGS.messageTemplates.officeStaff,
+      };
+    }
+
     const collection = db.collection('whatsapp_reminder_settings');
     const now = new Date();
 
@@ -79,7 +130,7 @@ export async function updateSettings(
       { tenantId },
       {
         $set: {
-          ...updates,
+          ...validatedUpdates,
           updatedAt: now,
         },
       },

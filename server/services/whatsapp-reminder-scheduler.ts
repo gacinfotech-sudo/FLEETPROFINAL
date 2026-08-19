@@ -21,11 +21,32 @@ export async function scheduleBookingReminders(
   customerId?: string
 ) {
   try {
+    // Validate inputs
+    if (!tenantId || !bookingId || !pickupDate) {
+      console.error('Missing required parameters for reminder scheduling:', { tenantId, bookingId, pickupDate });
+      return;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(tenantId)) {
+      console.error('Invalid tenant ID format:', tenantId);
+      return;
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      console.error('Invalid booking ID format:', bookingId);
+      return;
+    }
+
     const tenantObjectId = new mongoose.Types.ObjectId(tenantId);
     const booking = await Booking.findById(new mongoose.Types.ObjectId(bookingId)).lean();
 
     if (!booking) {
       console.error('Booking not found for reminder scheduling:', bookingId);
+      return;
+    }
+
+    if (!(pickupDate instanceof Date) || isNaN(pickupDate.getTime())) {
+      console.error('Invalid pickup date:', pickupDate);
       return;
     }
 

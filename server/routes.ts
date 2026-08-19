@@ -13748,7 +13748,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========== WHATSAPP REMINDER SETTINGS ==========
-  app.get("/api/whatsapp-reminders/settings/get", authenticateUser, requireTenant, requireAdmin, async (req: AuthRequest, res) => {
+  app.get("/api/whatsapp-reminders/settings/get", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { getSettings } = await import('./services/whatsapp-reminder-settings');
       const settings = await getSettings(req.tenantId!);
@@ -13761,9 +13761,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/whatsapp-reminders/settings/update", authenticateUser, requireTenant, requireAdmin, async (req: AuthRequest, res) => {
     try {
       const { updateSettings } = await import('./services/whatsapp-reminder-settings');
+      if (!req.body || Object.keys(req.body).length === 0) {
+        return res.status(400).json({ message: 'Request body is required' });
+      }
       const settings = await updateSettings(req.tenantId!, req.body);
       res.json({ success: true, message: '✅ Reminder settings updated', settings });
     } catch (error: any) {
+      console.error('Settings update error:', error);
       res.status(500).json({ message: error.message });
     }
   });
@@ -13784,14 +13788,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const db = mongoose.connection.db;
       if (!db) return res.status(500).json({ message: 'Database not connected' });
 
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, parseInt(req.query.limit as string) || 50);
+      const skip = (page - 1) * limit;
+
       const collection = db.collection('whatsapp_reminders');
+      const total = await collection.countDocuments({ tenantId: req.tenantId! });
+
       const reminders = await collection.find({
         tenantId: req.tenantId!,
         createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } // Last 7 days
-      }).sort({ createdAt: -1 }).limit(100).toArray();
+      }).sort({ createdAt: -1 }).skip(skip).limit(limit).toArray();
 
       res.json({
         success: true,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        },
         count: reminders.length,
         reminders: reminders.map(r => ({
           id: r._id,
@@ -13814,6 +13830,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const db = mongoose.connection.db;
       if (!db) return res.status(500).json({ message: 'Database not connected' });
+
+      // Validate MongoDB ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(req.params.bookingId)) {
+        return res.status(400).json({ message: 'Invalid booking ID format' });
+      }
 
       const collection = db.collection('whatsapp_reminders');
       const reminders = await collection.find({
@@ -13848,6 +13869,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const db = mongoose.connection.db;
       if (!db) return res.status(500).json({ message: 'Database not connected' });
+
+      // Validate MongoDB ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(req.params.reminderId)) {
+        return res.status(400).json({ message: 'Invalid reminder ID format' });
+      }
 
       const collection = db.collection('whatsapp_reminders');
       const reminderId = new mongoose.Types.ObjectId(req.params.reminderId);
