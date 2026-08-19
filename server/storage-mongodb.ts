@@ -1231,21 +1231,26 @@ export class MongoDBStorage implements IStorage {
   }> {
     try {
       // Base condition: Only completed bookings for revenue calculation
+      // Convert tenantId to ObjectId for proper aggregation matching
+      const tenantObjectId = mongoose.Types.ObjectId.isValid(tenantId)
+        ? new mongoose.Types.ObjectId(tenantId)
+        : tenantId;
+
       const matchConditions: any = {
-        tenantId: tenantId,
+        tenantId: tenantObjectId,
         status: 'completed'
       };
 
-      // Date filtering based on returnDate (end date) for completed bookings
+      // Date filtering based on updatedAt (completion date) for completed bookings
       if (startDate && endDate) {
-        matchConditions.returnDate = {
+        matchConditions.updatedAt = {
           $gte: new Date(startDate),
           $lte: new Date(endDate + 'T23:59:59.999Z') // Include entire end date
         };
       }
 
       // Expense date filter (matching booking date range)
-      let expenseQuery: any = { tenantId: tenantId };
+      let expenseQuery: any = { tenantId: tenantObjectId };
       if (startDate && endDate) {
         expenseQuery.date = {
           $gte: new Date(startDate),

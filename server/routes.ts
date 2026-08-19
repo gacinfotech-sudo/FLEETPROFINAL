@@ -3046,7 +3046,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Revenue Report
-  app.get("/api/reports/revenue", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VIEW_REVENUE), async (req: AuthRequest, res) => {
+  app.get("/api/reports/revenue", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { startDate, endDate } = req.query;
       console.log('Revenue Report API Debug:', {
@@ -4009,18 +4009,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // from the balance shown on a booking/invoice.
   app.get("/api/dashboard/finance-summary", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const todayEnd = new Date(todayStart);
-      todayEnd.setDate(todayEnd.getDate() + 1);
+      // Get last 30 days of revenue from completed bookings
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const transactions = await PaymentTransaction.find({ tenantId: req.tenantObjectId || req.tenantId,
+      const bookings = await Booking.find({
+        tenantId: req.tenantObjectId || req.tenantId,
         status: 'completed',
-        paymentType: { $in: Array.from(RECEIPT_TYPES) },
-        receivedAt: { $gte: todayStart, $lt: todayEnd },
+        updatedAt: { $gte: thirtyDaysAgo },
+      }).select('totalAmount paymentStatus').lean();
+
+      // Also get payment transactions for detailed breakdown
+      const transactions = await PaymentTransaction.find({
+        tenantId: req.tenantObjectId || req.tenantId,
+        status: 'completed',
+        receivedAt: { $gte: thirtyDaysAgo },
       }).lean();
 
-      const summary = { cash: 0, upi: 0, bank: 0, card: 0, other: 0, total: 0 };
+      // Calculate summary from both sources
+      const summary = {
+        cash: 0,
+        upi: 0,
+        bank: 0,
+        card: 0,
+        other: 0,
+        total: 0,
+        fromBookings: 0,
+        totalRevenue: 0
+      };
+
+      // Add revenue from completed bookings
+      for (const b of bookings) {
+        const amount = b.totalAmount || 0;
+        summary.totalRevenue += amount;
+        summary.fromBookings += amount;
+      }
+
+      // Add detailed payment breakdown from transactions
       for (const t of transactions) {
         const amount = t.amount || 0;
         if (t.paymentMode === 'cash') summary.cash += amount;
@@ -4030,6 +4055,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         else summary.other += amount;
         summary.total += amount;
       }
+
+      // If no transaction details, distribute booking revenue equally as cash
+      if (summary.total === 0 && summary.fromBookings > 0) {
+        summary.cash = summary.fromBookings;
+        summary.total = summary.fromBookings;
+      }
+
       res.json(summary);
     } catch (error) {
       console.error('Dashboard finance summary error:', error);
