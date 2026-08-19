@@ -56,6 +56,7 @@ export const TENANT_MODULES = [
 
   // Communications
   { id: 'whatsapp', label: 'WhatsApp', iconKey: 'whatsapp', parentGroup: 'communications' },
+  { id: 'whatsapp-reminders', label: 'Reminder Settings', iconKey: 'notification', parentGroup: 'communications' },
 
   // Settings
   { id: 'users', label: 'Manage Users', iconKey: 'users', parentGroup: 'settings' },
@@ -129,7 +130,7 @@ export function getNavigationStructure(role?: string, permissions?: string[]): N
       id: 'communications',
       label: 'Communications',
       iconKey: 'whatsapp',
-      children: ['whatsapp']
+      children: ['whatsapp', 'whatsapp-reminders']
     },
     {
       id: 'settings',

@@ -13747,6 +13747,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== WHATSAPP REMINDER SETTINGS ==========
+  app.get("/api/whatsapp-reminders/settings/get", authenticateUser, requireTenant, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { getSettings } = await import('./services/whatsapp-reminder-settings');
+      const settings = await getSettings(req.tenantId!);
+      res.json({ success: true, settings });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/whatsapp-reminders/settings/update", authenticateUser, requireTenant, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { updateSettings } = await import('./services/whatsapp-reminder-settings');
+      const settings = await updateSettings(req.tenantId!, req.body);
+      res.json({ success: true, message: '✅ Reminder settings updated', settings });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/whatsapp-reminders/settings/reset", authenticateUser, requireTenant, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { resetSettings } = await import('./services/whatsapp-reminder-settings');
+      const settings = await resetSettings(req.tenantId!);
+      res.json({ success: true, message: '✅ Reminder settings reset to defaults', settings });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ========== WHATSAPP REMINDERS ==========
   app.get("/api/whatsapp-reminders", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
