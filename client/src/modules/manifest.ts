@@ -151,8 +151,8 @@ export function getNavigationStructure(role?: string, permissions?: string[]): N
   }
 
   if (role === 'operator') {
-    // Operators see operations, bookings, drivers, customers
-    return groups.filter(g => ['dashboard', 'booking', 'drivers', 'customers', 'vehicles'].includes(g.id));
+    // Operators see operations, bookings, drivers, customers, communications
+    return groups.filter(g => ['dashboard', 'booking', 'drivers', 'customers', 'vehicles', 'communications'].includes(g.id));
   }
 
   // Default: return all (will be further restricted by backend permissions)

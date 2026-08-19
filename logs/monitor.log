@@ -4876,3 +4876,33 @@ Wed Aug 19 14:10:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
 Wed Aug 19 14:10:00 IST 2026: Database backups:      125
 Wed Aug 19 14:10:00 IST 2026: Disk usage: 38%
 Wed Aug 19 14:10:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 14:15:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 14:15:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 14:15:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 14:15:00 IST 2026: Database backups:      125
+Wed Aug 19 14:15:00 IST 2026: Disk usage: 38%
+Wed Aug 19 14:15:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 14:20:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 14:20:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 14:20:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 14:20:00 IST 2026: Database backups:      125
+Wed Aug 19 14:20:00 IST 2026: Disk usage: 38%
+Wed Aug 19 14:20:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 14:25:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 14:25:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 14:25:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 14:25:00 IST 2026: Database backups:      125
+Wed Aug 19 14:25:00 IST 2026: Disk usage: 38%
+Wed Aug 19 14:25:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 14:30:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 14:30:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 14:30:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 14:30:00 IST 2026: Database backups:      125
+Wed Aug 19 14:30:00 IST 2026: Disk usage: 38%
+Wed Aug 19 14:30:00 IST 2026: ⚠️ ALERT: API health check failed
+Wed Aug 19 14:35:00 IST 2026: ⚠️ ALERT: Backend process not running
+Wed Aug 19 14:35:00 IST 2026: ⚠️ ALERT: Port 5050 not listening
+Wed Aug 19 14:35:00 IST 2026: ⚠️ ALERT: MongoDB unreachable
+Wed Aug 19 14:35:00 IST 2026: Database backups:      125
+Wed Aug 19 14:35:00 IST 2026: Disk usage: 38%
+Wed Aug 19 14:35:00 IST 2026: ⚠️ ALERT: API health check failed
