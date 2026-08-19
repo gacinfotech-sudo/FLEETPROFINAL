@@ -13731,6 +13731,107 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== SEED LIVE BOOKINGS ==========
+  app.post("/api/seed/live-bookings", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    console.log('🌱 TEST LIVE BOOKINGS ENDPOINT CALLED');
+    try {
+      const tenantId = req.tenantId!;
+      const tenantObjectId = new mongoose.Types.ObjectId(tenantId);
+
+      // Get vehicles and drivers
+      const vehicles = await Vehicle.find({ tenantId: tenantObjectId }).select('_id').limit(2);
+      const drivers = await Driver.find({ tenantId: tenantObjectId }).select('_id').limit(2);
+
+      if (!vehicles.length || !drivers.length) {
+        return res.status(400).json({ message: 'Need at least one vehicle and driver' });
+      }
+
+      const now = new Date();
+      const bookings = [];
+
+      // TODAY - Trip Starting Now
+      const trip1Date = new Date(now);
+      trip1Date.setHours(10, 0, 0, 0);
+      const b1 = await Booking.create({
+        tenantId: tenantObjectId,
+        bookingId: `BK-LIVE-${Date.now()}_0`,
+        customerName: 'Mr. Raj Kumar',
+        customerPhone: '9876543210',
+        vehicleId: vehicles[0]._id,
+        driverId: drivers[0]._id,
+        pickupLocation: 'Delhi Airport',
+        dropLocation: 'Agra',
+        pickupDate: trip1Date,
+        bookingType: 'with_driver',
+        status: 'trip_started',
+        totalAmount: 3500,
+        createdAt: now,
+        updatedAt: now,
+      });
+      bookings.push(b1);
+
+      // TODAY - Trip Confirmed (Starting in 2 hours)
+      const trip2Date = new Date(now);
+      trip2Date.setHours(now.getHours() + 2, 30, 0, 0);
+      const b2 = await Booking.create({
+        tenantId: tenantObjectId,
+        bookingId: `BK-LIVE-${Date.now()}_1`,
+        customerName: 'Mrs. Priya Singh',
+        customerPhone: '9876543211',
+        vehicleId: vehicles[1] ? vehicles[1]._id : vehicles[0]._id,
+        driverId: drivers[1] ? drivers[1]._id : drivers[0]._id,
+        pickupLocation: 'Bangalore Airport',
+        dropLocation: 'Mysore',
+        pickupDate: trip2Date,
+        bookingType: 'with_driver',
+        status: 'confirmed',
+        totalAmount: 4000,
+        createdAt: now,
+        updatedAt: now,
+      });
+      bookings.push(b2);
+
+      // TOMORROW - Upcoming Trip
+      const tomorrowDate = new Date(now);
+      tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+      tomorrowDate.setHours(9, 0, 0, 0);
+      const b3 = await Booking.create({
+        tenantId: tenantObjectId,
+        bookingId: `BK-LIVE-${Date.now()}_2`,
+        customerName: 'Mr. Arun Patel',
+        customerPhone: '9876543212',
+        vehicleId: vehicles[0]._id,
+        driverId: drivers[0]._id,
+        pickupLocation: 'Mumbai Airport',
+        dropLocation: 'Pune',
+        pickupDate: tomorrowDate,
+        bookingType: 'with_driver',
+        status: 'confirmed',
+        totalAmount: 3000,
+        createdAt: now,
+        updatedAt: now,
+      });
+      bookings.push(b3);
+
+      res.json({
+        success: true,
+        message: '✅ Live bookings created',
+        count: bookings.length,
+        bookings: bookings.map(b => ({
+          id: b._id,
+          bookingId: b.bookingId,
+          status: b.status,
+          customer: b.customerName,
+          date: b.pickupDate,
+        }))
+      });
+    } catch (error: any) {
+      console.error('❌ Seed live-bookings error:', error);
+      console.error('Error stack:', error.stack);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ========== SEED TEST DATA ==========
   app.post("/api/seed/test-data", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
