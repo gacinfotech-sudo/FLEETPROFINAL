@@ -46,6 +46,7 @@ import DriverPayrollDashboard from "./driver-payroll-dashboard";
 import VehiclePerformancePage from "./vehicle-performance";
 import GpsSettingsPage from "./gps-settings";
 import WhatsAppPanel from "./whatsapp-panel";
+import WhatsAppSettingsHub from "./whatsapp-settings-hub";
 import DailyOperationsPopup from "../components/dashboard/daily-operations-popup";
 import { useBookingWorkspace } from "@/components/booking/booking-workspace-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -1864,6 +1865,9 @@ export default function Dashboard() {
 
       case "whatsapp":
         return <WhatsAppPanel />;
+
+      case "whatsapp-settings":
+        return <WhatsAppSettingsHub />;
 
       case "salary":
         return <DriverSalaryPayroll />;

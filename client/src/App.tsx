@@ -54,6 +54,7 @@ import WhatsAppTemplateHistory from "./pages/whatsapp-template-history";
 import WhatsAppApprovalQueue from "./pages/whatsapp-approval-queue";
 import WhatsAppApprovalConfig from "./pages/whatsapp-approval-config";
 import WhatsAppReminderSettings from "./pages/tenant/whatsapp-reminder-settings";
+import WhatsAppSettingsHub from "./pages/whatsapp-settings-hub";
 
 // SuperAdmin Pages
 import SuperAdminDashboard from "./pages/superadmin/dashboard";
@@ -610,9 +611,9 @@ function AuthenticatedApp() {
         </ProtectedRoute>
       </Route>
 
-      <Route path="/settings/whatsapp-reminders">
+      <Route path="/settings/whatsapp-settings">
         <ProtectedRoute requiredRole="admin">
-          <WhatsAppReminderSettings />
+          <WhatsAppSettingsHub />
         </ProtectedRoute>
       </Route>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
+import { Car, BarChart3, Calendar, Users, History, TrendingUp, Menu, Shield, LogOut, UserPlus, ReceiptIcon, Banknote, Radio, MessageCircle, CalendarClock, Wallet, UserX, Gauge, Wrench, ClipboardCheck, Contact, HeartHandshake, Megaphone, ChevronDown, ChevronRight, AlertCircle, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -26,7 +26,7 @@ const icons = {
   history: History, customers: Contact, 'after-sales': HeartHandshake, campaigns: Megaphone,
   revenue: TrendingUp, expenses: ReceiptIcon, salary: Banknote, whatsapp: MessageCircle,
   users: UserPlus, profile: Shield, contact: Contact, calendar: Calendar, receipt: ReceiptIcon,
-  banknote: Banknote, alert: AlertCircle,
+  banknote: Banknote, alert: AlertCircle, notification: Bell,
 } as const;
 
 export default function Sidebar({ currentView, onViewChange, isOpen, onToggle }: SidebarProps) {
