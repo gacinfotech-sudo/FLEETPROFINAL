@@ -177,6 +177,36 @@ export default function Dashboard() {
     return () => window.removeEventListener('focus', handleFocus);
   }, [user, refetchUser]);
 
+  // Listen for real-time tenant limit updates from ROOT ADMIN
+  useEffect(() => {
+    if (!user || !user.tenantId) return;
+
+    const handleLimitUpdate = () => {
+      // Silently refetch user data when root admin updates limits
+      refetchUser?.().catch(() => {});
+    };
+
+    // Use window's storage events if available (cross-tab communication)
+    window.addEventListener('storage', (e) => {
+      if (e.key === `tenant_limits_updated_${user.tenantId}`) {
+        handleLimitUpdate();
+      }
+    });
+
+    // Also listen for direct socket events if socket.io is available
+    try {
+      const script = document.querySelector('script[src*="socket"]');
+      if (script && (window as any).io) {
+        const io = (window as any).io;
+        const socket = io();
+        socket?.on(`tenant:${user.tenantId}:limits_updated`, handleLimitUpdate);
+        return () => socket?.off(`tenant:${user.tenantId}:limits_updated`, handleLimitUpdate);
+      }
+    } catch (e) {
+      // Socket.io might not be available, that's ok
+    }
+  }, [user, refetchUser]);
+
   // Don't render UI until auth is complete and user role is loaded
   // This prevents sidebar from rendering with null user, which shows all menu items
   if (authLoading || !user) {

@@ -297,6 +297,24 @@ app.use((req, res, next) => {
     log2.error('Failed to start WhatsApp reminder processor', { error });
   }
 
+  // Start WhatsApp auto-reconnect monitor
+  try {
+    const { WhatsAppAutoReconnect } = await import('./services/whatsapp-auto-reconnect');
+    WhatsAppAutoReconnect.startAutoReconnectMonitor(5000);
+    log2.info('WhatsApp auto-reconnect monitor started (checks every 5 seconds)');
+  } catch (error) {
+    log2.error('Failed to start WhatsApp auto-reconnect monitor', { error });
+  }
+
+  // Start WhatsApp fast connect cleanup job
+  try {
+    const { WhatsAppFastConnect } = await import('./services/whatsapp-fast-connect');
+    WhatsAppFastConnect.startCleanupJob(60000);
+    log2.info('WhatsApp fast connect cleanup started (every 60 seconds)');
+  } catch (error) {
+    log2.error('Failed to start WhatsApp fast connect cleanup', { error });
+  }
+
   // Start notification webhook manager
   try {
     const { notificationWebhookManager } = await import('./utils/notificationWebhooks');
@@ -400,6 +418,15 @@ app.use((req, res, next) => {
     io.to(`tenant:${event.tenantId}`).emit(event.type, event.payload); // owner/admin aggregation view
     io.to(`call:${event.callSessionId}`).emit(event.type, event.payload); // anyone actively viewing this call's detail page
   });
+
+  // Register socket.io for real-time updates (booking/driver/staff)
+  try {
+    const { setSocketIOInstance } = await import('./services/realtime-updates');
+    setSocketIOInstance(io);
+    log2.info('Socket.IO registered for real-time updates');
+  } catch (error) {
+    log2.error('Failed to register Socket.IO:', { error });
+  }
 
   // P0 FIX: the global error handler must never throw after sending a
   // response — doing so previously crashed the Node process (or, depending

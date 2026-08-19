@@ -4,6 +4,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "./hooks/use-auth";
+import { useWhatsAppStatusMonitor } from "./hooks/useWhatsAppStatusMonitor";
 import { BookingWorkspaceProvider } from "@/components/booking/booking-workspace-context";
 import { OfflineNotification } from "@/components/offline-notification";
 import ErrorBoundary from "@/components/error-boundary";
@@ -55,6 +56,7 @@ import WhatsAppApprovalQueue from "./pages/whatsapp-approval-queue";
 import WhatsAppApprovalConfig from "./pages/whatsapp-approval-config";
 import WhatsAppReminderSettings from "./pages/tenant/whatsapp-reminder-settings";
 import WhatsAppSettingsHub from "./pages/whatsapp-settings-hub";
+import StaffWhatsAppManagement from "./pages/staff-whatsapp-management";
 
 // SuperAdmin Pages
 import SuperAdminDashboard from "./pages/superadmin/dashboard";
@@ -617,6 +619,12 @@ function AuthenticatedApp() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/settings/staff-whatsapp-management">
+        <ProtectedRoute requiredRole="admin">
+          <StaffWhatsAppManagement />
+        </ProtectedRoute>
+      </Route>
+
       {/* Dashboard - Tenant operations only */}
       <Route path="/dashboard">
         {loading ? (
@@ -680,12 +688,19 @@ function Router() {
   );
 }
 
+// WhatsApp Monitor runs globally to check connection every 5 seconds
+function WhatsAppMonitor() {
+  useWhatsAppStatusMonitor(); // Silent auto-check and reconnect
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <OfflineNotification />
+        <WhatsAppMonitor /> {/* Global WhatsApp status checker */}
         <Router />
       </TooltipProvider>
     </QueryClientProvider>

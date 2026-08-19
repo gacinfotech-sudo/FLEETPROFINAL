@@ -430,9 +430,14 @@ export class MongoDBStorage implements IStorage {
 
   async getTenant(id: string): Promise<ITenant | undefined> {
     try {
+      // Convert string ID to ObjectId for proper MongoDB lookup
+      const objectId = mongoose.Types.ObjectId.isValid(id)
+        ? new mongoose.Types.ObjectId(id)
+        : id;
+
       const db = mongoose.connection.getClient().db('fleetpro');
       const collection = db.collection('tenants');
-      return await collection.findOne({_id: id}) as unknown as ITenant || undefined;
+      return await collection.findOne({_id: objectId}) as unknown as ITenant || undefined;
     } catch (error) {
       console.error('Error getting tenant:', error);
       return undefined;

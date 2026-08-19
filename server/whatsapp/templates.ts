@@ -17,61 +17,61 @@ export function buildBookingConfirmationMessage(booking: any, tenant: any): stri
   const vehicle = booking.vehicleId && typeof booking.vehicleId === 'object' ? booking.vehicleId : null;
   const driver = booking.driverId && typeof booking.driverId === 'object' ? booking.driverId : null;
   const remaining = remainingBalance(booking);
-  const tripLabel = booking.dropoffLocation ? `${booking.pickupLocation} से ${booking.dropoffLocation}` : booking.pickupLocation;
+  const tripLabel = booking.dropoffLocation ? `${booking.pickupLocation} → ${booking.dropoffLocation}` : booking.pickupLocation;
 
   const lines: string[] = [
+    `╔════════════════════════════════════╗`,
+    `║  ✅ आपकी बुकिंग पुष्टि हुई          ║`,
+    `║  ${(tenant.businessName || tenant.name || 'FleetPro').padEnd(32)}║`,
+    `╚════════════════════════════════════╝`,
+    ``,
     `नमस्कार ${booking.customerName} जी,`,
     ``,
-    `आपकी बुकिंग सफलतापूर्वक कन्फर्म हो गई है।`,
+    `आपकी यात्रा के लिए सब कुछ तैयार है।`,
     ``,
-    `Booking ID: ${booking.bookingId}`,
-    `Trip: ${tripLabel}`,
-    `Pickup: ${booking.pickupLocation}`,
+    `━━━ 📋 बुकिंग विवरण ━━━`,
+    `🔖 बुकिंग ID: ${booking.bookingId}`,
+    `🚗 मार्ग: ${tripLabel}`,
+    `📍 पिकअप: ${booking.pickupLocation}`,
   ];
-  if (booking.dropoffLocation) lines.push(`Drop: ${booking.dropoffLocation}`);
-  if (Array.isArray(booking.additionalStops) && booking.additionalStops.length > 0) {
-    lines.push(`Additional Stops: ${booking.additionalStops.join(', ')}`);
-  }
-  if (booking.pickupDate) lines.push(`Pickup Date: ${formatDate(booking.pickupDate)}`);
-  if (booking.pickupTime) lines.push(`Pickup Time: ${booking.pickupTime}`);
-  if (booking.returnDate) lines.push(`Return Date: ${formatDate(booking.returnDate)}${booking.returnTime ? ` ${booking.returnTime}` : ''}`);
 
-  lines.push(``);
-  lines.push(`कुल किराया: ₹${booking.totalAmount}`);
-  lines.push(`एडवांस प्राप्त: ₹${booking.advanceReceived || 0}`);
-  lines.push(`शेष भुगतान: ₹${remaining}`);
+  if (booking.dropoffLocation) lines.push(`🏁 ड्रॉप: ${booking.dropoffLocation}`);
 
-  if (remaining > 0) {
-    lines.push(``);
-    lines.push(`शेष ₹${remaining} यात्रा के दौरान कैश में ड्राइवर को देना है।`);
+  if (booking.pickupDate) {
+    const dateStr = formatDate(booking.pickupDate);
+    const timeStr = booking.pickupTime ? ` @ ${booking.pickupTime}` : '';
+    lines.push(`📅 तारीख: ${dateStr}${timeStr}`);
   }
 
   if (driver) {
-    lines.push(``);
-    lines.push(`Driver Details:`);
-    lines.push(`नाम: ${driver.name}`);
-    lines.push(`मोबाइल: ${driver.phone}`);
+    lines.push(``,`━━━ 👨‍💼 ड्राइवर जानकारी ━━━`);
+    lines.push(`👤 नाम: ${driver.name}`);
+    lines.push(`📱 कॉल करें: ${driver.phone}`);
   }
 
   if (vehicle) {
-    lines.push(``);
-    lines.push(`Vehicle Details:`);
-    lines.push(`Vehicle: ${[vehicle.make, vehicle.vehicleModel].filter(Boolean).join(' ')}`);
-    lines.push(`Vehicle Number: ${vehicle.licensePlate || 'N/A'}`);
+    lines.push(``,`━━━ 🚙 वाहन विवरण ━━━`);
+    lines.push(`🚗 गाड़ी: ${[vehicle.make, vehicle.vehicleModel].filter(Boolean).join(' ')}`);
+    lines.push(`🏷️  नंबर: ${vehicle.licensePlate || 'N/A'}`);
+  }
+
+  lines.push(``,`━━━ 💰 भुगतान विवरण ━━━`);
+  lines.push(`कुल किराया: ₹${booking.totalAmount}`);
+  lines.push(`एडवांस: ₹${booking.advanceReceived || 0}`);
+  lines.push(`शेष: ₹${remaining}`);
+
+  if (remaining > 0) {
+    lines.push(``,`⚠️  ₹${remaining} यात्रा के दौरान ड्राइवर को कैश में दें।`);
   }
 
   if (booking.notes) {
-    lines.push(``);
-    lines.push(`महत्वपूर्ण निर्देश:`);
+    lines.push(``,`━━━ 📌 विशेष निर्देश ━━━`);
     lines.push(booking.notes);
   }
 
-  lines.push(``);
-  lines.push(`सहायता के लिए संपर्क:`);
-  lines.push(`${tenant.businessName || tenant.name}`);
-  if (tenant.phone) lines.push(`मोबाइल: ${tenant.phone}`);
-  lines.push(``);
-  lines.push(`धन्यवाद।`);
+  lines.push(``,`━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,`🙏 धन्यवाद!`,``,`कोई समस्या? हमसे संपर्क करें:`);
+  lines.push(`📞 ${tenant.phone || 'Support'}`);
+  lines.push(`🌐 ${tenant.businessName || 'FleetPro'}`);
 
   return lines.join('\n');
 }
@@ -81,32 +81,44 @@ export function buildDriverDutyMessage(booking: any, tenant: any): string {
   const remaining = remainingBalance(booking);
 
   const lines: string[] = [
-    `नई ड्यूटी असाइन की गई है।`,
+    `╔════════════════════════════════════╗`,
+    `║  🚨 नई ड्यूटी असाइन               ║`,
+    `║  ${(tenant.businessName || tenant.name || 'FleetPro').padEnd(32)}║`,
+    `╚════════════════════════════════════╝`,
     ``,
-    `Booking ID: ${booking.bookingId}`,
-    `Customer: ${booking.customerName}`,
-    `Customer Mobile: ${booking.customerPhone}`,
+    `👋 नमस्कार,`,
     ``,
-    `Pickup: ${booking.pickupLocation}`,
+    `आपको एक नई ड्यूटी असाइन की गई है।`,
+    ``,
+    `━━━ 📋 ड्यूटी विवरण ━━━`,
+    `🔖 बुकिंग ID: ${booking.bookingId}`,
+    `👤 कस्टमर: ${booking.customerName}`,
+    `📱 कॉल करें: ${booking.customerPhone}`,
+    ``,
+    `━━━ 📍 मार्ग विवरण ━━━`,
+    `🚩 पिकअप: ${booking.pickupLocation}`,
   ];
-  if (booking.dropoffLocation) lines.push(`Drop: ${booking.dropoffLocation}`);
+
+  if (booking.dropoffLocation) lines.push(`🏁 ड्रॉप: ${booking.dropoffLocation}`);
+
   if (Array.isArray(booking.additionalStops) && booking.additionalStops.length > 0) {
-    lines.push(`Additional Stops: ${booking.additionalStops.join(', ')}`);
+    lines.push(`📌 रुकने की जगहें: ${booking.additionalStops.join(', ')}`);
   }
-  if (booking.pickupTime) lines.push(`Pickup Time: ${booking.pickupTime}`);
-  if (booking.returnDate) lines.push(`Duty End: ${formatDate(booking.returnDate)}${booking.returnTime ? ` ${booking.returnTime}` : ''}`);
+
+  if (booking.pickupTime) lines.push(`⏰ पिकअप समय: ${booking.pickupTime}`);
+  if (booking.returnDate) lines.push(`⌛ ड्यूटी खत्म: ${formatDate(booking.returnDate)}${booking.returnTime ? ` @ ${booking.returnTime}` : ''}`);
 
   if (vehicle) {
-    lines.push(``);
-    lines.push(`Vehicle: ${[vehicle.make, vehicle.vehicleModel].filter(Boolean).join(' ')}`);
-    lines.push(`Vehicle Number: ${vehicle.licensePlate || 'N/A'}`);
+    lines.push(``,`━━━ 🚙 आपकी गाड़ी ━━━`);
+    lines.push(`🚗 मॉडल: ${[vehicle.make, vehicle.vehicleModel].filter(Boolean).join(' ')}`);
+    lines.push(`🏷️  नंबर: ${vehicle.licensePlate || 'N/A'}`);
   }
 
-  lines.push(``);
-  lines.push(`कुल बुकिंग: ₹${booking.totalAmount}`);
-  lines.push(`एडवांस प्राप्त: ₹${booking.advanceReceived || 0}`);
+  lines.push(``,`━━━ 💰 भुगतान विवरण ━━━`);
+  lines.push(`📌 कुल अमाउंट: ₹${booking.totalAmount}`);
+  lines.push(`✅ एडवांस प्राप्त: ₹${booking.advanceReceived || 0}`);
   if (remaining > 0) {
-    lines.push(`कस्टमर से कलेक्ट करना है: ₹${remaining} Cash`);
+    lines.push(`⚠️  कलेक्ट करना है: ₹${remaining} (कैश)`);
   }
 
   if (booking.customerDiscussionSummary) {

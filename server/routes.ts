@@ -2401,8 +2401,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!updatedTenant) {
         return res.status(404).json({ message: "Tenant not found" });
       }
-      
-      res.json({ 
+
+      // Emit real-time update to all connected users of this tenant
+      try {
+        const io = (global as any).socketIOInstance;
+        if (io) {
+          const tenantRoom = `tenant:${tenantId}`;
+          io.to(tenantRoom).emit('tenant_limits_updated', {
+            tenantId,
+            limits: updatedTenant.limits,
+            subscriptionPlan: updatedTenant.subscriptionPlan,
+            updatedAt: new Date()
+          });
+          console.log(`📡 Real-time tenant limits update emitted for ${tenantId}`);
+        }
+      } catch (e) {
+        console.warn('Failed to emit socket event:', e);
+      }
+
+      res.json({
         message: "Plan updated successfully",
         subscriptionPlan: updatedTenant.subscriptionPlan,
         limits: updatedTenant.limits
