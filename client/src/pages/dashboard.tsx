@@ -47,6 +47,7 @@ import VehiclePerformancePage from "./vehicle-performance";
 import GpsSettingsPage from "./gps-settings";
 import WhatsAppPanel from "./whatsapp-panel";
 import WhatsAppSettingsHub from "./whatsapp-settings-hub";
+import StaffWhatsAppManagement from "./staff-whatsapp-management";
 import DailyOperationsPopup from "../components/dashboard/daily-operations-popup";
 import { useBookingWorkspace } from "@/components/booking/booking-workspace-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -64,7 +65,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Menu, LogOut, Star, Car, Users, UserCheck, Phone, Mail, MessageCircle, Banknote, Plus, User, FileText, Trash2 } from "lucide-react";
 
-type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "live-operations" | "self-drive" | "whatsapp" | "upcoming-bookings" | "booking-queues" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "customers-add" | "drivers-add" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors" | "rewards-referrals" | "gps-tracking";
+type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "live-operations" | "self-drive" | "whatsapp" | "upcoming-bookings" | "booking-queues" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "customers-add" | "drivers-add" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors" | "rewards-referrals" | "gps-tracking" | "whatsapp-settings" | "staff-whatsapp-management";
 
 // apiRequest() throws Error("<status>: <raw response text>") on a non-2xx
 // response (queryClient.ts:throwIfResNotOk) — without this, a rejected
@@ -156,8 +157,25 @@ export default function Dashboard() {
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refetchUser } = useAuth();
   const { canManageFleet, canManageDrivers, canViewRevenue, canDeleteBooking, canGenerateInvoice } = usePermissions();
+
+  // Refetch user data on mount to ensure tenant limits are fresh
+  // Also refetch when window regains focus to catch any limit updates made by root admin
+  useEffect(() => {
+    if (user) {
+      refetchUser?.().catch(() => {}); // Silent refetch on mount
+    }
+
+    const handleFocus = () => {
+      if (user) {
+        refetchUser?.().catch(() => {}); // Silent refetch on focus
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [user, refetchUser]);
 
   // Don't render UI until auth is complete and user role is loaded
   // This prevents sidebar from rendering with null user, which shows all menu items
@@ -1868,6 +1886,9 @@ export default function Dashboard() {
 
       case "whatsapp-settings":
         return <WhatsAppSettingsHub />;
+
+      case "staff-whatsapp-management":
+        return <StaffWhatsAppManagement />;
 
       case "salary":
         return <DriverSalaryPayroll />;

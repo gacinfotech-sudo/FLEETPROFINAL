@@ -30,6 +30,7 @@ interface AuthContextType {
   resetPassword: (newPassword: string, confirmPassword: string) => Promise<void>;
   loading: boolean;
   handleSessionExpiry: () => void;
+  refetchUser?: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -256,8 +257,12 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
     }
   };
 
+  const refetchUser = async () => {
+    await checkAuthStatus();
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, resetPassword, loading, handleSessionExpiry }}>
+    <AuthContext.Provider value={{ user, login, logout, resetPassword, loading, handleSessionExpiry, refetchUser }}>
       {children}
     </AuthContext.Provider>
   );

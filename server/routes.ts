@@ -1012,13 +1012,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         accountType = 'PLATFORM';
       }
 
+      // Fetch fresh tenant data if user has a tenantId (includes limits)
+      let tenantData: any = user.tenantId;
+      if (user.tenantId && typeof user.tenantId === 'string') {
+        try {
+          const freshTenant = await storage.getTenant(user.tenantId);
+          if (freshTenant) {
+            tenantData = freshTenant;
+          }
+        } catch (e) {
+          console.warn(`Failed to fetch fresh tenant data for ${user.tenantId}:`, e);
+          // Fall back to cached tenantId if fresh fetch fails
+        }
+      }
+
       res.json({
         user: {
           id: user.id,
           userId: user.userId,
           role: user.role,
           platformRole: user.platformRole,
-          tenantId: user.tenantId,
+          tenantId: tenantData,
           accountType: accountType,
           mustResetPassword: user.mustResetPassword,
           hasCompletedOnboarding: user.hasCompletedOnboarding || false,
@@ -3473,6 +3487,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Driver not found" });
       }
 
+      // Emit real-time update for all connected clients
+      try {
+        const { emitDriverUpdate } = await import('./services/realtime-updates');
+        emitDriverUpdate(String(req.tenantId), String(driver._id), driver);
+      } catch (err) {
+        console.error('Real-time emit failed:', err?.message || err);
+      }
+
       res.json(driver);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -4183,12 +4205,210 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== WHATSAPP FAST CONNECT ROUTES ==========
+  // Check if session can be restored from cache (no QR needed)
+  app.get("/api/whatsapp/fast-connect/check-cache", authenticateUser, requireTenant, requireWhatsAppAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { WhatsAppFastConnect } = await import("./services/whatsapp-fast-connect");
+      const cached = await WhatsAppFastConnect.restoreFromCacheFast(req.tenantId!);
+
+      if (cached) {
+        return res.json({
+          success: true,
+          message: "✅ Session found in cache - no QR scan needed!",
+          cachedSession: true,
+          sessionData: cached
+        });
+      }
+
+      res.json({
+        success: false,
+        message: "No cached session found - QR scan required",
+        cachedSession: false
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to check cache" });
+    }
+  });
+
+  // Start fast connect process
+  app.post("/api/whatsapp/fast-connect/start", authenticateUser, requireTenant, requireWhatsAppAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { WhatsAppFastConnect } = await import("./services/whatsapp-fast-connect");
+
+      // Try auto-retry with cache first
+      const result = await WhatsAppFastConnect.connectWithAutoRetry(req.tenantId!);
+
+      if (result.success && result.sessionData) {
+        return res.json({
+          success: true,
+          message: result.message,
+          cachedSession: true,
+          sessionData: result.sessionData
+        });
+      }
+
+      // Generate QR
+      const qrData = await WhatsAppFastConnect.generateQRFast(req.tenantId!);
+
+      res.json({
+        success: true,
+        message: "✅ QR code ready - scan now!",
+        qrCode: qrData.qrCode,
+        expiresIn: qrData.expiresIn,
+        cachedSession: false
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Get connection progress
+  app.get("/api/whatsapp/fast-connect/progress", authenticateUser, requireTenant, requireWhatsAppAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { WhatsAppFastConnect } = await import("./services/whatsapp-fast-connect");
+      const progress = WhatsAppFastConnect.getProgress(req.tenantId!);
+
+      if (!progress) {
+        return res.json({
+          success: false,
+          message: "No active connection in progress",
+          progress: null
+        });
+      }
+
+      res.json({
+        success: true,
+        progress: {
+          stage: progress.stage,
+          progress: progress.progress,
+          message: progress.message,
+          retryCount: progress.retryCount || 0
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to get progress" });
+    }
+  });
+
+  // Complete QR scan and initialize session
+  app.post("/api/whatsapp/fast-connect/finalize", authenticateUser, requireTenant, requireWhatsAppAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { WhatsAppFastConnect } = await import("./services/whatsapp-fast-connect");
+      const { credentials } = req.body;
+
+      if (!credentials) {
+        return res.status(400).json({ message: "Credentials required" });
+      }
+
+      const success = await WhatsAppFastConnect.initializeSessionFast(req.tenantId!, credentials);
+
+      if (success) {
+        return res.json({
+          success: true,
+          message: "✅ WhatsApp connected! Session saved permanently."
+        });
+      }
+
+      res.status(500).json({ message: "Failed to finalize connection" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/whatsapp/session/logout", authenticateUser, requireTenant, requireWhatsAppAdmin, async (req: AuthRequest, res) => {
     try {
       await whatsappProvider.logoutSession(req.tenantId!);
       res.json({ message: "WhatsApp session logged out" });
     } catch (error: any) {
       res.status(500).json({ message: "Failed to log out WhatsApp session" });
+    }
+  });
+
+  // ========== WHATSAPP AUTO-RECONNECT ROUTES ==========
+  // Auto-reconnect with persistent storage
+  app.post("/api/whatsapp/session/auto-reconnect", authenticateUser, requireTenant, requireWhatsAppAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { WhatsAppAutoReconnect } = await import("./services/whatsapp-auto-reconnect");
+
+      // Get session status first
+      const status = await WhatsAppAutoReconnect.getSessionStatus(req.tenantId!);
+
+      if (!status.canAutoReconnect) {
+        return res.status(400).json({
+          success: false,
+          message: "No stored session found. Please scan QR code first.",
+          status
+        });
+      }
+
+      // Attempt auto-reconnection
+      const success = await WhatsAppAutoReconnect.autoReconnectWithRetry(
+        req.tenantId!,
+        async (sessionData) => {
+          // Reconnection callback
+          console.log(`🔄 Attempting to reconnect with stored session...`);
+          // Return true if reconnection succeeds
+          return sessionData ? true : false;
+        }
+      );
+
+      res.json({
+        success,
+        message: success ? "✅ Auto-reconnected successfully" : "❌ Auto-reconnection failed",
+        status: await WhatsAppAutoReconnect.getSessionStatus(req.tenantId!)
+      });
+    } catch (error: any) {
+      console.error("Error in auto-reconnect:", error);
+      res.status(500).json({ message: "Auto-reconnection failed" });
+    }
+  });
+
+  // Get session status
+  app.get("/api/whatsapp/session/auto-status", authenticateUser, requireTenant, requireWhatsAppAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { WhatsAppAutoReconnect } = await import("./services/whatsapp-auto-reconnect");
+      const status = await WhatsAppAutoReconnect.getSessionStatus(req.tenantId!);
+      res.json({ success: true, status });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to get session status" });
+    }
+  });
+
+  // Store session permanently
+  app.post("/api/whatsapp/session/store-permanent", authenticateUser, requireTenant, requireWhatsAppAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { sessionData } = req.body;
+
+      if (!sessionData) {
+        return res.status(400).json({ message: "Session data required" });
+      }
+
+      const { WhatsAppAutoReconnect } = await import("./services/whatsapp-auto-reconnect");
+      await WhatsAppAutoReconnect.storeSessionPermanently(req.tenantId!, sessionData);
+
+      res.json({
+        success: true,
+        message: "✅ Session stored permanently - no more QR scans needed!"
+      });
+    } catch (error: any) {
+      console.error("Error storing session permanently:", error);
+      res.status(500).json({ message: "Failed to store session" });
+    }
+  });
+
+  // Start auto-reconnect monitor
+  app.post("/api/whatsapp/session/start-monitor", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { WhatsAppAutoReconnect } = await import("./services/whatsapp-auto-reconnect");
+      WhatsAppAutoReconnect.startAutoReconnectMonitor(5000);
+
+      res.json({
+        success: true,
+        message: "✅ Auto-reconnect monitor started"
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: "Failed to start monitor" });
     }
   });
 
@@ -4291,8 +4511,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(400).json({ message: `Invalid ${recipientType} phone number: "${rawPhone || ''}"` });
       return null;
     }
-    const tenant = await storage.getTenant(req.tenantId!);
+    // Use booking's tenantId instead of request tenantId to ensure proper format
+    const tenantIdToUse = booking.tenantId || req.tenantId;
+    const tenant = await storage.getTenant(String(tenantIdToUse));
     if (!tenant) {
+      console.error(`Tenant not found: tried with ${tenantIdToUse}, req.tenantId: ${req.tenantId}`);
       res.status(404).json({ message: "Tenant not found" });
       return null;
     }
@@ -4831,20 +5054,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // creation itself; the attempt is still recorded (status 'failed')
       // so staff can see it and retry from the Booking Communication panel.
       // Only for bookings that are actually confirmed, not a bare enquiry.
-      if (booking.status === 'confirmed') {
-        sendBookingMessage({
-          tenantId: req.tenantId!,
-          bookingId: (booking as any)._id.toString(),
-          messageType: 'booking_confirmation',
-          actor: { userId: req.userId!, role: req.user?.role || 'client' },
-        }).catch((err) => {
-          console.error('Auto-send booking confirmation failed:', err?.message || err);
-        });
-
-        // Schedule WhatsApp reminders for driver, customer, and office staff
+      // Schedule WhatsApp reminders for driver, customer, and office staff
+      // Do this for all bookings that have a pickup date
+      if (booking.pickupDate) {
         (async () => {
           try {
             const { scheduleBookingReminders } = await import('./services/whatsapp-reminder-scheduler');
+            console.log(`📅 Scheduling reminders for booking ${(booking as any).bookingId}`);
             await scheduleBookingReminders(
               req.tenantId!,
               (booking as any)._id.toString(),
@@ -4854,6 +5070,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
             );
           } catch (err: any) {
             console.error('WhatsApp reminder scheduling failed:', err?.message || err);
+          }
+        })();
+      }
+
+      // Auto-send booking messages when confirmed
+      if (booking.status === 'confirmed') {
+        // Send to DRIVER: driver duty details
+        if ((booking as any).driverId) {
+          sendBookingMessage({
+            tenantId: req.tenantId!,
+            bookingId: (booking as any)._id.toString(),
+            messageType: 'driver_duty',
+            actor: { userId: req.userId!, role: req.user?.role || 'client' },
+          }).catch((err) => {
+            console.error('Auto-send driver duty failed:', err?.message || err);
+          });
+        }
+
+        // Send to CUSTOMER: booking confirmation
+        sendBookingMessage({
+          tenantId: req.tenantId!,
+          bookingId: (booking as any)._id.toString(),
+          messageType: 'booking_confirmation',
+          actor: { userId: req.userId!, role: req.user?.role || 'client' },
+        }).catch((err) => {
+          console.error('Auto-send booking confirmation failed:', err?.message || err);
+        });
+
+        // Send to STAFF/OWNER: detailed booking alert with all info
+        (async () => {
+          try {
+            const Driver = mongoose.model('Driver');
+            const User = mongoose.model('User');
+
+            // Get driver details for message
+            let driverName = 'TBD';
+            let driverPhone = 'N/A';
+            if ((booking as any).driverId) {
+              const driver = await Driver.findById((booking as any).driverId).lean();
+              if (driver) {
+                driverName = driver.name || 'Unknown';
+                driverPhone = driver.phone || 'N/A';
+              }
+            }
+
+            // Get vehicle details for message
+            let vehicleInfo = 'TBD';
+            if ((booking as any).vehicleId) {
+              const Vehicle = mongoose.model('Vehicle');
+              const vehicle = await Vehicle.findById((booking as any).vehicleId).lean();
+              if (vehicle) {
+                vehicleInfo = `${vehicle.registrationNumber || 'N/A'} (${vehicle.model || 'N/A'})`;
+              }
+            }
+
+            // Build staff notification message with complete booking details
+            const staffMessage = `
+📋 *नया Booking Alert* 📋
+
+🆔 Booking ID: ${(booking as any).bookingId}
+👤 Customer: ${booking.customerName || 'N/A'}
+📱 Customer Phone: ${booking.customerPhone || 'N/A'}
+
+🚗 Vehicle: ${vehicleInfo}
+👨‍✈️ Driver: ${driverName}
+📞 Driver Phone: ${driverPhone}
+
+📍 Pickup: ${booking.pickupLocation || 'N/A'}
+🚩 Drop: ${booking.dropoffLocation || 'N/A'}
+
+💰 Amount: ₹${booking.totalAmount || 0}
+⏰ Pickup Time: ${booking.pickupDate ? new Date(booking.pickupDate).toLocaleString('en-IN') : 'N/A'}
+`.trim();
+
+            // Find staff members (admin/manager) with WhatsApp numbers
+            const staffUsers = await User.find({
+              tenantId: req.tenantObjectId || req.tenantId,
+              role: { $in: ['admin', 'manager'] },
+              $or: [
+                { whatsappInternalPhone: { $type: 'string', $ne: '' } },
+                { phone: { $type: 'string', $ne: '' } }
+              ]
+            }).lean();
+
+            // Send to each staff member
+            for (const staff of staffUsers) {
+              const staffPhone = staff.whatsappInternalPhone || staff.phone;
+              if (staffPhone) {
+                const { whatsappProvider } = await import('./whatsapp/index');
+                whatsappProvider.sendText(req.tenantId!, staffPhone, staffMessage)
+                  .then(result => {
+                    if (result.status === 'sent') {
+                      console.log(`✅ Staff notification sent to ${staff.name || 'Unknown'} (${staffPhone})`);
+                    } else {
+                      console.warn(`⚠️ Staff notification failed for ${staff.name || 'Unknown'}: ${result.error}`);
+                    }
+                  })
+                  .catch((err: any) => {
+                    console.error(`❌ Staff notification error for ${staff.name || 'Unknown'}:`, err?.message);
+                  });
+              }
+            }
+          } catch (err: any) {
+            console.error('Staff notification error:', err?.message || err);
           }
         })();
       }
@@ -4898,7 +5218,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/bookings/:id", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
     try {
-      const id = req.params.id;
+      let id = req.params.id;
+      const Booking = mongoose.model('Booking');
+
+      // Try to find booking by either MongoDB _id or custom bookingId
+      let existing = await storage.getBooking(id, scopeTenant(req));
+
+      if (!existing) {
+        // If not found by _id, try to find by custom bookingId
+        existing = await Booking.findOne({
+          tenantId: req.tenantId,
+          bookingId: id
+        });
+      }
+
+      if (!existing) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      // Use MongoDB _id for subsequent operations
+      id = existing._id.toString();
 
       // status is no longer editable through the generic update route —
       // it must go through POST /api/bookings/:id/status so every status
@@ -4938,11 +5277,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // null here, once, for every caller.
       for (const clearable of ['driverId', 'vehicleId', 'followUpAt'] as const) {
         if ((bookingData as any)[clearable] === '') (bookingData as any)[clearable] = null;
-      }
-
-      const existing = await storage.getBooking(id, scopeTenant(req));
-      if (!existing) {
-        return res.status(404).json({ message: "Booking not found" });
       }
 
       // Derived-state repair (root cause of the visible "Driver Assigned +
@@ -5091,6 +5425,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }).catch((err) => {
           console.error('Auto-send driver duty failed:', err?.message || err);
         });
+      }
+
+      // Emit real-time update for all connected clients
+      try {
+        const { emitBookingUpdate, emitDriverAvailabilityChange } = await import('./services/realtime-updates');
+        emitBookingUpdate(String(req.tenantId), booking.bookingId || id, booking);
+        if (driverChanged) {
+          emitDriverAvailabilityChange(String(req.tenantId), String(bookingData.driverId || existing.driverId), false);
+        }
+      } catch (err) {
+        console.error('Real-time emit failed:', err?.message || err);
       }
 
       res.json(booking);
@@ -5536,30 +5881,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // SMART SEARCH: Customer deduplication + instant lookup
+  // SMART SEARCH: Customer deduplication + instant lookup (Ultra-fast MongoDB)
   app.get("/api/customers/search-dedup", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { q } = req.query;
-      if (!q || typeof q !== 'string' || q.length < 2) {
+      if (!q || typeof q !== 'string' || q.trim().length < 1) {
         return res.json([]);
       }
 
-      // Ultra-fast search: phone number OR name match
-      const customers = await storage.queryRaw(`
-        SELECT _id, name, phone, email FROM customers
-        WHERE tenantId = ? AND (phone LIKE ? OR name LIKE ?)
-        LIMIT 10
-      `, [req.tenantId, `%${q}%`, `%${q}%`]);
+      const searchQuery = q.trim();
+      const Customer = mongoose.model('Customer');
 
-      // Deduplicate: if phone matches, return that customer immediately
-      const phoneMatches = customers.filter((c: any) => c.phone?.includes(q));
-      if (phoneMatches.length > 0) {
-        return res.json([{ ...phoneMatches[0], duplicate: true, message: `Customer already exists: ${phoneMatches[0].name}` }]);
+      // Ultra-fast search: exact phone match first (fastest), then name/email (regex)
+      const normalized = normalizeIndianPhone(searchQuery);
+      const digitsOnly = normalized ? normalized.replace(/\D/g, '') : searchQuery.replace(/\D/g, '');
+
+      // Build MongoDB query for instant matching
+      const mongoQuery: any = {
+        tenantId: req.tenantObjectId || req.tenantId,
+        isDeleted: { $ne: true }
+      };
+
+      // If search looks like phone (has digits), prioritize phone match
+      if (digitsOnly && digitsOnly.length >= 5) {
+        const phoneRegex = { $regex: digitsOnly, $options: 'i' };
+
+        // Exact phone matches first (fastest)
+        const exactPhoneMatches = await Customer.find({
+          ...mongoQuery,
+          $or: [
+            { primaryMobile: { $regex: `^${digitsOnly}`, $options: 'i' } },
+            { alternateMobile: { $regex: `^${digitsOnly}`, $options: 'i' } },
+            { whatsappNumber: { $regex: `^${digitsOnly}`, $options: 'i' } }
+          ]
+        })
+        .select('_id name primaryMobile alternateMobile email phone')
+        .limit(5)
+        .lean()
+        .exec();
+
+        if (exactPhoneMatches.length > 0) {
+          return res.json(exactPhoneMatches.map(c => ({
+            ...c,
+            duplicate: true,
+            message: `Customer: ${c.name} (${c.primaryMobile || c.phone})`
+          })));
+        }
       }
+
+      // Name/email search (partial matches)
+      const safeSearch = escapeRegex(searchQuery.slice(0, 50));
+      const customers = await Customer.find({
+        ...mongoQuery,
+        $or: [
+          { name: { $regex: safeSearch, $options: 'i' } },
+          { primaryMobile: { $regex: safeSearch, $options: 'i' } },
+          { email: { $regex: safeSearch, $options: 'i' } }
+        ]
+      })
+      .select('_id name primaryMobile alternateMobile email phone')
+      .limit(10)
+      .lean()
+      .exec();
 
       res.json(customers);
     } catch (error) {
-      console.error('Search dedup error:', error);
+      console.error('Search dedup error:', error?.message || error);
       res.json([]);
     }
   });
@@ -13743,6 +14130,270 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
     } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ========== STAFF WHATSAPP MANAGEMENT ==========
+  app.get("/api/staff/whatsapp-numbers", authenticateUser, requireTenant, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const User = mongoose.model('User');
+      const tenantId = req.tenantId;
+      const staff = await User.find({ tenantId })
+        .select('_id name email phone whatsappInternalPhone role')
+        .lean();
+
+      res.json({
+        success: true,
+        count: staff.length,
+        staff: staff.map(s => ({
+          id: s._id,
+          name: s.name,
+          email: s.email,
+          phone: s.phone,
+          whatsappNumber: s.whatsappInternalPhone,
+          role: s.role,
+        }))
+      });
+    } catch (error: any) {
+      console.error('Error fetching staff WhatsApp numbers:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/staff/:userId/whatsapp-number", authenticateUser, requireTenant, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const User = mongoose.model('User');
+      const { whatsappNumber } = req.body;
+
+      if (!whatsappNumber || typeof whatsappNumber !== 'string') {
+        return res.status(400).json({ message: 'Valid WhatsApp number is required' });
+      }
+
+      // Validate phone number format (basic validation)
+      const phoneRegex = /^[\d\s\+\-\(\)]+$/;
+      if (!phoneRegex.test(whatsappNumber)) {
+        return res.status(400).json({ message: 'Invalid WhatsApp number format' });
+      }
+
+      const userId = req.params.userId;
+      const tenantId = req.tenantId;
+
+      // Convert userId (which is _id as string) to ObjectId
+      let userObjectId: any;
+      try {
+        userObjectId = new mongoose.Types.ObjectId(userId);
+      } catch (e) {
+        return res.status(400).json({ message: 'Invalid user ID format' });
+      }
+
+      const staff = await User.findOneAndUpdate(
+        { _id: userObjectId, tenantId },
+        { $set: { whatsappInternalPhone: whatsappNumber.trim() } },
+        { new: true }
+      ).select('_id name email phone whatsappInternalPhone role');
+
+      if (!staff) {
+        return res.status(404).json({ message: 'Staff member not found' });
+      }
+
+      // Emit real-time update for all connected clients
+      try {
+        const { emitStaffUpdate } = await import('./services/realtime-updates');
+        emitStaffUpdate(String(tenantId), String(staff._id), {
+          id: staff._id,
+          name: staff.name,
+          email: staff.email,
+          phone: staff.phone,
+          whatsappNumber: staff.whatsappInternalPhone,
+          role: staff.role,
+        });
+      } catch (err) {
+        console.error('Real-time emit failed:', err?.message || err);
+      }
+
+      res.json({
+        success: true,
+        message: '✅ WhatsApp number updated',
+        staff: {
+          id: staff._id,
+          name: staff.name,
+          email: staff.email,
+          phone: staff.phone,
+          whatsappNumber: staff.whatsappInternalPhone,
+          role: staff.role,
+        }
+      });
+    } catch (error: any) {
+      console.error('Error updating staff WhatsApp number:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // ========== TENANT LIMITS ENFORCEMENT ==========
+  // Check current usage and limits
+  app.get("/api/tenant/limits/status", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { TenantLimitsEnforcer } = await import('./services/tenant-limits-enforcer');
+      const status = await TenantLimitsEnforcer.checkLimitsStatus(req.tenantId!);
+
+      res.json({
+        success: true,
+        status,
+        message: status.overallStatus === 'ok' ? '✅ Within limits' : '⚠️ Limits exceeded'
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: 'Error checking limits' });
+    }
+  });
+
+  // Check if admin can be added
+  app.get("/api/tenant/limits/can-add-admin", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { TenantLimitsEnforcer } = await import('./services/tenant-limits-enforcer');
+      const result = await TenantLimitsEnforcer.canAddAdmin(req.tenantId!);
+
+      res.json({
+        success: true,
+        allowed: result.allowed,
+        message: result.reason || '✅ Admin can be added'
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: 'Error checking admin limit' });
+    }
+  });
+
+  // Check if manager can be added
+  app.get("/api/tenant/limits/can-add-manager", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { TenantLimitsEnforcer } = await import('./services/tenant-limits-enforcer');
+      const result = await TenantLimitsEnforcer.canAddManager(req.tenantId!);
+
+      res.json({
+        success: true,
+        allowed: result.allowed,
+        message: result.reason || '✅ Manager can be added'
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: 'Error checking manager limit' });
+    }
+  });
+
+  // Get upgrade recommendation
+  app.get("/api/tenant/limits/upgrade-recommendation", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { TenantLimitsEnforcer } = await import('./services/tenant-limits-enforcer');
+      const recommendation = await TenantLimitsEnforcer.getUpgradeRecommendation(req.tenantId!);
+
+      res.json({
+        success: true,
+        recommendation
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: 'Error getting recommendation' });
+    }
+  });
+
+  // Get enforcement logs
+  app.get("/api/tenant/limits/logs", authenticateUser, requireTenant, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { TenantLimitsEnforcer } = await import('./services/tenant-limits-enforcer');
+      const logs = await TenantLimitsEnforcer.getLimitEnforcementLogs(req.tenantId!);
+
+      res.json({
+        success: true,
+        count: logs.length,
+        logs
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: 'Error fetching logs' });
+    }
+  });
+
+  // Create new user/staff member
+  app.post("/api/users/create", authenticateUser, requireTenant, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      // Check limits first
+      const { TenantLimitsEnforcer } = await import('./services/tenant-limits-enforcer');
+      const { role } = req.body;
+
+      const resourceType = role === 'admin' ? 'admin' : 'manager';
+      const limitCheck = await TenantLimitsEnforcer.enforceLimit(req.tenantId!, resourceType);
+
+      if (!limitCheck.allowed) {
+        // Log the denied attempt
+        await TenantLimitsEnforcer.logLimitEnforcement(
+          req.tenantId!,
+          'create_user',
+          resourceType,
+          false,
+          limitCheck.message
+        );
+
+        return res.status(403).json({
+          success: false,
+          message: limitCheck.message,
+          limitExceeded: true
+        });
+      }
+
+      // Continue with user creation
+      const User = mongoose.model('User');
+      const { name, email, phone, password } = req.body;
+
+      if (!name || !email || !phone || !role) {
+        return res.status(400).json({ message: 'Name, email, phone, and role are required' });
+      }
+
+      // Check if user already exists
+      const existing = await User.findOne({ $or: [{ email }, { userId: email.split('@')[0] }] });
+      if (existing) {
+        return res.status(400).json({ message: 'User with this email already exists' });
+      }
+
+      // Hash password
+      const { default: bcrypt } = await import('bcrypt');
+      const hashedPassword = await bcrypt.hash(password || 'Staff@123', 10);
+
+      // Generate unique userId
+      const userId = email.replace(/[@.]/g, '_').toLowerCase();
+
+      const newUser = {
+        userId: userId + '_' + Date.now(),
+        email,
+        name,
+        phone,
+        role: role || 'manager',
+        tenantId: req.tenantId,
+        password: hashedPassword,
+        isActive: true,
+        createdAt: new Date()
+      };
+
+      const result = await User.create(newUser);
+
+      // Log successful creation
+      await TenantLimitsEnforcer.logLimitEnforcement(
+        req.tenantId!,
+        'create_user',
+        resourceType,
+        true,
+        `${name} added successfully`
+      );
+
+      res.json({
+        success: true,
+        message: '✅ Staff member created successfully',
+        staff: {
+          id: result._id,
+          name: result.name,
+          email: result.email,
+          phone: result.phone,
+          role: result.role
+        }
+      });
+    } catch (error: any) {
+      console.error('Error creating user:', error);
       res.status(500).json({ message: error.message });
     }
   });
