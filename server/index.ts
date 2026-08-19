@@ -288,6 +288,15 @@ app.use((req, res, next) => {
     log2.error('Failed to start notification rate limiter', { error });
   }
 
+  // Start WhatsApp reminder processor
+  try {
+    const { startReminderProcessor } = await import('./services/whatsapp-reminder-scheduler');
+    startReminderProcessor();
+    log2.info('WhatsApp reminder processor started');
+  } catch (error) {
+    log2.error('Failed to start WhatsApp reminder processor', { error });
+  }
+
   // Start notification webhook manager
   try {
     const { notificationWebhookManager } = await import('./utils/notificationWebhooks');

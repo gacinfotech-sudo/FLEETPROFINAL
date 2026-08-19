@@ -4840,6 +4840,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }).catch((err) => {
           console.error('Auto-send booking confirmation failed:', err?.message || err);
         });
+
+        // Schedule WhatsApp reminders for driver, customer, and office staff
+        (async () => {
+          try {
+            const { scheduleBookingReminders } = await import('./services/whatsapp-reminder-scheduler');
+            await scheduleBookingReminders(
+              req.tenantId!,
+              (booking as any)._id.toString(),
+              booking.pickupDate,
+              (booking as any).driverId?.toString(),
+              (booking as any).customerId?.toString()
+            );
+          } catch (err: any) {
+            console.error('WhatsApp reminder scheduling failed:', err?.message || err);
+          }
+        })();
       }
 
       res.json(booking);
@@ -13731,6 +13747,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== WHATSAPP REMINDERS ==========
+  app.get("/api/whatsapp-reminders", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const db = mongoose.connection.db;
+      if (!db) return res.status(500).json({ message: 'Database not connected' });
+
+      const collection = db.collection('whatsapp_reminders');
+      const reminders = await collection.find({
+        tenantId: req.tenantId!,
+        createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } // Last 7 days
+      }).sort({ createdAt: -1 }).limit(100).toArray();
+
+      res.json({
+        success: true,
+        count: reminders.length,
+        reminders: reminders.map(r => ({
+          id: r._id,
+          bookingId: r.bookingDetails?.bookingId,
+          recipientType: r.recipientType,
+          minutesBefore: r.reminderIntervals[0],
+          status: r.status,
+          scheduledFor: r.pickupTime,
+          sentAt: r.sentAt,
+          createdAt: r.createdAt
+        }))
+      });
+    } catch (error: any) {
+      console.error('Error fetching reminders:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/whatsapp-reminders/booking/:bookingId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const db = mongoose.connection.db;
+      if (!db) return res.status(500).json({ message: 'Database not connected' });
+
+      const collection = db.collection('whatsapp_reminders');
+      const reminders = await collection.find({
+        tenantId: req.tenantId!,
+        bookingId: req.params.bookingId
+      }).toArray();
+
+      res.json({
+        success: true,
+        bookingId: req.params.bookingId,
+        total: reminders.length,
+        byRecipient: {
+          driver: reminders.filter(r => r.recipientType === 'driver').length,
+          customer: reminders.filter(r => r.recipientType === 'customer').length,
+          office_staff: reminders.filter(r => r.recipientType === 'office_staff').length,
+        },
+        reminders: reminders.map(r => ({
+          id: r._id,
+          recipientType: r.recipientType,
+          minutesBefore: r.reminderIntervals[0],
+          status: r.status,
+          sentAt: r.sentAt
+        }))
+      });
+    } catch (error: any) {
+      console.error('Error fetching booking reminders:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/whatsapp-reminders/resend/:reminderId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const db = mongoose.connection.db;
+      if (!db) return res.status(500).json({ message: 'Database not connected' });
+
+      const collection = db.collection('whatsapp_reminders');
+      const reminderId = new mongoose.Types.ObjectId(req.params.reminderId);
+
+      const result = await collection.updateOne(
+        { _id: reminderId, tenantId: req.tenantId! },
+        { $set: { status: 'pending', resendAt: new Date() } }
+      );
+
+      if (result.matchedCount === 0) {
+        return res.status(404).json({ message: 'Reminder not found' });
+      }
+
+      res.json({ success: true, message: 'Reminder marked for resending' });
+    } catch (error: any) {
+      console.error('Error resending reminder:', error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // ========== SEED LIVE BOOKINGS ==========
   app.post("/api/seed/live-bookings", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     console.log('🌱 TEST LIVE BOOKINGS ENDPOINT CALLED');
@@ -13813,9 +13919,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       bookings.push(b3);
 
+      // Schedule WhatsApp reminders for all bookings
+      try {
+        const { scheduleBookingReminders } = await import('./services/whatsapp-reminder-scheduler');
+        for (const booking of bookings) {
+          if (booking.status === 'confirmed' || booking.status === 'trip_started') {
+            await scheduleBookingReminders(
+              tenantId,
+              booking._id.toString(),
+              booking.pickupDate,
+              booking.driverId?.toString(),
+              booking.customerId?.toString()
+            );
+          }
+        }
+      } catch (err: any) {
+        console.error('Reminder scheduling error:', err?.message || err);
+      }
+
       res.json({
         success: true,
-        message: '✅ Live bookings created',
+        message: '✅ Live bookings created + WhatsApp reminders scheduled',
         count: bookings.length,
         bookings: bookings.map(b => ({
           id: b._id,
