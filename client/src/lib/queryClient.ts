@@ -37,7 +37,8 @@ export async function apiRequest(
       const headers: Record<string, string> = data && !isFormData ? { "Content-Type": "application/json" } : {};
 
       // Add JWT token from localStorage
-      const jwtToken = typeof window !== 'undefined' ? localStorage.getItem('fleetpro_token') : null;
+      const jwtToken = typeof window !== 'undefined' ?
+        (localStorage.getItem('fleetpro_access_token') || localStorage.getItem('fleetpro_token')) : null;
       if (jwtToken) {
         headers["Authorization"] = `Bearer ${jwtToken}`;
       }

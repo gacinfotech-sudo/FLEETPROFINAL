@@ -131,7 +131,13 @@ export default function BookingCommunication({ booking }: Props) {
         driverName,
         driverPhone,
       });
-      return res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        const err: any = new Error(data.error || data.message || "Failed to send");
+        err.status = res.status;
+        throw err;
+      }
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/bookings/${booking._id || booking.id}/360/communications`] });
@@ -141,7 +147,8 @@ export default function BookingCommunication({ booking }: Props) {
       toast({ title: "Driver change notification sent" });
     },
     onError: (err: any) => {
-      toast({ title: "Failed to send notification", variant: "destructive" });
+      console.error("[DRIVER-CHANGE] Error:", err);
+      toast({ title: "Failed to send notification", description: err.message || "Unknown error", variant: "destructive" });
     },
   });
 
@@ -151,7 +158,13 @@ export default function BookingCommunication({ booking }: Props) {
         vehicleName,
         vehicleNumber,
       });
-      return res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        const err: any = new Error(data.error || data.message || "Failed to send");
+        err.status = res.status;
+        throw err;
+      }
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/bookings/${booking._id || booking.id}/360/communications`] });
@@ -161,7 +174,8 @@ export default function BookingCommunication({ booking }: Props) {
       toast({ title: "Vehicle change notification sent" });
     },
     onError: (err: any) => {
-      toast({ title: "Failed to send notification", variant: "destructive" });
+      console.error("[VEHICLE-CHANGE] Error:", err);
+      toast({ title: "Failed to send notification", description: err.message || "Unknown error", variant: "destructive" });
     },
   });
 
@@ -170,7 +184,13 @@ export default function BookingCommunication({ booking }: Props) {
       const res = await apiRequest("POST", `/api/bookings/${booking._id || booking.id}/notify/custom`, {
         customMessage,
       });
-      return res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        const err: any = new Error(data.error || data.message || "Failed to send");
+        err.status = res.status;
+        throw err;
+      }
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/bookings/${booking._id || booking.id}/360/communications`] });
@@ -179,7 +199,8 @@ export default function BookingCommunication({ booking }: Props) {
       toast({ title: "Custom message sent" });
     },
     onError: (err: any) => {
-      toast({ title: "Failed to send message", variant: "destructive" });
+      console.error("[CUSTOM-MESSAGE] Error:", err);
+      toast({ title: "Failed to send message", description: err.message || "Unknown error", variant: "destructive" });
     },
   });
 
