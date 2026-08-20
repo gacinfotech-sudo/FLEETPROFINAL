@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { MessageCircle, Send, History, AlertTriangle, FileDown } from "lucide-react";
+import { MessageCircle, Send, History, AlertTriangle, FileDown, Bell, User, Truck, MessageSquare, RefreshCw } from "lucide-react";
 import { FormSubmitStatus } from "@/components/forms/form-enhancements";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -57,6 +57,12 @@ export default function BookingCommunication({ booking }: Props) {
   const [previewType, setPreviewType] = useState<MessageType | null>(null);
   const [previewData, setPreviewData] = useState<any>(null);
   const [downloadingSlip, setDownloadingSlip] = useState<"office" | "driver" | null>(null);
+  const [updateDialog, setUpdateDialog] = useState<"driver_change" | "vehicle_change" | "custom_message" | null>(null);
+  const [driverName, setDriverName] = useState("");
+  const [driverPhone, setDriverPhone] = useState("");
+  const [vehicleName, setVehicleName] = useState("");
+  const [vehicleNumber, setVehicleNumber] = useState("");
+  const [customMessage, setCustomMessage] = useState("");
 
   const companyName = (user?.tenantId as any)?.businessName || (user?.tenantId as any)?.name || "FleetPro";
   const companyPhone = (user?.tenantId as any)?.phone;
@@ -118,6 +124,65 @@ export default function BookingCommunication({ booking }: Props) {
     },
   });
 
+  // Mutations for update notifications
+  const driverChangeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/bookings/${booking._id || booking.id}/notify/driver-change`, {
+        driverName,
+        driverPhone,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/bookings/${booking._id || booking.id}/360/communications`] });
+      setUpdateDialog(null);
+      setDriverName("");
+      setDriverPhone("");
+      toast({ title: "Driver change notification sent" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to send notification", variant: "destructive" });
+    },
+  });
+
+  const vehicleChangeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/bookings/${booking._id || booking.id}/notify/vehicle-change`, {
+        vehicleName,
+        vehicleNumber,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/bookings/${booking._id || booking.id}/360/communications`] });
+      setUpdateDialog(null);
+      setVehicleName("");
+      setVehicleNumber("");
+      toast({ title: "Vehicle change notification sent" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to send notification", variant: "destructive" });
+    },
+  });
+
+  const customMessageMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/bookings/${booking._id || booking.id}/notify/custom`, {
+        customMessage,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/bookings/${booking._id || booking.id}/360/communications`] });
+      setUpdateDialog(null);
+      setCustomMessage("");
+      toast({ title: "Custom message sent" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to send message", variant: "destructive" });
+    },
+  });
+
   const messages: any[] = (messagesQuery.data as any[]) || [];
 
   return (
@@ -140,6 +205,18 @@ export default function BookingCommunication({ booking }: Props) {
         >
           Send Driver Details
         </Button>
+        <Button size="sm" variant="outline" onClick={() => setUpdateDialog("driver_change")}>
+          <RefreshCw className="w-3.5 h-3.5 mr-1" />
+          Driver Change
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setUpdateDialog("vehicle_change")}>
+          <Truck className="w-3.5 h-3.5 mr-1" />
+          Vehicle Change
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setUpdateDialog("custom_message")}>
+          <MessageSquare className="w-3.5 h-3.5 mr-1" />
+          Custom Message
+        </Button>
         <Button
           size="sm"
           variant="outline"
@@ -147,7 +224,7 @@ export default function BookingCommunication({ booking }: Props) {
           onClick={() => handleDownloadSlip("office")}
         >
           <FileDown className="w-3.5 h-3.5 mr-1" />
-          {downloadingSlip === "office" ? "Generating..." : "Office Duty Slip"}
+          {downloadingSlip === "office" ? "Generating..." : "Office Slip"}
         </Button>
         <Button
           size="sm"
@@ -156,7 +233,7 @@ export default function BookingCommunication({ booking }: Props) {
           onClick={() => handleDownloadSlip("driver")}
         >
           <FileDown className="w-3.5 h-3.5 mr-1" />
-          {downloadingSlip === "driver" ? "Generating..." : "Driver Duty Slip"}
+          {downloadingSlip === "driver" ? "Generating..." : "Driver Slip"}
         </Button>
       </div>
 
@@ -234,6 +311,81 @@ export default function BookingCommunication({ booking }: Props) {
               }}
             >
               Send Again
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Driver Change Dialog */}
+      <Dialog open={updateDialog === "driver_change"} onOpenChange={(open) => { if (!open) { setUpdateDialog(null); setDriverName(""); setDriverPhone(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Driver Change Notification</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium">Driver Name</label>
+              <input type="text" value={driverName} onChange={(e) => setDriverName(e.target.value)} placeholder="Enter driver name" className="w-full border rounded p-2 text-sm" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Driver Phone</label>
+              <input type="tel" value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} placeholder="9876543210" className="w-full border rounded p-2 text-sm" />
+            </div>
+          </div>
+          <FormSubmitStatus status={driverChangeMutation.isPending ? 'loading' : 'idle'} successMessage="Sent" />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUpdateDialog(null)}>Cancel</Button>
+            <Button onClick={() => driverChangeMutation.mutate()} disabled={!driverName || !driverPhone || driverChangeMutation.isPending}>
+              <Send className="w-4 h-4 mr-2" />
+              Send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vehicle Change Dialog */}
+      <Dialog open={updateDialog === "vehicle_change"} onOpenChange={(open) => { if (!open) { setUpdateDialog(null); setVehicleName(""); setVehicleNumber(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Vehicle Change Notification</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium">Vehicle Name</label>
+              <input type="text" value={vehicleName} onChange={(e) => setVehicleName(e.target.value)} placeholder="Innova Crysta" className="w-full border rounded p-2 text-sm" />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Vehicle Number</label>
+              <input type="text" value={vehicleNumber} onChange={(e) => setVehicleNumber(e.target.value)} placeholder="MP09AB6578" className="w-full border rounded p-2 text-sm" />
+            </div>
+          </div>
+          <FormSubmitStatus status={vehicleChangeMutation.isPending ? 'loading' : 'idle'} successMessage="Sent" />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUpdateDialog(null)}>Cancel</Button>
+            <Button onClick={() => vehicleChangeMutation.mutate()} disabled={!vehicleName || !vehicleNumber || vehicleChangeMutation.isPending}>
+              <Send className="w-4 h-4 mr-2" />
+              Send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Custom Message Dialog */}
+      <Dialog open={updateDialog === "custom_message"} onOpenChange={(open) => { if (!open) { setUpdateDialog(null); setCustomMessage(""); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Custom Message</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <textarea value={customMessage} onChange={(e) => setCustomMessage(e.target.value)} placeholder="Enter your message..." className="w-full border rounded p-2 text-sm min-h-24" maxLength={1000} />
+            <div className="text-xs text-gray-500">{customMessage.length}/1000</div>
+          </div>
+          <FormSubmitStatus status={customMessageMutation.isPending ? 'loading' : 'idle'} successMessage="Sent" />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUpdateDialog(null)}>Cancel</Button>
+            <Button onClick={() => customMessageMutation.mutate()} disabled={!customMessage.trim() || customMessageMutation.isPending}>
+              <Send className="w-4 h-4 mr-2" />
+              Send
             </Button>
           </DialogFooter>
         </DialogContent>
