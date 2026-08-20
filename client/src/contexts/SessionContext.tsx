@@ -37,6 +37,8 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 const REFRESH_TOKEN_KEY = 'fleetpro_refresh_token';
 const ACCESS_TOKEN_KEY = 'fleetpro_access_token';
 const USER_KEY = 'fleetpro_user';
+const TENANT_KEY = 'fleetpro_tenant_id';
+const SESSION_TIMESTAMP_KEY = 'fleetpro_session_timestamp';
 
 export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tokens, setTokens] = useState<SessionTokens | null>(null);
@@ -50,20 +52,30 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
       try {
         const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
         const storedUser = localStorage.getItem(USER_KEY);
+        const storedTenant = localStorage.getItem(TENANT_KEY);
+        const sessionTimestamp = localStorage.getItem(SESSION_TIMESTAMP_KEY);
+
+        console.log('[SESSION] Restore attempt - hasRefreshToken:', !!storedRefreshToken, 'hasUser:', !!storedUser, 'tenantId:', storedTenant, 'timestamp:', sessionTimestamp);
 
         if (storedRefreshToken && storedUser) {
           const parsedUser = JSON.parse(storedUser);
+          console.log('[SESSION] User restored from storage:', parsedUser.userId);
           setUser(parsedUser);
 
           // Try to refresh access token
+          console.log('[SESSION] Attempting to refresh access token...');
           const success = await refreshAccessToken(storedRefreshToken);
-          if (!success) {
-            // Clear storage if refresh fails
+          if (success) {
+            console.log('[SESSION] ✅ Access token refreshed successfully');
+          } else {
+            console.log('[SESSION] ❌ Access token refresh failed - clearing storage');
             clearStorage();
           }
+        } else {
+          console.log('[SESSION] No stored session found');
         }
       } catch (error) {
-        console.error('Error restoring session:', error);
+        console.error('[SESSION] Error restoring session:', error);
         clearStorage();
       } finally {
         setIsLoading(false);
@@ -90,9 +102,12 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [tokens]);
 
   const clearStorage = () => {
+    console.log('[SESSION] Clearing session storage');
     localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(TENANT_KEY);
+    localStorage.removeItem(SESSION_TIMESTAMP_KEY);
   };
 
   const refreshAccessToken = async (refreshToken: string): Promise<boolean> => {
@@ -128,9 +143,13 @@ export const SessionProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const login = useCallback((newTokens: SessionTokens, newUser: SessionUser) => {
     setTokens(newTokens);
     setUser(newUser);
+    // Persist all tokens and user data to localStorage
     localStorage.setItem(ACCESS_TOKEN_KEY, newTokens.accessToken);
     localStorage.setItem(REFRESH_TOKEN_KEY, newTokens.refreshToken);
     localStorage.setItem(USER_KEY, JSON.stringify(newUser));
+    localStorage.setItem(TENANT_KEY, newUser.tenantId);
+    localStorage.setItem(SESSION_TIMESTAMP_KEY, new Date().toISOString());
+    console.log('[SESSION] Login successful - session persisted to localStorage');
   }, []);
 
   const logout = useCallback(async () => {

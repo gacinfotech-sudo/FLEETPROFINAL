@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useFormAutoSave, FormSubmitStatus } from "@/components/forms/form-enhancements";
 import BookingAssistant from "./booking-assistant";
+import CustomerAutocomplete from "./customer-autocomplete";
 
 const bookingSchema = z.object({
   customerName: z.string().optional(),
@@ -44,10 +45,30 @@ interface BookingFormProps {
 
 export default function BookingForm({ onSuccess }: BookingFormProps) {
   const [step, setStep] = useState(1);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
+
   const totalSteps = 4;
+
+  // Handle customer selection from autocomplete
+  const handleCustomerSelect = (customer: any) => {
+    setSelectedCustomerId(customer._id);
+    form.setValue("customerName", customer.name);
+    form.setValue("customerPhone", customer.primaryMobile || customer.phone || "");
+    form.setValue("customerEmail", customer.email || "");
+
+    // Auto-fill location if available from last booking
+    if (customer.lastBooking) {
+      form.setValue("pickupLocation", customer.lastBooking.pickup || "");
+      form.setValue("dropoffLocation", customer.lastBooking.drop || "");
+    }
+
+    toast({
+      title: "✅ Customer selected",
+      description: `${customer.name} • ${customer.bookingCount || 0} previous trips`,
+    });
+  };
 
   const form = useForm<BookingFormData>({
     resolver: zodResolver(bookingSchema),
@@ -400,33 +421,47 @@ export default function BookingForm({ onSuccess }: BookingFormProps) {
                   />
                 )}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField
-                    control={form.control}
-                    name="customerName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs md:text-sm">👤 Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Name" {...field} className="text-xs h-9 md:h-10" />
-                        </FormControl>
-                        <FormMessage className="text-xs" />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="customerPhone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs md:text-sm">📱 Phone</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Phone" {...field} className="text-xs h-9 md:h-10" />
-                        </FormControl>
-                        <FormMessage className="text-xs" />
-                      </FormItem>
-                    )}
-                  />
+                <div className="space-y-3">
+                  {/* Customer Autocomplete */}
+                  <div>
+                    <FormLabel className="text-xs md:text-sm block mb-2">👤 Customer (Search by name or phone)</FormLabel>
+                    <CustomerAutocomplete
+                      value={watchedValues.customerName || ""}
+                      onSelect={handleCustomerSelect}
+                      placeholder="Type customer name or phone number..."
+                      autoFocus={true}
+                    />
+                  </div>
+
+                  {/* Manual override fields */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={form.control}
+                      name="customerName"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs md:text-sm">Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Name" {...field} className="text-xs h-9 md:h-10" disabled={!!selectedCustomerId} />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="customerPhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs md:text-sm">📱 Phone</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Phone" {...field} className="text-xs h-9 md:h-10" disabled={!!selectedCustomerId} />
+                          </FormControl>
+                          <FormMessage className="text-xs" />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
 
                 <FormField

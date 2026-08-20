@@ -1,0 +1,20 @@
+{
+  "tenantId": "6a83785fa7e723e36c549fe4",
+  "backups": {
+    "primary": "/Users/pradeep/fleetpro-final-recovery/backups/tenant-6a83785fa7e723e36c549fe4/primary",
+    "secondary": "/Users/pradeep/fleetpro-final-recovery/backups/tenant-6a83785fa7e723e36c549fe4/secondary",
+    "tertiary": "/Users/pradeep/fleetpro-final-recovery/backups/tenant-6a83785fa7e723e36c549fe4/tertiary"
+  },
+  "checksums": [
+    {
+      "fileName": "users.jsonl",
+      "sha256": "b5bc954b6586bda676443aa39111fbc9e04c1884e3a35bfcca92aa67cc9d8625",
+      "recordCount": 1,
+      "timestamp": "2026-08-20T11:35:52.110Z",
+      "tenantId": "6a83785fa7e723e36c549fe4"
+    }
+  ],
+  "lastVerificationTime": "2026-08-20T11:35:52.110Z",
+  "integrityStatus": "healthy",
+  "dataLossRiskLevel": "none"
+}

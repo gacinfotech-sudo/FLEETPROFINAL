@@ -3,6 +3,7 @@ import { storage } from '../storage-mongodb';
 import { buildMessage, type MessageType } from './templates';
 import { normalizeIndianPhone } from './phone';
 import { whatsappProvider } from './index';
+import { getAndSubstituteTemplate, substituteVariables } from '../services/template-substitution-service';
 
 export interface SendBookingMessageParams {
   tenantId: string;
@@ -69,7 +70,79 @@ export async function sendBookingMessage(params: SendBookingMessageParams): Prom
   }
 
   const idempotencyKey = force ? `${baseKey}_resend_${Date.now()}` : baseKey;
-  const content = buildMessage(messageType, booking, tenant);
+
+  // Check if payment collection is disabled
+  const collectPayment = booking.collectPayment !== false;
+
+  // If driver message and payment collection is disabled, send a different message
+  if (messageType === 'driver_duty' && !collectPayment) {
+    const noPaymentTemplate = `✅ *नो पेमेंट कलेक्शन | {{companyName}} Services*\n\nनमस्कार {{driverName}},\n\nयह बुकिंग {{bookingId}} के लिए आपको ग्राहक से कोई भुगतान नहीं लेना है।\n\nकृपया सामान्य तरीके से ड्यूटी पूरी करें।\n\n📞 किसी भी समस्या में ऑफिस से संपर्क करें: {{supportPhone}}`;
+    const noPaymentMessage = substituteVariables(noPaymentTemplate, { booking, tenant });
+
+    let messageDoc;
+    try {
+      messageDoc = await WhatsAppMessage.create({
+        tenantId,
+        bookingId: booking._id,
+        recipientType: 'driver',
+        recipientPhone,
+        messageType: 'driver_no_payment_collection',
+        content: noPaymentMessage,
+        provider: whatsappProvider.kind,
+        status: 'queued',
+        attemptCount: 0,
+        createdBy: actor,
+        idempotencyKey,
+      });
+    } catch (error: any) {
+      if (error?.code === 11000) {
+        return { ok: false, code: 'ALREADY_SENT', message: 'This message was already sent' };
+      }
+      throw error;
+    }
+
+    const result = await whatsappProvider.sendText(tenantId, recipientPhone, noPaymentMessage);
+    messageDoc.attemptCount = 1;
+    messageDoc.status = result.status === 'sent' ? 'sent' : 'failed';
+    messageDoc.providerMessageId = result.providerMessageId || undefined;
+    messageDoc.error = result.error || undefined;
+    if (result.status === 'sent') messageDoc.sentAt = new Date();
+    await messageDoc.save();
+
+    if (result.status !== 'sent') {
+      return { ok: false, code: 'SEND_FAILED', message: result.error || 'Failed to send WhatsApp message', messageDoc };
+    }
+    return { ok: true, messageDoc };
+  }
+
+  // Try to use custom template from database first
+  const templateType = messageType === 'driver_duty' ? 'driver' : 'customer';
+  const { body: content, found: templateFound } = await getAndSubstituteTemplate(
+    tenantId,
+    templateType,
+    messageType,
+    { booking, tenant },
+    messageType === 'driver_duty' ? 'driver' : 'customer'
+  );
+
+  console.log(`[SEND_MSG] messageType=${messageType}, templateFound=${templateFound}, contentLen=${content?.length || 0}`);
+  console.log(`[SEND_MSG] booking.driverId:`, booking.driverId ? `{ id: ${booking.driverId._id}, name: ${booking.driverId.name} }` : 'null');
+  console.log(`[SEND_MSG] booking.bookingId=${booking.bookingId}`);
+  console.log(`[SEND_MSG] booking.customerName=${booking.customerName}`);
+  console.log(`[SEND_MSG] tenant.businessName=${tenant?.businessName}`);
+
+  // If no template found in database, use hardcoded fallback with variable substitution
+  let finalContent = content;
+  if (!content) {
+    const fallbackTemplate = buildMessage(messageType, booking, tenant);
+    console.log(`[SEND_MSG] Using fallback template, before subst length=${fallbackTemplate.length}`);
+    finalContent = substituteVariables(fallbackTemplate, { booking, tenant });
+    console.log(`[SEND_MSG] After subst length=${finalContent.length}`);
+  }
+
+  if (!finalContent) {
+    return { ok: false, code: 'SEND_FAILED', message: 'No template available for this message type' };
+  }
 
   let messageDoc;
   try {
@@ -79,12 +152,13 @@ export async function sendBookingMessage(params: SendBookingMessageParams): Prom
       recipientType,
       recipientPhone,
       messageType,
-      content,
+      content: finalContent,
       provider: whatsappProvider.kind,
       status: 'queued',
       attemptCount: 0,
       createdBy: actor,
       idempotencyKey,
+      templateFound,
     });
   } catch (error: any) {
     if (error?.code === 11000) {
@@ -93,7 +167,7 @@ export async function sendBookingMessage(params: SendBookingMessageParams): Prom
     throw error;
   }
 
-  const result = await whatsappProvider.sendText(tenantId, recipientPhone, content);
+  const result = await whatsappProvider.sendText(tenantId, recipientPhone, finalContent);
   messageDoc.attemptCount = 1;
   messageDoc.status = result.status === 'sent' ? 'sent' : 'failed';
   messageDoc.providerMessageId = result.providerMessageId || undefined;

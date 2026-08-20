@@ -65,7 +65,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, Menu, LogOut, Star, Car, Users, UserCheck, Phone, Mail, MessageCircle, Banknote, Plus, User, FileText, Trash2 } from "lucide-react";
 
-type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "live-operations" | "self-drive" | "whatsapp" | "upcoming-bookings" | "booking-queues" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "customers-add" | "drivers-add" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors" | "rewards-referrals" | "gps-tracking" | "whatsapp-settings" | "staff-whatsapp-management";
+type ViewType = "dashboard" | "bookings" | "fleet" | "drivers" | "history" | "revenue" | "vendor-settlement" | "expenses" | "salary" | "profile" | "users" | "live-bookings" | "live-operations" | "self-drive" | "whatsapp" | "upcoming-bookings" | "booking-queues" | "payment-dues" | "driver-leave" | "driver-performance" | "vehicle-performance" | "driver-attendance" | "customers" | "customers-add" | "drivers-add" | "after-sales" | "campaigns" | "inquiries" | "leads" | "followups" | "vendors" | "rewards-referrals" | "gps-tracking" | "whatsapp-settings" | "staff-whatsapp-management" | "vehicle-compliance";
 
 // apiRequest() throws Error("<status>: <raw response text>") on a non-2xx
 // response (queryClient.ts:throwIfResNotOk) — without this, a rejected
@@ -136,6 +136,9 @@ export default function Dashboard() {
   const [showDriverForm, setShowDriverForm] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<any>(null);
   const [viewingVehicle, setViewingVehicle] = useState<any>(null);
+  const [vehicleViewTab, setVehicleViewTab] = useState<"overview" | "specs" | "documents">("overview");
+  const [viewing360Vehicle, setViewing360Vehicle] = useState<any>(null);
+  const [vehicle360Tab, setVehicle360Tab] = useState<"overview" | "service" | "maintenance" | "expenses" | "performance">("overview");
   const [editingDriver, setEditingDriver] = useState<any>(null);
   const [viewingDriver, setViewingDriver] = useState<any>(null);
   const { openBooking } = useBookingWorkspace();
@@ -442,7 +445,13 @@ export default function Dashboard() {
   };
 
   const handleViewVehicle = (vehicle: any) => {
+    setVehicleViewTab("overview");
     setViewingVehicle(vehicle);
+  };
+
+  const handleView360Vehicle = (vehicle: any) => {
+    setVehicle360Tab("overview");
+    setViewing360Vehicle(vehicle);
   };
 
   const handleEditDriver = (driver: any) => {
@@ -524,6 +533,11 @@ export default function Dashboard() {
 
   const { data: bookings = [] } = useQuery<any[]>({
     queryKey: ["/api/bookings"],
+  });
+
+  const { data: complianceAlerts = { totalAlerts: 0, criticalAlerts: 0, alerts: [] } } = useQuery<any>({
+    queryKey: ["/api/vehicles/compliance/alerts"],
+    refetchInterval: 300000, // Refresh every 5 minutes
   });
 
 
@@ -615,6 +629,52 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+
+            {/* Compliance Alerts Banner */}
+            {complianceAlerts.totalAlerts > 0 && (
+              <Card className={`border-2 ${complianceAlerts.criticalAlerts > 0 ? 'border-red-500 bg-red-50' : 'border-yellow-500 bg-yellow-50'}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div>
+                      <h3 className={`font-bold text-lg ${complianceAlerts.criticalAlerts > 0 ? 'text-red-700' : 'text-yellow-700'}`}>
+                        ⚠️ {complianceAlerts.totalAlerts} Document{complianceAlerts.totalAlerts > 1 ? 's' : ''} Expiring Soon
+                      </h3>
+                      <p className={`text-sm mt-1 ${complianceAlerts.criticalAlerts > 0 ? 'text-red-600' : 'text-yellow-600'}`}>
+                        {complianceAlerts.criticalAlerts > 0 && `${complianceAlerts.criticalAlerts} critical alert${complianceAlerts.criticalAlerts > 1 ? 's' : ''} - Action required!`}
+                        {complianceAlerts.criticalAlerts === 0 && "Review and renew documents before expiry"}
+                      </p>
+                      <div className="mt-3 space-y-1 max-h-32 overflow-y-auto">
+                        {complianceAlerts.alerts.slice(0, 5).map((alert: any) => (
+                          <div key={alert.id} className="text-xs flex items-center gap-2">
+                            <span className="font-semibold">{alert.icon}</span>
+                            <span className="flex-1">{alert.vehicle} - {alert.title}</span>
+                            <Badge
+                              className={
+                                alert.status === 'expired' ? 'bg-red-600' :
+                                alert.status === 'critical' ? 'bg-orange-600' :
+                                'bg-yellow-600'
+                              }
+                            >
+                              {alert.daysLeft > 0 ? `${alert.daysLeft}d` : 'Expired'}
+                            </Badge>
+                          </div>
+                        ))}
+                        {complianceAlerts.totalAlerts > 5 && (
+                          <p className="text-xs text-gray-600 mt-2">+{complianceAlerts.totalAlerts - 5} more alerts</p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentView("vehicle-compliance")}
+                      className="whitespace-nowrap"
+                    >
+                      View All Alerts →
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
@@ -726,9 +786,7 @@ export default function Dashboard() {
                           <Button size="sm" variant="secondary" className="flex-1" onClick={() => handleViewVehicle(vehicle)}>
                             View Profile
                           </Button>
-                          <Link href={`/vehicles/${vehicle._id || vehicle.id}`} className="flex-1">
-                            <Button size="sm" variant="outline" className="w-full">View 360</Button>
-                          </Link>
+                          <Button size="sm" variant="outline" className="w-full" onClick={() => handleView360Vehicle(vehicle)}>View 360</Button>
                           {canManageFleet() && <>
                             <Button size="sm" variant="outline" className="flex-1" onClick={() => handleEditVehicle(vehicle)}>
                               Edit
@@ -803,9 +861,7 @@ export default function Dashboard() {
                                 >
                                   View Profile
                                 </Button>
-                                <Link href={`/vehicles/${vehicle._id || vehicle.id}`}>
-                                  <Button variant="ghost" size="sm">View 360</Button>
-                                </Link>
+                                <Button variant="ghost" size="sm" onClick={() => handleView360Vehicle(vehicle)}>View 360</Button>
                                 {canManageFleet() && <>
                                   <Button 
                                     variant="ghost" 
@@ -1908,6 +1964,101 @@ export default function Dashboard() {
       case "vehicle-performance":
         return <VehiclePerformancePage />;
 
+      case "vehicle-compliance":
+        return (
+          <div className="space-y-6">
+            <div className="gradient-header bg-gradient-to-r from-red-600 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <h1 className="text-3xl font-bold">📋 Vehicle Compliance Alerts</h1>
+                  <p className="text-red-100 mt-1">Monitor document expiry dates • Registration, Insurance, PUC, Fitness, Permit</p>
+                </div>
+              </div>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl">⚠️ All Compliance Alerts</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {complianceAlerts.totalAlerts === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500 text-lg">✅ All documents are valid!</p>
+                    <p className="text-gray-400 text-sm mt-2">No expiry alerts at this time.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {complianceAlerts.alerts.map((alert: any) => (
+                      <div
+                        key={alert.id}
+                        className={`border-2 rounded-lg p-4 flex items-start justify-between gap-4 ${
+                          alert.status === 'expired' ? 'border-red-500 bg-red-50' :
+                          alert.status === 'critical' ? 'border-orange-500 bg-orange-50' :
+                          'border-yellow-500 bg-yellow-50'
+                        }`}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3">
+                            <span className="text-3xl">{alert.icon}</span>
+                            <div>
+                              <p className="font-bold text-lg">{alert.title}</p>
+                              <p className="text-sm text-gray-600">{alert.vehicle}</p>
+                              <p className="text-xs text-gray-500 mt-1">{alert.registration}</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge
+                            className={
+                              alert.status === 'expired' ? 'bg-red-600 text-white text-lg px-3 py-2' :
+                              alert.status === 'critical' ? 'bg-orange-600 text-white text-lg px-3 py-2' :
+                              'bg-yellow-600 text-white text-lg px-3 py-2'
+                            }
+                          >
+                            {alert.status === 'expired' ? '🔴 EXPIRED' : `${alert.daysLeft}d left`}
+                          </Badge>
+                          <p className="text-xs text-gray-600 mt-2">Due: {alert.expiryDate}</p>
+                          <p className={`text-sm font-semibold mt-1 ${
+                            alert.status === 'expired' ? 'text-red-700' :
+                            alert.status === 'critical' ? 'text-orange-700' :
+                            'text-yellow-700'
+                          }`}>{alert.message}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-blue-50 border-blue-200">
+              <CardHeader>
+                <CardTitle className="text-lg text-blue-900">📞 Renew Documents</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="font-semibold text-blue-900">📋 Registration Certificate</p>
+                    <p className="text-gray-700 text-xs mt-1">Renew at your nearest RTO office or online portal</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-blue-900">🛡️ Insurance</p>
+                    <p className="text-gray-700 text-xs mt-1">Contact your insurance provider or renew online</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-blue-900">✅ Fitness Certificate</p>
+                    <p className="text-gray-700 text-xs mt-1">Get your vehicle inspected at authorized centers</p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-blue-900">🌍 PUC Certificate</p>
+                    <p className="text-gray-700 text-xs mt-1">Pollution test at authorized PUC centers</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
       case "gps-tracking":
         return <GpsSettingsPage />;
 
@@ -2140,20 +2291,380 @@ export default function Dashboard() {
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900 capitalize">{[viewingVehicle.make, viewingVehicle.vehicleModel || viewingVehicle.model].filter(Boolean).join(' ')}</h2>
                   <p className="text-gray-600">{viewingVehicle.licensePlate || viewingVehicle.registrationNumber || 'No registration'}</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {viewingVehicle.color && `Color: ${viewingVehicle.color}`}
+                    {viewingVehicle.color && viewingVehicle.fuelType && ' • '}
+                    {viewingVehicle.fuelType && `Fuel: ${viewingVehicle.fuelType}`}
+                    {(viewingVehicle.color || viewingVehicle.fuelType) && viewingVehicle.year && ' • '}
+                    {viewingVehicle.year && `Year: ${viewingVehicle.year}`}
+                  </p>
                 </div>
               </div>
               <div className="flex gap-2 flex-wrap text-sm">
-                <Badge variant={viewingVehicle.status === 'available' ? 'default' : 'secondary'} className="capitalize">{viewingVehicle.status}</Badge>
-                <Badge variant="outline" className="capitalize">{viewingVehicle.type || viewingVehicle.vehicleType || 'Uncategorised'}</Badge>
-                {viewingVehicle.year && <Badge variant="outline">{viewingVehicle.year}</Badge>}
+                <Badge variant={viewingVehicle.status === 'available' ? 'default' : 'secondary'} className="capitalize">{viewingVehicle.status || 'Unknown'}</Badge>
+                <Badge variant="outline" className="capitalize">{viewingVehicle.type || viewingVehicle.vehicleType || 'Unknown'}</Badge>
               </div>
             </div>
-            <VehicleFeedbackProfile
-              vehicleId={viewingVehicle._id || viewingVehicle.id}
-              onOpenBooking={(booking) => { setViewingVehicle(null); handleViewBooking(booking); }}
-            />
+
+            <Tabs value={vehicleViewTab} onValueChange={setVehicleViewTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="specs">Specs</TabsTrigger>
+                <TabsTrigger value="documents">Documents</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="overview" className="space-y-4">
+                <VehicleFeedbackProfile
+                  vehicleId={viewingVehicle._id || viewingVehicle.id}
+                  onOpenBooking={(booking) => { setViewingVehicle(null); handleViewBooking(booking); }}
+                />
+              </TabsContent>
+
+              <TabsContent value="specs" className="space-y-4">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="border rounded p-4 bg-blue-50">
+                      <p className="text-xs text-gray-600 font-semibold">Registration</p>
+                      <p className="text-lg font-bold text-blue-700">{viewingVehicle.licensePlate || viewingVehicle.registrationNumber || 'N/A'}</p>
+                    </div>
+                    <div className="border rounded p-4 bg-purple-50">
+                      <p className="text-xs text-gray-600 font-semibold">Make</p>
+                      <p className="text-lg font-bold text-purple-700">{viewingVehicle.make || 'N/A'}</p>
+                    </div>
+                    <div className="border rounded p-4 bg-indigo-50">
+                      <p className="text-xs text-gray-600 font-semibold">Model</p>
+                      <p className="text-lg font-bold text-indigo-700">{viewingVehicle.vehicleModel || viewingVehicle.model || 'N/A'}</p>
+                    </div>
+                    <div className="border rounded p-4 bg-pink-50">
+                      <p className="text-xs text-gray-600 font-semibold">Year</p>
+                      <p className="text-lg font-bold text-pink-700">{viewingVehicle.year || 'N/A'}</p>
+                    </div>
+                    <div className="border rounded p-4 bg-orange-50">
+                      <p className="text-xs text-gray-600 font-semibold">Color</p>
+                      <p className="text-lg font-bold text-orange-700">{viewingVehicle.color || 'N/A'}</p>
+                    </div>
+                    <div className="border rounded p-4 bg-green-50">
+                      <p className="text-xs text-gray-600 font-semibold">Type</p>
+                      <p className="text-lg font-bold text-green-700">{viewingVehicle.type || viewingVehicle.vehicleType || 'N/A'}</p>
+                    </div>
+                    <div className="border rounded p-4 bg-teal-50">
+                      <p className="text-xs text-gray-600 font-semibold">Fuel Type</p>
+                      <p className="text-lg font-bold text-teal-700">{viewingVehicle.fuelType || 'N/A'}</p>
+                    </div>
+                    <div className="border rounded p-4 bg-cyan-50">
+                      <p className="text-xs text-gray-600 font-semibold">Seating Capacity</p>
+                      <p className="text-lg font-bold text-cyan-700">{viewingVehicle.seatingCapacity || 'N/A'}</p>
+                    </div>
+                    <div className="border rounded p-4 bg-red-50">
+                      <p className="text-xs text-gray-600 font-semibold">Transmission</p>
+                      <p className="text-lg font-bold text-red-700">{viewingVehicle.transmission || 'N/A'}</p>
+                    </div>
+                    <div className="border rounded p-4 bg-yellow-50">
+                      <p className="text-xs text-gray-600 font-semibold">Engine Capacity</p>
+                      <p className="text-lg font-bold text-yellow-700">{viewingVehicle.engineCapacity || 'N/A'}</p>
+                    </div>
+                    <div className="border rounded p-4 bg-lime-50">
+                      <p className="text-xs text-gray-600 font-semibold">Chassis No.</p>
+                      <p className="text-lg font-bold text-lime-700">{viewingVehicle.chassisNumber || 'N/A'}</p>
+                    </div>
+                    <div className="border rounded p-4 bg-fuchsia-50">
+                      <p className="text-xs text-gray-600 font-semibold">Engine No.</p>
+                      <p className="text-lg font-bold text-fuchsia-700">{viewingVehicle.engineNumber || 'N/A'}</p>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="documents" className="space-y-4">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Registration */}
+                    <div className={`border-2 rounded-lg p-4 ${
+                      viewingVehicle.registrationExpiry && new Date(viewingVehicle.registrationExpiry) < new Date() ? 'border-red-500 bg-red-50' :
+                      viewingVehicle.registrationExpiry && new Date(viewingVehicle.registrationExpiry).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000 ? 'border-orange-500 bg-orange-50' :
+                      'border-green-500 bg-green-50'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600">📋 Registration Certificate</p>
+                          <p className="text-lg font-bold mt-2">
+                            {viewingVehicle.registrationExpiry
+                              ? new Date(viewingVehicle.registrationExpiry).toLocaleDateString('en-IN')
+                              : 'Not Set'
+                            }
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          {viewingVehicle.registrationExpiry && new Date(viewingVehicle.registrationExpiry) < new Date() && (
+                            <Badge className="bg-red-600">🔴 EXPIRED</Badge>
+                          )}
+                          {viewingVehicle.registrationExpiry && new Date(viewingVehicle.registrationExpiry).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000 && new Date(viewingVehicle.registrationExpiry) >= new Date() && (
+                            <Badge className="bg-orange-600">⚠️ URGENT</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Insurance */}
+                    <div className={`border-2 rounded-lg p-4 ${
+                      viewingVehicle.insuranceExpiry && new Date(viewingVehicle.insuranceExpiry) < new Date() ? 'border-red-500 bg-red-50' :
+                      viewingVehicle.insuranceExpiry && new Date(viewingVehicle.insuranceExpiry).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000 ? 'border-orange-500 bg-orange-50' :
+                      'border-blue-500 bg-blue-50'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600">🛡️ Insurance Policy</p>
+                          <p className="text-lg font-bold mt-2">
+                            {viewingVehicle.insuranceExpiry
+                              ? new Date(viewingVehicle.insuranceExpiry).toLocaleDateString('en-IN')
+                              : 'Not Set'
+                            }
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          {viewingVehicle.insuranceExpiry && new Date(viewingVehicle.insuranceExpiry) < new Date() && (
+                            <Badge className="bg-red-600">🔴 EXPIRED</Badge>
+                          )}
+                          {viewingVehicle.insuranceExpiry && new Date(viewingVehicle.insuranceExpiry).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000 && new Date(viewingVehicle.insuranceExpiry) >= new Date() && (
+                            <Badge className="bg-orange-600">⚠️ URGENT</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* PUC */}
+                    <div className={`border-2 rounded-lg p-4 ${
+                      viewingVehicle.pucExpiry && new Date(viewingVehicle.pucExpiry) < new Date() ? 'border-red-500 bg-red-50' :
+                      viewingVehicle.pucExpiry && new Date(viewingVehicle.pucExpiry).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000 ? 'border-orange-500 bg-orange-50' :
+                      'border-green-500 bg-green-50'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600">🌍 PUC Certificate</p>
+                          <p className="text-lg font-bold mt-2">
+                            {viewingVehicle.pucExpiry
+                              ? new Date(viewingVehicle.pucExpiry).toLocaleDateString('en-IN')
+                              : 'Not Set'
+                            }
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          {viewingVehicle.pucExpiry && new Date(viewingVehicle.pucExpiry) < new Date() && (
+                            <Badge className="bg-red-600">🔴 EXPIRED</Badge>
+                          )}
+                          {viewingVehicle.pucExpiry && new Date(viewingVehicle.pucExpiry).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000 && new Date(viewingVehicle.pucExpiry) >= new Date() && (
+                            <Badge className="bg-orange-600">⚠️ URGENT</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Fitness */}
+                    <div className={`border-2 rounded-lg p-4 ${
+                      viewingVehicle.fitnessCertExpiry && new Date(viewingVehicle.fitnessCertExpiry) < new Date() ? 'border-red-500 bg-red-50' :
+                      viewingVehicle.fitnessCertExpiry && new Date(viewingVehicle.fitnessCertExpiry).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000 ? 'border-orange-500 bg-orange-50' :
+                      'border-purple-500 bg-purple-50'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600">✅ Fitness Certificate</p>
+                          <p className="text-lg font-bold mt-2">
+                            {viewingVehicle.fitnessCertExpiry
+                              ? new Date(viewingVehicle.fitnessCertExpiry).toLocaleDateString('en-IN')
+                              : 'Not Set'
+                            }
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          {viewingVehicle.fitnessCertExpiry && new Date(viewingVehicle.fitnessCertExpiry) < new Date() && (
+                            <Badge className="bg-red-600">🔴 EXPIRED</Badge>
+                          )}
+                          {viewingVehicle.fitnessCertExpiry && new Date(viewingVehicle.fitnessCertExpiry).getTime() - new Date().getTime() < 30 * 24 * 60 * 60 * 1000 && new Date(viewingVehicle.fitnessCertExpiry) >= new Date() && (
+                            <Badge className="bg-orange-600">⚠️ URGENT</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>}
           <DialogFooter><Button variant="outline" onClick={() => setViewingVehicle(null)}>Close</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vehicle 360 — Comprehensive vehicle data (service, maintenance, expenses, performance) */}
+      <Dialog open={!!viewing360Vehicle} onOpenChange={() => setViewing360Vehicle(null)}>
+        <DialogContent className="max-w-6xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Car className="text-green-600" size={24} />
+              <span>🚗 Vehicle 360 - {viewing360Vehicle?.make} {viewing360Vehicle?.vehicleModel || viewing360Vehicle?.model}</span>
+            </DialogTitle>
+          </DialogHeader>
+          {viewing360Vehicle && <div className="space-y-6">
+            <div className="flex items-center justify-between gap-4 p-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg flex-wrap border border-green-200">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-green-100 rounded-lg flex items-center justify-center"><Car className="h-8 w-8 text-green-600" /></div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">{viewing360Vehicle.make} {viewing360Vehicle.vehicleModel || viewing360Vehicle.model}</h2>
+                  <p className="text-gray-600">{viewing360Vehicle.licensePlate || viewing360Vehicle.registrationNumber || 'No registration'}</p>
+                  <p className="text-sm text-gray-500 mt-1">📍 {viewing360Vehicle.year || 'Year unknown'} • {viewing360Vehicle.type || 'Type unknown'}</p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 text-sm">
+                <Badge variant={viewing360Vehicle.status === 'available' ? 'default' : 'secondary'} className="capitalize text-center">{viewing360Vehicle.status || 'Unknown'}</Badge>
+                <Badge className="text-center bg-green-500">360 Comprehensive View</Badge>
+              </div>
+            </div>
+
+            <Tabs value={vehicle360Tab} onValueChange={setVehicle360Tab} className="w-full">
+              <TabsList className="grid w-full grid-cols-5">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="service">Service</TabsTrigger>
+                <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+                <TabsTrigger value="expenses">Expenses</TabsTrigger>
+                <TabsTrigger value="performance">Performance</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="overview" className="space-y-6">
+                <VehicleFeedbackProfile
+                  vehicleId={viewing360Vehicle._id || viewing360Vehicle.id}
+                  onOpenBooking={(booking) => { setViewing360Vehicle(null); handleViewBooking(booking); }}
+                />
+              </TabsContent>
+
+              <TabsContent value="service" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">🔧 Service Records</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="border rounded p-3 bg-blue-50">
+                          <p className="text-xs text-gray-600">Total Services</p>
+                          <p className="text-2xl font-bold text-blue-600">-</p>
+                        </div>
+                        <div className="border rounded p-3 bg-green-50">
+                          <p className="text-xs text-gray-600">Last Service</p>
+                          <p className="text-lg font-semibold text-green-600">-</p>
+                        </div>
+                        <div className="border rounded p-3 bg-orange-50">
+                          <p className="text-xs text-gray-600">Next Service Due</p>
+                          <p className="text-lg font-semibold text-orange-600">-</p>
+                        </div>
+                      </div>
+                      <div className="rounded border p-4 text-center text-gray-500 text-sm">
+                        Service history will appear here when data is available
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="maintenance" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">🛠️ Maintenance & Repairs</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-4 gap-3">
+                        <div className="border rounded p-3 bg-red-50">
+                          <p className="text-xs text-gray-600">Total Repairs</p>
+                          <p className="text-2xl font-bold text-red-600">-</p>
+                        </div>
+                        <div className="border rounded p-3 bg-yellow-50">
+                          <p className="text-xs text-gray-600">Pending Work</p>
+                          <p className="text-2xl font-bold text-yellow-600">-</p>
+                        </div>
+                        <div className="border rounded p-3 bg-purple-50">
+                          <p className="text-xs text-gray-600">Completed</p>
+                          <p className="text-2xl font-bold text-purple-600">-</p>
+                        </div>
+                        <div className="border rounded p-3 bg-teal-50">
+                          <p className="text-xs text-gray-600">Warranty Active</p>
+                          <p className="text-lg font-semibold text-teal-600">-</p>
+                        </div>
+                      </div>
+                      <div className="rounded border p-4 text-center text-gray-500 text-sm">
+                        Maintenance records will appear here when available
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="expenses" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">💰 Expenses & Costs</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-4 gap-3">
+                        <div className="border rounded p-3 bg-blue-50">
+                          <p className="text-xs text-gray-600">Total Expenses</p>
+                          <p className="text-xl font-bold text-blue-600">₹-</p>
+                        </div>
+                        <div className="border rounded p-3 bg-green-50">
+                          <p className="text-xs text-gray-600">Fuel Cost</p>
+                          <p className="text-xl font-bold text-green-600">₹-</p>
+                        </div>
+                        <div className="border rounded p-3 bg-orange-50">
+                          <p className="text-xs text-gray-600">Maintenance</p>
+                          <p className="text-xl font-bold text-orange-600">₹-</p>
+                        </div>
+                        <div className="border rounded p-3 bg-red-50">
+                          <p className="text-xs text-gray-600">Insurance</p>
+                          <p className="text-xl font-bold text-red-600">₹-</p>
+                        </div>
+                      </div>
+                      <div className="rounded border p-4 text-center text-gray-500 text-sm">
+                        Expense tracking will appear here when available
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="performance" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">📊 Performance Metrics</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-4 gap-3">
+                        <div className="border rounded p-3 bg-blue-50">
+                          <p className="text-xs text-gray-600">Avg Speed</p>
+                          <p className="text-2xl font-bold text-blue-600">-</p>
+                        </div>
+                        <div className="border rounded p-3 bg-green-50">
+                          <p className="text-xs text-gray-600">Fuel Efficiency</p>
+                          <p className="text-2xl font-bold text-green-600">-</p>
+                        </div>
+                        <div className="border rounded p-3 bg-purple-50">
+                          <p className="text-xs text-gray-600">Uptime %</p>
+                          <p className="text-2xl font-bold text-purple-600">-</p>
+                        </div>
+                        <div className="border rounded p-3 bg-yellow-50">
+                          <p className="text-xs text-gray-600">Monthly KMs</p>
+                          <p className="text-2xl font-bold text-yellow-600">-</p>
+                        </div>
+                      </div>
+                      <div className="rounded border p-4 text-center text-gray-500 text-sm">
+                        Performance data will appear here when available
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>}
+          <DialogFooter><Button variant="outline" onClick={() => setViewing360Vehicle(null)}>Close</Button></DialogFooter>
         </DialogContent>
       </Dialog>
 

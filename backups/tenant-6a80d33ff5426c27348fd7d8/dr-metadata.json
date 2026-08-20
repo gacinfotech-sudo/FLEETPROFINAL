@@ -1,0 +1,12 @@
+{
+  "tenantId": "6a80d33ff5426c27348fd7d8",
+  "backups": {
+    "primary": "/Users/pradeep/fleetpro-final-recovery/backups/tenant-6a80d33ff5426c27348fd7d8/primary",
+    "secondary": "/Users/pradeep/fleetpro-final-recovery/backups/tenant-6a80d33ff5426c27348fd7d8/secondary",
+    "tertiary": "/Users/pradeep/fleetpro-final-recovery/backups/tenant-6a80d33ff5426c27348fd7d8/tertiary"
+  },
+  "checksums": [],
+  "lastVerificationTime": "2026-08-20T11:35:51.970Z",
+  "integrityStatus": "healthy",
+  "dataLossRiskLevel": "none"
+}

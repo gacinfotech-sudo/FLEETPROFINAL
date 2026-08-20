@@ -37,14 +37,32 @@ export default function CollectPaymentDialog({ card, onClose, onDone }: {
     }
     setSubmitting(true);
     try {
+      const isFullPayment = amt >= card.balance;
+
       await apiRequest("POST", `/api/bookings/${card.id}/payments`, {
         amount: amt,
-        paymentType: amt >= card.balance ? "final_payment" : "partial_payment",
+        paymentType: isFullPayment ? "final_payment" : "partial_payment",
         paymentMode,
         transactionReference: reference || undefined,
         idempotencyKey,
       });
-      toast({ title: "Payment recorded", description: `${money(amt)} against ${card.bookingCode}` });
+
+      // Send message to driver if full payment received
+      if (isFullPayment) {
+        try {
+          await apiRequest("POST", `/api/bookings/${card.id}/whatsapp/send-driver-payment-confirmation`, {
+            amount: amt,
+            totalAmount: card.totalAmount,
+          });
+          toast({ title: "✅ Payment recorded", description: `${money(amt)} - Driver notified` });
+        } catch (err: any) {
+          // Don't fail the payment recording if message send fails
+          toast({ title: "✅ Payment recorded", description: `${money(amt)} against ${card.bookingCode}` });
+        }
+      } else {
+        toast({ title: "Payment recorded", description: `${money(amt)} against ${card.bookingCode}` });
+      }
+
       onDone();
     } catch (err: any) {
       toast({ title: "Payment failed", description: apiErrorMessage(err), variant: "destructive" });

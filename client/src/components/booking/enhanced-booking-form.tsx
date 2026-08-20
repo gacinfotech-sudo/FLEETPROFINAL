@@ -14,7 +14,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, Check, Phone, Mail, IndianRupee, Download, ChevronDown, ChevronRight, Building2, Send, AlertTriangle, HelpCircle, CalendarRange } from "lucide-react";
+import { Calendar, MapPin, Clock, Car, User, CreditCard, ArrowRight, ArrowLeft, Check, Phone, Mail, IndianRupee, Download, ChevronDown, ChevronRight, Building2, Send, AlertTriangle, HelpCircle, CalendarRange, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,6 +24,7 @@ import BookingConfirmationPDF from "./booking-confirmation-pdf";
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from "@/components/ui/dialog";
 import { useSmartBookingNavigation } from "@/hooks/useSmartBookingNavigation";
 import { validateCompleteBooking } from "@/utils/bookingValidation";
+import CustomerAutocomplete from "./customer-autocomplete";
 
 const bookingSchema = z.object({
   // ULTRA FAST: ALL booking fields optional - zero friction form
@@ -113,6 +114,13 @@ const bookingSchema = z.object({
   driverCollectionAmount: z.number().min(0).optional(),
   collectionMode: z.enum(["company", "driver", "vendor", "split"]).optional(),
   redeemPoints: z.number().min(0).optional(),
+  // New customer flag - to auto-create customer if not found
+  isNewCustomer: z.boolean().optional(),
+  // Payment collection flag - whether to collect payment from customer
+  collectPayment: z.boolean().default(true),
+  // Toll/Parking collection flag
+  collectTollParking: z.boolean().default(false),
+  tollParkingAmount: z.number().min(0).optional(),
 });
 
 type BookingFormData = z.infer<typeof bookingSchema>;
@@ -1073,6 +1081,41 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
     // ULTRA FAST: All validations removed - zero friction submission
     // Users can create booking with ANY data, fill details later
     // No amount required, no vehicle required, no field blocking
+
+    // Auto-create new customer if phone number doesn't match any existing customer
+    if (data.isNewCustomer && data.customerPhone && data.customerName) {
+      try {
+        const newCustomerResponse = await fetch('/api/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: data.customerName,
+            phone: data.customerPhone,
+            primaryMobile: data.customerPhone,
+            email: data.customerEmail || '',
+          }),
+        });
+
+        if (newCustomerResponse.ok) {
+          const newCustomer = await newCustomerResponse.json();
+          console.log('✅ New customer created:', newCustomer);
+          toast({
+            title: 'New customer created',
+            description: `${data.customerName} added to database`,
+            variant: 'success',
+          });
+        }
+      } catch (error) {
+        console.error('Error creating customer:', error);
+        toast({
+          title: 'Warning',
+          description: 'Customer save failed, but booking will still be created',
+          variant: 'default',
+        });
+      }
+    }
+
+    // Create booking
     await createBookingMutation.mutateAsync(data);
   };
 
@@ -1278,60 +1321,181 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
               </div>
 
               {watchedValues.travelDateStatus === "confirmed" && (
-              <div className="mb-3">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <FormField
-                    control={form.control}
-                    name="pickupDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">📅 Pickup</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} min={new Date().toISOString().split('T')[0]} className="h-9 text-xs" />
-                        </FormControl>
-                        <FormMessage className="text-xs" />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="pickupTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">⏰ Time</FormLabel>
-                        <FormControl>
-                          <Input type="time" {...field} className="h-9 text-xs" />
-                        </FormControl>
-                        <FormMessage className="text-xs" />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="returnDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">📅 Return</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} min={watchedValues.pickupDate || new Date().toISOString().split('T')[0]} className="h-9 text-xs" />
-                        </FormControl>
-                        <FormMessage className="text-xs" />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="returnTime"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">⏰ Time</FormLabel>
-                        <FormControl>
-                          <Input type="time" {...field} className="h-9 text-xs" />
-                        </FormControl>
-                        <FormMessage className="text-xs" />
-                      </FormItem>
-                    )}
-                  />
+              <div className="mb-4 bg-gradient-to-r from-blue-50 to-indigo-50 p-5 rounded-lg border-2 border-blue-300">
+                <div className="space-y-4">
+                  {/* PICKUP SECTION */}
+                  <div className="space-y-3">
+                    <h4 className="font-bold text-blue-900 flex items-center text-sm">
+                      <Calendar className="w-5 h-5 mr-2 text-blue-600" />
+                      📍 Pickup
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Pickup Date */}
+                      <FormField
+                        control={form.control}
+                        name="pickupDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-semibold text-gray-700">Date</FormLabel>
+                            <div className="space-y-2">
+                              <Input
+                                type="date"
+                                {...field}
+                                min={new Date().toISOString().split('T')[0]}
+                                className="h-11 text-sm font-semibold border-2 border-blue-400 focus:border-blue-600 rounded-lg cursor-pointer bg-white"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const today = new Date().toISOString().split('T')[0];
+                                    form.setValue("pickupDate", today);
+                                  }}
+                                  className="flex-1 px-2 py-1.5 text-xs font-semibold bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                                >
+                                  Today
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+                                    form.setValue("pickupDate", tomorrow);
+                                  }}
+                                  className="flex-1 px-2 py-1.5 text-xs font-semibold bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                                >
+                                  Tomorrow
+                                </button>
+                              </div>
+                            </div>
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
+                      {/* Pickup Time */}
+                      <FormField
+                        control={form.control}
+                        name="pickupTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-semibold text-gray-700">Time</FormLabel>
+                            <FormControl>
+                              <Select value={field.value} onValueChange={field.onChange}>
+                                <SelectTrigger className="h-11 text-sm font-semibold border-2 border-blue-400 focus:border-blue-600 rounded-lg bg-white">
+                                  <SelectValue placeholder="Select time" />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-64">
+                                  {Array.from({ length: 24 }, (_, h) => {
+                                    const hour = String(h).padStart(2, '0');
+                                    return (
+                                      <SelectGroup key={hour}>
+                                        {['00', '30'].map((min) => {
+                                          const time = `${hour}:${min}`;
+                                          return (
+                                            <SelectItem key={time} value={time} className="cursor-pointer font-semibold">
+                                              {time}
+                                            </SelectItem>
+                                          );
+                                        })}
+                                      </SelectGroup>
+                                    );
+                                  })}
+                                </SelectContent>
+                              </Select>
+                            </FormControl>
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  {/* RETURN SECTION */}
+                  <div className="space-y-3 pt-3 border-t border-blue-200">
+                    <h4 className="font-bold text-blue-900 flex items-center text-sm">
+                      <Calendar className="w-5 h-5 mr-2 text-blue-600" />
+                      🏁 Return
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Return Date */}
+                      <FormField
+                        control={form.control}
+                        name="returnDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-semibold text-gray-700">Date</FormLabel>
+                            <div className="space-y-2">
+                              <Input
+                                type="date"
+                                {...field}
+                                min={watchedValues.pickupDate || new Date().toISOString().split('T')[0]}
+                                className="h-11 text-sm font-semibold border-2 border-blue-400 focus:border-blue-600 rounded-lg cursor-pointer bg-white"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const pickupDate = watchedValues.pickupDate ? new Date(watchedValues.pickupDate) : new Date();
+                                    const sameDay = pickupDate.toISOString().split('T')[0];
+                                    form.setValue("returnDate", sameDay);
+                                  }}
+                                  className="flex-1 px-2 py-1.5 text-xs font-semibold bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                                >
+                                  Same Day
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const pickupDate = watchedValues.pickupDate ? new Date(watchedValues.pickupDate) : new Date();
+                                    const nextDay = new Date(pickupDate.getTime() + 86400000).toISOString().split('T')[0];
+                                    form.setValue("returnDate", nextDay);
+                                  }}
+                                  className="flex-1 px-2 py-1.5 text-xs font-semibold bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                                >
+                                  Next Day
+                                </button>
+                              </div>
+                            </div>
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
+                      {/* Return Time */}
+                      <FormField
+                        control={form.control}
+                        name="returnTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-semibold text-gray-700">Time</FormLabel>
+                            <FormControl>
+                              <Select value={field.value} onValueChange={field.onChange}>
+                                <SelectTrigger className="h-11 text-sm font-semibold border-2 border-blue-400 focus:border-blue-600 rounded-lg bg-white">
+                                  <SelectValue placeholder="Select time" />
+                                </SelectTrigger>
+                                <SelectContent className="max-h-64">
+                                  {Array.from({ length: 24 }, (_, h) => {
+                                    const hour = String(h).padStart(2, '0');
+                                    return (
+                                      <SelectGroup key={hour}>
+                                        {['00', '30'].map((min) => {
+                                          const time = `${hour}:${min}`;
+                                          return (
+                                            <SelectItem key={time} value={time} className="cursor-pointer font-semibold">
+                                              {time}
+                                            </SelectItem>
+                                          );
+                                        })}
+                                      </SelectGroup>
+                                    );
+                                  })}
+                                </SelectContent>
+                              </Select>
+                            </FormControl>
+                            <FormMessage className="text-xs" />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
               )}
@@ -2143,55 +2307,122 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
             </CardHeader>
             <CardContent className="p-4 sm:p-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="customerName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center text-sm font-medium text-gray-700">
-                        <User className="w-4 h-4 mr-2" />
-                        Customer Name
-                      </FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="Enter full name" 
-                          {...field} 
-                          className="h-12 border-2 border-gray-200 focus:border-purple-500 rounded-lg"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <div>
                   <FormField
                     control={form.control}
-                    name="customerPhone"
+                    name="customerName"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="flex items-center text-sm font-medium text-gray-700">
-                          <Phone className="w-4 h-4 mr-2" />
-                          Phone Number
+                          <User className="w-4 h-4 mr-2" />
+                          Customer Name (Auto-filled by Phone)
                         </FormLabel>
                         <FormControl>
-                          <Input 
-                            type="tel"
-                            placeholder="Enter phone number (e.g., 9876543210)" 
+                          <Input
+                            placeholder="Auto-filled when phone number found..."
                             value={field.value || ""}
-                            name="customerPhone"
-                            onBlur={field.onBlur}
-                            className="h-12 border-2 border-gray-200 focus:border-purple-500 rounded-lg"
-                            onChange={(e) => {
-                              // Allow only numbers and basic formatting
-                              const numericValue = e.target.value.replace(/[^\d]/g, '');
-                              field.onChange(numericValue);
-                            }}
+                            onChange={(e) => field.onChange(e.target.value)}
+                            className="h-12 border-2 border-gray-200 focus:border-purple-500 rounded-lg bg-gray-50"
+                            disabled={false}
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
+                  />
+                </div>
+
+                <div>
+                  <FormField
+                    control={form.control}
+                    name="customerPhone"
+                    render={({ field }) => {
+                      const phoneValue = field.value || '';
+                      const isValidPhone = phoneValue.length >= 10;
+
+                      return (
+                        <FormItem>
+                          <FormLabel className="flex items-center text-sm font-medium text-gray-700">
+                            <Phone className="w-4 h-4 mr-2" />
+                            Phone Number (Search or Create New)
+                          </FormLabel>
+                          <FormControl>
+                            <div className="space-y-2">
+                              <Input
+                                type="tel"
+                                placeholder="Enter phone number (10+ digits)"
+                                value={phoneValue}
+                                name="customerPhone"
+                                onBlur={field.onBlur}
+                                className="h-12 border-2 border-gray-200 focus:border-purple-500 rounded-lg"
+                                onChange={async (e) => {
+                                  // Allow only numbers
+                                  const numericValue = e.target.value.replace(/[^\d]/g, '');
+                                  field.onChange(numericValue);
+
+                                  // Auto-search and fetch customer when phone number is complete
+                                  if (numericValue.length >= 10) {
+                                    try {
+                                      const response = await fetch(`/api/customers/search-dedup?q=${numericValue}`);
+                                      if (response.ok) {
+                                        const customers = await response.json();
+                                        console.log('🔍 Search results:', customers);
+
+                                        // Find exact phone match
+                                        const matchedCustomer = Array.isArray(customers) ? customers.find((c: any) => {
+                                          const custPhone = (c.phone || c.primaryMobile || '').toString();
+                                          const searchDigits = numericValue.toString();
+                                          // Match if phone contains search or search contains last 10 digits of phone
+                                          return custPhone.includes(searchDigits) || searchDigits.includes(custPhone.slice(-10));
+                                        }) : null;
+
+                                        console.log('✅ Matched customer:', matchedCustomer);
+
+                                        if (matchedCustomer) {
+                                          // Existing customer - auto-fill
+                                          console.log('Setting values:', matchedCustomer.name, matchedCustomer.email);
+                                          form.setValue("customerName", matchedCustomer.name);
+                                          form.setValue("customerEmail", matchedCustomer.email || "");
+                                          form.setValue("isNewCustomer", false);
+                                        } else {
+                                          // New customer - allow manual entry
+                                          form.setValue("isNewCustomer", true);
+                                          form.setValue("customerName", "");
+                                          form.setValue("customerEmail", "");
+                                        }
+                                      }
+                                    } catch (error) {
+                                      console.error("❌ Error fetching customer:", error);
+                                      form.setValue("isNewCustomer", true);
+                                    }
+                                  }
+                                }}
+                              />
+
+                              {/* Status indicator */}
+                              {isValidPhone && (
+                                <div className={`text-xs font-medium p-2 rounded flex items-center gap-2 ${
+                                  form.watch("isNewCustomer")
+                                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                    : "bg-green-50 text-green-700 border border-green-200"
+                                }`}>
+                                  {form.watch("isNewCustomer") ? (
+                                    <>
+                                      <span>➕ New Customer - Enter details below</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>✅ Existing Customer Found</span>
+                                    </>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
                 </div>
 
@@ -2496,13 +2727,23 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
                 </Button>
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   onClick={() => {
-                    if (!watchedValues.customerName || !watchedValues.customerPhone) {
+                    // Phone number is required - name is auto-filled from phone search
+                    if (!watchedValues.customerPhone) {
                       toast({
-                        title: "Please fill required fields",
-                        description: "Customer name and phone are required.",
+                        title: "Phone number required",
+                        description: "Enter customer phone number to search or create new customer.",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    // If customer name is still empty after phone search, show different message
+                    if (!watchedValues.customerName) {
+                      toast({
+                        title: "Fill customer details",
+                        description: "Enter phone for existing customer, or fill name for new customer.",
                         variant: "destructive"
                       });
                       return;
@@ -3242,11 +3483,59 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                           from real payment transactions after submit. */}
                       <Separator />
                       <div className="space-y-4 p-4 bg-blue-50 rounded-lg">
-                        <h4 className="font-semibold text-blue-900 flex items-center">
-                          <IndianRupee className="w-4 h-4 mr-2" />
-                          Advance Payment (Optional)
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-3">
+                            <FormField
+                              control={form.control}
+                              name="collectPayment"
+                              render={({ field }) => (
+                                <FormItem className="flex items-center space-y-0 gap-2">
+                                  <FormControl>
+                                    <input
+                                      type="checkbox"
+                                      checked={field.value}
+                                      onChange={field.onChange}
+                                      className="w-5 h-5 cursor-pointer"
+                                    />
+                                  </FormControl>
+                                  <FormLabel className="font-semibold text-blue-900 cursor-pointer mb-0">
+                                    Collect Payment from Customer
+                                  </FormLabel>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <FormField
+                              control={form.control}
+                              name="collectTollParking"
+                              render={({ field }) => (
+                                <FormItem className="flex items-center space-y-0 gap-2">
+                                  <FormControl>
+                                    <input
+                                      type="checkbox"
+                                      checked={field.value}
+                                      onChange={field.onChange}
+                                      className="w-5 h-5 cursor-pointer"
+                                    />
+                                  </FormControl>
+                                  <FormLabel className="font-semibold text-blue-900 cursor-pointer mb-0">
+                                    Collect Toll/Parking from Customer
+                                  </FormLabel>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        </div>
+
+                        {watchedValues.collectPayment !== false && (
+                          <>
+                            <h4 className="font-semibold text-blue-900 flex items-center">
+                              <IndianRupee className="w-4 h-4 mr-2" />
+                              Advance Payment (Optional)
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
                             name="advanceRequested"
@@ -3447,6 +3736,60 @@ export default function EnhancedBookingForm({ onSuccess, initialValues }: Enhanc
                             )}
                           </span>
                         </div>
+                          </>
+                        )}
+
+                        {watchedValues.collectTollParking !== false && (
+                          <div className="space-y-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                            <h4 className="font-semibold text-yellow-900 flex items-center">
+                              <AlertCircle className="w-4 h-4 mr-2" />
+                              Toll & Parking Charges
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <FormField
+                                control={form.control}
+                                name="tollCharges"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-sm font-medium text-gray-700">Toll Charges (₹)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number" min={0} placeholder="0"
+                                        value={field.value ?? ""}
+                                        onWheel={(e) => (e.target as HTMLElement).blur()}
+                                        onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
+                                        className="h-10 text-sm border border-gray-300 focus:border-yellow-500 rounded"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              <FormField
+                                control={form.control}
+                                name="parkingCharges"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-sm font-medium text-gray-700">Parking Charges (₹)</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number" min={0} placeholder="0"
+                                        value={field.value ?? ""}
+                                        onWheel={(e) => (e.target as HTMLElement).blur()}
+                                        onChange={(e) => field.onChange(e.target.value === "" ? undefined : parseFloat(e.target.value))}
+                                        className="h-10 text-sm border border-gray-300 focus:border-yellow-500 rounded"
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            <div className="text-sm text-yellow-800 bg-yellow-100 p-2 rounded">
+                              Total Toll/Parking: ₹{(watchedValues.tollCharges || 0) + (watchedValues.parkingCharges || 0)}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

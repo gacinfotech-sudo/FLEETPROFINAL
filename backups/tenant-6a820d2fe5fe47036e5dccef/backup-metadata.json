@@ -1,0 +1,38 @@
+{
+  "tenantId": "tenant-6a820d2fe5fe47036e5dccef",
+  "lastBackupTime": "2026-08-20T11:34:14.340Z",
+  "collections": {
+    "customers": {
+      "lastBackupTime": "1970-01-01T00:00:00.000Z",
+      "recordCount": 0
+    },
+    "drivers": {
+      "lastBackupTime": "1970-01-01T00:00:00.000Z",
+      "recordCount": 0
+    },
+    "vehicles": {
+      "lastBackupTime": "1970-01-01T00:00:00.000Z",
+      "recordCount": 0
+    },
+    "bookings": {
+      "lastBackupTime": "1970-01-01T00:00:00.000Z",
+      "recordCount": 0
+    },
+    "payments": {
+      "lastBackupTime": "1970-01-01T00:00:00.000Z",
+      "recordCount": 0
+    },
+    "users": {
+      "lastBackupTime": "1970-01-01T00:00:00.000Z",
+      "recordCount": 0
+    },
+    "tenantconfigs": {
+      "lastBackupTime": "1970-01-01T00:00:00.000Z",
+      "recordCount": 0
+    },
+    "tenantlimits": {
+      "lastBackupTime": "1970-01-01T00:00:00.000Z",
+      "recordCount": 0
+    }
+  }
+}

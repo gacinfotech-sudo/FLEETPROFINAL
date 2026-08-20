@@ -857,7 +857,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (req.session as any).platformRole = user.platformRole || null;
       (req.session as any).loginTime = new Date().getTime();
 
-      req.session.save((err) => {
+      req.session.save(async (err) => {
         if (err) {
           console.error('[LOGIN] ❌ Session save failed:', err);
           return res.status(500).json({ message: "Session creation failed" });
@@ -867,6 +867,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('[LOGIN] User role:', user.role);
         console.log('[LOGIN] Platform role:', user.platformRole);
         console.log('[LOGIN] Tenant ID:', user.tenantId);
+
+        // Initialize default WhatsApp templates for tenant
+        if (user.tenantId) {
+          try {
+            const { initializeDefaultTemplates } = await import('./services/whatsapp-templates-service');
+            await initializeDefaultTemplates(user.tenantId.toString(), storage);
+            console.log('[LOGIN] ✅ WhatsApp templates initialized');
+          } catch (error: any) {
+            console.error('[LOGIN] ⚠️ Template init warning:', error.message);
+          }
+        }
 
         // Determine redirect
         let redirectUrl = '/dashboard';
@@ -4003,8 +4014,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const endingWindow = validWindows.includes(req.query.endingWindow as string)
         ? (req.query.endingWindow as any) : 'today';
 
+      console.log(`[LIVE-BOOKINGS] 🔍 TenantId: ${req.tenantId}, startingWindow: ${startingWindow}, endingWindow: ${endingWindow}`);
+
       const bookings = await storage.getBookingsByTenant(req.tenantId!);
+      console.log(`[LIVE-BOOKINGS] 📊 Found ${bookings.length} bookings for tenant ${req.tenantId}`);
+
       const result = buildLiveOperations(bookings, new Date(), startingWindow, endingWindow);
+      console.log(`[LIVE-BOOKINGS] ✅ Result keys: ${Object.keys(result).join(', ')}`);
+
       res.json(result);
     } catch (error) {
       console.error('Live operations error:', error);
@@ -4609,6 +4626,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send payment confirmation to driver
+  app.post("/api/bookings/:id/whatsapp/send-driver-payment-confirmation", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const booking: any = await Booking.findOne({ _id: req.params.id, tenantId: req.tenantObjectId || req.tenantId })
+        .populate('driverId');
+
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      if (!booking.driverId?.phone) {
+        return res.status(400).json({ message: "Driver phone not available" });
+      }
+
+      const tenant = await storage.getTenant(String(req.tenantId));
+      const driverPhone = booking.driverId.phone;
+      const message = `✅ *भुगतान प्राप्त हुआ | ${tenant?.businessName || 'FleetPro'} Services*\n\nनमस्कार ${booking.driverId.name},\n\nबुकिंग ${booking.bookingId} का संपूर्ण भुगतान प्राप्त हो गया है।\n\n💰 कुल राशि: ₹${booking.totalAmount}\n✅ स्थिति: पूर्ण भुगतान\n\n🙏 धन्यवाद!`;
+
+      const result = await whatsappProvider.sendText(String(req.tenantId), driverPhone, message);
+
+      if (result.status === 'sent') {
+        await WhatsAppMessage.create({
+          tenantId: req.tenantObjectId || req.tenantId,
+          bookingId: booking._id,
+          recipientType: 'driver',
+          recipientPhone: driverPhone,
+          messageType: 'payment_confirmation',
+          content: message,
+          provider: whatsappProvider.kind,
+          status: 'sent',
+          sentAt: new Date(),
+          createdBy: { userId: req.userId!, role: req.user?.role || 'client' },
+        });
+
+        res.json({ success: true, message: "Payment confirmation sent to driver" });
+      } else {
+        res.status(502).json({ message: "Failed to send message" });
+      }
+    } catch (error: any) {
+      console.error('Payment confirmation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to send payment confirmation" });
+    }
+  });
+
   // Fix existing bookings - add createdBy field to bookings that don't have it
   // P0 FIX: this mutates data across the whole database and was previously
   // reachable by ANY authenticated user (not just admins).
@@ -5164,29 +5225,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Find staff members (admin/manager) with WhatsApp numbers
             const staffUsers = await User.find({
               tenantId: req.tenantObjectId || req.tenantId,
-              role: { $in: ['admin', 'manager'] },
-              $or: [
-                { whatsappInternalPhone: { $type: 'string', $ne: '' } },
-                { phone: { $type: 'string', $ne: '' } }
-              ]
+              role: { $in: ['admin', 'manager', 'owner', 'superadmin'] }
             }).lean();
+
+            console.log(`[STAFF_NOTIFY] Found ${staffUsers.length} staff users for tenant ${req.tenantId}`);
 
             // Send to each staff member
             for (const staff of staffUsers) {
-              const staffPhone = staff.whatsappInternalPhone || staff.phone;
+              // Try multiple phone fields
+              const staffPhone = staff.whatsappInternalPhone || staff.whatsappPhone || staff.phone || staff.mobilePhone;
+              console.log(`[STAFF_NOTIFY] Staff ${staff.name}: phone=${staffPhone}`);
+
               if (staffPhone) {
-                const { whatsappProvider } = await import('./whatsapp/index');
-                whatsappProvider.sendText(req.tenantId!, staffPhone, staffMessage)
-                  .then(result => {
-                    if (result.status === 'sent') {
-                      console.log(`✅ Staff notification sent to ${staff.name || 'Unknown'} (${staffPhone})`);
-                    } else {
-                      console.warn(`⚠️ Staff notification failed for ${staff.name || 'Unknown'}: ${result.error}`);
-                    }
-                  })
-                  .catch((err: any) => {
-                    console.error(`❌ Staff notification error for ${staff.name || 'Unknown'}:`, err?.message);
-                  });
+                const { normalizeIndianPhone } = await import('./whatsapp/phone');
+                const normalizedPhone = normalizeIndianPhone(staffPhone);
+
+                if (normalizedPhone) {
+                  const { whatsappProvider } = await import('./whatsapp/index');
+                  whatsappProvider.sendText(req.tenantId!, normalizedPhone, staffMessage)
+                    .then(result => {
+                      if (result.status === 'sent') {
+                        console.log(`✅ Staff notification sent to ${staff.name || 'Unknown'} (${normalizedPhone})`);
+                      } else {
+                        console.warn(`⚠️ Staff notification failed for ${staff.name || 'Unknown'}: ${result.error}`);
+                      }
+                    })
+                    .catch((err: any) => {
+                      console.error(`❌ Staff notification error for ${staff.name || 'Unknown'}:`, err?.message);
+                    });
+                } else {
+                  console.warn(`[STAFF_NOTIFY] Invalid phone for ${staff.name}: ${staffPhone}`);
+                }
+              } else {
+                console.warn(`[STAFF_NOTIFY] No phone found for staff ${staff.name}`);
               }
             }
           } catch (err: any) {
@@ -13034,9 +13105,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/tenant/whatsapp-templates", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
+      console.log('[TEMPLATE-CREATE] 📝 Received request body:', { name: req.body.name, templateType: req.body.templateType });
+
       const { body, variables, changesSummary, ...rest } = req.body;
+
+      if (!body || !rest.name) {
+        console.log('[TEMPLATE-CREATE] ❌ Missing required fields - body:', !!body, 'name:', !!rest.name);
+        return res.status(400).json({ message: 'Template body and name are required' });
+      }
+
+      const tenantId = (req.tenantObjectId || req.tenantId);
+      console.log('[TEMPLATE-CREATE] 🔐 TenantId:', tenantId, 'Type:', typeof tenantId);
+
       const newTemplate = {
-        tenantId: (req.tenantObjectId || req.tenantId),
+        tenantId,
         body,
         variables: variables || extractVariablesFromText(body),
         isCustom: true,
@@ -13044,10 +13126,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updatedAt: new Date(),
         ...rest,
       };
+
+      console.log('[TEMPLATE-CREATE] 💾 Inserting template:', rest.name);
+
       const result = await storage.client
         ?.db("fleetpro")
         .collection("whatsappTemplates")
         .insertOne(newTemplate);
+
+      console.log('[TEMPLATE-CREATE] ✅ Inserted with ID:', result?.insertedId);
 
       // Create initial version
       const WhatsAppTemplateVersioning = (await import('./services/whatsapp-template-versioning')).default;
@@ -13059,14 +13146,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.user?.email || 'system'
       );
 
+      console.log('[TEMPLATE-CREATE] ✅ Template created successfully');
       res.json({ template: { ...newTemplate, _id: result?.insertedId } });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error('[TEMPLATE-CREATE] ❌ ERROR:', error.message || error);
+      res.status(500).json({ message: error.message, details: error.toString() });
     }
   });
 
   app.put("/api/tenant/whatsapp-templates/:templateId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
+      console.log('[TEMPLATE-UPDATE] 📝 Updating template:', req.params.templateId, 'Name:', req.body.name);
+
       const { _id, body, variables, changesSummary, ...rest } = req.body;
       const updateData = {
         body,
@@ -13074,6 +13165,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updatedAt: new Date(),
         ...rest,
       };
+
+      console.log('[TEMPLATE-UPDATE] 🔍 Query filter - ID:', req.params.templateId, 'TenantId:', req.tenantId);
 
       // Update template
       const result = await storage.client
@@ -13084,6 +13177,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           { $set: updateData },
           { returnDocument: 'after' }
         );
+
+      if (!result.value) {
+        console.log('[TEMPLATE-UPDATE] ❌ Template not found');
+        return res.status(404).json({ message: 'Template not found' });
+      }
+
+      console.log('[TEMPLATE-UPDATE] ✅ Template updated');
 
       // Create version entry if body changed
       if (body) {
@@ -13099,7 +13199,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ success: true, message: 'Template updated', template: result.value });
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      console.error('[TEMPLATE-UPDATE] ❌ ERROR:', error.message || error);
+      res.status(500).json({ message: error.message, details: error.toString() });
     }
   });
 
@@ -13110,6 +13211,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .collection("whatsappTemplates")
         .deleteOne({ _id: new mongoose.Types.ObjectId(req.params.templateId), tenantId: (req.tenantObjectId || req.tenantId), isCustom: true });
       res.json({ success: true, message: 'Template deleted' });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Admin: Cleanup duplicate templates
+  app.post("/api/admin/cleanup-duplicate-templates", authenticateUser, requireAdmin, async (req: AuthRequest, res) => {
+    try {
+      const { cleanupDuplicateTemplates } = await import('./services/template-cleanup-service');
+      const result = await cleanupDuplicateTemplates();
+      res.json({
+        success: true,
+        message: `Cleaned up ${result.duplicateGroups} groups, deleted ${result.templatesDeleted} templates`,
+        ...result
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

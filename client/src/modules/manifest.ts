@@ -56,6 +56,7 @@ export const TENANT_MODULES = [
 
   // Communications
   { id: 'whatsapp', label: 'WhatsApp', iconKey: 'whatsapp', parentGroup: 'communications' },
+  { id: 'whatsapp-templates', label: 'WhatsApp Templates', iconKey: 'activity', parentGroup: 'communications' },
   { id: 'whatsapp-settings', label: 'WhatsApp Settings', iconKey: 'alert', parentGroup: 'communications' },
   { id: 'staff-whatsapp-management', label: 'Staff WhatsApp Numbers', iconKey: 'users', parentGroup: 'communications' },
 
@@ -131,7 +132,7 @@ export function getNavigationStructure(role?: string, permissions?: string[]): N
       id: 'communications',
       label: 'Communications',
       iconKey: 'whatsapp',
-      children: ['whatsapp', 'whatsapp-settings', 'staff-whatsapp-management']
+      children: ['whatsapp', 'whatsapp-templates', 'whatsapp-settings', 'staff-whatsapp-management']
     },
     {
       id: 'settings',

@@ -465,6 +465,8 @@ export interface IBooking extends Document {
   advanceRequested?: number;
   driverCollectionAmount?: number;
   collectionMode?: 'company' | 'driver' | 'vendor' | 'split';
+  collectPayment?: boolean;
+  collectTollParking?: boolean;
   // Free-text summary of what was agreed with the customer on the phone —
   // visible to customer and driver in WhatsApp messages. Distinct from
   // `notes`, which is treated as driver/office-facing instructions.
@@ -956,6 +958,8 @@ const BookingSchema = new Schema<IBooking>({
     enum: ['company', 'driver', 'vendor', 'split'],
     default: 'company',
   },
+  collectPayment: { type: Boolean, default: true },
+  collectTollParking: { type: Boolean, default: false },
   customerDiscussionSummary: { type: String },
   paymentStatus: { 
     type: String, 

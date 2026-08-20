@@ -15,9 +15,9 @@ function fmtMoney(n?: number) {
 export default function UpcomingBookings() {
   const { openBooking } = useBookingWorkspace();
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["/api/operations/upcoming-bookings?days=3"],
+    queryKey: ["/api/operations/upcoming-bookings?days=180"],
     queryFn: async () => {
-      const res = await fetch('/api/operations/upcoming-bookings?days=3', { credentials: "include" });
+      const res = await fetch('/api/operations/upcoming-bookings?days=180', { credentials: "include" });
       if (!res.ok) throw new Error('Failed to fetch upcoming bookings');
       return res.json();
     },
@@ -27,10 +27,7 @@ export default function UpcomingBookings() {
   const days: any[] = (data as any[]) || [];
 
   // Calculate totals across all days
-  const todayCount = days[0]?.bookings?.length || 0;
-  const tomorrowCount = days[1]?.bookings?.length || 0;
-  const dayAfterCount = days[2]?.bookings?.length || 0;
-  const totalBookings = todayCount + tomorrowCount + dayAfterCount;
+  const totalBookings = days.reduce((sum, d) => sum + (d.bookings?.length || 0), 0);
   const totalRevenue = days.flatMap((d: any) => d.bookings || []).reduce((sum: number, b: any) => sum + (b.totalAmount || 0), 0);
 
   return (
@@ -42,39 +39,25 @@ export default function UpcomingBookings() {
         <div className="gradient-header bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl p-6 text-white shadow-lg" role="region" aria-label="Page header">
           <div>
             <h1 className="text-3xl font-bold">📅 Upcoming Bookings</h1>
-          <p className="text-blue-100 mt-1">Today, tomorrow and the day after — sorted by pickup time</p>
+          <p className="text-blue-100 mt-1">Next 180 days — sorted by pickup time</p>
         </div>
       </div>
 
         {/* Summary Stats Cards */}
         {!isLoading && !isError && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4" role="region" aria-label="Upcoming bookings summary">
-            <Card className="stat-card card-hover bg-gradient-to-br from-green-50 to-emerald-50 border-green-200" role="status">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4" role="region" aria-label="Upcoming bookings summary">
+            <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200" role="status">
               <CardContent className="p-4">
-                <p className="text-sm text-gray-600 font-medium" id="today-label">📍 TODAY</p>
-                <p className="text-2xl font-bold text-green-600 mt-2" aria-labelledby="today-label">{todayCount}</p>
-              <p className="text-xs text-gray-500 mt-1">bookings</p>
-            </CardContent>
-          </Card>
-          <Card className="stat-card card-hover bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200">
-            <CardContent className="p-4">
-              <p className="text-sm text-gray-600 font-medium">🔜 TOMORROW</p>
-              <p className="text-2xl font-bold text-blue-600 mt-2">{tomorrowCount}</p>
-              <p className="text-xs text-gray-500 mt-1">bookings</p>
-            </CardContent>
-          </Card>
-          <Card className="stat-card card-hover bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200">
-            <CardContent className="p-4">
-              <p className="text-sm text-gray-600 font-medium">📌 DAY AFTER</p>
-              <p className="text-2xl font-bold text-purple-600 mt-2">{dayAfterCount}</p>
-              <p className="text-xs text-gray-500 mt-1">bookings</p>
+                <p className="text-sm text-gray-600 font-medium" id="booking-label">📅 TOTAL UPCOMING</p>
+                <p className="text-2xl font-bold text-blue-600 mt-2" aria-labelledby="booking-label">{totalBookings}</p>
+              <p className="text-xs text-gray-500 mt-1">bookings (next 180 days)</p>
             </CardContent>
           </Card>
           <Card className="stat-card card-hover bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200">
             <CardContent className="p-4">
-              <p className="text-sm text-gray-600 font-medium">💰 REVENUE</p>
+              <p className="text-sm text-gray-600 font-medium">💰 TOTAL REVENUE</p>
               <p className="text-2xl font-bold text-amber-600 mt-2">{fmtMoney(totalRevenue)}</p>
-              <p className="text-xs text-gray-500 mt-1">3 days total</p>
+              <p className="text-xs text-gray-500 mt-1">180 days total</p>
             </CardContent>
           </Card>
         </div>

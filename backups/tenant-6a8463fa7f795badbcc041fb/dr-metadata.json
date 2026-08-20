@@ -1,0 +1,41 @@
+{
+  "tenantId": "6a8463fa7f795badbcc041fb",
+  "backups": {
+    "primary": "/Users/pradeep/fleetpro-final-recovery/backups/tenant-6a8463fa7f795badbcc041fb/primary",
+    "secondary": "/Users/pradeep/fleetpro-final-recovery/backups/tenant-6a8463fa7f795badbcc041fb/secondary",
+    "tertiary": "/Users/pradeep/fleetpro-final-recovery/backups/tenant-6a8463fa7f795badbcc041fb/tertiary"
+  },
+  "checksums": [
+    {
+      "fileName": "customers.jsonl",
+      "sha256": "29f6c0bbdf4901a44a8c4081d44f60d79d065fdb2102bafd6f39625e95f36a12",
+      "recordCount": 8,
+      "timestamp": "2026-08-20T11:35:52.111Z",
+      "tenantId": "6a8463fa7f795badbcc041fb"
+    },
+    {
+      "fileName": "drivers.jsonl",
+      "sha256": "651987b55b221857b8c7f6c82124c020ad8c693a629c69751de040c6b55a9c97",
+      "recordCount": 18,
+      "timestamp": "2026-08-20T11:35:52.112Z",
+      "tenantId": "6a8463fa7f795badbcc041fb"
+    },
+    {
+      "fileName": "vehicles.jsonl",
+      "sha256": "966f22056b6d7e660c160639c05000a7afc9d25d0687fd3ed231c7008bace222",
+      "recordCount": 18,
+      "timestamp": "2026-08-20T11:35:52.112Z",
+      "tenantId": "6a8463fa7f795badbcc041fb"
+    },
+    {
+      "fileName": "bookings.jsonl",
+      "sha256": "87720713b5b6b78da4b9a772aad49fa4d57e30e1b3a1b8010dcb90a0156c0be0",
+      "recordCount": 43,
+      "timestamp": "2026-08-20T11:35:52.118Z",
+      "tenantId": "6a8463fa7f795badbcc041fb"
+    }
+  ],
+  "lastVerificationTime": "2026-08-20T11:35:52.119Z",
+  "integrityStatus": "healthy",
+  "dataLossRiskLevel": "none"
+}

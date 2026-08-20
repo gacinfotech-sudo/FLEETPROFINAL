@@ -111,7 +111,11 @@ export default function LoginPage() {
       );
 
       console.log(`🚀 Redirecting to: ${redirectUrl}`);
-      window.location.href = redirectUrl;
+
+      // Small delay to allow browser to save password before redirect
+      setTimeout(() => {
+        window.location.href = redirectUrl;
+      }, 500);
     } catch (err: any) {
       console.error("❌ P0 LOGIN FAILED:", err);
       setError(`Login failed: ${err.message}`);
@@ -237,7 +241,7 @@ export default function LoginPage() {
                   {error}
                 </div>
               )}
-              <form onSubmit={handleSubmit} className="space-y-4 lg:space-y-8" noValidate autoComplete="off">
+              <form onSubmit={handleSubmit} className="space-y-4 lg:space-y-8" noValidate autoComplete="on">
                 <div className="space-y-2 lg:space-y-3">
                   <Label htmlFor="userId" className="text-sm lg:text-base font-semibold text-slate-700">
                     User ID

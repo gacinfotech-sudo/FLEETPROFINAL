@@ -21,41 +21,56 @@ export async function scheduleBookingReminders(
   customerId?: string
 ) {
   try {
-    console.log(`📅 scheduleBookingReminders called: bookingId=${bookingId}, pickupDate=${pickupDate}`);
+    console.log(`📅 [REMINDER] scheduleBookingReminders: bookingId=${bookingId}, type=${driverId ? 'with-driver' : 'self-drive'}, pickupDate=${pickupDate}`);
 
     // Validate inputs
     if (!tenantId || !bookingId || !pickupDate) {
-      console.error('Missing required parameters for reminder scheduling:', { tenantId, bookingId, pickupDate });
+      console.error('[REMINDER] Missing parameters:', { tenantId, bookingId, pickupDate });
       return;
     }
 
     if (!mongoose.Types.ObjectId.isValid(tenantId)) {
-      console.error('Invalid tenant ID format:', tenantId);
+      console.error('[REMINDER] Invalid tenant ID:', tenantId);
       return;
     }
 
     if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-      console.error('Invalid booking ID format:', bookingId);
+      console.error('[REMINDER] Invalid booking ID:', bookingId);
       return;
     }
 
     const tenantObjectId = new mongoose.Types.ObjectId(tenantId);
-    const booking = await Booking.findById(new mongoose.Types.ObjectId(bookingId)).lean();
+    const booking = await Booking.findById(new mongoose.Types.ObjectId(bookingId))
+      .populate('driverId', 'name phone')
+      .lean();
 
     if (!booking) {
-      console.error('Booking not found for reminder scheduling:', bookingId);
+      console.error('[REMINDER] Booking not found:', bookingId);
       return;
     }
 
+    console.log(`[REMINDER] Booking found:`, {
+      bookingId: booking.bookingId,
+      customerPhone: booking.customerPhone,
+      customerName: booking.customerName,
+      driverId: booking.driverId?._id || booking.driverId,
+      driverName: booking.driverId?.name || 'N/A',
+      pickupDate: pickupDate,
+      bookingType: booking.bookingType
+    });
+
     if (!(pickupDate instanceof Date) || isNaN(pickupDate.getTime())) {
-      console.error('Invalid pickup date:', pickupDate);
+      console.error('[REMINDER] Invalid pickup date:', pickupDate);
       return;
     }
+
+    console.log(`[REMINDER] Booking type: ${booking.bookingType}, hasDriver: ${!!driverId}, customerPhone: ${booking.customerPhone}`);
 
     const schedules: ReminderSchedule[] = [];
 
-    // Schedule reminders for DRIVER
-    if (driverId) {
+    // Schedule reminders for DRIVER (if with-driver booking)
+    if (driverId && booking.driverId) {
+      console.log(`[REMINDER] Scheduling driver reminders for ${booking.bookingType} booking`);
       for (const interval of REMINDER_INTERVALS) {
         const reminderTime = new Date(pickupDate.getTime() - interval * 60000);
 
@@ -72,8 +87,9 @@ export async function scheduleBookingReminders(
       }
     }
 
-    // Schedule reminders for CUSTOMER
-    if (customerId) {
+    // Schedule reminders for CUSTOMER (always if customer phone exists)
+    if (booking.customerPhone) {
+      console.log(`[REMINDER] Scheduling customer reminders to ${booking.customerPhone}`);
       for (const interval of REMINDER_INTERVALS) {
         const reminderTime = new Date(pickupDate.getTime() - interval * 60000);
 
@@ -88,6 +104,8 @@ export async function scheduleBookingReminders(
           });
         }
       }
+    } else {
+      console.warn(`[REMINDER] No customer phone found for booking ${bookingId}`);
     }
 
     // Schedule reminders for OFFICE STAFF (manager/admin)
@@ -131,16 +149,20 @@ async function storeReminderSchedules(schedules: ReminderSchedule[], booking: an
 
   // Extract phone numbers for each recipient type
   const getPhoneNumber = async (schedule: ReminderSchedule, booking: any) => {
-    console.log(`🔍 getPhoneNumber: type=${schedule.recipientType}, customerPhone=${booking.customerPhone || 'MISSING'}`);
+    console.log(`[REMINDER] getPhoneNumber: type=${schedule.recipientType}`);
 
     if (schedule.recipientType === 'customer') {
-      console.log(`   → Returning customer phone: ${booking.customerPhone}`);
-      return booking.customerPhone;
+      const phone = booking.customerPhone;
+      console.log(`[REMINDER] Customer phone: ${phone}`);
+      return phone;
     } else if (schedule.recipientType === 'driver' && booking.driverId) {
       try {
         const driver = await Driver.findById(booking.driverId).lean();
-        return driver?.phone || null;
-      } catch {
+        const phone = driver?.phone || null;
+        console.log(`[REMINDER] Driver ${booking.driverId} phone: ${phone}`);
+        return phone;
+      } catch (err) {
+        console.error(`[REMINDER] Error fetching driver:`, err);
         return null;
       }
     } else if (schedule.recipientType === 'office_staff') {
@@ -150,27 +172,30 @@ async function storeReminderSchedules(schedules: ReminderSchedule[], booking: an
         const staffWithWhatsApp = await User.findOne({
           tenantId: schedule.tenantId,
           role: { $in: ['admin', 'manager'] },
-          'whatsappInternalPhone': { $type: 'string', $ne: '' }
+          whatsappInternalPhone: { $exists: true, $ne: '', $type: 'string' }
         }).lean();
 
         if (staffWithWhatsApp?.whatsappInternalPhone) {
+          console.log(`[REMINDER] Found staff with WhatsApp phone: ${staffWithWhatsApp.whatsappInternalPhone}`);
           return staffWithWhatsApp.whatsappInternalPhone;
         }
 
         // Fallback: try to find any staff member's phone
         const staffWithPhone = await User.findOne({
           tenantId: schedule.tenantId,
-          role: { $in: ['admin', 'manager'] },
-          'phone': { $type: 'string', $ne: '' }
+          role: { $in: ['admin', 'manager', 'tenant_owner'] },
+          phone: { $exists: true, $ne: '', $type: 'string' }
         }).lean();
 
         if (staffWithPhone?.phone) {
+          console.log(`[REMINDER] Found staff with phone: ${staffWithPhone.phone}`);
           return staffWithPhone.phone;
         }
 
+        console.warn(`[REMINDER] No staff phone found for tenantId ${schedule.tenantId}`);
         return null;
       } catch (error) {
-        console.error('Error getting staff phone:', error);
+        console.error('[REMINDER] Error getting staff phone:', error);
         return null;
       }
     }
@@ -349,14 +374,20 @@ async function sendReminderMessage(reminder: any): Promise<{ success: boolean; e
 let reminderProcessorInterval: NodeJS.Timeout | null = null;
 
 export function startReminderProcessor() {
-  if (reminderProcessorInterval) return;
+  if (reminderProcessorInterval) {
+    console.log('[REMINDER] Processor already running');
+    return;
+  }
 
   // Process reminders every minute
   reminderProcessorInterval = setInterval(() => {
-    processWhatsAppReminders().catch(err => console.error('Reminder processor error:', err));
+    processWhatsAppReminders().catch(err => console.error('[REMINDER] Processor error:', err));
   }, 60000);
 
-  console.log('✅ WhatsApp Reminder Processor started (runs every 60 seconds)');
+  console.log('[REMINDER] ✅ Processor started (runs every 60 seconds)');
+
+  // Also run immediately on startup
+  processWhatsAppReminders().catch(err => console.error('[REMINDER] Initial run error:', err));
 }
 
 export function stopReminderProcessor() {

@@ -43,6 +43,12 @@ const vehicleSchema = z.object({
   ownershipType: z.enum(["owned", "leased", "financed", "rented"]).optional(),
   currentOdometer: z.number().min(0).optional(),
   branch: z.string().optional(),
+  // Document expiry dates (compliance)
+  registrationExpiry: z.string().optional(),
+  insuranceExpiry: z.string().optional(),
+  fitnessCertExpiry: z.string().optional(),
+  pucExpiry: z.string().optional(),
+  permitExpiry: z.string().optional(),
 });
 
 // Save Draft intentionally validates nothing beyond "this is an object" —
@@ -104,6 +110,11 @@ export default function VehicleForm({ vehicle, onSuccess }: VehicleFormProps) {
       ownershipType: vehicle?.ownershipType || undefined,
       currentOdometer: vehicle?.currentOdometer || undefined,
       branch: vehicle?.branch || "",
+      registrationExpiry: vehicle?.registrationExpiry || "",
+      insuranceExpiry: vehicle?.insuranceExpiry || "",
+      fitnessCertExpiry: vehicle?.fitnessCertExpiry || "",
+      pucExpiry: vehicle?.pucExpiry || "",
+      permitExpiry: vehicle?.permitExpiry || "",
     },
   });
 
@@ -551,6 +562,83 @@ export default function VehicleForm({ vehicle, onSuccess }: VehicleFormProps) {
             </FormItem>
           )}
         />
+
+        {/* 📋 DOCUMENTS SECTION */}
+        <div className="border-t pt-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">📋 Document Expiry Dates</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="registrationExpiry"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>📋 Registration Expiry</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="insuranceExpiry"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>🛡️ Insurance Expiry</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="fitnessCertExpiry"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>✅ Fitness Certificate Expiry</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="pucExpiry"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>🌍 PUC Expiry</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="permitExpiry"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>🎫 Permit Expiry</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
 
         <div className="flex flex-wrap justify-end gap-4">
           <Button type="button" variant="outline" onClick={() => onSuccess()}>
