@@ -14920,6 +14920,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════
+  // CUSTOMER UPDATE NOTIFICATIONS ROUTES (ADD-ONLY)
+  // ═══════════════════════════════════════════════════════════════
+
+  // Send driver change notification to customer
+  app.post('/api/bookings/:id/notify/driver-change', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+      const { driverName, driverPhone } = req.body;
+
+      if (!driverName || !driverPhone) {
+        return res.status(400).json({ success: false, error: 'Driver name and phone required' });
+      }
+
+      if (typeof driverName !== 'string' || driverName.trim().length === 0) {
+        return res.status(400).json({ success: false, error: 'Invalid driver name' });
+      }
+
+      if (typeof driverPhone !== 'string' || driverPhone.trim().length < 10) {
+        return res.status(400).json({ success: false, error: 'Invalid driver phone' });
+      }
+
+      const { sendCustomerUpdateNotification } = await import('./services/customer-update-notifications');
+      const result = await sendCustomerUpdateNotification({
+        tenantId: req.tenantId!,
+        bookingId,
+        updateType: 'driver_change',
+        newDetails: { driverName, driverPhone },
+      });
+
+      console.log(`[UPDATE] Route: Driver change sent for booking ${bookingId}`, result);
+      res.json(result);
+    } catch (error: any) {
+      console.error('[UPDATE] Error sending driver change notification:', error);
+      res.status(500).json({ success: false, error: error?.message });
+    }
+  });
+
+  // Send vehicle change notification to customer
+  app.post('/api/bookings/:id/notify/vehicle-change', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+      const { vehicleName, vehicleNumber } = req.body;
+
+      if (!vehicleName || !vehicleNumber) {
+        return res.status(400).json({ success: false, error: 'Vehicle name and number required' });
+      }
+
+      if (typeof vehicleName !== 'string' || vehicleName.trim().length === 0) {
+        return res.status(400).json({ success: false, error: 'Invalid vehicle name' });
+      }
+
+      if (typeof vehicleNumber !== 'string' || vehicleNumber.trim().length === 0) {
+        return res.status(400).json({ success: false, error: 'Invalid vehicle number' });
+      }
+
+      const { sendCustomerUpdateNotification } = await import('./services/customer-update-notifications');
+      const result = await sendCustomerUpdateNotification({
+        tenantId: req.tenantId!,
+        bookingId,
+        updateType: 'vehicle_change',
+        newDetails: { vehicleName, vehicleNumber },
+      });
+
+      console.log(`[UPDATE] Route: Vehicle change sent for booking ${bookingId}`, result);
+      res.json(result);
+    } catch (error: any) {
+      console.error('[UPDATE] Error sending vehicle change notification:', error);
+      res.status(500).json({ success: false, error: error?.message });
+    }
+  });
+
+  // Send generic booking update notification to customer
+  app.post('/api/bookings/:id/notify/update', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+
+      const { sendCustomerUpdateNotification } = await import('./services/customer-update-notifications');
+      const result = await sendCustomerUpdateNotification({
+        tenantId: req.tenantId!,
+        bookingId,
+        updateType: 'booking_update',
+      });
+
+      console.log(`[UPDATE] Route: Booking update sent for booking ${bookingId}`, result);
+      res.json(result);
+    } catch (error: any) {
+      console.error('[UPDATE] Error sending booking update notification:', error);
+      res.status(500).json({ success: false, error: error?.message });
+    }
+  });
+
+  // Send custom message to customer
+  app.post('/api/bookings/:id/notify/custom', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+      const { customMessage } = req.body;
+
+      if (!customMessage || typeof customMessage !== 'string') {
+        return res.status(400).json({ success: false, error: 'Custom message required (string)' });
+      }
+
+      if (customMessage.trim().length === 0) {
+        return res.status(400).json({ success: false, error: 'Custom message cannot be empty' });
+      }
+
+      if (customMessage.length > 1000) {
+        return res.status(400).json({ success: false, error: 'Custom message too long (max 1000 chars)' });
+      }
+
+      const { sendCustomerUpdateNotification } = await import('./services/customer-update-notifications');
+      const result = await sendCustomerUpdateNotification({
+        tenantId: req.tenantId!,
+        bookingId,
+        updateType: 'custom',
+        newDetails: { customMessage },
+      });
+
+      console.log(`[UPDATE] Route: Custom message sent for booking ${bookingId}`, result);
+      res.json(result);
+    } catch (error: any) {
+      console.error('[UPDATE] Error sending custom notification:', error);
+      res.status(500).json({ success: false, error: error?.message });
+    }
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+
   const httpServer = createServer(app);
 
   return httpServer;

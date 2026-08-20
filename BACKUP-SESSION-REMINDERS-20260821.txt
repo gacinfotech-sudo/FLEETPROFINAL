@@ -1,0 +1,85 @@
+═══════════════════════════════════════════════════════════════════
+  COMPLETE BACKUP - Session Persistence + Reminders + UI Updates
+═══════════════════════════════════════════════════════════════════
+
+📅 DATE: 2026-08-21 (Today)
+🔖 BACKUP TAG: backup-session-reminders-tollparking-20260821-014954
+📊 COMMIT: 4dc3427
+
+✅ FEATURES IMPLEMENTED:
+
+1. SESSION PERSISTENCE
+   ├─ JWT tokens stored in localStorage
+   ├─ Auto-restore on page refresh
+   ├─ User data persistent
+   ├─ Session timestamp tracking
+   └─ Console logging for debugging
+
+2. TOLL/PARKING COLLECTION
+   ├─ Schema: collectTollParking boolean field added
+   ├─ Form: Checkbox + amount input fields
+   ├─ Driver notification: Toll/parking info in message
+   ├─ Total calculation in UI
+   └─ Default: false (no collection)
+
+3. DATE/TIME UX IMPROVEMENTS
+   ├─ Gradient background container
+   ├─ Calendar & Clock icons
+   ├─ Quick Select buttons:
+   │  ├─ Pickup: "Today", "Tomorrow"
+   │  └─ Return: "Same Day", "Next Day"
+   ├─ Time dropdown (30-min intervals)
+   ├─ 24-hour format (00:00 to 23:30)
+   └─ Better responsive layout
+
+4. WHATSAPP REMINDERS FIXED
+   ├─ Customer reminders via customerPhone (not ID)
+   ├─ Driver reminders for with-driver bookings
+   ├─ Staff notifications to admins/managers
+   ├─ Intervals: 5, 10, 20, 30 min, 1hr, 2hrs, 5hrs
+   ├─ Auto-processor: runs every 60 seconds
+   ├─ Improved logging [REMINDER] prefix
+   └─ Better error handling & fallbacks
+
+📁 FILES MODIFIED:
+
+Server:
+  ├─ server/models/index.ts (collectTollParking field)
+  ├─ server/whatsapp/templates.ts (toll/parking in messages)
+  ├─ server/whatsapp/sendBookingMessage.ts (updated logic)
+  ├─ server/services/whatsapp-reminder-scheduler.ts (customer phone fix + logging)
+  └─ server/index.ts (already has reminder processor)
+
+Client:
+  ├─ client/src/components/booking/enhanced-booking-form.tsx
+  │  ├─ Toll/Parking checkbox + fields
+  │  ├─ Date/Time picker improvements
+  │  └─ Better UI styling
+  └─ client/src/contexts/SessionContext.tsx
+     ├─ Enhanced session restoration
+     ├─ Tenant ID tracking
+     ├─ Session timestamp
+     └─ Better logging
+
+🚀 SERVER STATUS:
+  ├─ Running on :5050 (HTTPS)
+  ├─ MongoDB connected
+  ├─ WhatsApp auto-reconnect enabled
+  ├─ Reminder processor active (60s intervals)
+  └─ Session restoration working
+
+📊 DATABASE:
+  ├─ whatsapp_sessions_permanent (auto-reconnect)
+  ├─ whatsapp_reminders (scheduling)
+  ├─ whatsapp_messages (logs)
+  └─ All booking collections updated
+
+✨ NEXT TASK (Ready):
+  Customer Update Messages:
+  ├─ Driver change notification template
+  ├─ Vehicle change notification template
+  ├─ Booking details update template
+  ├─ UI buttons in booking form
+  └─ Send-on-demand functionality
+
+═══════════════════════════════════════════════════════════════════
