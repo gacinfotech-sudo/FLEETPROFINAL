@@ -15208,6 +15208,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send manual reminder to customer
+  app.post('/api/bookings/:id/remind', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { id: bookingId } = req.params;
+      const { reminderType } = req.body; // 'pickup' or 'dropoff'
+
+      const booking = await Booking.findOne({ _id: bookingId, tenantId: req.tenantId! })
+        .populate('driverId', 'name phone')
+        .populate('vehicleId', 'name registrationNumber')
+        .lean();
+
+      if (!booking) {
+        return res.status(404).json({ success: false, error: 'Booking not found' });
+      }
+
+      const customerPhone = normalizeIndianPhone(booking.customerPhone);
+      if (!customerPhone) {
+        return res.status(400).json({ success: false, error: 'Invalid customer phone' });
+      }
+
+      let message = '';
+      if (reminderType === 'pickup') {
+        message = `📍 *Pickup Reminder*\n\n`;
+        message += `नमस्कार *${booking.customerName}*,\n\n`;
+        message += `आपकी बुकिंग ${booking.bookingId} के लिए पिकअप समय हो गया।\n\n`;
+        message += `📍 पिकअप: *${booking.pickupLocation}*\n`;
+        if (booking.driverId) {
+          message += `👨‍✈️ ड्राइवर: *${booking.driverId.name}*\n`;
+          message += `📱 मोबाइल: *${booking.driverId.phone}*\n`;
+        }
+        if (booking.vehicleId) {
+          message += `🚗 गाड़ी: *${booking.vehicleId.name}* (${booking.vehicleId.registrationNumber})\n`;
+        }
+        message += `\nधन्यवाद!`;
+      } else if (reminderType === 'dropoff') {
+        message = `🏁 *Drop-off Reminder*\n\n`;
+        message += `नमस्कार *${booking.customerName}*,\n\n`;
+        message += `आपकी बुकिंग ${booking.bookingId} के लिए ड्रॉप-ऑफ समय हो गया।\n\n`;
+        message += `🏁 ड्रॉप: *${booking.dropoffLocation || 'Local'}*\n`;
+        if (booking.totalAmount) {
+          message += `💰 कुल किराया: *₹${booking.totalAmount}*\n`;
+          if (booking.advanceReceived) {
+            message += `✅ अग्रिम भुगतान: *₹${booking.advanceReceived}*\n`;
+            message += `📊 बकाया: *₹${booking.totalAmount - booking.advanceReceived}*\n`;
+          }
+        }
+        message += `\nधन्यवाद!`;
+      } else {
+        return res.status(400).json({ success: false, error: 'Invalid reminder type (pickup or dropoff)' });
+      }
+
+      // Send via WhatsApp
+      const result = await whatsappProvider.sendText(req.tenantId!, customerPhone, message);
+
+      // Log the message
+      const idempotencyKey = `remind_${bookingId}_${reminderType}_${Date.now()}`;
+      await WhatsAppMessage.create({
+        tenantId: req.tenantId!,
+        bookingId: new mongoose.Types.ObjectId(bookingId),
+        customerId: booking.customerId,
+        recipientType: 'customer',
+        recipientPhone: customerPhone,
+        messageType: `reminder_${reminderType}`,
+        content: message,
+        provider: whatsappProvider.kind,
+        status: result.status === 'sent' ? 'sent' : 'failed',
+        attemptCount: 1,
+        providerMessageId: result.providerMessageId || undefined,
+        error: result.error || undefined,
+        idempotencyKey,
+        sentAt: result.status === 'sent' ? new Date() : undefined,
+        createdBy: { userId: req.userId || 'system', role: req.userRole || 'system' },
+      });
+
+      if (result.status !== 'sent') {
+        return res.status(400).json({ success: false, error: result.error || 'Failed to send reminder' });
+      }
+
+      res.json({ success: true, message: `Reminder sent to ${customerPhone}` });
+    } catch (error: any) {
+      console.error('[REMIND] Error sending reminder:', error);
+      res.status(500).json({ success: false, error: error?.message });
+    }
+  });
+
   // ═══════════════════════════════════════════════════════════════
 
   const httpServer = createServer(app);

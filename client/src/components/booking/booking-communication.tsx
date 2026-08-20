@@ -204,6 +204,40 @@ export default function BookingCommunication({ booking }: Props) {
     },
   });
 
+  const pickupReminderMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/bookings/${booking._id || booking.id}/remind`, {
+        reminderType: "pickup",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/bookings/${booking._id || booking.id}/whatsapp/messages`] });
+      toast({ title: "Pickup reminder sent" });
+    },
+    onError: (err: any) => {
+      console.error("[PICKUP-REMINDER] Error:", err);
+      toast({ title: "Failed to send reminder", description: err.message || "Unknown error", variant: "destructive" });
+    },
+  });
+
+  const dropoffReminderMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/bookings/${booking._id || booking.id}/remind`, {
+        reminderType: "dropoff",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/bookings/${booking._id || booking.id}/whatsapp/messages`] });
+      toast({ title: "Drop-off reminder sent" });
+    },
+    onError: (err: any) => {
+      console.error("[DROPOFF-REMINDER] Error:", err);
+      toast({ title: "Failed to send reminder", description: err.message || "Unknown error", variant: "destructive" });
+    },
+  });
+
   const messages: any[] = (messagesQuery.data as any[]) || [];
 
   return (
@@ -225,6 +259,24 @@ export default function BookingCommunication({ booking }: Props) {
           onClick={() => openPreview("driver_duty")}
         >
           Send Driver Details
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => pickupReminderMutation.mutate()}
+          disabled={pickupReminderMutation.isPending}
+        >
+          <Bell className="w-3.5 h-3.5 mr-1" />
+          {pickupReminderMutation.isPending ? "Sending..." : "Pickup Reminder"}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => dropoffReminderMutation.mutate()}
+          disabled={dropoffReminderMutation.isPending}
+        >
+          <Bell className="w-3.5 h-3.5 mr-1" />
+          {dropoffReminderMutation.isPending ? "Sending..." : "Drop-off Reminder"}
         </Button>
         <Button size="sm" variant="outline" onClick={() => setUpdateDialog("driver_change")}>
           <RefreshCw className="w-3.5 h-3.5 mr-1" />
