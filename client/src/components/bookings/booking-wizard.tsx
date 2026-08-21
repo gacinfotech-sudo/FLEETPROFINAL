@@ -29,6 +29,7 @@ interface BookingData {
   vehicleId?: string;
   notes?: string;
   totalAmount?: number;
+  vendorAgreedRate?: number;
   paymentMethod?: string;
 }
 
@@ -455,6 +456,21 @@ export default function BookingWizard({
                 <p className="text-xs text-gray-500 mt-2">
                   Distance-based calculation • Includes all charges
                 </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Vendor Cost (₹) * Optional
+                </label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={bookingData.vendorAgreedRate || ""}
+                  onChange={(e) =>
+                    handleFieldChange("vendorAgreedRate", e.target.value ? parseFloat(e.target.value) : undefined)
+                  }
+                  placeholder="If using vendor (cost to pay vendor)"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
