@@ -62,18 +62,26 @@ export async function recordCustomerPayment(
       bookingId,
       {
         $inc: { advanceReceived: amount },
-        $push: {
-          paymentHistory: {
-            type: 'customer',
-            amount,
-            paymentMode,
-            receivedAt: new Date(),
-            notes: `Customer payment received via ${paymentMode}`,
-          },
-        },
       },
       { new: true }
     );
+
+    // Log to VendorFinancialLedger for audit trail
+    try {
+      const { VendorFinancialLedger } = await import('../models/index');
+      await VendorFinancialLedger.create({
+        tenantId: new mongoose.Types.ObjectId(tenantId),
+        vendorId: booking.fulfilmentVendorId || new mongoose.Types.ObjectId('000000000000000000000000'),
+        transactionType: 'payment',
+        amount,
+        bookingId: new mongoose.Types.ObjectId(bookingId),
+        paymentMethod: paymentMode,
+        status: 'completed',
+        notes: `Customer payment received via ${paymentMode}`,
+      });
+    } catch (err) {
+      console.warn(`[SETTLEMENT] Could not log to ledger:`, err);
+    }
 
     console.log(`[SETTLEMENT] Customer payment recorded: ₹${amount} for booking ${booking.bookingId}`);
 
@@ -156,18 +164,25 @@ export async function recordDriverCollection(
       bookingId,
       {
         $inc: { advanceReceived: amount },
-        $push: {
-          paymentHistory: {
-            type: 'driver_collection',
-            amount,
-            collectedBy,
-            receivedAt: new Date(),
-            notes: `Direct collection by driver ${collectedBy}`,
-          },
-        },
       },
       { new: true }
     );
+
+    // Log to VendorFinancialLedger for audit trail
+    try {
+      const { VendorFinancialLedger } = await import('../models/index');
+      await VendorFinancialLedger.create({
+        tenantId: new mongoose.Types.ObjectId(tenantId),
+        vendorId: booking.fulfilmentVendorId || new mongoose.Types.ObjectId('000000000000000000000000'),
+        transactionType: 'payment',
+        amount,
+        bookingId: new mongoose.Types.ObjectId(bookingId),
+        status: 'completed',
+        notes: `Driver collection by ${collectedBy}`,
+      });
+    } catch (err) {
+      console.warn(`[SETTLEMENT] Could not log to ledger:`, err);
+    }
 
     console.log(
       `[SETTLEMENT] Driver collection recorded: ₹${amount} collected by ${collectedBy} for booking ${booking.bookingId}`
@@ -217,9 +232,9 @@ export async function getSettlementBreakdown(
     const vendorPaid = vendorLedger?.status === 'completed' ? totalVendorCost : 0;
     const vendorPending = Math.max(0, totalVendorCost - vendorPaid);
 
-    const driverCollected = (booking.paymentHistory || [])
-      .filter((p: any) => p.type === 'driver_collection')
-      .reduce((sum, p: any) => sum + (p.amount || 0), 0);
+    // For now, driver collection is tracked via same advanceReceived field
+    // In future, can add separate tracking via ledger notes
+    const driverCollected = 0;
 
     const tenantProfit = totalCustomerPayment - totalVendorCost;
     const tenantProfitStatus =

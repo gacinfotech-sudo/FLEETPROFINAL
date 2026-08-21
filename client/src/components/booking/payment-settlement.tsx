@@ -123,109 +123,112 @@ export default function PaymentSettlement({ booking }: PaymentSettlementProps) {
   };
 
   return (
-    <div className="border rounded-lg p-4 space-y-4">
-      <div className="flex items-center gap-2 font-medium text-gray-900">
-        <DollarSign className="w-4 h-4" />
+    <div className="border rounded-lg p-2 space-y-2">
+      <div className="flex items-center gap-2 font-medium text-sm text-gray-900">
+        <DollarSign className="w-3 h-3" />
         Payment Settlement
       </div>
 
-      {/* Settlement Status */}
-      <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+      {/* Settlement Status - Compact */}
+      <div className="flex items-center gap-2 p-2 bg-gray-50 rounded text-xs">
         {getStatusIcon(settlement.settlement.status)}
-        <div>
+        <div className="flex-1">
           <div className="font-medium capitalize">{settlement.settlement.status}</div>
-          <div className="text-sm text-gray-600">{settlement.settlement.notes}</div>
         </div>
       </div>
 
-      {/* Customer Payment */}
-      <Card className="p-3">
-        <div className="flex items-center justify-between mb-2">
-          <span className="font-medium">Customer Payment</span>
-          <span className="text-sm font-semibold">₹{settlement.customerPayment.received} / ₹{settlement.customerPayment.total}</span>
+      {/* Customer Payment - Compact */}
+      <div className="border rounded p-2 bg-gray-50">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-medium">Customer</span>
+          <span className="text-xs font-semibold">₹{settlement.customerPayment.received}/₹{settlement.customerPayment.total}</span>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+        <div className="w-full bg-gray-300 rounded-full h-1.5 mb-1">
           <div
-            className={`h-2 rounded-full ${getProgressColor(settlement.customerPayment.percentage)}`}
+            className={`h-1.5 rounded-full ${getProgressColor(settlement.customerPayment.percentage)}`}
             style={{ width: `${Math.min(100, settlement.customerPayment.percentage)}%` }}
           />
         </div>
-        <div className="flex justify-between text-sm text-gray-600 mb-3">
-          <span>{Math.round(settlement.customerPayment.percentage)}% received</span>
-          <span className="text-red-600">₹{settlement.customerPayment.pending} pending</span>
+        <div className="flex justify-between text-xs text-gray-600 mb-2">
+          <span>{Math.round(settlement.customerPayment.percentage)}%</span>
+          <span>₹{settlement.customerPayment.pending} pending</span>
         </div>
         <Button
           size="sm"
           variant="outline"
           onClick={() => setDialogOpen('customer')}
-          className="w-full"
+          className="w-full h-7 text-xs"
         >
-          Record Customer Payment
+          Record Payment
         </Button>
-      </Card>
+      </div>
 
-      {/* Vendor Settlement */}
+      {/* Vendor Settlement - Compact */}
       {booking.fulfilmentType === 'vendor' && (
-        <Card className="p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-medium">Vendor Settlement</span>
-            <span className="text-sm font-semibold">₹{settlement.vendorSettlement.paid} / ₹{settlement.vendorSettlement.total}</span>
+        <div className="border rounded p-2 bg-gray-50">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium">Vendor</span>
+            <span className="text-xs font-semibold">₹{settlement.vendorSettlement.paid}/₹{settlement.vendorSettlement.total}</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+          <div className="w-full bg-gray-300 rounded-full h-1.5 mb-1">
             <div
-              className={`h-2 rounded-full ${getProgressColor(settlement.vendorSettlement.percentage)}`}
+              className={`h-1.5 rounded-full ${getProgressColor(settlement.vendorSettlement.percentage)}`}
               style={{ width: `${Math.min(100, settlement.vendorSettlement.percentage)}%` }}
             />
           </div>
-          <div className="flex justify-between text-sm text-gray-600 mb-3">
-            <span>{Math.round(settlement.vendorSettlement.percentage)}% paid</span>
-            <span className="text-red-600">₹{settlement.vendorSettlement.pending} pending</span>
+          <div className="flex justify-between text-xs text-gray-600 mb-2">
+            <span>{Math.round(settlement.vendorSettlement.percentage)}%</span>
+            <span>₹{settlement.vendorSettlement.pending} pending</span>
           </div>
           <Button
             size="sm"
             variant="outline"
             onClick={() => setDialogOpen('vendor')}
-            className="w-full"
+            className="w-full h-7 text-xs"
           >
-            Record Vendor Payment
+            Record Payment
           </Button>
-        </Card>
+        </div>
       )}
 
-      {/* Driver Collection */}
+      {/* Driver Collection - Compact */}
       {booking.fulfilmentType === 'vendor' && (
-        <Card className="p-3">
+        <div className="border rounded p-2 bg-gray-50">
           <div className="flex items-center justify-between mb-2">
-            <span className="font-medium">Driver Collection</span>
-            <span className="text-sm font-semibold">₹{settlement.driverCollection.collected}</span>
+            <span className="text-xs font-medium">Driver Collection</span>
+            <span className="text-xs font-semibold">₹{settlement.driverCollection.collected}</span>
           </div>
           {settlement.driverCollection.pending > 0 && (
-            <div className="text-sm text-red-600 mb-3">
-              ₹{settlement.driverCollection.pending} still to collect
+            <div className="text-xs text-red-600 mb-2">
+              ₹{settlement.driverCollection.pending} pending
             </div>
           )}
           <Button
             size="sm"
             variant="outline"
             onClick={() => setDialogOpen('driver')}
-            className="w-full"
+            className="w-full h-7 text-xs"
           >
-            Record Driver Collection
+            Record Collection
           </Button>
-        </Card>
+        </div>
       )}
 
-      {/* Tenant Profit */}
-      <Card className="p-3 bg-green-50 border-green-200">
-        <div className="flex items-center gap-2 mb-2">
-          <TrendingDown className="w-4 h-4 text-green-600" />
-          <span className="font-medium">Tenant Profit</span>
+      {/* Tenant Profit - Compact */}
+      <div className="border rounded p-2 bg-green-50 border-green-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <TrendingDown className="w-3 h-3 text-green-600" />
+            <span className="text-xs font-medium">Profit</span>
+          </div>
+          <div className="text-right">
+            <div className="text-lg font-bold text-green-700">₹{settlement.tenantProfit.amount}</div>
+            <div className="text-xs text-green-600">
+              {settlement.tenantProfit.status === 'received' ? '✓ Received' : '⏳ Pending'}
+            </div>
+          </div>
         </div>
-        <div className="text-2xl font-bold text-green-700">₹{settlement.tenantProfit.amount}</div>
-        <div className="text-sm text-green-600">
-          {settlement.tenantProfit.status === 'received' ? '✓ Profit received' : '⏳ Awaiting customer payment'}
-        </div>
-      </Card>
+      </div>
 
       {/* Customer Payment Dialog */}
       <Dialog open={dialogOpen === 'customer'} onOpenChange={(open) => !open && setDialogOpen(null)}>
