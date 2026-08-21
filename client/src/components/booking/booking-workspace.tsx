@@ -157,6 +157,7 @@ export default function BookingWorkspace({ bookingId, initialFocus, onClose }: B
       parkingCharges: booking.parkingCharges ?? "",
       miscellaneousAmount: booking.miscellaneousAmount ?? "",
       miscellaneousDescription: booking.miscellaneousDescription ?? "",
+      vendorAgreedRate: booking.vendorAgreedRate ?? "",
     });
     setFollowUpForm({ followUpAt: toDateTimeLocal(booking.followUpAt) });
   }, [booking?._id, booking?.updatedAt, booking?.lastActivityAt]);
@@ -177,6 +178,7 @@ export default function BookingWorkspace({ bookingId, initialFocus, onClose }: B
     String(pricingForm.tollCharges) !== String(booking.tollCharges ?? "") ||
     String(pricingForm.parkingCharges) !== String(booking.parkingCharges ?? "") ||
     String(pricingForm.miscellaneousAmount) !== String(booking.miscellaneousAmount ?? "") ||
+    String(pricingForm.vendorAgreedRate) !== String(booking.vendorAgreedRate ?? "") ||
     String(pricingForm.miscellaneousDescription) !== String(booking.miscellaneousDescription ?? "")
   ));
   const followUpDirty = !!(booking && followUpForm && followUpForm.followUpAt !== toDateTimeLocal(booking.followUpAt));
@@ -269,6 +271,7 @@ export default function BookingWorkspace({ bookingId, initialFocus, onClose }: B
       parkingCharges: pricingForm.parkingCharges === "" ? 0 : Number(pricingForm.parkingCharges),
       miscellaneousAmount: pricingForm.miscellaneousAmount === "" ? 0 : Number(pricingForm.miscellaneousAmount),
       miscellaneousDescription: pricingForm.miscellaneousDescription || "",
+      vendorAgreedRate: pricingForm.vendorAgreedRate === "" ? 0 : Number(pricingForm.vendorAgreedRate),
     };
     if (status === "closed") {
       if (!adjustmentReason.trim()) {
@@ -550,6 +553,14 @@ export default function BookingWorkspace({ bookingId, initialFocus, onClose }: B
                       <Input type="number" inputMode="numeric" value={pricingForm.totalAmount} disabled={financeLocked}
                         onChange={(e) => setPricingForm({ ...pricingForm, totalAmount: e.target.value })} />
                     </div>
+                    {booking.fulfilmentType === 'vendor' && (
+                      <div>
+                        <Label>Vendor Cost (₹)</Label>
+                        <Input type="number" inputMode="numeric" value={pricingForm.vendorAgreedRate} disabled={financeLocked}
+                          onChange={(e) => setPricingForm({ ...pricingForm, vendorAgreedRate: e.target.value })}
+                          placeholder="Amount to pay vendor" />
+                      </div>
+                    )}
                     <div>
                       <Label>Toll (₹)</Label>
                       <Input type="number" inputMode="numeric" value={pricingForm.tollCharges} disabled={financeLocked}
