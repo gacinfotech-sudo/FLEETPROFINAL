@@ -58,6 +58,7 @@ import ResourceFulfilmentPanel from "./resource-fulfilment-panel";
 import AssignVendorDialog from "./assign-vendor-dialog";
 import ExtendBookingDialog from "./extend-booking-dialog";
 import BookingCommunication from "./booking-communication";
+import PaymentSettlement from "./payment-settlement";
 import SelfDrivePanel from "./self-drive-panel";
 import PipelineStepper from "../pipeline/pipeline-stepper";
 import { bookingPipelineInfo } from "../../lib/pipelineStages";
@@ -458,6 +459,8 @@ export default function BookingWorkspace({ bookingId, initialFocus, onClose }: B
                   )}
 
                   <BookingCommunication booking={booking} />
+
+                  <PaymentSettlement booking={booking} />
                 </TabsContent>
 
                 {/* ================= CUSTOMER & JOURNEY ================= */}

@@ -15335,6 +15335,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get complete settlement breakdown (customer + vendor + driver)
+  app.get('/api/bookings/:id/settlement', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { getSettlementBreakdown } = await import('./services/payment-settlement-service');
+      const settlement = await getSettlementBreakdown(req.params.id, req.tenantId!);
+      if (!settlement) {
+        return res.status(404).json({ error: 'Booking not found' });
+      }
+      res.json(settlement);
+    } catch (error: any) {
+      console.error('[SETTLEMENT] Error getting breakdown:', error);
+      res.status(500).json({ error: error?.message });
+    }
+  });
+
+  // Record customer payment received
+  app.post('/api/bookings/:id/payment/customer', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { amount, paymentMode } = req.body;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: 'Invalid amount' });
+      }
+
+      if (!['cash', 'card', 'bank_transfer', 'wallet'].includes(paymentMode)) {
+        return res.status(400).json({ error: 'Invalid payment mode' });
+      }
+
+      const { recordCustomerPayment } = await import('./services/payment-settlement-service');
+      const result = await recordCustomerPayment(req.params.id, req.tenantId!, amount, paymentMode);
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('[SETTLEMENT] Error recording customer payment:', error);
+      res.status(500).json({ error: error?.message });
+    }
+  });
+
+  // Record vendor payment made
+  app.post('/api/bookings/:id/payment/vendor', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { vendorId, amount, paymentMode } = req.body;
+
+      if (!vendorId || !amount || amount <= 0) {
+        return res.status(400).json({ error: 'Invalid vendor ID or amount' });
+      }
+
+      if (!['cash', 'bank_transfer', 'wallet'].includes(paymentMode)) {
+        return res.status(400).json({ error: 'Invalid payment mode' });
+      }
+
+      const { recordVendorPayment } = await import('./services/payment-settlement-service');
+      const result = await recordVendorPayment(req.params.id, req.tenantId!, vendorId, amount, paymentMode);
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('[SETTLEMENT] Error recording vendor payment:', error);
+      res.status(500).json({ error: error?.message });
+    }
+  });
+
+  // Record driver collection (direct from customer)
+  app.post('/api/bookings/:id/payment/driver-collection', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { amount, collectedBy } = req.body;
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ error: 'Invalid amount' });
+      }
+
+      if (!collectedBy || typeof collectedBy !== 'string') {
+        return res.status(400).json({ error: 'Collector name required' });
+      }
+
+      const { recordDriverCollection } = await import('./services/payment-settlement-service');
+      const result = await recordDriverCollection(req.params.id, req.tenantId!, amount, collectedBy);
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('[SETTLEMENT] Error recording collection:', error);
+      res.status(500).json({ error: error?.message });
+    }
+  });
+
   // ═══════════════════════════════════════════════════════════════
 
   const httpServer = createServer(app);
