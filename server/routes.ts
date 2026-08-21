@@ -9453,6 +9453,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       if (!booking) return res.status(404).json({ message: "Booking not found" });
       await applyCustomerStatusEffects(booking, req.params.id, 'completed', req);
+
+      // Auto-create vendor invoice if vendor involved
+      if (booking.fulfilmentType === 'vendor' && booking.fulfilmentVendorId) {
+        try {
+          const { createVendorInvoiceOnBookingComplete } = await import('./services/vendor-invoice-service');
+          const invoiceResult = await createVendorInvoiceOnBookingComplete(req.params.id, req.tenantId!);
+          if (invoiceResult.success) {
+            console.log(`[VENDOR-INVOICE] Auto-created for booking ${booking.bookingId}`, invoiceResult);
+          }
+        } catch (err: any) {
+          console.warn(`[VENDOR-INVOICE] Failed to auto-create (non-blocking):`, err?.message);
+          // Don't fail the booking completion if invoice creation fails
+        }
+      }
+
       res.json(booking);
     } catch (error: any) {
       if (error instanceof InvalidTransitionError) {
@@ -15290,6 +15305,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('[REMIND] Error sending reminder:', error);
       res.status(500).json({ success: false, error: error?.message });
+    }
+  });
+
+  // Get vendor invoices & profit summary
+  app.get('/api/vendor/invoices', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { getVendorFinancialSummary } = await import('./services/vendor-invoice-service');
+      const summary = await getVendorFinancialSummary(req.tenantId!);
+      res.json(summary);
+    } catch (error: any) {
+      console.error('[VENDOR-INVOICE] Error fetching invoices:', error);
+      res.status(500).json({ error: error?.message });
+    }
+  });
+
+  // Get booking profit breakdown for tenant
+  app.get('/api/bookings/:id/profit', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { getBookingProfitBreakdown } = await import('./services/vendor-invoice-service');
+      const profit = await getBookingProfitBreakdown(req.params.id, req.tenantId!);
+      if (!profit) {
+        return res.status(404).json({ error: 'Booking not found' });
+      }
+      res.json(profit);
+    } catch (error: any) {
+      console.error('[VENDOR-INVOICE] Error calculating profit:', error);
+      res.status(500).json({ error: error?.message });
     }
   });
 
