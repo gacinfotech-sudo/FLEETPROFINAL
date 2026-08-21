@@ -209,11 +209,17 @@ export default function BookingCommunication({ booking }: Props) {
       const res = await apiRequest("POST", `/api/bookings/${booking._id || booking.id}/remind`, {
         reminderType: "pickup",
       });
-      return res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        const err: any = new Error(data.error || data.message || "Failed to send");
+        err.status = res.status;
+        throw err;
+      }
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/bookings/${booking._id || booking.id}/whatsapp/messages`] });
-      toast({ title: "Pickup reminder sent" });
+      toast({ title: "Pickup reminder sent ✅" });
     },
     onError: (err: any) => {
       console.error("[PICKUP-REMINDER] Error:", err);
@@ -226,11 +232,17 @@ export default function BookingCommunication({ booking }: Props) {
       const res = await apiRequest("POST", `/api/bookings/${booking._id || booking.id}/remind`, {
         reminderType: "dropoff",
       });
-      return res.json();
+      const data = await res.json();
+      if (!res.ok) {
+        const err: any = new Error(data.error || data.message || "Failed to send");
+        err.status = res.status;
+        throw err;
+      }
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/bookings/${booking._id || booking.id}/whatsapp/messages`] });
-      toast({ title: "Drop-off reminder sent" });
+      toast({ title: "Drop-off reminder sent ✅" });
     },
     onError: (err: any) => {
       console.error("[DROPOFF-REMINDER] Error:", err);
