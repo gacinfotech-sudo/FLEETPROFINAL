@@ -553,14 +553,12 @@ export default function BookingWorkspace({ bookingId, initialFocus, onClose }: B
                       <Input type="number" inputMode="numeric" value={pricingForm.totalAmount} disabled={financeLocked}
                         onChange={(e) => setPricingForm({ ...pricingForm, totalAmount: e.target.value })} />
                     </div>
-                    {booking.fulfilmentType === 'vendor' && (
-                      <div>
-                        <Label>Vendor Cost (₹)</Label>
-                        <Input type="number" inputMode="numeric" value={pricingForm.vendorAgreedRate} disabled={financeLocked}
-                          onChange={(e) => setPricingForm({ ...pricingForm, vendorAgreedRate: e.target.value })}
-                          placeholder="Amount to pay vendor" />
-                      </div>
-                    )}
+                    <div>
+                      <Label>Vendor Cost (₹) *</Label>
+                      <Input type="number" inputMode="numeric" value={pricingForm.vendorAgreedRate} disabled={financeLocked}
+                        onChange={(e) => setPricingForm({ ...pricingForm, vendorAgreedRate: e.target.value })}
+                        placeholder="If vendor booking" />
+                    </div>
                     <div>
                       <Label>Toll (₹)</Label>
                       <Input type="number" inputMode="numeric" value={pricingForm.tollCharges} disabled={financeLocked}
