@@ -1127,6 +1127,40 @@ export class MongoDBStorage implements IStorage {
 
       const tenantObjectId = mongoose.Types.ObjectId.isValid(tenantId) ? new mongoose.Types.ObjectId(tenantId) : tenantId;
 
+      const booking = await collection.findOne({ _id: bookingObjectId, tenantId: tenantObjectId });
+
+      if (booking) {
+        // Create refund transaction for advance payment
+        if (booking.advanceReceived && booking.advanceReceived > 0) {
+          const PaymentTransaction = mongoose.model('PaymentTransaction');
+          await PaymentTransaction.create({
+            tenantId: tenantObjectId,
+            bookingId: bookingObjectId,
+            amount: booking.advanceReceived,
+            paymentType: 'refund',
+            paymentMode: booking.paymentMode || 'cash',
+            reason: 'Booking canceled - advance refund',
+            createdAt: new Date(),
+            status: 'completed',
+          });
+        }
+
+        // Reverse vendor earnings if booking was completed
+        if ((booking.status === 'completed' || booking.status === 'return_pending') && booking.fulfilmentVendorId) {
+          try {
+            const Vendor = mongoose.model('Vendor');
+            const vendorEarnings = booking.vendorEarnings || 0;
+            await Vendor.findByIdAndUpdate(
+              booking.fulfilmentVendorId,
+              { $inc: { totalEarnings: -vendorEarnings, outstandingBalance: -vendorEarnings } },
+              { new: true }
+            );
+          } catch (e) {
+            console.warn('Warning: Could not reverse vendor earnings for booking deletion:', e);
+          }
+        }
+      }
+
       const result = await collection.deleteOne({ _id: bookingObjectId, tenantId: tenantObjectId });
       if (result.deletedCount === 0) {
         await collection.deleteOne({ _id: bookingObjectId, tenantId: tenantId });
@@ -1270,7 +1304,8 @@ export class MongoDBStorage implements IStorage {
         topPerformingVehicles,
         fleetSize,
         completedBookings,
-        totalExpenses,
+        vendorCostsResult,
+        manualExpensesResult,
         expensesByCategory
       ] = await Promise.all([
         Booking.aggregate([
@@ -1368,7 +1403,19 @@ export class MongoDBStorage implements IStorage {
         ]),
         Vehicle.countDocuments({ tenantId }),
         Booking.countDocuments(matchConditions), // Already filtered by completed status
-        // Total expenses calculation
+        // Total expenses calculation (manual expenses + vendor costs)
+        Booking.aggregate([
+          { $match: matchConditions },
+          {
+            $group: {
+              _id: null,
+              vendorCosts: {
+                $sum: { $ifNull: ['$vendorAgreedRate', 0] }
+              }
+            }
+          }
+        ]),
+        // Manual expenses
         Expense.aggregate([
           { $match: expenseQuery },
           { $group: { _id: null, total: { $sum: '$amount' } } }
@@ -1397,7 +1444,11 @@ export class MongoDBStorage implements IStorage {
       const stats = revenueResult[0] || { totalRevenue: 0, totalBookings: 0 };
       const totalRevenue = stats.totalRevenue;
       const totalBookings = stats.totalBookings;
-      const totalExpensesValue = totalExpenses[0]?.total || 0;
+
+      // Calculate total expenses: vendor costs + manual expenses
+      const vendorCosts = vendorCostsResult[0]?.vendorCosts || 0;
+      const manualExpenses = manualExpensesResult[0]?.total || 0;
+      const totalExpensesValue = vendorCosts + manualExpenses;
       const netRevenue = totalRevenue - totalExpensesValue;
 
       // Calculate proper fleet utilization (percentage of vehicles with bookings)

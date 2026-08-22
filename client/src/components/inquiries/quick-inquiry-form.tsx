@@ -127,6 +127,7 @@ export default function QuickInquiryForm({ onSuccess, onCancel, initialMobile }:
     },
     onSuccess: (inquiry) => {
       queryClient.invalidateQueries({ queryKey: ["/api/inquiries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
       toast({ variant: "success", title: "Inquiry saved", description: `${inquiry.inquiryNumber} created.` });
       onSuccess?.(inquiry);
     },

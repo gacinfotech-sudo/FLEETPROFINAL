@@ -4149,13 +4149,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/bookings", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
+      const status = req.query.status as string | undefined;
+
       if (req.query.limit || req.query.skip) {
         const limit = Math.min(500, Math.max(1, parseInt(req.query.limit as string) || 100));
         const skip = Math.max(0, parseInt(req.query.skip as string) || 0);
         const { rows, total } = await storage.getBookingsByTenantPaginated(req.tenantId!, { limit, skip });
-        return res.json({ rows, total, limit, skip });
+        const filtered = status ? rows.filter((b: any) => b.status === status) : rows;
+        return res.json({ rows: filtered, total: filtered.length, limit, skip });
       }
-      const bookings = await storage.getBookingsByTenant(req.tenantId!);
+
+      let bookings = await storage.getBookingsByTenant(req.tenantId!);
+
+      // Filter by status if provided
+      if (status && status !== 'all') {
+        bookings = bookings.filter((b: any) => b.status === status);
+      }
+
       res.json(bookings);
     } catch (error) {
       console.error('Error fetching bookings:', error);
@@ -5066,26 +5076,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!bookingData.sourceContact) bookingData.sourceContact = sourceVendor.primaryMobile;
       }
 
-      // BUG-015 FIX: Check for same-day double-booking BEFORE creation
-      // Prevent driver/vehicle from being overbooked on the same day
+      // BUG-020/021 FIX: Check for overlapping bookings using actual time windows
+      // NOT just same-day checks (which cause false positives for non-overlapping times)
       if (bookingData.pickupDate && (bookingData.driverId || bookingData.vehicleId)) {
-        const pickupDate = new Date(bookingData.pickupDate);
-        const dayStart = new Date(pickupDate);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(pickupDate);
-        dayEnd.setHours(23, 59, 59, 999);
+        const pickupStart = combineDateTime(bookingData.pickupDate, bookingData.pickupTime);
+        const returnEnd = bookingData.returnDate
+          ? combineDateTime(bookingData.returnDate, bookingData.returnTime)
+          : combineDateTime(bookingData.pickupDate, bookingData.returnTime);
 
         const conflicts: any = {};
 
         if (bookingData.vehicleId) {
-          const vehicleConflicts = await findVehicleConflicts(req.tenantId!, bookingData.vehicleId, dayStart, dayEnd, undefined);
+          const vehicleConflicts = await findVehicleConflicts(req.tenantId!, bookingData.vehicleId, pickupStart, returnEnd, undefined);
           if (vehicleConflicts.length > 0) {
             conflicts.vehicle = vehicleConflicts;
           }
         }
 
         if (bookingData.driverId) {
-          const driverAvail = await checkDriverAvailability(req.tenantId!, bookingData.driverId, dayStart, dayEnd, undefined);
+          const driverAvail = await checkDriverAvailability(req.tenantId!, bookingData.driverId, pickupStart, returnEnd, undefined);
           if (!driverAvail.available) {
             const allConflicts = [...(driverAvail.bookingConflicts || []), ...(driverAvail.leaveConflicts || [])];
             if (allConflicts.length > 0) {
@@ -5096,8 +5105,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (Object.keys(conflicts).length > 0) {
           return res.status(409).json({
-            message: "Driver or vehicle is already assigned for this date. Choose different resources or override if authorized.",
-            code: 'SAME_DAY_CONFLICT',
+            message: "Driver or vehicle is already assigned for the selected time. Choose different resources or override if authorized.",
+            code: 'TIME_CONFLICT',
             conflicts
           });
         }
@@ -5328,15 +5337,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        // Send to CUSTOMER: booking confirmation
-        sendBookingMessage({
-          tenantId: req.tenantId!,
-          bookingId: (booking as any)._id.toString(),
-          messageType: 'booking_confirmation',
-          actor: { userId: req.userId!, role: req.user?.role || 'client' },
-        }).catch((err) => {
-          console.error('Auto-send booking confirmation failed:', err?.message || err);
-        });
+        // Send to CUSTOMER: booking confirmation (only if enabled)
+        if (req.body.sendWhatsAppNotification !== false) {
+          sendBookingMessage({
+            tenantId: req.tenantId!,
+            bookingId: (booking as any)._id.toString(),
+            messageType: 'booking_confirmation',
+            actor: { userId: req.userId!, role: req.user?.role || 'client' },
+          }).catch((err) => {
+            console.error('Auto-send booking confirmation failed:', err?.message || err);
+          });
+        }
 
         // Send to STAFF/OWNER: detailed booking alert with all info
         (async () => {
@@ -8651,7 +8662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Settlement are separate follow-up patches; this covers the root
   // Vendor record every later phase links against via vendorId.
   // ---------------------------------------------------------------------
-  app.get("/api/vendors", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+  app.get("/api/vendors", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { status, search } = req.query as { status?: string; search?: string };
       const query: any = { tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } };
@@ -8673,7 +8684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/vendors/:vendorId", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+  app.get("/api/vendors/:vendorId", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!vendor) return res.status(404).json({ message: "Vendor not found" });
@@ -8788,11 +8799,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Vendor Drivers — scoped to (tenantId, vendorId). Duplicate protection
   // is by normalized mobile WITHIN the vendor only (see vendorDriverService).
-  app.get("/api/vendors/:vendorId/drivers", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+  app.get("/api/vendors/:vendorId/drivers", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+
       const drivers = await VendorDriver.find({ tenantId: req.tenantObjectId || req.tenantId, vendorId: vendor._id, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
+
+      // Filter by availability if pickupDate/returnDate provided
+      const { pickupDate, pickupTime, returnDate, returnTime } = req.query;
+      if (pickupDate && returnDate) {
+        const window = {
+          start: combineDateTime(pickupDate as string, pickupTime as string | undefined),
+          end: combineDateTime(returnDate as string, returnTime as string | undefined),
+        };
+
+        const availableDrivers = [];
+        for (const driver of drivers) {
+          const availability = await checkVendorDriverAvailability(req.tenantId!, req.params.vendorId, String(driver._id), window);
+          if (availability.available) {
+            availableDrivers.push(driver);
+          }
+        }
+        return res.json(availableDrivers);
+      }
+
       res.json(drivers);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch vendor drivers" });
@@ -8802,7 +8833,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // "Search within this vendor for an existing driver by mobile before
   // creating a new one" — the exact lookup the booking-assignment flow
   // (spec §5) needs before showing "Add this driver to Vendor CRM".
-  app.get("/api/vendors/:vendorId/drivers/lookup", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+  app.get("/api/vendors/:vendorId/drivers/lookup", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { mobile } = req.query as { mobile?: string };
       if (!mobile) return res.status(400).json({ message: "mobile is required" });
@@ -8818,7 +8849,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // before. When a pickupDate/returnDate pair is sent (the Booking
   // Wizard's Vendor Vehicle path does), this also runs the real
   // VendorDuty overlap check, same as assign-vendor already does.
-  app.get("/api/vendors/:vendorId/drivers/:driverId/availability", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+  app.get("/api/vendors/:vendorId/drivers/:driverId/availability", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { pickupDate, pickupTime, returnDate, returnTime } = req.query;
       const window = (pickupDate && returnDate)
@@ -8890,18 +8921,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Vendor Vehicles — scoped to (tenantId, vendorId). Duplicate protection
   // is by normalized registration number WITHIN the vendor only.
-  app.get("/api/vendors/:vendorId/vehicles", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+  app.get("/api/vendors/:vendorId/vehicles", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!vendor) return res.status(404).json({ message: "Vendor not found" });
       const vehicles = await VendorVehicle.find({ tenantId: req.tenantObjectId || req.tenantId, vendorId: vendor._id, isDeleted: { $ne: true } }).sort({ createdAt: -1 });
+
+      // Filter by availability if pickupDate/returnDate provided
+      const { pickupDate, pickupTime, returnDate, returnTime } = req.query;
+      if (pickupDate && returnDate) {
+        const window = {
+          start: combineDateTime(pickupDate as string, pickupTime as string | undefined),
+          end: combineDateTime(returnDate as string, returnTime as string | undefined),
+        };
+
+        const availableVehicles = [];
+        for (const vehicle of vehicles) {
+          const availability = await checkVendorVehicleAvailability(req.tenantId!, req.params.vendorId, String(vehicle._id), window);
+          if (availability.available) {
+            availableVehicles.push(vehicle);
+          }
+        }
+        return res.json(availableVehicles);
+      }
+
       res.json(vehicles);
     } catch (error: any) {
       res.status(500).json({ message: "Failed to fetch vendor vehicles" });
     }
   });
 
-  app.get("/api/vendors/:vendorId/vehicles/lookup", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+  app.get("/api/vendors/:vendorId/vehicles/lookup", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { registrationNumber } = req.query as { registrationNumber?: string };
       if (!registrationNumber) return res.status(400).json({ message: "registrationNumber is required" });
@@ -8913,7 +8963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Same additive time-window support as the driver-availability endpoint above.
-  app.get("/api/vendors/:vendorId/vehicles/:vehicleId/availability", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+  app.get("/api/vendors/:vendorId/vehicles/:vehicleId/availability", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const { pickupDate, pickupTime, returnDate, returnTime } = req.query;
       const window = (pickupDate && returnDate)
@@ -8993,7 +9043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Vendor 360 detail view's Duties tab. Read-only; there is no direct
   // create/edit route since a duty only ever comes from a real booking
   // assignment or that booking's own status changes.
-  app.get("/api/vendors/:vendorId/duties", authenticateUser, requireTenant, requirePermission(PERMISSIONS.VENDOR_VIEW), async (req: AuthRequest, res) => {
+  app.get("/api/vendors/:vendorId/duties", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
       const vendor = await Vendor.findOne({ _id: req.params.vendorId, tenantId: (req.tenantObjectId || req.tenantId), isDeleted: { $ne: true } });
       if (!vendor) return res.status(404).json({ message: "Vendor not found" });
@@ -9475,6 +9525,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error('Complete trip error:', error?.message || error);
       res.status(500).json({ message: "Failed to complete trip" });
+    }
+  });
+
+  // Calculate and apply late charges to a booking
+  app.post("/api/bookings/:id/apply-late-charges", authenticateUser, requireTenant, requirePermission(PERMISSIONS.EDIT_BOOKING), async (req: AuthRequest, res) => {
+    try {
+      const { actualReturnTime, lateChargeRate, gracePeriodMinutes } = req.body;
+
+      if (!actualReturnTime) {
+        return res.status(400).json({ message: "actualReturnTime is required (ISO string)" });
+      }
+
+      const booking: any = await Booking.findOne({ _id: req.params.id, tenantId: req.tenantId });
+      if (!booking) return res.status(404).json({ message: "Booking not found" });
+
+      const scheduled = booking.scheduledEndDateTime || new Date(booking.returnDate);
+      const actual = new Date(actualReturnTime);
+      const diffMs = actual.getTime() - scheduled.getTime();
+
+      if (diffMs <= 0) {
+        // Not late
+        return res.json({ message: "Booking returned on time", booking });
+      }
+
+      const lateMinutes = Math.ceil(diffMs / 60000);
+      const graceMins = gracePeriodMinutes || booking.lateGracePeriodMinutes || 0;
+      const chargeableMinutes = Math.max(0, lateMinutes - graceMins);
+
+      if (chargeableMinutes === 0) {
+        return res.json({ message: `Late by ${lateMinutes} minutes, but within grace period of ${graceMins} minutes`, booking });
+      }
+
+      const rate = lateChargeRate || booking.lateChargeRate || 500; // Default ₹500/hour
+      const chargePerMinute = rate / 60;
+      const lateCharge = Math.round(chargeableMinutes * chargePerMinute);
+
+      // Add late charge record
+      if (!booking.lateCharges) booking.lateCharges = [];
+      booking.lateCharges.push({
+        lateMinutes,
+        chargeApplied: lateCharge,
+        calculatedAt: new Date(),
+        appliedBy: { userId: req.userId!, role: req.user?.role || 'client' }
+      });
+
+      // Update total late charge
+      booking.totalLateCharge = (booking.lateCharges || []).reduce((sum: number, c: any) => sum + (c.chargeApplied || 0), 0);
+
+      // Add to booking total amount
+      booking.totalAmount = (booking.totalAmount || 0) + lateCharge;
+
+      await booking.save();
+
+      res.json({
+        message: `Late charges applied: ₹${lateCharge}`,
+        lateMinutes,
+        gracePeriodMinutes: graceMins,
+        chargeableMinutes,
+        chargePerHour: rate,
+        chargeApplied: lateCharge,
+        totalLateCharge: booking.totalLateCharge,
+        newBookingTotal: booking.totalAmount,
+        booking
+      });
+    } catch (error: any) {
+      console.error('Late charge calculation error:', error?.message || error);
+      res.status(500).json({ message: "Failed to apply late charges" });
     }
   });
 
@@ -10703,6 +10820,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // VENDOR MARGIN CREDIT Routes
+  app.post('/api/vendors/:vendorId/margin-credit', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { bookingId, creditAmount, creditType = 'overpayment_absorption', reason } = req.body;
+
+      if (!bookingId || !creditAmount || creditAmount <= 0) {
+        return res.status(400).json({ error: 'Invalid booking ID or credit amount' });
+      }
+
+      // vendorId can be ObjectId OR vendor name
+      let vendorId = req.params.vendorId;
+      let vendorObjectId: any = vendorId;
+
+      if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+        // Find vendor by name from booking
+        const booking = await Booking.findOne({
+          _id: new mongoose.Types.ObjectId(bookingId),
+          tenantId: new mongoose.Types.ObjectId(req.tenantId),
+        });
+
+        if (!booking) {
+          return res.status(404).json({ error: 'Booking not found' });
+        }
+
+        if (booking.fulfilmentVendorId) {
+          vendorObjectId = booking.fulfilmentVendorId;
+        } else {
+          return res.status(400).json({ error: 'Booking has no vendor assigned' });
+        }
+      }
+
+      const { recordMarginCredit } = await import('./services/vendor-margin-credit-service');
+      const result = await recordMarginCredit(
+        req.tenantId!,
+        vendorObjectId.toString(),
+        bookingId,
+        creditAmount,
+        creditType,
+        reason || `Margin credit for booking ${bookingId}`
+      );
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('[MARGIN-CREDIT] Error recording credit:', error);
+      res.status(500).json({ error: error?.message });
+    }
+  });
+
+  app.get('/api/vendors/:vendorId/statement', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const fromDate = req.query.from ? new Date(req.query.from as string) : undefined;
+      const toDate = req.query.to ? new Date(req.query.to as string) : undefined;
+
+      // vendorId can be ObjectId OR vendor name
+      // Try to find by ObjectId first, then by name in bookings
+      let vendorId = req.params.vendorId;
+      let vendorObjectId: any = vendorId;
+
+      // Check if it's a valid ObjectId
+      if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+        // It's not an ObjectId, treat as vendor name and find first booking with this vendor
+        const booking = await Booking.findOne({
+          tenantId: new mongoose.Types.ObjectId(req.tenantId),
+          vendorName: vendorId,
+        }).lean();
+
+        if (booking && booking.fulfilmentVendorId) {
+          vendorObjectId = booking.fulfilmentVendorId;
+        } else {
+          // No actual vendor found, return empty statement
+          return res.json({
+            success: true,
+            vendorId,
+            period: { from: fromDate, to: toDate || new Date() },
+            transactions: { payments: 0, credits: 0 },
+            summary: { totalPayments: 0, totalCredits: 0, netPayable: 0 },
+            credits: [],
+          });
+        }
+      }
+
+      const { getVendorStatement } = await import('./services/vendor-margin-credit-service');
+      const result = await getVendorStatement(req.tenantId!, vendorObjectId.toString(), fromDate, toDate);
+
+      if (!result.success) {
+        return res.json({
+          success: true,
+          vendorId,
+          period: { from: fromDate, to: toDate || new Date() },
+          transactions: { payments: 0, credits: 0 },
+          summary: { totalPayments: 0, totalCredits: 0, netPayable: 0 },
+          credits: [],
+        });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('[MARGIN-CREDIT] Error getting statement:', error);
+      res.json({
+        success: true,
+        vendorId: req.params.vendorId,
+        transactions: { payments: 0, credits: 0 },
+        summary: { totalPayments: 0, totalCredits: 0, netPayable: 0 },
+        credits: [],
+      });
+    }
+  });
+
+  app.get('/api/vendors/:vendorId/margin-credit/:creditId/proof', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { getMarginCreditProof } = await import('./services/vendor-margin-credit-service');
+      const result = await getMarginCreditProof(req.tenantId!, req.params.creditId);
+
+      if (!result.success) {
+        return res.status(404).json({ error: result.error });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('[MARGIN-CREDIT] Error getting proof:', error);
+      res.status(500).json({ error: error?.message });
+    }
+  });
+
   // WAVE 6: Expense 360 Routes
   app.get("/api/expenses/360", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
@@ -11031,15 +11276,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============ VENDOR ENDPOINTS ============
 
   // Get all vendors
-  app.get("/api/vendors", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
-    try {
-      const vendors = await Vendor.find({ tenantId: req.tenantObjectId || req.tenantId }).sort({ createdAt: -1 });
-      res.json(vendors);
-    } catch (error: any) {
-      res.status(500).json({ message: "Failed to fetch vendors" });
-    }
-  });
-
   // Get vendor by ID
   app.get("/api/vendors/:id", authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {
@@ -15386,8 +15622,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Invalid vendor ID or amount' });
       }
 
-      if (!['cash', 'bank_transfer', 'wallet'].includes(paymentMode)) {
+      if (!['cash', 'bank_transfer', 'wallet', 'upi'].includes(paymentMode)) {
         return res.status(400).json({ error: 'Invalid payment mode' });
+      }
+
+      // Validate overpayment - check booking's vendor agreed rate and cumulative payments
+      const booking = await Booking.findById(req.params.id);
+      if (!booking) {
+        return res.status(404).json({ error: 'Booking not found' });
+      }
+
+      const vendorAgreedRate = booking.vendorAgreedRate || 0;
+      const alreadyPaidToVendor = booking.vendorAdvancePaid || 0;
+      const remainingToPay = vendorAgreedRate - alreadyPaidToVendor;
+
+      // Prevent overpayment: new payment should not exceed remaining amount
+      if (amount > remainingToPay) {
+        return res.status(400).json({
+          error: `Overpayment detected! You can only pay ₹${remainingToPay} more (agreed: ₹${vendorAgreedRate}, already paid: ₹${alreadyPaidToVendor})`,
+          maxAllowed: remainingToPay,
+          alreadyPaid: alreadyPaidToVendor,
+          vendorAgreedRate: vendorAgreedRate,
+          requested: amount
+        });
       }
 
       const { recordVendorPayment } = await import('./services/payment-settlement-service');
@@ -15427,6 +15684,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(result);
     } catch (error: any) {
       console.error('[SETTLEMENT] Error recording collection:', error);
+      res.status(500).json({ error: error?.message });
+    }
+  });
+
+  // VENDOR ACCOUNT ROUTES - Vendor-collected payments & balance
+  app.post('/api/vendors/:vendorId/collect-payment', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { bookingId, amount, collectionMode, collectedBy } = req.body;
+
+      if (!bookingId || !amount || amount <= 0) {
+        return res.status(400).json({ error: 'Invalid booking ID or amount' });
+      }
+
+      if (!['cash', 'bank_transfer', 'upi', 'wallet'].includes(collectionMode)) {
+        return res.status(400).json({ error: 'Invalid collection mode' });
+      }
+
+      const { recordVendorCollection } = await import('./services/vendor-account-service');
+      const result = await recordVendorCollection(
+        req.tenantId!,
+        req.params.vendorId,
+        bookingId,
+        amount,
+        collectionMode,
+        collectedBy
+      );
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('[VENDOR-ACCOUNT] Error recording collection:', error);
+      res.status(500).json({ error: error?.message });
+    }
+  });
+
+  app.get('/api/vendors/:vendorId/account', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { getVendorAccount } = await import('./services/vendor-account-service');
+      const result = await getVendorAccount(req.tenantId!, req.params.vendorId);
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('[VENDOR-ACCOUNT] Error getting account:', error);
+      res.status(500).json({ error: error?.message });
+    }
+  });
+
+  app.post('/api/vendors/:vendorId/settle-account', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { settlementAmount, settlementMethod, notes } = req.body;
+
+      if (!settlementAmount || settlementAmount <= 0) {
+        return res.status(400).json({ error: 'Invalid settlement amount' });
+      }
+
+      if (!['cash', 'bank_transfer', 'wallet', 'deduction'].includes(settlementMethod)) {
+        return res.status(400).json({ error: 'Invalid settlement method' });
+      }
+
+      const { settleVendorAccount } = await import('./services/vendor-account-service');
+      const result = await settleVendorAccount(
+        req.tenantId!,
+        req.params.vendorId,
+        settlementAmount,
+        settlementMethod,
+        notes
+      );
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('[VENDOR-ACCOUNT] Error settling account:', error);
+      res.status(500).json({ error: error?.message });
+    }
+  });
+
+  app.get('/api/vendors/:vendorId/transaction-history', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { limit } = req.query;
+      const { getVendorTransactionHistory } = await import('./services/vendor-account-service');
+      const result = await getVendorTransactionHistory(
+        req.tenantId!,
+        req.params.vendorId,
+        parseInt(limit as string) || 50
+      );
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('[VENDOR-ACCOUNT] Error getting history:', error);
       res.status(500).json({ error: error?.message });
     }
   });
