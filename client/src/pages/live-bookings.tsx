@@ -365,13 +365,15 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
       </main>
 
       {/* Payment Collection Dialog */}
-      <AutoPaymentFlow
-        isOpen={!!paymentFlowBooking}
-        onOpenChange={(open) => !open && setPaymentFlowBooking(null)}
-        bookingId={paymentFlowBooking?.id}
-        bookingTotal={paymentFlowBooking?.totalAmount}
-        advanceReceived={paymentFlowBooking?.advanceReceived || 0}
-      />
+      {paymentFlowBooking && (
+        <AutoPaymentFlow
+          isOpen={!!paymentFlowBooking}
+          onOpenChange={(open) => !open && setPaymentFlowBooking(null)}
+          bookingId={paymentFlowBooking.id}
+          bookingTotal={paymentFlowBooking.totalAmount}
+          advanceReceived={paymentFlowBooking.advanceReceived || 0}
+        />
+      )}
 
       {/* Late Charge Dialog */}
       <LateChargeDialog
