@@ -463,6 +463,7 @@ export interface IBooking extends Document {
   rewardDiscountApplied?: number;
   advanceReceived?: number;
   advanceRequested?: number;
+  totalReceived?: number;
   driverCollectionAmount?: number;
   collectionMode?: 'company' | 'driver' | 'vendor' | 'split';
   collectPayment?: boolean;
@@ -507,6 +508,16 @@ export interface IBooking extends Document {
     requestedBy: { userId: string; role: string };
     createdAt: Date;
   }[];
+  // Late charge calculation fields
+  lateChargeRate?: number; // Per hour rate in rupees (e.g., 500 per hour)
+  lateGracePeriodMinutes?: number; // Grace period before late charges apply (e.g., 30 minutes)
+  lateCharges?: Array<{
+    lateMinutes: number; // How many minutes late
+    chargeApplied: number; // Rupees charged
+    calculatedAt: Date;
+    appliedBy: { userId: string; role: string };
+  }>;
+  totalLateCharge?: number; // Sum of all late charges
   // Third-party driver fields
   useThirdPartyDriver?: boolean;
   thirdPartyDriverName?: string;
@@ -947,6 +958,8 @@ const BookingSchema = new Schema<IBooking>({
   // What staff asked the customer for — a target/reminder number, not a
   // ledger entry. advanceReceived (above) is what was actually recorded.
   advanceRequested: { type: Number, default: 0 },
+  // Total amount received from customer (advance + final payment)
+  totalReceived: { type: Number, default: 0 },
   // Planned/expected amount for the driver (or vendor) to collect from
   // the customer directly — distinct from actual driver_collection
   // ledger transactions, which record what was ACTUALLY collected. This
@@ -1013,6 +1026,19 @@ const BookingSchema = new Schema<IBooking>({
     },
     createdAt: { type: Date, default: Date.now }
   }],
+  // Late charge fields
+  lateChargeRate: { type: Number }, // Per hour rate in rupees
+  lateGracePeriodMinutes: { type: Number }, // Grace period before charges apply
+  lateCharges: [{
+    lateMinutes: { type: Number },
+    chargeApplied: { type: Number },
+    calculatedAt: { type: Date, default: Date.now },
+    appliedBy: {
+      userId: { type: String },
+      role: { type: String }
+    }
+  }],
+  totalLateCharge: { type: Number, default: 0 },
   // Third-party driver fields
   useThirdPartyDriver: { type: Boolean, default: false },
   thirdPartyDriverName: { type: String },
@@ -5332,3 +5358,120 @@ SupportTicketSchema.index({ status: 1, priority: 1 });
 SupportTicketSchema.index({ ticketNumber: 1 });
 // NOTE: SupportTicket model moved to server/platform/models/SupportTicket.ts for Platform Control Plane
 export const SupportTicket = mongoose.models['SupportTicket'] || mongoose.model<ISupportTicket>('SupportTicket_Legacy', SupportTicketSchema);
+
+// ============================================================================
+// VENDOR MARGIN CREDIT — Track credits given to vendors from company margin
+// ============================================================================
+
+export interface IVendorMarginCredit extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  vendorId: mongoose.Types.ObjectId;
+  bookingId: mongoose.Types.ObjectId;
+  creditType: 'overpayment_absorption' | 'adjustment' | 'goodwill' | 'dispute_settlement';
+  amount: number;
+  reason: string;
+  bookingDetails: {
+    bookingId: string;
+    customerName: string;
+    customerPhone?: string;
+    pickupLocation?: string;
+    dropoffLocation?: string;
+    pickupDate?: Date;
+    totalAmount: number;
+    vendorAgreedRate: number;
+    advanceReceived: number;
+    overpaymentAmount?: number;
+  };
+  marginImpact: {
+    originalMargin: number;
+    usedFromMargin: number;
+    remainingMargin: number;
+  };
+  approvedBy?: {
+    userId: string;
+    role: string;
+    approvedAt: Date;
+  };
+  status: 'pending' | 'credited' | 'reversed';
+  notes?: string;
+  createdAt: Date;
+}
+
+const VendorMarginCreditSchema = new Schema<IVendorMarginCredit>({
+  tenantId: { type: Schema.Types.ObjectId, ref: 'Tenant', required: true },
+  vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  bookingId: { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
+  creditType: {
+    type: String,
+    enum: ['overpayment_absorption', 'adjustment', 'goodwill', 'dispute_settlement'],
+    required: true,
+  },
+  amount: { type: Number, required: true, min: 0 },
+  reason: { type: String, required: true },
+  bookingDetails: {
+    bookingId: { type: String, required: true },
+    customerName: { type: String, required: true },
+    customerPhone: { type: String },
+    pickupLocation: { type: String },
+    dropoffLocation: { type: String },
+    pickupDate: { type: Date },
+    totalAmount: { type: Number, required: true },
+    vendorAgreedRate: { type: Number, required: true },
+    advanceReceived: { type: Number, required: true },
+    overpaymentAmount: { type: Number },
+  },
+  marginImpact: {
+    originalMargin: { type: Number, required: true },
+    usedFromMargin: { type: Number, required: true },
+    remainingMargin: { type: Number, required: true },
+  },
+  approvedBy: {
+    userId: { type: String },
+    role: { type: String },
+    approvedAt: { type: Date },
+  },
+  status: { type: String, enum: ['pending', 'credited', 'reversed'], default: 'credited' },
+  notes: { type: String },
+  createdAt: { type: Date, default: Date.now },
+});
+
+VendorMarginCreditSchema.index({ tenantId: 1, vendorId: 1 });
+VendorMarginCreditSchema.index({ tenantId: 1, bookingId: 1 });
+VendorMarginCreditSchema.index({ createdAt: -1 });
+VendorMarginCreditSchema.index({ status: 1 });
+
+export const VendorMarginCredit = mongoose.models['VendorMarginCredit'] || mongoose.model<IVendorMarginCredit>('VendorMarginCredit', VendorMarginCreditSchema);
+
+// VendorAccount - Vendor's collected payments & balance tracking
+export interface IVendorAccount extends Document {
+  tenantId: mongoose.Types.ObjectId;
+  vendorId: mongoose.Types.ObjectId;
+  vendorName?: string;
+  currentBalance: number; // Amount vendor has collected but not yet settled
+  totalCollected: number; // Lifetime total collected
+  totalSettled: number; // Total settled/paid to company
+  lastSettlementDate?: Date;
+  lastCollectionDate?: Date;
+  collectionNotes?: string; // How vendor prefers to collect
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const VendorAccountSchema = new Schema<IVendorAccount>({
+  tenantId: { type: Schema.Types.ObjectId, required: true },
+  vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', required: true },
+  vendorName: { type: String },
+  currentBalance: { type: Number, default: 0 },
+  totalCollected: { type: Number, default: 0 },
+  totalSettled: { type: Number, default: 0 },
+  lastSettlementDate: { type: Date },
+  lastCollectionDate: { type: Date },
+  collectionNotes: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+VendorAccountSchema.index({ tenantId: 1, vendorId: 1 });
+VendorAccountSchema.index({ createdAt: -1 });
+VendorAccountSchema.pre('save', function (next) { (this as any).updatedAt = new Date(); next(); });
+export const VendorAccount = mongoose.models['VendorAccount'] || mongoose.model<IVendorAccount>('VendorAccount', VendorAccountSchema);

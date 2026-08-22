@@ -318,7 +318,7 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
                                 <a href={`https://wa.me/${b.customerPhone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="WhatsApp customer">
                                   <Button variant="ghost" size="icon" className="text-green-600 hover:bg-green-50"><MessageCircle className="w-4 h-4" /></Button>
                                 </a>
-                                {(b.totalReceived || 0) < (b.totalAmount || 0) && (b.status === "completed" || b.status === "return_pending" || b.status === "completionOverdue") ? (
+                                {((b.totalReceived || b.advanceReceived || 0) < (b.totalAmount || 0)) && (b.status === "completed" || b.status === "return_pending" || b.status === "completionOverdue") ? (
                                   <Button
                                     size="sm"
                                     className="h-8 bg-green-600 hover:bg-green-700 text-white"

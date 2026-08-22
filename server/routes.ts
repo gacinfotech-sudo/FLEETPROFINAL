@@ -15724,6 +15724,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Booking not found' });
       }
 
+      // Initialize totalReceived if not set (for old bookings)
+      if (!booking.totalReceived) {
+        booking.totalReceived = booking.advanceReceived || 0;
+        await booking.save();
+      }
+
       // Create payment transaction
       const paymentMode = paymentMethod === 'qr' ? 'upi' : 'cash';
       const transaction = await PaymentTransaction.create({
