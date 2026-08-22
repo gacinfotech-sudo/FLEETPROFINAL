@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,9 @@ function fmtMoney(n?: number) {
 
 export default function UpcomingBookings() {
   const { openBooking } = useBookingWorkspace();
-  const { data, isLoading, isError } = useQuery({
+  const queryClient = useQueryClient();
+
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["/api/operations/upcoming-bookings?days=180"],
     queryFn: async () => {
       const res = await fetch('/api/operations/upcoming-bookings?days=180', { credentials: "include" });
@@ -23,6 +26,17 @@ export default function UpcomingBookings() {
     },
     refetchInterval: 60000,
   });
+
+  // Refetch when tab becomes visible (tab focus recovery)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refetch();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [refetch]);
 
   const days: any[] = (data as any[]) || [];
 

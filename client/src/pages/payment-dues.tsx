@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -14,10 +15,21 @@ function fmtMoney(n?: number) {
 
 export default function PaymentDues() {
   const { openBooking } = useBookingWorkspace();
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["/api/operations/payment-dues"],
     refetchInterval: 60000,
   });
+
+  // Refetch when tab becomes visible (tab focus recovery)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refetch();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [refetch]);
 
   const rows: any[] = (data as any[]) || [];
   const totalDue = rows.reduce((sum, r) => sum + (r.remainingBalance || 0), 0);
