@@ -15688,6 +15688,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // AUTO PAYMENT FLOW - QR/Cash payment with expense tracking (fuel, toll, etc.)
+  app.post('/api/bookings/:id/record-payment', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
+    try {
+      const { paymentMethod, amount, fuelExpense = 0, otherExpense = 0, otherExpenseReason = '', idempotencyKey } = req.body;
+      const bookingId = req.params.id;
+
+      if (!paymentMethod || !['qr', 'cash'].includes(paymentMethod)) {
+        return res.status(400).json({ message: 'Invalid payment method' });
+      }
+
+      if (!amount || amount <= 0) {
+        return res.status(400).json({ message: 'Invalid payment amount' });
+      }
+
+      // Idempotency check
+      if (idempotencyKey) {
+        const existing = await PaymentTransaction.findOne({
+          bookingId: new mongoose.Types.ObjectId(bookingId),
+          idempotencyKey,
+          tenantId: req.tenantObjectId || req.tenantId,
+        });
+        if (existing) {
+          return res.json({ success: true, message: 'Payment already recorded', transaction: existing });
+        }
+      }
+
+      // Get booking
+      const booking = await Booking.findOne({
+        _id: bookingId,
+        tenantId: req.tenantObjectId || req.tenantId,
+      });
+
+      if (!booking) {
+        return res.status(404).json({ message: 'Booking not found' });
+      }
+
+      // Create payment transaction
+      const paymentMode = paymentMethod === 'qr' ? 'upi' : 'cash';
+      const transaction = await PaymentTransaction.create({
+        tenantId: req.tenantObjectId || req.tenantId,
+        bookingId: new mongoose.Types.ObjectId(bookingId),
+        amount,
+        paymentType: 'final_payment',
+        paymentMode,
+        receivedBy: req.user?.name || req.user?.id,
+        receivedAt: new Date(),
+        idempotencyKey,
+        notes: `Payment via ${paymentMethod}${fuelExpense > 0 ? ` | Fuel: ₹${fuelExpense}` : ''}${otherExpense > 0 ? ` | ${otherExpenseReason}: ₹${otherExpense}` : ''}`,
+      });
+
+      // Update booking - add fuel expense tracking
+      if (fuelExpense > 0 || otherExpense > 0) {
+        const expenses = [
+          ...(booking.expenses || []),
+          {
+            type: 'fuel',
+            amount: fuelExpense,
+            date: new Date(),
+            recordedBy: req.user?.id,
+          },
+        ];
+
+        if (otherExpense > 0) {
+          expenses.push({
+            type: otherExpenseReason || 'other',
+            amount: otherExpense,
+            date: new Date(),
+            recordedBy: req.user?.id,
+          });
+        }
+
+        await Booking.updateOne(
+          { _id: bookingId },
+          {
+            $push: { expenses: { $each: expenses } },
+            totalExpense: (booking.totalExpense || 0) + fuelExpense + otherExpense,
+          }
+        );
+      }
+
+      // Update total received
+      const totalReceived = (booking.totalReceived || 0) + amount;
+      await Booking.updateOne(
+        { _id: bookingId },
+        { totalReceived }
+      );
+
+      // Invalidate caches
+      queryClient?.invalidateQueries?.({ queryKey: ['/api/bookings'] });
+      queryClient?.invalidateQueries?.({ queryKey: [`/api/bookings/${bookingId}`] });
+      queryClient?.invalidateQueries?.({ queryKey: ['/api/operations/payment-dues'] });
+
+      res.json({
+        success: true,
+        message: 'Payment recorded',
+        transaction: transaction.toJSON(),
+        booking: {
+          totalReceived,
+          remainingBalance: booking.totalAmount - totalReceived,
+          fuelExpense,
+          otherExpense,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error recording payment:', error);
+      res.status(500).json({ message: error?.message || 'Failed to record payment' });
+    }
+  });
+
   // VENDOR ACCOUNT ROUTES - Vendor-collected payments & balance
   app.post('/api/vendors/:vendorId/collect-payment', authenticateUser, requireTenant, async (req: AuthRequest, res) => {
     try {

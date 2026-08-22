@@ -6,11 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Phone, MessageCircle, RefreshCw, AlertTriangle } from "lucide-react";
+import { Phone, MessageCircle, RefreshCw, AlertTriangle, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useBookingWorkspace } from "@/components/booking/booking-workspace-context";
 import { SkipToMainContent, LoadingAnnouncement, DynamicContentAnnouncement } from "@/components/accessibility-helpers";
+import LateChargeDialog from "@/components/booking/late-charge-dialog";
+import AutoPaymentFlow from "@/components/booking/auto-payment-flow";
 
 export type Bucket = "startDue" | "startDelayed" | "startingSoon" | "ongoing" | "endingSoon" | "completionOverdue" | "paymentPending" | "completedToday" | "delayed" | "unassigned" | "cancelled";
 
@@ -45,6 +47,8 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
   const [activeTab, setActiveTab] = useState<Bucket>(initialTab || "startDue");
   const [startingWindow, setStartingWindow] = useState("today");
   const [endingWindow, setEndingWindow] = useState("today");
+  const [lateChargeBooking, setLateChargeBooking] = useState<any>(null);
+  const [paymentFlowBooking, setPaymentFlowBooking] = useState<any>(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: [`/api/operations/live-bookings?startingWindow=${startingWindow}&endingWindow=${endingWindow}`],
@@ -314,6 +318,27 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
                                 <a href={`https://wa.me/${b.customerPhone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" title="WhatsApp customer">
                                   <Button variant="ghost" size="icon" className="text-green-600 hover:bg-green-50"><MessageCircle className="w-4 h-4" /></Button>
                                 </a>
+                                {(b.totalReceived || 0) < (b.totalAmount || 0) && (b.status === "completed" || b.status === "return_pending" || b.status === "completionOverdue") ? (
+                                  <Button
+                                    size="sm"
+                                    className="h-8 bg-green-600 hover:bg-green-700 text-white"
+                                    onClick={() => setPaymentFlowBooking(b)}
+                                    title="Collect remaining payment with fuel & expense tracking"
+                                  >
+                                    💰 Collect Payment
+                                  </Button>
+                                ) : null}
+                                {b.status === "return_pending" || b.status === "completed" || b.status === "completionOverdue" ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 text-orange-600 border-orange-300 hover:bg-orange-50"
+                                    onClick={() => setLateChargeBooking(b)}
+                                    title="Apply late charges if customer returned late"
+                                  >
+                                    <Clock className="w-3.5 h-3.5 mr-1" /> Late Charge
+                                  </Button>
+                                ) : null}
                                 {nextAction && (
                                   <Button
                                     size="sm"
@@ -338,6 +363,24 @@ export default function LiveBookings({ initialTab }: { initialTab?: Bucket } = {
         ))}
       </Tabs>
       </main>
+
+      {/* Payment Collection Dialog */}
+      <AutoPaymentFlow
+        isOpen={!!paymentFlowBooking}
+        onOpenChange={(open) => !open && setPaymentFlowBooking(null)}
+        bookingId={paymentFlowBooking?.id}
+        bookingTotal={paymentFlowBooking?.totalAmount}
+        advanceReceived={paymentFlowBooking?.advanceReceived || 0}
+      />
+
+      {/* Late Charge Dialog */}
+      <LateChargeDialog
+        isOpen={!!lateChargeBooking}
+        onOpenChange={(open) => !open && setLateChargeBooking(null)}
+        bookingId={lateChargeBooking?.id}
+        scheduledReturnTime={lateChargeBooking?.scheduledEndDateTime}
+        currentTotal={lateChargeBooking?.totalAmount}
+      />
     </div>
   );
 }
