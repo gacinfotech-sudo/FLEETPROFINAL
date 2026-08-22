@@ -80,6 +80,30 @@ export default function UpcomingBookings() {
       {isLoading && <p className="text-sm text-gray-500">Loading...</p>}
       {isError && <p className="text-sm text-red-600">Failed to load upcoming bookings.</p>}
 
+      {/* Period Summary */}
+      {!isLoading && !isError && (
+        <Card className="bg-gradient-to-r from-indigo-50 to-blue-50 border-indigo-200">
+          <CardHeader>
+            <CardTitle className="text-lg">📊 Bookings by Period</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {[
+                { label: "Today", count: days[0]?.bookings?.length || 0 },
+                { label: "Tomorrow", count: days[1]?.bookings?.length || 0 },
+                { label: "This Week", count: days.slice(0, 7).reduce((sum, d) => sum + (d.bookings?.length || 0), 0) },
+                { label: "This Month", count: days.slice(0, 30).reduce((sum, d) => sum + (d.bookings?.length || 0), 0) }
+              ].map((period) => (
+                <div key={period.label} className="bg-white p-3 rounded border-l-4 border-indigo-500">
+                  <p className="text-xs text-gray-600 font-medium">{period.label}</p>
+                  <p className="text-2xl font-bold text-indigo-700">{period.count}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {days.map((day, idx) => {
         const colors = ["from-green-50 to-emerald-50 border-green-200", "from-blue-50 to-cyan-50 border-blue-200", "from-purple-50 to-pink-50 border-purple-200"];
         const colorClass = colors[idx % colors.length];
@@ -89,12 +113,12 @@ export default function UpcomingBookings() {
             <CardTitle className="text-base flex items-center gap-3">
               <span className="text-2xl">{idx === 0 ? "📍" : idx === 1 ? "🔜" : "📌"}</span>
               <span className="font-bold text-gray-900">{day.label}</span>
-              <Badge className="bg-blue-100 text-blue-700 font-bold">{day.bookings.length} bookings</Badge>
+              <Badge className="bg-blue-100 text-blue-700 font-bold">{day.bookings?.length || 0} bookings</Badge>
               <span className="text-xs font-normal text-gray-500 ml-auto">{day.date}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {day.bookings.length === 0 ? (
+            {!day.bookings || day.bookings.length === 0 ? (
               <p className="text-sm text-gray-500 py-4 text-center">No bookings.</p>
             ) : (
               <Table>
@@ -111,7 +135,7 @@ export default function UpcomingBookings() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {day.bookings.map((b: any) => (
+                  {(day.bookings || []).map((b: any) => (
                     <TableRow
                       key={b.id}
                       className="cursor-pointer hover:bg-white/60 transition-all"
